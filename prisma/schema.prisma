@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum StudyDayStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum FlashcardType {
+  QA
+  CONCEPT
+  CLOZE
+  TRUE_FALSE
+  ASSOCIATION
+  DEFINITION
+  PRACTICAL_EXAMPLE
+}
+
+enum FlashcardStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  ARCHIVED
+}
+
+enum ReviewRating {
+  AGAIN
+  HARD
+  GOOD
+  EASY
+}
+
+model User {
+  id                     String         @id @default(cuid())
+  name                   String?
+  email                  String         @unique
+  passwordHash           String?
+  googleAccountConnected Boolean        @default(false)
+  googleAccessToken      String?
+  googleRefreshToken     String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  subjects               StudySubject[]
+  materials              StudyMaterial[]
+  plans                  StudyPlan[]
+  flashcards             Flashcard[]
+  notes                  StudyNote[]
+}
+
+model StudySubject { id String @id @default(cuid()) userId String name String description String? priority Int @default(3) examWeight Float @default(1) progress Float @default(0) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt user User @relation(fields:[userId], references:[id], onDelete: Cascade) materials StudyMaterial[] contents ExtractedContent[] flashcards Flashcard[] planDays StudyPlanDay[] @@unique([userId,name]) }
+
+model StudyMaterial { id String @id @default(cuid()) userId String subjectId String? googleDriveFileId String? fileName String filePath String mimeType String totalPages Int? processingStatus ProcessingStatus @default(PENDING) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt user User @relation(fields:[userId], references:[id], onDelete: Cascade) subject StudySubject? @relation(fields:[subjectId], references:[id], onDelete: SetNull) contents ExtractedContent[] }
+
+model ExtractedContent { id String @id @default(cuid()) materialId String subjectId String? title String pageStart Int pageEnd Int text String orderIndex Int estimatedStudyMinutes Int @default(25) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt material StudyMaterial @relation(fields:[materialId], references:[id], onDelete: Cascade) subject StudySubject? @relation(fields:[subjectId], references:[id], onDelete: SetNull) planDays StudyPlanDay[] flashcards Flashcard[] notes StudyNote[] @@index([materialId, orderIndex]) }
+
+model StudyPlan { id String @id @default(cuid()) userId String estimatedExamDate DateTime dailyStudyMinutes Int availableWeekDays Int[] status String @default("ACTIVE") createdAt DateTime @default(now()) updatedAt DateTime @updatedAt user User @relation(fields:[userId], references:[id], onDelete: Cascade) days StudyPlanDay[] }
+
+model StudyPlanDay { id String @id @default(cuid()) studyPlanId String dayNumber Int scheduledDate DateTime subjectId String contentId String status StudyDayStatus @default(PENDING) completedAt DateTime? studyPlan StudyPlan @relation(fields:[studyPlanId], references:[id], onDelete: Cascade) subject StudySubject @relation(fields:[subjectId], references:[id], onDelete: Cascade) content ExtractedContent @relation(fields:[contentId], references:[id], onDelete: Cascade) @@unique([studyPlanId, dayNumber]) }
+
+model Flashcard { id String @id @default(cuid()) userId String subjectId String? contentId String? question String answer String type FlashcardType @default(QA) difficulty Int @default(3) status FlashcardStatus @default(PENDING_APPROVAL) easeFactor Float @default(2.5) intervalDays Int @default(0) repetitionCount Int @default(0) lastReviewedAt DateTime? nextReviewAt DateTime? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt user User @relation(fields:[userId], references:[id], onDelete: Cascade) subject StudySubject? @relation(fields:[subjectId], references:[id], onDelete: SetNull) content ExtractedContent? @relation(fields:[contentId], references:[id], onDelete: SetNull) reviews FlashcardReview[] }
+
+model FlashcardReview { id String @id @default(cuid()) flashcardId String userId String rating ReviewRating reviewedAt DateTime @default(now()) previousInterval Int newInterval Int previousEaseFactor Float newEaseFactor Float flashcard Flashcard @relation(fields:[flashcardId], references:[id], onDelete: Cascade) @@index([flashcardId, reviewedAt]) }
+
+model StudyNote { id String @id @default(cuid()) userId String contentId String note String createdAt DateTime @default(now()) updatedAt DateTime @updatedAt user User @relation(fields:[userId], references:[id], onDelete: Cascade) content ExtractedContent @relation(fields:[contentId], references:[id], onDelete: Cascade) }
