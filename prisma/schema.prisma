@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String              @id @default(cuid())
+  name                   String?
+  email                  String?             @unique
+  passwordHash           String?
+  googleAccountConnected Boolean             @default(false)
+  googleAccessToken      String?
+  googleRefreshToken     String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  subjects               StudySubject[]
+  studyPlans             StudyPlan[]
+  flashcards             Flashcard[]
+  materials              StudyMaterial[]
+  extractedContent       ExtractedContent[]
+  studyBlocks            StudyBlock[]
+  studySchedules         StudySchedule[]
+  studyScheduleItems     StudyScheduleItem[]
+}
+
+model StudySubject {
+  id               String              @id @default(cuid())
+  name             String
+  description      String?
+  priority         Int                 @default(1)
+  examWeight       Float               @default(1.0)
+  progress         Float               @default(0)
+  userId           String
+  user             User                @relation(fields: [userId], references: [id])
+  materials        StudyMaterial[]
+  flashcards       Flashcard[]
+  studyPlanDays    StudyPlanDay[]
+  extractedContent ExtractedContent[]
+  studyBlocks      StudyBlock[]
+  schedules        StudySchedule[]
+  scheduleItems    StudyScheduleItem[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model StudyMaterial {
+  id                 String              @id @default(cuid())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id])
+  fileName           String
+  originalFileName   String?
+  filePath           String?
+  googleDriveFileId  String?
+  mimeType           String              @default("application/pdf")
+  fileSize           Int?
+  totalPages         Int?
+  
+  // New fields for the intelligent organizer
+  sourceType         String              @default("LOCAL_UPLOAD") // LOCAL_UPLOAD, LOCAL_INBOX
+  sourcePath         String?
+  fileHash           String?
+  organizationStatus String              @default("UPLOADED") // UPLOADED, IMPORTED, EXTRACTING, ANALYZING, ORGANIZED, NEEDS_REVIEW, ERROR
+  detectedSubjectName String?
+  detectedStructure  String?             // JSON string for structure
+  
+  processingStatus   String              @default("PENDING") // PENDING, PROCESSING, PROCESSED, ERROR
+  processingError    String?
+  subjectId          String
+  subject            StudySubject        @relation(fields: [subjectId], references: [id])
+  extractedContent   ExtractedContent[]
+  studyBlocks        StudyBlock[]
+  flashcards         Flashcard[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  studyScheduleItems StudyScheduleItem[]
+}
+
+model ExtractedContent {
+  id                    String         @id @default(cuid())
+  userId                String
+  user                  User           @relation(fields: [userId], references: [id])
+  subjectId             String
+  subject               StudySubject   @relation(fields: [subjectId], references: [id])
+  title                 String?
+  pageNumber            Int
+  text                  String
+  orderIndex            Int
+  estimatedStudyMinutes Int?
+  materialId            String
+  material              StudyMaterial  @relation(fields: [materialId], references: [id])
+  studyPlanDays         StudyPlanDay[]
+  flashcards            Flashcard[]
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+}
+
+model StudyPlan {
+  id                String         @id @default(cuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id])
+  estimatedExamDate DateTime?
+  dailyStudyMinutes Int            @default(120)
+  availableWeekDays String         @default("1,2,3,4,5") // 0=Sun, 1=Mon, etc.
+  status            String         @default("ACTIVE")
+  days              StudyPlanDay[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model StudyPlanDay {
+  id            String           @id @default(cuid())
+  studyPlanId   String
+  studyPlan     StudyPlan        @relation(fields: [studyPlanId], references: [id])
+  dayNumber     Int
+  scheduledDate DateTime
+  subjectId     String
+  subject       StudySubject     @relation(fields: [subjectId], references: [id])
+  contentId     String
+  content       ExtractedContent @relation(fields: [contentId], references: [id])
+  status        String           @default("PENDING") // PENDING, COMPLETED, SKIPPED
+  completedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model Flashcard {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id])
+  subjectId    String
+  subject      StudySubject      @relation(fields: [subjectId], references: [id])
+  contentId    String?
+  content      ExtractedContent? @relation(fields: [contentId], references: [id])
+  materialId   String?
+  material     StudyMaterial?    @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  studyBlockId String?
+  studyBlock   StudyBlock?       @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+
+  question     String
+  answer       String
+  type         String @default("QUESTION_ANSWER") // QUESTION_ANSWER, CLOZE, etc.
+  difficulty   String @default("MEDIUM") // EASY, MEDIUM, HARD
+  status       String @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, ARCHIVED
+  reviewStatus String @default("NEW") // NEW, LEARNING, REVIEW, GRADUATED
+
+  sourcePageStart Int?
+  sourcePageEnd   Int?
+
+  easeFactor      Float             @default(2.5)
+  intervalDays    Int               @default(0)
+  repetitionCount Int               @default(0)
+  lastReviewedAt  DateTime?
+  nextReviewAt    DateTime          @default(now())
+  reviews         FlashcardReview[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model FlashcardReview {
+  id                 String    @id @default(cuid())
+  flashcardId        String
+  flashcard          Flashcard @relation(fields: [flashcardId], references: [id])
+  userId             String
+  rating             Int // 1=Again, 2=Hard, 3=Good, 4=Easy
+  reviewedAt         DateTime  @default(now())
+  previousInterval   Int
+  newInterval        Int
+  previousEaseFactor Float
+  newEaseFactor      Float
+}
+
+model StudyNote {
+  id        String   @id @default(cuid())
+  userId    String
+  contentId String
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudyBlock {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id])
+  subjectId  String
+  subject    StudySubject  @relation(fields: [subjectId], references: [id])
+  materialId String
+  material   StudyMaterial @relation(fields: [materialId], references: [id])
+
+  title                 String
+  description           String?
+  pageStart             Int
+  pageEnd               Int
+  orderIndex            Int     @default(0)
+  estimatedStudyMinutes Int?
+  status                String  @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, SKIPPED
+
+  // New fields for AI organization
+  createdBy             String  @default("MANUAL") // MANUAL, AI
+  sourceHeading         String?
+  sourceSection         String?
+  confidence            Float?
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  flashcards    Flashcard[]
+  scheduleItems StudyScheduleItem[]
+}
+
+model StudySchedule {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id])
+  title             String
+  startDate         DateTime            @default(now())
+  estimatedExamDate DateTime?
+  dailyStudyMinutes Int                 @default(60)
+  status            String              @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
+  items             StudyScheduleItem[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  studySubject      StudySubject?       @relation(fields: [studySubjectId], references: [id])
+  studySubjectId    String?
+}
+
+model StudyScheduleItem {
+  id               String        @id @default(cuid())
+  userId           String
+  user             User          @relation(fields: [userId], references: [id])
+  scheduleId       String
+  schedule         StudySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  subjectId        String
+  subject          StudySubject  @relation(fields: [subjectId], references: [id])
+  materialId       String
+  material         StudyMaterial @relation(fields: [materialId], references: [id])
+  studyBlockId     String
+  studyBlock       StudyBlock    @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  dayNumber        Int
+  scheduledDate    DateTime?
+  estimatedMinutes Int?
+  status           String        @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SKIPPED
+  completedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}

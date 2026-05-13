@@ -9,18 +9,46 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/client": "^6.19.3",
+    "@types/jsdom": "^28.0.2",
+    "@types/tesseract.js": "^0.0.2",
+    "better-sqlite3": "^12.10.0",
+    "canvas": "^3.2.3",
+    "clsx": "^2.1.1",
+    "jsdom": "^29.1.1",
+    "lucide-react": "^1.14.0",
     "next": "16.2.6",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
+    "pdf2json": "^4.0.3",
+    "pdf2pic": "^3.2.0",
+    "pdfjs-dist": "^4.10.38",
+    "pdfreader": "^3.0.8",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tesseract.js": "^5.1.1",
+    "tesseract.js-node": "^0.1.0",
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }
