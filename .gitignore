@@ -1,56 +1,11 @@
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# AG-Kit
-.agent/
-task.md
-implementation_plan.md
-walkthrough.md
-brain/
-knowledge/
-lint_output.txt
-node.zip
-node_new.zip
+# Dependências e Cache (Arquivos muito grandes para o GitHub)
+node_modules/
+.next/
+out/
+build/
 node/
-uploads/
-study-inbox/
-prisma/dev.db
-prisma/dev.db-journal
-find_material.js
-list_flash.js
-list_materials.js
-list_models.js
-reset_status.js
-add_ivana_roteiro.js
-scratch/
+*.zip
+
+# Outros arquivos temporários
+.vercel
+*.tsbuildinfo
