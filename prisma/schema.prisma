@@ -202,11 +202,35 @@ model StudyBlock {
   estimatedStudyMinutes Int?
   status                String  @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, SKIPPED
 
-  // New fields for AI organization
+  // AI organization metadata
   createdBy             String  @default("MANUAL") // MANUAL, AI
   sourceHeading         String?
   sourceSection         String?
   confidence            Float?
+
+  // Study cycle lifecycle
+  theoryStatus          String    @default("NOT_STARTED") // NOT_STARTED | COMPLETED
+  questionsStatus       String    @default("NOT_STARTED") // NOT_STARTED | COMPLETED
+  flashcardsStatus      String    @default("NOT_STARTED") // NOT_STARTED | GENERATED
+
+  theoryCompletedAt     DateTime?
+  questionsCompletedAt  DateTime?
+  flashcardsGeneratedAt DateTime?
+
+  // Spaced repetition block reviews
+  review1dScheduledAt   DateTime?
+  review7dScheduledAt   DateTime?
+  review15dScheduledAt  DateTime?
+  review30dScheduledAt  DateTime?
+
+  review1dCompletedAt   DateTime?
+  review7dCompletedAt   DateTime?
+  review15dCompletedAt  DateTime?
+  review30dCompletedAt  DateTime?
+
+  lastStudiedAt         DateTime?
+  nextActionType        String?   // THEORY | QUESTIONS | GENERATE_FLASHCARDS | REVIEW_BLOCK | REINFORCEMENT
+  nextActionAt          DateTime?
 
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
@@ -231,22 +255,28 @@ model StudySchedule {
 }
 
 model StudyScheduleItem {
-  id               String        @id @default(cuid())
+  id               String         @id @default(cuid())
   userId           String
-  user             User          @relation(fields: [userId], references: [id])
+  user             User           @relation(fields: [userId], references: [id])
   scheduleId       String
-  schedule         StudySchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schedule         StudySchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   subjectId        String
-  subject          StudySubject  @relation(fields: [subjectId], references: [id])
-  materialId       String
-  material         StudyMaterial @relation(fields: [materialId], references: [id])
-  studyBlockId     String
-  studyBlock       StudyBlock    @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  subject          StudySubject   @relation(fields: [subjectId], references: [id])
+  materialId       String?
+  material         StudyMaterial? @relation(fields: [materialId], references: [id])
+  studyBlockId     String?
+  studyBlock       StudyBlock?    @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+
+  // Action metadata (new)
+  actionType       String?        // THEORY | QUESTIONS | GENERATE_FLASHCARDS | REVIEW_BLOCK | REVIEW_FLASHCARDS | REINFORCEMENT
+  priorityScore    Float?
+  reason           String?
+
   dayNumber        Int
   scheduledDate    DateTime?
   estimatedMinutes Int?
-  status           String        @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SKIPPED
+  status           String         @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SKIPPED
   completedAt      DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }

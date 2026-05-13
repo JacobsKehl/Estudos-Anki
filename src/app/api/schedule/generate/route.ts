@@ -1,31 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSimpleSchedule } from "@/lib/scheduler";
+import { prisma } from "@/lib/prisma";
+import { generateSmartSchedule } from "@/lib/scheduler";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const mockUserId = "cm39k012x0001k93jqwerty12";
-
   try {
-    const body = await req.json();
-    const { title, dailyMinutes } = body;
+    const user = await prisma.user.findFirst();
+    if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
-    const schedule = await generateSimpleSchedule(mockUserId, {
-      title: title || "Meu Plano de Estudos",
-      dailyMinutes: dailyMinutes || 60,
-      startDate: new Date()
+    const body = await req.json().catch(() => ({}));
+    const { title, dailyMinutes, daysAhead } = body;
+
+    const result = await generateSmartSchedule(user.id, {
+      title: title || "Meu Cronograma de Estudos",
+      dailyMinutes: dailyMinutes || 120,
+      daysAhead: daysAhead || 30,
     });
 
-    if (!schedule) {
-      return NextResponse.json({ 
-        error: "Ainda não há blocos de estudo suficientes para criar um cronograma. Que tal fatiar algum material primeiro?" 
+    if (!result) {
+      return NextResponse.json({
+        message: "Nenhuma tarefa de estudo encontrada para gerar cronograma. Organize seus PDFs primeiro.",
       }, { status: 400 });
     }
 
-    return NextResponse.json(schedule);
-  } catch (error: unknown) {
-    console.error("Schedule generation error:", error);
-    const err = error as Error;
+    return NextResponse.json({
+      message: `Cronograma criado com ${result.itemsCount} tarefa(s) nos próximos ${daysAhead ?? 30} dias.`,
+      scheduleId: result.schedule.id,
+      itemsCount: result.itemsCount,
+    });
+  } catch (error: any) {
+    console.error("[SCHEDULE GENERATE]", error);
     return NextResponse.json(
-      { error: "Tivemos uma falha ao organizar seu cronograma. Por favor, tente novamente.", details: err.message },
+      { error: "Falha ao gerar cronograma.", details: error.message },
       { status: 500 }
     );
   }
