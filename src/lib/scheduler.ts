@@ -8,7 +8,7 @@ interface ScheduleOptions {
 }
 
 export async function generateSimpleSchedule(userId: string, options: ScheduleOptions) {
-  // 1. Fetch all NOT_STARTED study blocks
+  // 1. Buscar todos os blocos ainda não iniciados
   const blocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
@@ -26,7 +26,13 @@ export async function generateSimpleSchedule(userId: string, options: ScheduleOp
 
   if (blocks.length === 0) return null;
 
-  // 2. Create the main schedule record
+  // 2. Desativar cronogramas ativos anteriores (evitar duplicatas)
+  await (prisma as any).studySchedule.updateMany({
+    where: { userId, status: "ACTIVE" },
+    data: { status: "ARCHIVED" }
+  });
+
+  // 3. Criar o novo cronograma principal
   const schedule = await (prisma as any).studySchedule.create({
     data: {
       userId,
@@ -37,16 +43,16 @@ export async function generateSimpleSchedule(userId: string, options: ScheduleOp
     }
   });
 
-  // 3. Distribute blocks into days
+  // 4. Distribuir blocos nos dias
   let currentDay = 1;
   let currentDayMinutes = 0;
   const scheduleItemsData = [];
 
   for (const block of blocks) {
-    const blockMinutes = block.estimatedStudyMinutes || 30; // Default to 30 if missing
+    const blockMinutes = block.estimatedStudyMinutes || 30;
 
-    // If adding this block exceeds daily limit, move to next day
-    // (But always put at least one block per day if day is empty)
+    // Se adicionar esse bloco excede o limite diário, avança para o próximo dia
+    // (garante pelo menos um bloco por dia se o dia estiver vazio)
     if (currentDayMinutes > 0 && currentDayMinutes + blockMinutes > options.dailyMinutes) {
       currentDay++;
       currentDayMinutes = 0;
@@ -70,7 +76,7 @@ export async function generateSimpleSchedule(userId: string, options: ScheduleOp
     currentDayMinutes += blockMinutes;
   }
 
-  // 4. Batch create items
+  // 5. Criar os itens em lote
   await (prisma as any).studyScheduleItem.createMany({
     data: scheduleItemsData
   });
