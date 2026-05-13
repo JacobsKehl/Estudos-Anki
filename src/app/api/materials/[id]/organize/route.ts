@@ -2,22 +2,65 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import fs from "fs";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-import { detectStructure } from "@/lib/ai/organizer";
+import { identifySubject, detectStructure } from "@/lib/ai/organizer";
 
 export const dynamic = "force-dynamic";
+
+// Cache do pdfjs para não reconfigurar o worker a cada chamada
+let pdfjsCache: typeof import("pdfjs-dist/legacy/build/pdf.mjs") | null = null;
+
+async function getPdfjsLib() {
+  if (pdfjsCache) return pdfjsCache;
+  const lib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  lib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/legacy/build/pdf.worker.mjs",
+    import.meta.url
+  ).href;
+  pdfjsCache = lib;
+  return lib;
+}
+
+async function extractText(filePath: string, maxPages = 15): Promise<{ text: string; numPages: number }> {
+  const pdfjsLib = await getPdfjsLib();
+  const fileBuffer = fs.readFileSync(filePath);
+  const uint8Array = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength);
+
+  const loadingTask = pdfjsLib.getDocument({
+    data: uint8Array,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+    disableFontFace: true,
+  });
+
+  const doc = await loadingTask.promise;
+  const numPages = doc.numPages;
+  const pagesToRead = Math.min(maxPages, numPages);
+  let text = "";
+
+  for (let i = 1; i <= pagesToRead; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((item: any) => ("str" in item ? item.str : "")).join(" ") + "\n";
+  }
+
+  return { text, numPages };
+}
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const pdf = require("pdf-parse");
   const { id } = await params;
-  const userId = "cm39k012x0001k93jqwerty12";
 
   try {
-    const material = await (prisma as any).studyMaterial.findUnique({
+    // 1. Buscar o material e o usuário real
+    const user = await prisma.user.findFirst();
+    if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+
+    const userId = user.id;
+
+    const material = await prisma.studyMaterial.findFirst({
       where: { id, userId },
       include: { _count: { select: { studyBlocks: true } } }
     });
@@ -27,64 +70,109 @@ export async function POST(
     }
 
     if (!material.sourcePath || !fs.existsSync(material.sourcePath)) {
-      return NextResponse.json({ error: "Arquivo original não encontrado para análise" }, { status: 400 });
+      return NextResponse.json({ error: "Arquivo original não encontrado em disco" }, { status: 400 });
     }
 
-    // 1. Extrair texto para detecção de estrutura (primeiras 15 páginas para pegar sumário)
-    const dataBuffer = fs.readFileSync(material.sourcePath);
-    const pdfData = await pdf(dataBuffer, { max: 15 });
-    
-    if (!pdfData.text || pdfData.text.trim().length < 100) {
-      return NextResponse.json({ 
-        error: "Não foi possível extrair texto suficiente do PDF para detectar a estrutura automática." 
+    const stats = fs.statSync(material.sourcePath);
+    if (stats.size === 0) {
+      return NextResponse.json({ error: "O arquivo PDF está vazio (0 bytes)" }, { status: 400 });
+    }
+
+    // 2. Marcar como analisando
+    await prisma.studyMaterial.update({
+      where: { id },
+      data: { organizationStatus: "ANALYZING" }
+    });
+
+    // 3. Extrair texto com pdfjs-dist
+    const { text: extractedText, numPages } = await extractText(material.sourcePath, 15);
+
+    if (!extractedText || extractedText.trim().length < 50) {
+      await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "Texto insuficiente" } });
+      return NextResponse.json({
+        error: "Não foi possível extrair texto deste PDF. Ele pode ser uma imagem escaneada ou estar protegido."
       }, { status: 400 });
     }
 
-    // 2. Detectar blocos com IA
-    const detectedBlocks = await detectStructure(pdfData.text);
+    // 4. Identificar matéria se não tiver
+    let subjectId = material.subjectId;
+    if (!subjectId) {
+      const detectedSubject = await identifySubject(extractedText.substring(0, 3000), material.fileName);
 
-    if (detectedBlocks.length === 0) {
-      return NextResponse.json({ error: "A IA não conseguiu identificar uma estrutura clara neste material." }, { status: 400 });
+      let subject = await prisma.studySubject.findFirst({
+        where: { userId, name: { contains: detectedSubject } }
+      });
+
+      if (!subject) {
+        const allSubjects = await prisma.studySubject.findMany({ where: { userId }, select: { id: true, name: true } });
+        subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;
+      }
+
+      if (!subject) {
+        subject = await prisma.studySubject.create({
+          data: { name: detectedSubject, userId, priority: 1 }
+        });
+      }
+
+      subjectId = subject.id;
+      await prisma.studyMaterial.update({
+        where: { id },
+        data: { subjectId, detectedSubjectName: detectedSubject }
+      });
     }
 
-    // 3. Criar os blocos de estudo
-    const createdBlocks = await prisma.$transaction(
-      detectedBlocks.map((block, index) => 
-        prisma.studyBlock.create({
-          data: {
-            userId,
-            subjectId: material.subjectId,
-            materialId: material.id,
-            title: block.title,
-            description: block.description,
-            pageStart: block.pageStart,
-            pageEnd: block.pageEnd,
-            orderIndex: index,
-            estimatedStudyMinutes: block.estimatedStudyMinutes || 60,
-            createdBy: "AI",
-            sourceHeading: block.sourceHeading,
-            status: "NOT_STARTED"
-          }
-        })
-      )
-    );
+    // 5. Detectar estrutura com IA
+    const detectedBlocks = await detectStructure(extractedText);
 
-    // 4. Atualizar o status do material
-    await (prisma as any).studyMaterial.update({
+    if (!detectedBlocks || detectedBlocks.length === 0) {
+      await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "IA não detectou estrutura" } });
+      return NextResponse.json({
+        error: "Não conseguimos organizar este PDF. Nenhum bloco foi criado."
+      }, { status: 400 });
+    }
+
+    // 6. Criar blocos
+    for (let i = 0; i < detectedBlocks.length; i++) {
+      const block = detectedBlocks[i];
+      await prisma.studyBlock.create({
+        data: {
+          userId,
+          subjectId: subjectId as string,
+          materialId: material.id,
+          title: block.title || `Parte ${i + 1}`,
+          description: block.description || "",
+          pageStart: block.pageStart || 1,
+          pageEnd: block.pageEnd || block.pageStart || 1,
+          orderIndex: i,
+          estimatedStudyMinutes: block.estimatedStudyMinutes || 60,
+          createdBy: "AI",
+          sourceHeading: block.sourceHeading,
+          status: "NOT_STARTED"
+        }
+      });
+    }
+
+    // 7. Atualizar status do material
+    await prisma.studyMaterial.update({
       where: { id },
       data: {
         organizationStatus: "ORGANIZED",
-        detectedStructure: JSON.stringify(detectedBlocks)
+        detectedStructure: JSON.stringify(detectedBlocks),
+        totalPages: numPages
       }
     });
 
     return NextResponse.json({
-      message: `${createdBlocks.length} blocos de estudo criados automaticamente.`,
-      blocks: createdBlocks
+      message: `${detectedBlocks.length} blocos de estudo criados com sucesso.`,
+      blocksCount: detectedBlocks.length
     });
 
   } catch (error: any) {
-    console.error("Erro na organização automática:", error);
+    console.error("[ORGANIZE SINGLE] Erro:", error);
+    await prisma.studyMaterial.update({
+      where: { id },
+      data: { organizationStatus: "ERROR", processingError: error.message }
+    }).catch(() => {});
     return NextResponse.json({ error: "Falha ao organizar material", details: error.message }, { status: 500 });
   }
 }

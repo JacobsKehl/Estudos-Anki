@@ -93,11 +93,16 @@ export function MaterialCard({ material }: MaterialCardProps) {
           subLabel: `${material.blocksCount || 0} blocos criados`
         };
       case "ANALYZING":
-      case "EXTRACTING":
         return { 
           label: "Organizando...", 
           variant: "default" as const,
-          subLabel: "IA em ação"
+          subLabel: "IA analisando estrutura"
+        };
+      case "IMPORTED":
+        return { 
+          label: "Aguardando IA", 
+          variant: "secondary" as const,
+          subLabel: "Pronto para organizar"
         };
       case "ERROR":
         return { 
@@ -168,7 +173,7 @@ export function MaterialCard({ material }: MaterialCardProps) {
         </div>
 
         <div className="bg-muted/30 px-5 py-3 border-t border-border/50 flex gap-2">
-          {material.organizationStatus !== "ORGANIZED" && (
+          {material.organizationStatus !== "ORGANIZED" ? (
             <Button 
               size="sm" 
               className="flex-1 rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm"
@@ -181,19 +186,29 @@ export function MaterialCard({ material }: MaterialCardProps) {
                 <><Sparkles className="w-3.5 h-3.5" /> Organizar</>
               )}
             </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" className="flex-1 rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5" asChild>
+                <Link href="/subjects">Ver Matéria</Link>
+              </Button>
+              <Button size="sm" className="flex-1 rounded-xl h-9 bg-accent text-white hover:bg-accent/90" asChild>
+                <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
+              </Button>
+            </>
           )}
           
-          <Button 
-            size="sm" 
-            variant="secondary" 
-            className={`rounded-xl h-9 gap-2 ${material.organizationStatus === "ORGANIZED" ? "flex-1" : "px-3"}`}
-            asChild
-          >
-            <Link href={`/materials/${material.id}`}>
-              <Eye className="w-3.5 h-3.5" />
-              {material.organizationStatus === "ORGANIZED" ? "Abrir Material" : ""}
-            </Link>
-          </Button>
+          {material.organizationStatus !== "ORGANIZED" && (
+            <Button 
+              size="sm" 
+              variant="secondary" 
+              className="rounded-xl h-9 px-3 gap-2"
+              asChild
+            >
+              <Link href={`/materials/${material.id}`}>
+                <Eye className="w-3.5 h-3.5" />
+              </Link>
+            </Button>
+          )}
         </div>
 
         <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

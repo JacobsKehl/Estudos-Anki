@@ -45,8 +45,9 @@ Formato esperado (JSON):
 
 Importante: Se o PDF for muito curto, crie apenas um bloco. Se for longo, divida-o de forma equilibrada.`;
 
-export function buildSubjectPrompt(content: string): string {
-  return `${SUBJECT_IDENTIFICATION_PROMPT}\n\nTexto extraído das primeiras páginas:\n${content}`;
+export function buildSubjectPrompt(content: string, fileName?: string): string {
+  const fileNameContext = fileName ? `Nome do arquivo: ${fileName}\n` : "";
+  return `${SUBJECT_IDENTIFICATION_PROMPT}\n\n${fileNameContext}Texto extraído das primeiras páginas:\n${content}`;
 }
 
 export function buildStructurePrompt(content: string): string {

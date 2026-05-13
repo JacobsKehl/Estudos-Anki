@@ -65,7 +65,10 @@ export default function InboxPage() {
   };
 
   const handleImportSelected = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0) {
+      toast.error("Selecione pelo menos um PDF para importar.");
+      return;
+    }
     
     setIsImporting(true);
     const toastId = toast.loading(`Importando ${selectedFiles.length} arquivos...`);
@@ -80,13 +83,25 @@ export default function InboxPage() {
       
       const data = await res.json();
       
-      const successCount = data.results.filter((r: any) => r.status === "SUCCESS" || r.status === "ALREADY_IMPORTED").length;
-      toast.success(`${successCount} arquivos processados com sucesso!`, { id: toastId });
+      if (!res.ok) throw new Error(data.error || "Erro na importação");
+
+      const results = data.results || [];
+      const success = results.filter((r: any) => r.status === "SUCCESS");
+      const already = results.filter((r: any) => r.status === "ALREADY_IMPORTED");
+      const errors = results.filter((r: any) => r.status === "ERROR");
+
+      if (success.length > 0) {
+        toast.success(`${success.length} PDF(s) importado(s) para a Biblioteca.`, { id: toastId });
+      } else if (already.length > 0) {
+        toast.info(`${already.length} PDF(s) já estavam na Biblioteca e foram ignorados.`, { id: toastId });
+      } else if (errors.length > 0) {
+        toast.error(`Falha ao importar os arquivos selecionados.`, { id: toastId });
+      }
       
       fetchInbox();
       setSelectedFiles([]);
     } catch (error: any) {
-      toast.error("Erro ao importar arquivos", { id: toastId });
+      toast.error(error.message || "Não conseguimos importar os PDFs selecionados.", { id: toastId });
     } finally {
       setIsImporting(false);
     }
@@ -121,6 +136,8 @@ export default function InboxPage() {
         return <Badge className="rounded-full bg-green-500 text-white border-none">Organizado</Badge>;
       case "ANALYZING":
         return <Badge className="rounded-full bg-blue-500 text-white border-none">Aguardando Organização</Badge>;
+      case "IMPORTED":
+        return <Badge variant="secondary" className="rounded-full bg-accent/20 text-accent border-accent/10">Aguardando IA</Badge>;
       case "ERROR":
         return <Badge variant="destructive" className="rounded-full">Erro</Badge>;
       default:

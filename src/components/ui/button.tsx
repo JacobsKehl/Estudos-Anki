@@ -37,7 +37,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { children: _, ...rest } = props;
       return React.cloneElement(child, {
-        ...rest, 7
+        ...rest,
         className: cn(combinedClassName, child.props?.className),
         ref: ref,
       });

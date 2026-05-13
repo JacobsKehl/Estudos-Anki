@@ -22,7 +22,7 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
     }
 
     setIsLoading(true);
-    const toastId = toast.loading("Organizando seus estudos com IA...");
+    const toastId = toast.loading(`Organizando ${unorganizedCount} PDF(s) com IA...`);
 
     try {
       const res = await fetch("/api/materials/organize-all", {
@@ -31,15 +31,17 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
 
       const data = await res.json();
 
-      if (data.error) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Erro na organização");
 
-      if (data.results?.success > 0) {
+      const results = data.results;
+
+      if (results?.success > 0) {
         setIsSuccess(true);
-        toast.success(data.message, { id: toastId });
+        toast.success(data.message, { id: toastId, duration: 8000 });
         router.refresh();
-        
-        // Reset success state after 5 seconds
-        setTimeout(() => setIsSuccess(false), 5000);
+        setTimeout(() => setIsSuccess(false), 8000);
+      } else if (results?.errors > 0) {
+        toast.warning(data.message || "Não conseguimos organizar alguns materiais.", { id: toastId });
       } else {
         toast.info(data.message, { id: toastId });
       }

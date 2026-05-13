@@ -2,108 +2,116 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import fs from "fs";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-import { identifySubject } from "@/lib/ai/organizer";
+import path from "path";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const crypto = require("crypto");
-  const pdf = require("pdf-parse");
-  const { files, userId = "cm39k012x0001k93jqwerty12" } = await req.json();
-
-  if (!files || !Array.isArray(files)) {
-    return NextResponse.json({ error: "Lista de arquivos inválida" }, { status: 400 });
+  const inboxDir = process.env.PDF_INBOX_DIR;
+  
+  if (!inboxDir) {
+    return NextResponse.json({ error: "PDF_INBOX_DIR não configurado" }, { status: 500 });
   }
 
-  const results = [];
+  try {
+    const { files } = await req.json();
 
-  for (const fileData of files) {
-    const { fullPath, fileName } = fileData;
+    if (!files || !Array.isArray(files)) {
+      return NextResponse.json({ error: "Lista de arquivos inválida" }, { status: 400 });
+    }
 
-    try {
-      if (!fs.existsSync(fullPath)) {
-        results.push({ fileName, status: "ERROR", error: "Arquivo não encontrado" });
-        continue;
-      }
-
-      // Calcular hash do arquivo para evitar duplicidade de conteúdo
-      const fileBuffer = fs.readFileSync(fullPath);
-      const fileHash = crypto.createHash("md5").update(fileBuffer).digest("hex");
-
-      // Verificar duplicidade por sourcePath ou fileHash
-      const existing = await (prisma as any).studyMaterial.findFirst({
-        where: { 
-          OR: [
-            { sourcePath: fullPath },
-            { fileHash: fileHash }
-          ],
-          userId 
-        }
+    // Buscar o primeiro usuário (em dev usamos o que estiver lá)
+    let user = await prisma.user.findFirst();
+    if (!user) {
+      user = await prisma.user.create({
+        data: { name: "Usuário Dev", email: "dev@kehl.study" }
       });
+    }
+    const userId = user.id;
 
-      if (existing) {
-        results.push({ fileName, status: "ALREADY_IMPORTED", id: existing.id });
-        continue;
-      }
+    const results = [];
 
-      // 1. Ler as primeiras páginas para identificação
-      // Extrair apenas o início (limitar a 5 páginas para ser rápido)
-      const pdfData = await pdf(fileBuffer, { max: 5 });
-      const sampleText = pdfData.text.substring(0, 5000);
+    for (const fileData of files) {
+      const { fullPath, fileName } = fileData;
 
-      // 2. Identificar matéria com IA
-      const subjectName = await identifySubject(sampleText);
-
-      // 3. Buscar ou criar matéria
-      // Usar uma busca insensível a maiúsculas/minúsculas se possível (SQLite é por padrão em muitos casos)
-      let subject = await prisma.studySubject.findFirst({
-        where: { 
-          name: { contains: subjectName },
-          userId 
+      try {
+        // Validação de Segurança: O arquivo deve estar dentro da inboxDir
+        const resolvedPath = path.resolve(fullPath);
+        const resolvedInboxDir = path.resolve(inboxDir);
+        
+        if (!resolvedPath.startsWith(resolvedInboxDir)) {
+          results.push({ fileName, status: "ERROR", error: "Acesso negado: arquivo fora da pasta autorizada" });
+          continue;
         }
-      });
 
-      if (!subject) {
-        subject = await prisma.studySubject.create({
-          data: {
-            name: subjectName,
-            userId,
-            priority: 1
+        if (!fs.existsSync(fullPath)) {
+          results.push({ fileName, status: "ERROR", error: "Arquivo não encontrado fisicamente" });
+          continue;
+        }
+
+        if (!fileName.toLowerCase().endsWith(".pdf")) {
+          results.push({ fileName, status: "ERROR", error: "Apenas arquivos PDF são permitidos" });
+          continue;
+        }
+
+        const stats = fs.statSync(fullPath);
+        
+        // Calcular hash rápido (apenas metadados + início do arquivo para performance, ou todo se pequeno)
+        // Por simplicidade e robustez pedida, vamos usar o hash do conteúdo
+        const fileBuffer = fs.readFileSync(fullPath);
+        const fileHash = crypto.createHash("md5").update(fileBuffer).digest("hex");
+
+        // Verificar duplicidade
+        const existing = await prisma.studyMaterial.findFirst({
+          where: { 
+            OR: [
+              { sourcePath: fullPath },
+              { fileHash: fileHash }
+            ],
+            userId 
           }
         });
-      }
 
-      // 4. Criar o material
-      const material = await (prisma as any).studyMaterial.create({
-        data: {
-          userId,
-          subjectId: subject.id,
-          fileName,
-          originalFileName: fileName,
-          sourceType: "LOCAL_INBOX",
-          sourcePath: fullPath,
-          fileHash: fileHash,
-          fileSize: fs.statSync(fullPath).size,
-          totalPages: pdfData.numpages,
-          organizationStatus: "ANALYZING", // Pronto para detectar estrutura
-          processingStatus: "PENDING"
+        if (existing) {
+          results.push({ fileName, status: "ALREADY_IMPORTED", id: existing.id });
+          continue;
         }
-      });
 
-      results.push({ 
-        fileName, 
-        status: "SUCCESS", 
-        id: material.id, 
-        subjectName: subject.name 
-      });
+        // Criar o material (Passo 1: Importação)
+        const material = await prisma.studyMaterial.create({
+          data: {
+            userId,
+            subjectId: null, // Matéria será identificada no Passo 2 (Organizar)
+            fileName,
+            originalFileName: fileName,
+            sourceType: "LOCAL_INBOX",
+            sourcePath: fullPath,
+            fileHash: fileHash,
+            fileSize: stats.size,
+            organizationStatus: "IMPORTED", 
+            processingStatus: "PENDING"
+          }
+        });
 
-    } catch (error: any) {
-      console.error(`Erro ao importar ${fileName}:`, error);
-      results.push({ fileName, status: "ERROR", error: error.message });
+        results.push({ 
+          fileName, 
+          status: "SUCCESS", 
+          id: material.id
+        });
+
+        console.log(`[IMPORT] Sucesso: ${fileName}`);
+
+      } catch (error: any) {
+        console.error(`[IMPORT ERROR] ${fileName}:`, error);
+        results.push({ fileName, status: "ERROR", error: error.message });
+      }
     }
-  }
 
-  return NextResponse.json({ results });
+    return NextResponse.json({ results });
+
+  } catch (error: any) {
+    console.error("[API ERROR] /api/inbox/import:", error);
+    return NextResponse.json({ error: "Erro interno na API de importação", details: error.message }, { status: 500 });
+  }
 }

@@ -72,8 +72,8 @@ model StudyMaterial {
   
   processingStatus   String              @default("PENDING") // PENDING, PROCESSING, PROCESSED, ERROR
   processingError    String?
-  subjectId          String
-  subject            StudySubject        @relation(fields: [subjectId], references: [id])
+  subjectId          String?
+  subject            StudySubject?       @relation(fields: [subjectId], references: [id])
   extractedContent   ExtractedContent[]
   studyBlocks        StudyBlock[]
   flashcards         Flashcard[]
