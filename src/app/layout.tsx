@@ -4,6 +4,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { UpdateNotifier } from "@/components/layout/UpdateNotifier";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,6 +46,7 @@ export default function RootLayout({
             </main>
           </div>
           <MobileNav />
+          <UpdateNotifier />
         </div>
         <Toaster position="top-center" richColors />
       </body>
