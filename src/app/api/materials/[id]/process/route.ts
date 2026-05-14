@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 import fs from "fs";
 import path from "path";
 import { PDFDocument } from "pdf-lib";
@@ -38,7 +39,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const mockUserId = "cm39k012x0001k93jqwerty12";
+  const mockUserId = await getMockUserId();
 
   try {
     const material = await prisma.studyMaterial.findUnique({ where: { id } });

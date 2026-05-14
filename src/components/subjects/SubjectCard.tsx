@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Blocks, Sparkles } from "lucide-react";
+import { BookOpen, Blocks, Sparkles, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SubjectHealth } from "@/lib/services/subject-metrics";
+import { TRT4_STRATEGY } from "@/lib/strategies/trt4";
+import { SubjectActions } from "./SubjectActions";
 
 interface SubjectCardProps {
   subject: {
@@ -22,6 +24,7 @@ interface SubjectCardProps {
       materials: number;
       studyBlocks: number;
     };
+    createdAt: string | Date;
   };
 }
 
@@ -36,6 +39,13 @@ export function SubjectCard({ subject }: SubjectCardProps) {
   const health = subject.metrics?.health || 'GOOD';
   const config = HEALTH_CONFIG[health];
 
+  // Regra TRT4: verificar se está no ciclo
+  const strategySub = TRT4_STRATEGY.subjects.find(s => s.name === subject.name);
+  const now = new Date();
+  const createdAt = new Date(subject.createdAt);
+  const daysSinceCreated = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+  const isWaitingCycle = strategySub?.cycleStartAfterDays && daysSinceCreated < strategySub.cycleStartAfterDays;
+
   return (
     <Link href={`/subjects/${subject.id}`}>
       <div className="group bg-card p-6 rounded-[2rem] border border-border/50 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/5 transition-all duration-500 flex flex-col gap-5 h-full">
@@ -43,9 +53,19 @@ export function SubjectCard({ subject }: SubjectCardProps) {
           <div className="w-12 h-12 rounded-2xl bg-sage-light/30 text-accent flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
             <BookOpen className="w-6 h-6" />
           </div>
-          <Badge className={`border-none px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm ${config.class}`}>
-            {config.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {isWaitingCycle ? (
+              <Badge className="bg-slate-100 text-slate-500 border-none px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                <Clock className="w-3 h-3 mr-1" />
+                Aguardando Ciclo
+              </Badge>
+            ) : (
+              <Badge className={`border-none px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm ${config.class}`}>
+                {config.label}
+              </Badge>
+            )}
+            <SubjectActions subject={subject} />
+          </div>
         </div>
 
         <div className="space-y-2">

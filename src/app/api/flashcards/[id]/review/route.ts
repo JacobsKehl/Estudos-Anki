@@ -1,18 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { calculateNextReview, ReviewRating } from "@/lib/spaced-repetition";
+import { getMockUserId } from "@/lib/auth-mock";
+import { calculateNextReview, FlashcardRating, FlashcardState } from "@/lib/srs/anki";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const mockUserId = "cm39k012x0001k93jqwerty12";
+  const mockUserId = await getMockUserId();
 
   try {
     const body = await req.json();
-    const { rating } = body as { rating: ReviewRating };
+    const { rating } = body as { rating: FlashcardRating };
 
     if (!rating || rating < 1 || rating > 4) {
       return NextResponse.json({ error: "Rating inválido (deve ser entre 1 e 4)" }, { status: 400 });
@@ -27,12 +28,13 @@ export async function POST(
       return NextResponse.json({ error: "Flashcard não encontrado" }, { status: 404 });
     }
 
-    // 2. Calculate next review data
+    // 2. Calculate next review data using the new Anki SRS logic
     const currentData = {
-      easeFactor: flashcard.easeFactor,
-      intervalDays: flashcard.intervalDays,
-      repetitionCount: flashcard.repetitionCount,
-      reviewStatus: flashcard.reviewStatus
+      state: (flashcard.reviewState as FlashcardState) || "NEW",
+      learningStep: flashcard.learningStep || 0,
+      easeFactor: flashcard.easeFactor || 2.5,
+      intervalDays: flashcard.intervalDays || 0,
+      lapseCount: flashcard.lapseCount || 0,
     };
 
     const nextReviewData = calculateNextReview(currentData, rating);
@@ -42,12 +44,14 @@ export async function POST(
       (prisma as any).flashcard.update({
         where: { id },
         data: {
+          reviewState: nextReviewData.state,
+          learningStep: nextReviewData.learningStep,
           easeFactor: nextReviewData.easeFactor,
           intervalDays: nextReviewData.intervalDays,
-          repetitionCount: nextReviewData.repetitionCount,
+          lapseCount: nextReviewData.lapseCount,
+          repetitionCount: { increment: 1 },
           nextReviewAt: nextReviewData.nextReviewAt,
           lastReviewedAt: new Date(),
-          reviewStatus: nextReviewData.reviewStatus
         }
       }),
       (prisma as any).flashcardReview.create({
@@ -56,10 +60,14 @@ export async function POST(
           userId: mockUserId,
           rating: rating,
           reviewedAt: new Date(),
+          previousState: flashcard.reviewState,
+          newState: nextReviewData.state,
           previousInterval: flashcard.intervalDays,
           newInterval: nextReviewData.intervalDays,
           previousEaseFactor: flashcard.easeFactor,
-          newEaseFactor: nextReviewData.easeFactor
+          newEaseFactor: nextReviewData.easeFactor,
+          previousNextReviewAt: flashcard.nextReviewAt,
+          newNextReviewAt: nextReviewData.nextReviewAt,
         }
       })
     ]);

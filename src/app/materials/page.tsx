@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
-import { InboxSummaryCard } from "@/components/materials/InboxSummaryCard";
+import { InboxPanel } from "@/components/materials/InboxPanel";
 
 type MaterialItem = {
   id: string;
@@ -17,19 +17,23 @@ type MaterialItem = {
   subjectName: string;
   status: "PENDING" | "PROCESSING" | "PROCESSED" | "ERROR";
   organizationStatus: string;
+  processingError: string | null;
   pageCount: number;
   extractedWords: number;
   uploadedAt: string;
   hasExistingBlocks: boolean;
   blocksCount: number;
+  flashcardsCount: number;
 };
+
+import { getMockUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
 export default async function MaterialsPage() {
   let materials: MaterialItem[] = [];
   let subjects: { id: string, name: string }[] = [];
-  const mockUserId = "cm39k012x0001k93jqwerty12";
+  const mockUserId = await getMockUserId();
 
   try {
     // 1. Fetch Materials from DB (only LOCAL_INBOX)
@@ -41,7 +45,10 @@ export default async function MaterialsPage() {
       include: {
         subject: true,
         _count: {
-          select: { studyBlocks: true }
+          select: { 
+            studyBlocks: true,
+            flashcards: true
+          }
         }
       },
       orderBy: {
@@ -55,11 +62,13 @@ export default async function MaterialsPage() {
       subjectName: m.subject?.name || "Sem Matéria",
       status: m.processingStatus as any,
       organizationStatus: m.organizationStatus,
+      processingError: m.processingError,
       pageCount: m.totalPages || 0,
       extractedWords: 0,
       uploadedAt: m.createdAt.toISOString(),
       hasExistingBlocks: m._count.studyBlocks > 0,
-      blocksCount: m._count.studyBlocks
+      blocksCount: m._count.studyBlocks,
+      flashcardsCount: m._count.flashcards
     }));
 
     // Fetch subjects for filters
@@ -88,8 +97,12 @@ export default async function MaterialsPage() {
         description="Gerencie e organize os materiais importados da sua pasta local."
       />
 
+      <div className="mb-10">
+        <InboxPanel />
+      </div>
+
       {/* Hero: Bulk Organization Action */}
-      <section className="bg-accent/5 rounded-[2.5rem] p-8 md:p-12 border border-accent/10 relative overflow-hidden">
+      <section className="bg-accent/5 rounded-[2.5rem] p-8 md:p-12 border border-accent/10 relative overflow-hidden mb-8">
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-4 text-center md:text-left">
             <Badge className="bg-accent/10 text-accent hover:bg-accent/10 border-accent/20 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
@@ -107,53 +120,27 @@ export default async function MaterialsPage() {
         <Sparkles className="absolute -right-8 -bottom-8 w-64 h-64 text-accent/5 -rotate-12 pointer-events-none" />
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Materials List */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-accent" />
-              <h3 className="text-xl font-bold">Arquivos Importados</h3>
-            </div>
-            {materials.length > 0 && <MaterialFilters />}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-accent" />
+            <h3 className="text-xl font-bold">PDFs na Biblioteca</h3>
           </div>
-          
-          <div className="grid gap-6">
-            {materials.length === 0 ? (
-              <EmptyState 
-                icon={Import}
-                title="Sua biblioteca está vazia"
-                description="Importe seus materiais a partir da pasta de entrada local para começar a organizar seus estudos."
-                action={{
-                  label: "Ir para Inbox de PDFs",
-                  href: "/import"
-                }}
-              />
-            ) : (
-              materials.map((material) => (
-                <MaterialCard key={material.id} material={material} />
-              ))
-            )}
-          </div>
+          {materials.length > 0 && <MaterialFilters />}
         </div>
-
-        {/* Right Column: Inbox Source Status */}
-        <div className="space-y-6">
-          <InboxSummaryCard />
-          
-          <Card className="rounded-[2rem] border-border/40 shadow-sm overflow-hidden bg-muted/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <FolderSearch className="w-4 h-4" />
-                Dica Técnica
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                O Kehl monitora automaticamente sua pasta local. Para novos arquivos aparecerem aqui, primeiro importe-os na aba <strong>Inbox</strong>.
-              </p>
-            </CardContent>
-          </Card>
+        
+        <div className="grid gap-6">
+          {materials.length === 0 ? (
+            <EmptyState 
+              icon={Import}
+              title="Sua biblioteca está vazia"
+              description="Importe seus materiais a partir da pasta de entrada local acima."
+            />
+          ) : (
+            materials.map((material) => (
+              <MaterialCard key={material.id} material={material} />
+            ))
+          )}
         </div>
       </div>
     </div>

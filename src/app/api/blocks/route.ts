@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     } = body;
     
     // For MVP, we use the mock user.
-    const userId = "cm39k012x0001k93jqwerty12";
+    const userId = await getMockUserId();
 
     if (!subjectId || !materialId || !title || typeof pageStart !== 'number' || typeof pageEnd !== 'number') {
       return NextResponse.json({ error: "Parece que faltam algumas informações. Preencha todos os campos para criar o bloco." }, { status: 400 });

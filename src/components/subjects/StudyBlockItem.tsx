@@ -3,6 +3,7 @@
 import * as React from "react";
 import { FileText, Edit2, Trash2, Loader2, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { GenerateFlashcardsButton } from "./GenerateFlashcardsButton";
 import { 
   Dialog, 
@@ -92,6 +93,11 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
           </div>
           
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {block.confidence && block.confidence < 0.5 && (
+              <Badge variant="outline" className="h-8 border-orange-200 bg-orange-50 text-orange-600 text-[10px] font-bold uppercase rounded-xl px-3 mr-1">
+                Divisão Provisória
+              </Badge>
+            )}
             <Button 
               variant="ghost" 
               size="icon" 

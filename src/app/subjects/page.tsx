@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 import { BookMarked } from "lucide-react";
 import { SubjectCard } from "@/components/subjects/SubjectCard";
 import { CreateSubjectDialog } from "@/components/subjects/CreateSubjectDialog";
@@ -9,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getAllSubjectsMetrics } from "@/lib/services/subject-metrics";
 
 export default async function SubjectsPage() {
-  const userId = "cm39k012x0001k93jqwerty12"; // Mock user for MVP
+  const userId = await getMockUserId();
 
   let subjects: any[] = [];
 

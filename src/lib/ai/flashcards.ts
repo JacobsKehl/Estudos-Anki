@@ -22,9 +22,17 @@ export async function generateFlashcards(text: string): Promise<GeneratedFlashca
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const responseText = response.text();
-    
     // Limpa a resposta para garantir que seja um JSON válido
-    const cleanJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+    // Busca o primeiro '[' e o último ']' para extrair apenas o array JSON
+    const startIndex = responseText.indexOf("[");
+    const endIndex = responseText.lastIndexOf("]");
+    
+    if (startIndex === -1 || endIndex === -1) {
+      console.error("Gemini não retornou um array JSON válido:", responseText);
+      return [];
+    }
+
+    const cleanJson = responseText.substring(startIndex, endIndex + 1);
     const cards: GeneratedFlashcard[] = JSON.parse(cleanJson);
 
     // Validações básicas e normalização

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpen, Blocks, Layers, FileText } from "lucide-react";
 import Link from "next/link";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SubjectDetailsPage({ params }: { params: { id: string } }) {
   const { id } = await params;
-  const userId = "cm39k012x0001k93jqwerty12"; // Mock user for MVP
+  const userId = await getMockUserId();
   
   let subject: any = null;
   let metrics: any = null;

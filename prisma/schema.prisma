@@ -145,19 +145,24 @@ model Flashcard {
 
   question     String
   answer       String
-  type         String @default("QUESTION_ANSWER") // QUESTION_ANSWER, CLOZE, etc.
+  type         String @default("QUESTION_ANSWER") // QUESTION_ANSWER, CLOZE
   difficulty   String @default("MEDIUM") // EASY, MEDIUM, HARD
   status       String @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, ARCHIVED
-  reviewStatus String @default("NEW") // NEW, LEARNING, REVIEW, GRADUATED
+  
+  // SRS (Anki-style)
+  reviewState     String?   @default("NEW") // NEW, LEARNING, REVIEW, RELEARNING, SUSPENDED
+  learningStep    Int?      @default(0)
+  easeFactor      Float?    @default(2.5)
+  intervalDays    Int?      @default(0)
+  repetitionCount Int?      @default(0)
+  lapseCount      Int?      @default(0)
+  lastReviewedAt  DateTime?
+  nextReviewAt    DateTime? @default(now())
+  approvedAt      DateTime?
 
   sourcePageStart Int?
   sourcePageEnd   Int?
 
-  easeFactor      Float             @default(2.5)
-  intervalDays    Int               @default(0)
-  repetitionCount Int               @default(0)
-  lastReviewedAt  DateTime?
-  nextReviewAt    DateTime          @default(now())
   reviews         FlashcardReview[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
@@ -166,14 +171,19 @@ model Flashcard {
 model FlashcardReview {
   id                 String    @id @default(cuid())
   flashcardId        String
-  flashcard          Flashcard @relation(fields: [flashcardId], references: [id])
+  flashcard          Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
   userId             String
   rating             Int // 1=Again, 2=Hard, 3=Good, 4=Easy
   reviewedAt         DateTime  @default(now())
+  
+  previousState      String
+  newState           String
   previousInterval   Int
   newInterval        Int
   previousEaseFactor Float
   newEaseFactor      Float
+  previousNextReviewAt DateTime
+  newNextReviewAt      DateTime
 }
 
 model StudyNote {

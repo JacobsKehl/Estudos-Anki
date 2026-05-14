@@ -1,18 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Calendar, Layers, CheckCircle2, Clock, Play, Plus } from "lucide-react";
+import { Calendar, Layers, CheckCircle2, Clock, Play } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { GenerateScheduleCTA } from "@/components/schedule/GenerateScheduleCTA";
-
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function SchedulePage() {
-  const mockUserId = "cm39k012x0001k93jqwerty12";
-
-  // 1. Fetch active schedule
+  const mockUserId = await getMockUserId();
   let schedule: any = null;
   try {
     schedule = await (prisma as any).studySchedule.findFirst({
@@ -36,33 +34,41 @@ export default async function SchedulePage() {
     return <GenerateScheduleCTA />;
   }
 
-  // Group items by day
-  const groupedItems = schedule.items.reduce((acc: any, item: any) => {
-    const day = item.dayNumber;
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(item);
-    return acc;
-  }, {});
+  // Group items by day, excluding flashcard reviews from the main schedule view
+  const groupedItems = schedule.items
+    .filter((item: any) => item.actionType !== "REVIEW_FLASHCARDS")
+    .reduce((acc: any, item: any) => {
+      const day = item.dayNumber;
+      if (!acc[day]) acc[day] = [];
+      acc[day].push(item);
+      return acc;
+    }, {});
+
+  const ACTION_LABELS: Record<string, string> = {
+    THEORY: "Teoria",
+    REVIEW_BLOCK: "Revisão de conteúdo",
+    PRACTICE_CARDS: "Praticar cards",
+    QUESTIONS: "Questões",
+    REINFORCEMENT: "Reforço",
+  };
 
   return (
     <div className="space-y-8 max-w-6xl animate-in fade-in duration-700 slide-in-from-bottom-4 pb-20">
       <PageHeader 
         icon={Calendar}
-        title="Cronograma de Estudo"
-        description="Seu roteiro personalizado baseado nos blocos de conteúdo extraídos."
+        title="Roteiro de Estudo"
+        description="Visualize sua jornada de aprendizado completa organizada por blocos teóricos."
       >
-        <Button variant="outline" className="rounded-xl">Configurar</Button>
-        <Button className="rounded-xl gap-2">
-          <Plus className="w-4 h-4" />
-          Adicionar Bloco
-        </Button>
+        <Link href="/">
+          <Button variant="outline" className="rounded-xl">Voltar ao Hoje</Button>
+        </Link>
       </PageHeader>
 
       <div className="space-y-10 relative before:absolute before:left-[19px] before:top-2 before:h-[calc(100%-16px)] before:w-[2px] before:bg-border/40">
         {Object.keys(groupedItems).map((dayStr) => {
           const day = parseInt(dayStr);
           const items = groupedItems[day];
-          const isToday = day === 1; // Simplified logic for MVP
+          const isToday = day === 1;
 
           return (
             <div key={day} className="relative pl-12 space-y-4">
@@ -97,7 +103,9 @@ export default async function SchedulePage() {
                         <Badge variant="outline" className="bg-sage-light/20 text-accent border-none rounded-lg text-[10px] py-0">
                           {item.subject.name}
                         </Badge>
-                        <h3 className="font-semibold text-base leading-tight">{item.studyBlock.title}</h3>
+                        <h3 className="font-semibold text-base leading-tight">
+                          {item.studyBlock?.title || "Bloco de Estudo"}
+                        </h3>
                       </div>
                       <div className={cn(
                         "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider",
@@ -110,7 +118,10 @@ export default async function SchedulePage() {
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Layers className="w-3 h-3" />
-                        Págs {item.studyBlock.pageStart}-{item.studyBlock.pageEnd}
+                        {item.studyBlock 
+                          ? `Págs ${item.studyBlock.pageStart}-${item.studyBlock.pageEnd}`
+                          : ACTION_LABELS[item.actionType] || item.actionType
+                        }
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -125,10 +136,10 @@ export default async function SchedulePage() {
                           Estudo finalizado
                         </div>
                       ) : (
-                        <Link href="/today" className="flex-1">
+                        <Link href="/" className="flex-1">
                           <Button size="sm" className="w-full rounded-xl gap-2 h-9">
                             <Play className="w-3 h-3 fill-current" />
-                            Começar agora
+                            {ACTION_LABELS[item.actionType] || "Começar agora"}
                           </Button>
                         </Link>
                       )}

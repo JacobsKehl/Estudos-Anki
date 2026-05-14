@@ -10,11 +10,26 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "IDs e status são obrigatórios" }, { status: 400 });
     }
 
+    const updateData: any = { status };
+    
+    // Initialize SRS fields when approving
+    if (status === "APPROVED") {
+      const now = new Date();
+      updateData.approvedAt = now;
+      updateData.reviewState = "NEW";
+      updateData.nextReviewAt = now;
+      updateData.learningStep = 0;
+      updateData.easeFactor = 2.5;
+      updateData.intervalDays = 0;
+      updateData.repetitionCount = 0;
+      updateData.lapseCount = 0;
+    }
+
     const updated = await (prisma as any).flashcard.updateMany({
       where: {
         id: { in: ids }
       },
-      data: { status }
+      data: updateData
     });
 
     return NextResponse.json({ 

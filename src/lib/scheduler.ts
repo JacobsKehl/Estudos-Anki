@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { getAdaptiveStudyQueue, StudyTask, ActionType } from "./recommendations/adaptive-scheduler";
+import { TRT4_STRATEGY } from "./strategies/trt4";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,10 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
 
   const startDate = options.startDate ?? getNextStudyDay(new Date());
 
-  // 1. Obter a fila inteligente de tarefas (até 200 para cobrir 30 dias)
-  const taskQueue = await getAdaptiveStudyQueue(userId, 200);
-  if (taskQueue.length === 0) return null;
+  // 1. Obter todas as matérias do usuário para mapeamento
+  const userSubjects = await prisma.studySubject.findMany({
+    where: { userId },
+  });
 
   // 2. Arquivar cronogramas ativos anteriores
   await (prisma as any).studySchedule.updateMany({
@@ -75,70 +77,74 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
     },
   });
 
-  // 4. Distribuir tarefas nos dias
+  // 4. Distribuir tarefas nos dias seguindo o ciclo TRT4
   const scheduleItemsData: object[] = [];
-
-  // Separar filas: revisões têm prioridade garantida sobre conteúdo novo
-  const reviewTasks = taskQueue.filter(
-    (t) => t.type === "REVIEW_BLOCK" || t.type === "REVIEW_FLASHCARDS"
-  );
-  const contentTasks = taskQueue.filter(
-    (t) => !["REVIEW_BLOCK", "REVIEW_FLASHCARDS"].includes(t.type)
-  );
-
-  let reviewIdx = 0;
-  let contentIdx = 0;
+  const now = new Date();
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const candidateDate = addDays(startDate, dayOffset);
     if (!isStudyDay(candidateDate)) continue;
 
-    let dayMinutes = 0;
-    const subjectsThisDay = new Set<string>();
-    const dayItems: object[] = [];
+    const cycleDay = dayOffset % 6;
+    const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
+    const dayNumber = dayOffset + 1;
 
-    // Prioridade 1: revisões de bloco e flashcards (não contam no limite de matérias/dia)
-    while (reviewIdx < reviewTasks.length && dayMinutes < dailyMinutes) {
-      const task = reviewTasks[reviewIdx];
-      if (dayMinutes + task.estimatedMinutes > dailyMinutes) break;
+    // A. Adicionar Reserva de SRS (30 min)
+    // Procuramos uma tarefa de flashcards ou criamos uma genérica
+    scheduleItemsData.push({
+      userId,
+      scheduleId: schedule.id,
+      subjectId: userSubjects[0]?.id || "default", // placeholder if no subject
+      actionType: "REVIEW_FLASHCARDS",
+      priorityScore: 100,
+      reason: "Sessão diária de Revisão de Cards (SRS)",
+      dayNumber,
+      scheduledDate: candidateDate,
+      estimatedMinutes: TRT4_STRATEGY.dailySrsMinutes,
+      status: "PENDING",
+    });
 
-      dayItems.push(buildItem(userId, schedule.id, task, candidateDate, dayOffset + 1));
-      dayMinutes += task.estimatedMinutes;
-      reviewIdx++;
-    }
+    // B. Adicionar 2 Blocos de Estudo (45 min cada)
+    for (const subName of subjectsTodayNames) {
+      const subject = userSubjects.find(s => s.name.toLowerCase().includes(subName.toLowerCase()));
+      
+      if (subject) {
+        // Verificar regra dos 90 dias para matérias de apoio
+        const strategySub = TRT4_STRATEGY.subjects.find(s => s.name === subName);
+        if (strategySub?.cycleStartAfterDays) {
+          const daysSinceSubjectCreated = (now.getTime() - subject.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceSubjectCreated < strategySub.cycleStartAfterDays) {
+            continue; // Pula se ainda não deu o prazo
+          }
+        }
 
-    // Prioridade 2: conteúdo novo (até subjectsPerDay matérias diferentes)
-    let contentScanned = contentIdx;
-    while (
-      contentScanned < contentTasks.length &&
-      subjectsThisDay.size < subjectsPerDay &&
-      dayMinutes < dailyMinutes
-    ) {
-      const task = contentTasks[contentScanned];
-      const mins = task.estimatedMinutes > minutesPerSubject
-        ? minutesPerSubject
-        : task.estimatedMinutes;
+        // Buscar o próximo bloco pendente desta matéria
+        const nextBlock = await (prisma as any).studyBlock.findFirst({
+          where: {
+            subjectId: subject.id,
+            userId,
+            theoryStatus: "NOT_STARTED",
+          },
+          orderBy: { orderIndex: "asc" },
+        });
 
-      if (
-        !subjectsThisDay.has(task.subjectId) &&
-        dayMinutes + mins <= dailyMinutes
-      ) {
-        const cloned = { ...task, estimatedMinutes: mins };
-        dayItems.push(buildItem(userId, schedule.id, cloned, candidateDate, dayOffset + 1));
-        dayMinutes += mins;
-        subjectsThisDay.add(task.subjectId);
-
-        // Marcar como consumida removendo do índice principal
-        contentTasks.splice(contentScanned, 1);
-      } else {
-        contentScanned++;
+        if (nextBlock) {
+          scheduleItemsData.push({
+            userId,
+            scheduleId: schedule.id,
+            subjectId: subject.id,
+            studyBlockId: nextBlock.id,
+            actionType: "THEORY",
+            priorityScore: 90,
+            reason: `Ciclo TRT4: Próximo conteúdo de ${subName}`,
+            dayNumber,
+            scheduledDate: candidateDate,
+            estimatedMinutes: TRT4_STRATEGY.minutesPerStudyBlock,
+            status: "PENDING",
+          });
+        }
       }
     }
-
-    scheduleItemsData.push(...dayItems);
-
-    // Parar se não há mais tarefas
-    if (reviewIdx >= reviewTasks.length && contentTasks.length === 0) break;
   }
 
   // 5. Salvar em batch

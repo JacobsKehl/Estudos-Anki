@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Sparkles, Loader2, CheckCircle2, FileText, BrainCircuit, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -10,53 +10,130 @@ interface OrganizeAllButtonProps {
   unorganizedCount: number;
 }
 
+type PipelineStep = "idle" | "extracting" | "analyzing" | "blocking" | "flashcards" | "done" | "error";
+
+const STEP_LABELS: Record<PipelineStep, string> = {
+  idle: "Organizar meus estudos",
+  extracting: "Extraindo texto...",
+  analyzing: "Identificando matéria...",
+  blocking: "Criando blocos...",
+  flashcards: "Gerando flashcards...",
+  done: "Concluído!",
+  error: "Erro na organização",
+};
+
 export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [step, setStep] = useState<PipelineStep>("idle");
+  const [processed, setProcessed] = useState(0);
+  const [totalFlashcards, setTotalFlashcards] = useState(0);
   const router = useRouter();
 
-  const handleOrganizeAll = async () => {
+  const isLoading = step !== "idle" && step !== "done" && step !== "error";
+  const isSuccess = step === "done";
+
+  const handleOrganize = async () => {
     if (unorganizedCount === 0) {
-      toast.info("Tudo organizado por aqui. Seus PDFs já foram analisados.");
+      toast.info("Tudo organizado! Seus PDFs já foram analisados.");
       return;
     }
 
-    setIsLoading(true);
-    const toastId = toast.loading(`Organizando ${unorganizedCount} PDF(s) com IA...`);
+    setStep("extracting");
+    setProcessed(0);
+    setTotalFlashcards(0);
 
-    try {
-      const res = await fetch("/api/materials/organize-all", {
-        method: "POST",
-      });
+    let totalProcessed = 0;
+    let totalCards = 0;
+    let totalBlocks = 0;
+    let totalErrors = 0;
+    const remaining = unorganizedCount;
 
-      const data = await res.json();
+    for (let i = 0; i < remaining; i++) {
+      const toastId = `organize-${i}`;
+      const pdfNum = i + 1;
 
-      if (!res.ok) throw new Error(data.error || "Erro na organização");
+      try {
+        setStep("extracting");
+        toast.loading(`PDF ${pdfNum}/${remaining}: Processando...`, { id: toastId });
 
-      const results = data.results;
+        const res = await fetch("/api/materials/organize-all", {
+          method: "POST",
+        });
+        const data = await res.json();
 
-      if (results?.success > 0) {
-        setIsSuccess(true);
-        toast.success(data.message, { id: toastId, duration: 8000 });
-        router.refresh();
-        setTimeout(() => setIsSuccess(false), 8000);
-      } else if (results?.errors > 0) {
-        toast.warning(data.message || "Não conseguimos organizar alguns materiais.", { id: toastId });
-      } else {
-        toast.info(data.message, { id: toastId });
+        if (!res.ok) {
+          totalErrors++;
+          toast.error(`PDF ${pdfNum}: ${data.error || "Falha técnica"}`, { id: toastId, duration: 4000 });
+          continue;
+        }
+
+        if (data.count === 0) {
+          toast.dismiss(toastId);
+          break;
+        }
+
+        const r = data.results;
+        if (r?.success > 0) {
+          totalProcessed += r.success;
+          totalCards += r.totalFlashcards ?? 0;
+          totalBlocks += r.totalBlocks ?? 0;
+          setProcessed(p => p + r.success);
+          setTotalFlashcards(c => c + (r.totalFlashcards ?? 0));
+          setStep("flashcards");
+          toast.success(
+            `PDF ${pdfNum}: ${r.totalBlocks} blocos · ${r.totalFlashcards} cards`,
+            { id: toastId, duration: 3000 }
+          );
+        } else if (r?.errors > 0) {
+          totalErrors += r.errors;
+          toast.warning(`PDF ${pdfNum}: ${data.message || "Não organizado"}`, { id: toastId, duration: 4000 });
+        }
+
+      } catch (err: any) {
+        totalErrors++;
+        toast.error(`PDF ${pdfNum}: Erro de rede`, { id: `err-${i}`, duration: 4000 });
       }
-    } catch (error: any) {
-      toast.error(error.message || "Não conseguimos organizar seus estudos agora.", { id: toastId });
-    } finally {
-      setIsLoading(false);
+    }
+
+    // Resumo Final Detalhado
+    if (totalProcessed > 0) {
+      setStep("done");
+      
+      const summaryMessage = (
+        <div className="space-y-1 py-1">
+          <p className="font-bold text-sm">Organização concluída!</p>
+          <div className="text-xs space-y-0.5 opacity-90">
+            <p>• PDFs processados: {totalProcessed + totalErrors}</p>
+            <p>• Blocos criados: {totalBlocks}</p>
+            <p>• Flashcards gerados: {totalCards}</p>
+            <p>• Cards aguardando aprovação: {totalCards}</p>
+            <p>• Cronograma atualizado: Sim</p>
+          </div>
+          {totalErrors > 0 && (
+            <p className="text-[10px] text-amber-500 font-bold mt-1">
+              ⚠️ {totalErrors} PDF(s) apresentaram erros.
+            </p>
+          )}
+        </div>
+      );
+
+      toast.success(summaryMessage, { duration: 10000 });
+      router.refresh();
+      setTimeout(() => setStep("idle"), 10000);
+    } else if (totalErrors > 0) {
+      setStep("error");
+      toast.error("A organização falhou para os materiais selecionados.", { duration: 5000 });
+      setTimeout(() => setStep("idle"), 3000);
+      router.refresh();
+    } else {
+      setStep("idle");
     }
   };
 
   if (unorganizedCount === 0) {
     return (
-      <Button 
+      <Button
         variant="outline"
-        className="rounded-2xl h-14 px-8 border-green-200 text-green-700 bg-green-50/50 hover:bg-green-50 cursor-default"
+        className="rounded-2xl h-14 px-8 border-emerald-200 text-emerald-700 bg-emerald-50/50 cursor-default"
         disabled
       >
         <CheckCircle2 className="w-5 h-5 mr-2" />
@@ -65,28 +142,45 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
     );
   }
 
+  const currentLabel = STEP_LABELS[step];
+
   return (
-    <Button 
-      className="rounded-2xl h-14 px-10 bg-accent text-white hover:bg-accent/90 shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98] font-bold text-lg"
-      disabled={isLoading || isSuccess}
-      onClick={handleOrganizeAll}
-    >
-      {isLoading ? (
-        <>
-          <Loader2 className="w-5 h-5 mr-3 animate-spin" />
-          Organizando...
-        </>
-      ) : isSuccess ? (
-        <>
-          <CheckCircle2 className="w-5 h-5 mr-3" />
-          Sucesso!
-        </>
-      ) : (
-        <>
-          <Sparkles className="w-5 h-5 mr-3" />
-          Organizar meus estudos ({unorganizedCount})
-        </>
+    <div className="flex flex-col items-center gap-2">
+      <Button
+        className="rounded-2xl h-14 px-10 bg-accent text-white hover:bg-accent/90 shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98] font-bold text-lg"
+        disabled={isLoading || isSuccess}
+        onClick={handleOrganize}
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+            {currentLabel}
+          </>
+        ) : isSuccess ? (
+          <>
+            <CheckCircle2 className="w-5 h-5 mr-3" />
+            Sucesso!
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-5 h-5 mr-3" />
+            Organizar meus estudos ({unorganizedCount})
+          </>
+        )}
+      </Button>
+
+      {isLoading && processed > 0 && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground animate-pulse">
+          <FileText className="w-3.5 h-3.5" />
+          <span>{processed} PDF(s) concluído(s)</span>
+          {totalFlashcards > 0 && (
+            <>
+              <BrainCircuit className="w-3.5 h-3.5" />
+              <span>{totalFlashcards} cards gerados</span>
+            </>
+          )}
+        </div>
       )}
-    </Button>
+    </div>
   );
 }

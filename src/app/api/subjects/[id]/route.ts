@@ -1,68 +1,26 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-
-  try {
-    const subject = await prisma.studySubject.findUnique({
-      where: { id },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      include: {
-        materials: {
-          orderBy: { createdAt: "desc" }
-        },
-        studyBlocks: {
-          orderBy: { orderIndex: "asc" }
-        },
-      } as any
-    });
-
-    if (!subject) {
-      return NextResponse.json({ error: "Matéria não encontrada" }, { status: 404 });
-    }
-
-    return NextResponse.json(subject);
-  } catch (error: unknown) {
-    const err = error as Error;
-    return NextResponse.json(
-      { error: "Erro ao buscar detalhes da matéria", details: err.message },
-      { status: 500 }
-    );
-  }
-}
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
   try {
+    const { id } = await params;
+    const userId = await getMockUserId();
     const body = await req.json();
-    const { name, description, priority, progress } = body;
+    const { name, description, priority, examWeight } = body;
 
-    const updated = await prisma.studySubject.update({
-      where: { id },
-      data: {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(priority !== undefined && { priority }),
-        ...(progress !== undefined && { progress }),
-      }
+    const subject = await prisma.studySubject.update({
+      where: { id, userId },
+      data: { name, description, priority, examWeight }
     });
 
-    return NextResponse.json(updated);
-  } catch (error: unknown) {
-    const err = error as Error;
-    return NextResponse.json(
-      { error: "Erro ao atualizar matéria", details: err.message },
-      { status: 500 }
-    );
+    return NextResponse.json(subject);
+  } catch (error: any) {
+    return NextResponse.json({ error: "Erro ao atualizar matéria", details: error.message }, { status: 500 });
   }
 }
 
@@ -70,27 +28,45 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
   try {
-    // Need to clean up relations before deleting subject
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (prisma as any).studyBlock.deleteMany({ where: { subjectId: id } });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await prisma.extractedContent.deleteMany({ where: { subjectId: id } } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await prisma.studyMaterial.deleteMany({ where: { subjectId: id } } as any);
+    const { id } = await params;
+    const userId = await getMockUserId();
 
-    await prisma.studySubject.delete({
-      where: { id }
-    });
+    // Verify subject belongs to user
+    const subject = await prisma.studySubject.findUnique({ where: { id, userId } });
+    if (!subject) {
+      return NextResponse.json({ error: "Matéria não encontrada" }, { status: 404 });
+    }
 
-    return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    const err = error as Error;
-    return NextResponse.json(
-      { error: "Erro ao remover matéria", details: err.message },
-      { status: 500 }
-    );
+    // Check for dependencies before allowing deletion
+    const [materialsCount, blocksCount, flashcardsCount, scheduleItemsCount] = await Promise.all([
+      prisma.studyMaterial.count({ where: { subjectId: id } }),
+      (prisma as any).studyBlock.count({ where: { subjectId: id } }),
+      (prisma as any).flashcard.count({ where: { subjectId: id } }),
+      (prisma as any).studyScheduleItem.count({ where: { subjectId: id } }),
+    ]);
+
+    const hasData = materialsCount > 0 || blocksCount > 0 || flashcardsCount > 0 || scheduleItemsCount > 0;
+
+    if (hasData) {
+      return NextResponse.json({
+        error: "Esta matéria tem dados vinculados que impedem a exclusão direta.",
+        impact: {
+          materials: materialsCount,
+          blocks: blocksCount,
+          flashcards: flashcardsCount,
+          scheduleItems: scheduleItemsCount,
+        },
+        suggestion: "archive",
+        message: `Encontramos ${materialsCount} material(is), ${blocksCount} bloco(s), ${flashcardsCount} flashcard(s) e ${scheduleItemsCount} item(ns) no cronograma. Use 'Arquivar' para ocultar sem perder o histórico.`
+      }, { status: 409 });
+    }
+
+    // Safe to delete — no dependencies
+    await prisma.studySubject.delete({ where: { id, userId } });
+    return NextResponse.json({ message: "Matéria excluída com sucesso" });
+
+  } catch (error: any) {
+    return NextResponse.json({ error: "Erro ao excluir matéria", details: error.message }, { status: 500 });
   }
 }

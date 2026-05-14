@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export async function POST(
@@ -8,7 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const mockUserId = "cm39k012x0001k93jqwerty12";
+  const mockUserId = await getMockUserId();
 
   try {
     // 1. Fetch the study block
@@ -67,7 +68,15 @@ export async function POST(
             answer: card.answer,
             type: card.type,
             difficulty: card.difficulty,
-            status: "PENDING_APPROVAL",
+            status: "APPROVED",
+            reviewState: "NEW",       
+            nextReviewAt: new Date(),      
+            approvedAt: new Date(),        
+            learningStep: 0,
+            easeFactor: 2.5,
+            intervalDays: 0,
+            repetitionCount: 0,
+            lapseCount: 0,
             sourcePageStart: block.pageStart,
             sourcePageEnd: block.pageEnd
           }
@@ -76,7 +85,7 @@ export async function POST(
     );
 
     return NextResponse.json({
-      message: `${savedCards.length} flashcards gerados com sucesso. Revise-os na área de curadoria.`,
+      message: `${savedCards.length} flashcards criados com sucesso. Prontos para revisão.`,
       count: savedCards.length,
       flashcards: savedCards
     });

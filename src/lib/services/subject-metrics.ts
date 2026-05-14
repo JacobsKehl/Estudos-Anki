@@ -141,3 +141,75 @@ export async function getAllSubjectsMetrics(userId: string) {
     metrics: metrics[i]
   }));
 }
+
+/**
+ * Get global study metrics for the user
+ */
+export async function getGlobalMetrics(userId: string) {
+  const subjectsMetrics = await getAllSubjectsMetrics(userId);
+  const now = new Date();
+  const todayStart = new Date(now.setHours(0, 0, 0, 0));
+  
+  // Total summary
+  const summary = {
+    totalSubjects: subjectsMetrics.length,
+    totalBlocks: subjectsMetrics.reduce((acc, s) => acc + s.metrics.totalBlocks, 0),
+    completedBlocks: subjectsMetrics.reduce((acc, s) => acc + s.metrics.completedBlocks, 0),
+    totalFlashcards: subjectsMetrics.reduce((acc, s) => acc + s.metrics.totalFlashcards, 0),
+    approvedFlashcards: subjectsMetrics.reduce((acc, s) => acc + s.metrics.approvedFlashcards, 0),
+    dueReviews: subjectsMetrics.reduce((acc, s) => acc + s.metrics.dueReviews, 0),
+    averageAccuracy: subjectsMetrics.length > 0 
+      ? Math.round(subjectsMetrics.reduce((acc, s) => acc + s.metrics.accuracyRate, 0) / subjectsMetrics.length) 
+      : 0,
+    globalProgress: subjectsMetrics.length > 0
+      ? Math.round(subjectsMetrics.reduce((acc, s) => acc + s.metrics.progress, 0) / subjectsMetrics.length)
+      : 0
+  };
+
+  // Heatmap Data (Last 30 days of study)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const dailyActivity = await prisma.flashcardReview.groupBy({
+    by: ['reviewedAt'],
+    where: {
+      userId,
+      reviewedAt: { gte: thirtyDaysAgo }
+    },
+    _count: { _all: true }
+  });
+
+  // Group by date (ignoring time)
+  const heatmap: Record<string, number> = {};
+  dailyActivity.forEach(activity => {
+    const dateStr = activity.reviewedAt.toISOString().split('T')[0];
+    heatmap[dateStr] = (heatmap[dateStr] || 0) + activity._count._all;
+  });
+
+  // Study states (Mastery breakdown)
+  const flashcards = await (prisma as any).flashcard.groupBy({
+    by: ['reviewState'],
+    where: { userId, status: 'APPROVED' },
+    _count: { _all: true }
+  });
+
+  const mastery = {
+    NEW: 0,
+    LEARNING: 0,
+    REVIEW: 0,
+    RELEARNING: 0
+  };
+  flashcards.forEach((f: any) => {
+    if (f.reviewState in mastery) {
+      (mastery as any)[f.reviewState] = f._count._all;
+    }
+  });
+
+  return {
+    summary,
+    subjects: subjectsMetrics,
+    heatmap,
+    mastery
+  };
+}
+

@@ -1,24 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RotateCw } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 import { ReviewDashboard } from "@/components/reviews/ReviewDashboard";
 
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function ReviewsPage() {
-  const mockUserId = "cm39k012x0001k93jqwerty12";
+  const mockUserId = await getMockUserId();
   const now = new Date();
 
   // 1. Fetch pending cards (nextReviewAt <= now AND status = APPROVED)
   let pendingCards: any[] = [];
   let reviewedTodayCount = 0;
+  let pendingApprovalCount = 0;
 
   try {
     pendingCards = await (prisma as any).flashcard.findMany({
       where: {
         userId: mockUserId,
         status: "APPROVED",
-        nextReviewAt: { lte: now }
+        nextReviewAt: { lte: now },
+        reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] }
       },
       include: {
         subject: { select: { name: true } }
@@ -29,6 +32,9 @@ export default async function ReviewsPage() {
         answer: true,
         type: true,
         difficulty: true,
+        reviewState: true,
+        intervalDays: true,
+        learningStep: true,
         subject: { select: { name: true } }
       },
       orderBy: { nextReviewAt: "asc" }
@@ -42,6 +48,14 @@ export default async function ReviewsPage() {
         reviewedAt: { gte: oneDayAgo }
       }
     });
+
+    // 3. Count cards pending approval
+    pendingApprovalCount = await (prisma as any).flashcard.count({
+      where: {
+        userId: mockUserId,
+        status: "PENDING_APPROVAL"
+      }
+    });
   } catch (error) {
     console.error("Failed to fetch review data:", error);
   }
@@ -49,7 +63,8 @@ export default async function ReviewsPage() {
   const stats = {
     totalPending: pendingCards.length,
     dueToday: pendingCards.length,
-    reviewedToday: reviewedTodayCount
+    reviewedToday: reviewedTodayCount,
+    pendingApproval: pendingApprovalCount
   };
 
   return (

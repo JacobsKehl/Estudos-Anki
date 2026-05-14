@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Logo } from "@/components/ui/logo";
 import { prisma } from "@/lib/prisma";
-import { FlashcardCuration } from "@/components/flashcards/FlashcardCuration";
+import { getMockUserId } from "@/lib/auth-mock";
+import { FlashcardRepository } from "@/components/flashcards/FlashcardRepository";
 
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function FlashcardsPage({ searchParams }: { searchParams: { blockId?: string } }) {
-  const mockUserId = "cm39k012x0001k93jqwerty12";
+  const mockUserId = await getMockUserId();
   const { blockId } = await searchParams;
 
   let flashcards: any[] = [];
@@ -31,11 +32,11 @@ export default async function FlashcardsPage({ searchParams }: { searchParams: {
     <div className="space-y-8 max-w-6xl animate-in fade-in duration-700 slide-in-from-bottom-4 pb-20">
       <PageHeader 
         icon={Logo}
-        title="Flashcards Inteligentes"
-        description="Revise conceitos gerados por IA. Aprove os melhores cards para sua revisão diária."
+        title="Repositório de Flashcards"
+        description="Área de edição e gerenciamento dos cards gerados automaticamente."
       />
 
-      <FlashcardCuration initialFlashcards={flashcards} />
+      <FlashcardRepository initialFlashcards={flashcards} />
     </div>
   );
 }

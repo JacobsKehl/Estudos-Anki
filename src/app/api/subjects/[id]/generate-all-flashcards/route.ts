@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export async function POST(
@@ -8,7 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: subjectId } = await params;
-  const mockUserId = "cm39k012x0001k93jqwerty12";
+  const mockUserId = await getMockUserId();
 
   try {
     // 1. Fetch all blocks for this subject that don't have many flashcards yet
@@ -62,7 +63,15 @@ export async function POST(
                   answer: card.answer,
                   type: card.type,
                   difficulty: card.difficulty,
-                  status: "PENDING_APPROVAL",
+                  status: "APPROVED",
+                  reviewState: "NEW",       
+                  nextReviewAt: new Date(),      
+                  approvedAt: new Date(),        
+                  learningStep: 0,
+                  easeFactor: 2.5,
+                  intervalDays: 0,
+                  repetitionCount: 0,
+                  lapseCount: 0,
                   sourcePageStart: block.pageStart,
                   sourcePageEnd: block.pageEnd
                 }
@@ -86,7 +95,7 @@ export async function POST(
     }
 
     return NextResponse.json({
-      message: `${totalSaved} flashcards gerados com sucesso para todos os blocos!`,
+      message: `${totalSaved} flashcards criados com sucesso para todos os blocos!`,
       count: totalSaved,
       results
     });

@@ -122,7 +122,7 @@ export async function POST(
     }
 
     // 5. Detectar estrutura com IA
-    const detectedBlocks = await detectStructure(extractedText);
+    const detectedBlocks = await detectStructure(extractedText, numPages);
 
     if (!detectedBlocks || detectedBlocks.length === 0) {
       await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "IA não detectou estrutura" } });
@@ -131,7 +131,12 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 6. Criar blocos
+    // 6. Remover blocos antigos se existirem (Reorganização)
+    await prisma.studyBlock.deleteMany({
+      where: { materialId: material.id }
+    });
+
+    // 7. Criar blocos
     for (let i = 0; i < detectedBlocks.length; i++) {
       const block = detectedBlocks[i];
       await prisma.studyBlock.create({
@@ -145,7 +150,8 @@ export async function POST(
           pageEnd: block.pageEnd || block.pageStart || 1,
           orderIndex: i,
           estimatedStudyMinutes: block.estimatedStudyMinutes || 60,
-          createdBy: "AI",
+          createdBy: block.createdBy || "AI",
+          confidence: block.confidence ?? 1.0,
           sourceHeading: block.sourceHeading,
           status: "NOT_STARTED"
         }

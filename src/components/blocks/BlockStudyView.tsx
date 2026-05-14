@@ -12,7 +12,8 @@ import {
   ChevronRight,
   BrainCircuit,
   Loader2,
-  Info
+  Info,
+  Play
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { GenerateFlashcardsButton } from "../subjects/GenerateFlashcardsButton";
+import { PdfBlockViewer } from "./PdfBlockViewer";
 
 interface BlockStudyViewProps {
   block: any;
@@ -34,17 +36,29 @@ interface BlockStudyViewProps {
 export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
   const router = useRouter();
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<"pdf" | "text">("pdf");
 
   const updateStatus = async (newStatus: string) => {
     setIsUpdatingStatus(true);
     try {
-      const res = await fetch(`/api/blocks/${block.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error("Erro ao atualizar status");
-      toast.success(newStatus === "COMPLETED" ? "Bloco concluído! Parabéns pelos estudos." : "Status atualizado");
+      if (newStatus === "COMPLETED") {
+        const res = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ step: "THEORY" }), // Mark theory as complete which triggers the whole block completion logic
+        });
+        if (!res.ok) throw new Error("Erro ao completar bloco");
+        const data = await res.json();
+        toast.success(data.message || "Bloco concluído! Parabéns pelos estudos.");
+      } else {
+        const res = await fetch(`/api/blocks/${block.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) throw new Error("Erro ao atualizar status");
+        toast.success("Status atualizado");
+      }
       router.refresh();
     } catch (error) {
       toast.error("Erro ao atualizar o status do bloco");
@@ -132,35 +146,63 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-8 items-start">
         {/* Área de Leitura */}
-        <main className="space-y-8">
-          {content.length === 0 ? (
-            <div className="bg-card p-12 rounded-[2.5rem] border-2 border-dashed border-border/60 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground">
-                <Info className="w-8 h-8" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-bold text-lg">Texto não disponível</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  Não encontramos texto extraído para as páginas deste bloco. Verifique se o processamento do material foi concluído.
-                </p>
-              </div>
-              <Button variant="outline" className="rounded-xl h-11" asChild>
-                <Link href={`/materials/${block.materialId}`}>Ver Material Completo</Link>
-              </Button>
-            </div>
+        <main className="space-y-6">
+          <div className="flex items-center gap-2 mb-4 p-1 bg-muted/30 rounded-2xl w-fit">
+            <Button 
+              variant={activeTab === "pdf" ? "secondary" : "ghost"} 
+              size="sm" 
+              className={`rounded-xl h-9 px-6 text-xs font-bold uppercase tracking-wider ${activeTab === "pdf" ? "bg-white shadow-sm" : ""}`}
+              onClick={() => setActiveTab("pdf")}
+            >
+              <FileText className="w-3.5 h-3.5 mr-2" />
+              PDF Original
+            </Button>
+            <Button 
+              variant={activeTab === "text" ? "secondary" : "ghost"} 
+              size="sm" 
+              className={`rounded-xl h-9 px-6 text-xs font-bold uppercase tracking-wider ${activeTab === "text" ? "bg-white shadow-sm" : ""}`}
+              onClick={() => setActiveTab("text")}
+            >
+              <FileText className="w-3.5 h-3.5 mr-2" />
+              Texto Extraído
+            </Button>
+          </div>
+
+          {activeTab === "pdf" ? (
+            <PdfBlockViewer 
+              materialId={block.materialId} 
+              pageStart={block.pageStart} 
+              pageEnd={block.pageEnd} 
+            />
           ) : (
-            content.map((page) => (
-              <section key={page.id} className="bg-white p-10 md:p-16 rounded-[3rem] border border-border/30 shadow-[0_8px_30px_rgb(0,0,0,0.02)] relative group transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                <div className="absolute top-8 right-10 text-[10px] font-bold text-muted-foreground/30 uppercase tracking-[0.2em] group-hover:text-accent/40 transition-colors">
-                  Página {page.pageNumber}
-                </div>
-                <div className="prose prose-sage max-w-none">
-                  <div className="whitespace-pre-wrap leading-[1.8] text-foreground/80 text-[1.05rem] font-medium selection:bg-accent/10 selection:text-accent">
-                    {page.text}
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {content.length === 0 ? (
+                <div className="bg-card p-12 rounded-[2.5rem] border-2 border-dashed border-border/60 text-center space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground">
+                    <Info className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-lg">Texto não disponível</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                      Não encontramos texto extraído para as páginas deste bloco. Verifique se o processamento do material foi concluído.
+                    </p>
                   </div>
                 </div>
-              </section>
-            ))
+              ) : (
+                content.map((page) => (
+                  <section key={page.id} className="bg-white p-10 md:p-16 rounded-[3rem] border border-border/30 shadow-[0_8px_30px_rgb(0,0,0,0.02)] relative group transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                    <div className="absolute top-8 right-10 text-[10px] font-bold text-muted-foreground/30 uppercase tracking-[0.2em] group-hover:text-accent/40 transition-colors">
+                      Página {page.pageNumber}
+                    </div>
+                    <div className="prose prose-sage max-w-none">
+                      <div className="whitespace-pre-wrap leading-[1.8] text-foreground/80 text-[1.05rem] font-medium selection:bg-accent/10 selection:text-accent">
+                        {page.text}
+                      </div>
+                    </div>
+                  </section>
+                ))
+              )}
+            </div>
           )}
         </main>
 
@@ -194,12 +236,22 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
               )}
 
               <div className="pt-2 flex flex-col gap-3">
+                {stats.approved > 0 && (
+                  <Button className="w-full rounded-2xl gap-2 h-12 bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200 transition-all hover:scale-[1.02]" asChild>
+                    <Link href={`/practice?blockId=${block.id}`}>
+                      <Play className="w-4 h-4 fill-current" />
+                      Praticar cards
+                    </Link>
+                  </Button>
+                )}
+                
                 <GenerateFlashcardsButton blockId={block.id} hasFlashcards={stats.total > 0} />
+                
                 {stats.total > 0 && (
                   <Button variant="ghost" className="w-full rounded-xl gap-2 h-11 text-muted-foreground hover:text-accent hover:bg-accent/5" asChild>
                     <Link href={`/flashcards?blockId=${block.id}`}>
                       <ExternalLink className="w-4 h-4" />
-                      Ver todos os cards
+                      Repositório de cards
                     </Link>
                   </Button>
                 )}

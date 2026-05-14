@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function GET() {
   try {
-    // For MVP, we use the mock user.
-    const userId = "cm39k012x0001k93jqwerty12";
+    const userId = await getMockUserId();
 
     const subjects = await prisma.studySubject.findMany({
       where: { userId },
@@ -36,8 +36,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, description, priority, examWeight } = body;
     
-    // For MVP, we use the mock user.
-    const userId = "cm39k012x0001k93jqwerty12";
+    const userId = await getMockUserId();
 
     if (!name) {
       return NextResponse.json({ error: "O nome da matéria é obrigatório" }, { status: 400 });

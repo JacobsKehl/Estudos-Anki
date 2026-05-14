@@ -3,20 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  LayoutDashboard, 
   Target, 
+  BookOpen,
   BookMarked, 
-  BrainCircuit,
-  RotateCw
+  Calendar,
+  Trophy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mobileItems = [
-  { label: "Início", href: "/", icon: LayoutDashboard },
-  { label: "Hoje", href: "/today", icon: Target },
+  { label: "Hoje", href: "/", icon: Target },
+  { label: "Cronograma", href: "/schedule", icon: Calendar },
+  { label: "Biblioteca", href: "/materials", icon: BookOpen },
   { label: "Matérias", href: "/subjects", icon: BookMarked },
-  { label: "Cards", href: "/flashcards", icon: BrainCircuit },
-  { label: "Revisar", href: "/reviews", icon: RotateCw },
+  { label: "Stats", href: "/stats", icon: Trophy },
 ];
 
 export function MobileNav() {
