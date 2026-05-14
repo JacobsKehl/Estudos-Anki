@@ -102,7 +102,7 @@ export function ReviewDashboard({ pendingCards, stats }: ReviewDashboardProps) {
                   className="rounded-2xl h-12 md:h-14 px-8 gap-2 shadow-lg shadow-accent/20 w-full sm:w-auto"
                   asChild
                 >
-                  <Link href="/reviews/session">
+                  <Link href="/practice?source=today">
                     <Play className="w-5 h-5 fill-current" />
                     Iniciar Revisão
                   </Link>

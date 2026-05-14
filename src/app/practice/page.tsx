@@ -3,30 +3,40 @@ import { prisma } from "@/lib/prisma";
 import { getMockUserId } from "@/lib/auth-mock";
 import { PracticeDashboard } from "@/components/flashcards/PracticeDashboard";
 
-export default async function PracticePage({ searchParams }: { searchParams: { blockId?: string, blockIds?: string } }) {
-  const mockUserId = await getMockUserId();
-  const { blockId, blockIds } = await searchParams;
+import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
 
-  let ids: string[] = [];
-  if (blockId) ids.push(blockId);
-  if (blockIds) ids = [...ids, ...blockIds.split(",")];
+export default async function PracticePage({ searchParams }: { searchParams: { blockId?: string, blockIds?: string, source?: string } }) {
+  const mockUserId = await getMockUserId();
+  const { blockId, blockIds, source } = await searchParams;
 
   let practiceCards: any[] = [];
 
   try {
-    if (ids.length > 0) {
-      practiceCards = await (prisma as any).flashcard.findMany({
-        where: {
-          userId: mockUserId,
-          status: "APPROVED",
-          studyBlockId: { in: ids }
-        },
-        include: {
-          subject: { select: { name: true } },
-          studyBlock: { select: { id: true, title: true } }
-        },
-        orderBy: { reviewState: "asc" } // NEW cards first
-      });
+    if (source === "today") {
+      const { cards } = await getUnifiedTodayCards(mockUserId);
+      practiceCards = cards;
+    } else {
+      let ids: string[] = [];
+      if (blockId) ids.push(blockId);
+      if (blockIds) ids = [...ids, ...blockIds.split(",")];
+
+      if (ids.length > 0) {
+        practiceCards = await (prisma as any).flashcard.findMany({
+          where: {
+            userId: mockUserId,
+            status: "APPROVED",
+            studyBlockId: { in: ids }
+          },
+          include: {
+            subject: { select: { name: true } },
+            studyBlock: { select: { id: true, title: true } }
+          },
+          orderBy: [
+            { studyBlockId: "asc" },
+            { createdAt: "asc" }
+          ]
+        });
+      }
     }
   } catch (error) {
     console.error("Failed to fetch practice cards:", error);

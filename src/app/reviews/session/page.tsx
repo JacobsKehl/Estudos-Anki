@@ -10,6 +10,50 @@ export default async function ReviewSessionPage() {
   const mockUserId = await getMockUserId();
   const now = new Date();
 
+  // 1. Get today's block IDs to exclude them (they are in "Cards do Dia")
+  let todayBlockIds: string[] = [];
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    const todayItems = await (prisma as any).studyScheduleItem.findMany({
+      where: {
+        userId: mockUserId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+        schedule: { status: "ACTIVE" },
+        scheduledDate: { gte: todayStart, lt: todayEnd },
+      },
+      select: { studyBlockId: true }
+    });
+
+    todayBlockIds = todayItems
+      .filter((item: any) => item.studyBlockId)
+      .map((item: any) => item.studyBlockId);
+
+    // Fallback logic matching page.tsx: include latest 5 blocks with cards
+    if (todayBlockIds.length === 0) {
+      const allWithCards = await (prisma as any).studyBlock.findMany({
+        where: { userId: mockUserId },
+        include: {
+          flashcards: {
+            where: { status: "APPROVED" },
+            select: { id: true }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      });
+
+      todayBlockIds = allWithCards
+        .filter((b: any) => b.flashcards.length > 0)
+        .map((b: any) => b.id);
+    }
+  } catch (e) {
+    console.error("Failed to fetch today block IDs for review exclusion:", e);
+  }
+
   let pendingCards: any[] = [];
 
   try {
@@ -18,7 +62,8 @@ export default async function ReviewSessionPage() {
         userId: mockUserId,
         status: "APPROVED",
         nextReviewAt: { lte: now },
-        reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] }
+        reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] },
+        studyBlockId: { notIn: todayBlockIds }
       },
       include: {
         subject: { select: { name: true } }
@@ -32,6 +77,7 @@ export default async function ReviewSessionPage() {
         reviewState: true,
         intervalDays: true,
         learningStep: true,
+        easeFactor: true,
         subject: { select: { name: true } }
       },
       orderBy: { nextReviewAt: "asc" }

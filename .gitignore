@@ -9,3 +9,8 @@ node/
 # Outros arquivos temporários
 .vercel
 *.tsbuildinfo
+dist/
+database.db
+prisma/dev.db
+prisma/dev.db-journal
+*.log

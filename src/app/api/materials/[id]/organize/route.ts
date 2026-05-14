@@ -97,7 +97,8 @@ export async function POST(
     // 4. Identificar matéria se não tiver
     let subjectId = material.subjectId;
     if (!subjectId) {
-      const detectedSubject = await identifySubject(extractedText.substring(0, 3000), material.fileName);
+      const idResult = await identifySubject(extractedText.substring(0, 3000), material.fileName);
+      const detectedSubject = idResult.subjectName;
 
       let subject = await prisma.studySubject.findFirst({
         where: { userId, name: { contains: detectedSubject } }

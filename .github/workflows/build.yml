@@ -1,0 +1,47 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Next.js
+        run: npm run build
+
+      - name: Build and Publish Electron App
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Set to true to release the build after it's been published
+          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          # If on macOS, we build for Mac. If on Windows, we build for Windows.
+          args: |
+            --${{ matrix.os == 'macos-latest' && 'mac' || 'win' }} \
+            ${{ matrix.os == 'macos-latest' && '--arm64 --x64' || '' }}
+        env:
+          # Use the default GitHub token for publishing
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,6 @@
 /**
  * Anki-style Spaced Repetition System (SRS) algorithm implementation.
- * Based on SM-2 variant used by Anki.
+ * Based on standard Anki behavior (v2 scheduler style).
  */
 
 export type FlashcardRating = 1 | 2 | 3 | 4; // 1=Again, 2=Hard, 3=Good, 4=Easy
@@ -26,136 +26,145 @@ interface SRSOutput {
 const LEARNING_STEPS_MINUTES = [1, 10];
 const RELEARNING_STEPS_MINUTES = [10];
 const MIN_EASE_FACTOR = 1.3;
+const DEFAULT_EASE_FACTOR = 2.5;
 const GRADUATING_INTERVAL = 1;
 const EASY_INTERVAL = 4;
 
+/**
+ * Calculates the next review date and state for a flashcard based on a user rating.
+ */
 export function calculateNextReview(input: SRSInput, rating: FlashcardRating): SRSOutput {
   const { state, learningStep, easeFactor, intervalDays, lapseCount } = input;
   const now = new Date();
+  const currentEase = easeFactor || DEFAULT_EASE_FACTOR;
 
   // --- NEW STATE ---
   if (state === "NEW") {
-    if (rating === 1) { // AGAIN
+    if (rating === 1) { // AGAIN (Errei)
       return {
         state: "LEARNING",
         learningStep: 0,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: 0,
         lapseCount,
-        nextReviewAt: addMinutes(now, LEARNING_STEPS_MINUTES[0]),
+        nextReviewAt: addMinutes(now, 1),
       };
     }
-    if (rating === 2) { // HARD
+    if (rating === 2) { // HARD (Difícil)
       return {
         state: "LEARNING",
         learningStep: 0,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: 0,
         lapseCount,
-        nextReviewAt: addMinutes(now, 6), // Anki logic: halfway between 1m and 10m
+        nextReviewAt: addMinutes(now, 6),
       };
     }
-    if (rating === 3) { // GOOD
+    if (rating === 3) { // GOOD (Bom)
       return {
         state: "LEARNING",
         learningStep: 1,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: 0,
         lapseCount,
-        nextReviewAt: addMinutes(now, LEARNING_STEPS_MINUTES[1]),
+        nextReviewAt: addMinutes(now, 10),
       };
     }
-    if (rating === 4) { // EASY
+    if (rating === 4) { // EASY (Fácil)
       return {
         state: "REVIEW",
         learningStep: 0,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: EASY_INTERVAL,
         lapseCount,
-        nextReviewAt: addDays(now, EASY_INTERVAL),
+        nextReviewAt: addDaysAtStartOfDay(now, EASY_INTERVAL),
       };
     }
   }
 
   // --- LEARNING STATE ---
   if (state === "LEARNING") {
-    if (rating === 1) { // AGAIN
+    if (rating === 1) { // AGAIN (Errei)
       return {
         state: "LEARNING",
         learningStep: 0,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: 0,
         lapseCount,
-        nextReviewAt: addMinutes(now, LEARNING_STEPS_MINUTES[0]),
+        nextReviewAt: addMinutes(now, 1),
       };
     }
-    if (rating === 2) { // HARD
+    if (rating === 2) { // HARD (Difícil)
+      // Repeat current step: 6m if step 0, 10m if step 1
+      const hardMinutes = learningStep === 0 ? 6 : 10;
       return {
         state: "LEARNING",
         learningStep,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: 0,
         lapseCount,
-        nextReviewAt: addMinutes(now, LEARNING_STEPS_MINUTES[learningStep]),
+        nextReviewAt: addMinutes(now, hardMinutes),
       };
     }
-    if (rating === 3) { // GOOD
-      if (learningStep < LEARNING_STEPS_MINUTES.length - 1) {
+    if (rating === 3) { // GOOD (Bom)
+      if (learningStep === 0) {
+        // Move to step 1 (10 min)
         return {
           state: "LEARNING",
-          learningStep: learningStep + 1,
-          easeFactor,
+          learningStep: 1,
+          easeFactor: currentEase,
           intervalDays: 0,
           lapseCount,
-          nextReviewAt: addMinutes(now, LEARNING_STEPS_MINUTES[learningStep + 1]),
+          nextReviewAt: addMinutes(now, 10),
         };
       } else {
-        // Graduate to REVIEW
+        // Graduate to REVIEW (1 day)
         return {
           state: "REVIEW",
           learningStep: 0,
-          easeFactor,
+          easeFactor: currentEase,
           intervalDays: GRADUATING_INTERVAL,
           lapseCount,
-          nextReviewAt: addDays(now, GRADUATING_INTERVAL),
+          nextReviewAt: addDaysAtStartOfDay(now, GRADUATING_INTERVAL),
         };
       }
     }
-    if (rating === 4) { // EASY
+    if (rating === 4) { // EASY (Fácil)
       return {
         state: "REVIEW",
         learningStep: 0,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: EASY_INTERVAL,
         lapseCount,
-        nextReviewAt: addDays(now, EASY_INTERVAL),
+        nextReviewAt: addDaysAtStartOfDay(now, EASY_INTERVAL),
       };
     }
   }
 
   // --- REVIEW STATE ---
   if (state === "REVIEW") {
-    let newEase = easeFactor;
-    let newInterval = intervalDays;
-
-    if (rating === 1) { // AGAIN
+    if (rating === 1) { // AGAIN (Errei)
       return {
         state: "RELEARNING",
         learningStep: 0,
-        easeFactor: Math.max(MIN_EASE_FACTOR, easeFactor - 0.2),
+        easeFactor: currentEase, // Anki doesn't typically change ease on Again in Review, just interval
         intervalDays: 0,
         lapseCount: lapseCount + 1,
-        nextReviewAt: addMinutes(now, RELEARNING_STEPS_MINUTES[0]),
+        nextReviewAt: addMinutes(now, 10),
       };
     }
-    if (rating === 2) { // HARD
-      newEase = Math.max(MIN_EASE_FACTOR, easeFactor - 0.15);
+    
+    let newEase = currentEase;
+    let newInterval = intervalDays;
+
+    if (rating === 2) { // HARD (Difícil)
+      newEase = Math.max(MIN_EASE_FACTOR, currentEase - 0.15);
       newInterval = Math.max(1, Math.round(intervalDays * 1.2));
-    } else if (rating === 3) { // GOOD
-      newInterval = Math.max(1, Math.round(intervalDays * easeFactor));
-    } else if (rating === 4) { // EASY
-      newEase = easeFactor + 0.15;
-      newInterval = Math.max(1, Math.round(intervalDays * easeFactor * 1.3));
+    } else if (rating === 3) { // GOOD (Bom)
+      newInterval = Math.max(1, Math.round(intervalDays * currentEase));
+    } else if (rating === 4) { // EASY (Fácil)
+      newEase = currentEase + 0.15;
+      newInterval = Math.max(1, Math.round(intervalDays * currentEase * 1.3));
     }
 
     return {
@@ -164,45 +173,47 @@ export function calculateNextReview(input: SRSInput, rating: FlashcardRating): S
       easeFactor: newEase,
       intervalDays: newInterval,
       lapseCount,
-      nextReviewAt: addDays(now, newInterval),
+      nextReviewAt: addDaysAtStartOfDay(now, newInterval),
     };
   }
 
   // --- RELEARNING STATE ---
   if (state === "RELEARNING") {
-    if (rating === 1 || rating === 2) { // AGAIN or HARD
+    if (rating === 1 || rating === 2) { // AGAIN (Errei) or HARD (Difícil)
       return {
         state: "RELEARNING",
         learningStep: 0,
-        easeFactor,
+        easeFactor: currentEase,
         intervalDays: 0,
         lapseCount,
-        nextReviewAt: addMinutes(now, RELEARNING_STEPS_MINUTES[0]),
+        nextReviewAt: addMinutes(now, 10),
       };
     }
-    if (rating === 3) { // GOOD
+    if (rating === 3) { // GOOD (Bom)
       return {
         state: "REVIEW",
         learningStep: 0,
-        easeFactor,
-        intervalDays: Math.max(1, intervalDays),
+        easeFactor: currentEase,
+        intervalDays: Math.max(1, intervalDays), // Keep previous interval or min 1
         lapseCount,
-        nextReviewAt: addDays(now, 1),
+        nextReviewAt: addDaysAtStartOfDay(now, 1),
       };
     }
-    if (rating === 4) { // EASY
+    if (rating === 4) { // EASY (Fácil)
+      const boostedInterval = Math.max(1, Math.round(Math.max(intervalDays, 1) * 1.3));
       return {
         state: "REVIEW",
         learningStep: 0,
-        easeFactor,
-        intervalDays: Math.max(1, Math.round(intervalDays * 1.3)),
+        easeFactor: currentEase,
+        intervalDays: boostedInterval,
         lapseCount,
-        nextReviewAt: addDays(now, 1),
+        nextReviewAt: addDaysAtStartOfDay(now, boostedInterval),
       };
     }
   }
 
-  return { ...input, nextReviewAt: addDays(now, 1) };
+  // Fallback
+  return { ...input, nextReviewAt: addDaysAtStartOfDay(now, 1) };
 }
 
 // Helper functions
@@ -212,9 +223,12 @@ function addMinutes(date: Date, minutes: number): Date {
   return result;
 }
 
-function addDays(date: Date, days: number): Date {
+/**
+ * Adds days to a date and returns the resulting date at 00:00:00.
+ */
+function addDaysAtStartOfDay(date: Date, days: number): Date {
   const result = new Date(date);
-  result.setHours(0, 0, 0, 0); // Start of day for daily intervals
+  result.setHours(0, 0, 0, 0); // Start of day
   result.setDate(result.getDate() + days);
   return result;
 }

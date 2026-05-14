@@ -78,8 +78,22 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
   });
 
   // 4. Distribuir tarefas nos dias seguindo o ciclo TRT4
-  const scheduleItemsData: object[] = [];
+  const scheduleItemsData: any[] = [];
   const now = new Date();
+  
+  // Rastrear IDs de blocos já agendados (no banco ou nesta sessão) para evitar duplicidade
+  const alreadyScheduledItems = await (prisma as any).studyScheduleItem.findMany({
+    where: {
+      userId,
+      status: { notIn: ["CANCELLED", "ARCHIVED"] },
+      studyBlockId: { not: null }
+    },
+    select: { studyBlockId: true }
+  });
+  
+  const scheduledBlockIds = new Set<string>(
+    alreadyScheduledItems.map((i: any) => i.studyBlockId)
+  );
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const candidateDate = addDays(startDate, dayOffset);
@@ -90,11 +104,10 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
     const dayNumber = dayOffset + 1;
 
     // A. Adicionar Reserva de SRS (30 min)
-    // Procuramos uma tarefa de flashcards ou criamos uma genérica
     scheduleItemsData.push({
       userId,
       scheduleId: schedule.id,
-      subjectId: userSubjects[0]?.id || "default", // placeholder if no subject
+      subjectId: userSubjects[0]?.id || "default",
       actionType: "REVIEW_FLASHCARDS",
       priorityScore: 100,
       reason: "Sessão diária de Revisão de Cards (SRS)",
@@ -109,21 +122,22 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
       const subject = userSubjects.find(s => s.name.toLowerCase().includes(subName.toLowerCase()));
       
       if (subject) {
-        // Verificar regra dos 90 dias para matérias de apoio
+        // Verificar regra dos 90 dias
         const strategySub = TRT4_STRATEGY.subjects.find(s => s.name === subName);
         if (strategySub?.cycleStartAfterDays) {
           const daysSinceSubjectCreated = (now.getTime() - subject.createdAt.getTime()) / (1000 * 60 * 60 * 24);
           if (daysSinceSubjectCreated < strategySub.cycleStartAfterDays) {
-            continue; // Pula se ainda não deu o prazo
+            continue;
           }
         }
 
-        // Buscar o próximo bloco pendente desta matéria
+        // Buscar o próximo bloco pendente desta matéria que NÃO esteja agendado
         const nextBlock = await (prisma as any).studyBlock.findFirst({
           where: {
             subjectId: subject.id,
             userId,
             theoryStatus: "NOT_STARTED",
+            id: { notIn: Array.from(scheduledBlockIds) }
           },
           orderBy: { orderIndex: "asc" },
         });
@@ -142,6 +156,9 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
             estimatedMinutes: TRT4_STRATEGY.minutesPerStudyBlock,
             status: "PENDING",
           });
+          
+          // Marcar como agendado para não repetir
+          scheduledBlockIds.add(nextBlock.id);
         }
       }
     }

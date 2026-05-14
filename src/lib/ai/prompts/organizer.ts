@@ -34,25 +34,27 @@ export const STRUCTURE_DETECTION_PROMPT = `Você é um especialista em análise 
 Sua tarefa é analisar o sumário ou as páginas iniciais de um material e identificar a estrutura de capítulos e tópicos para dividir o material em BLOCOS DE ESTUDO lógicos.
 
 Regras de Qualidade CRÍTICAS:
-1. PROIBIDO TÍTULOS GENÉRICOS: Nunca use títulos como "Todo Conteúdo", "Material Completo", "Resumo Geral", "Apostila Inteira" ou "PDF Completo". O título deve ser o ASSUNTO REAL (ex: "Controle de Constitucionalidade").
+1. PROIBIDO TÍTULOS GENÉRICOS: Nunca use títulos como "Parte 1 do Conteúdo", "Conteúdo Completo", "Todo Conteúdo", "Material Completo", "Resumo Geral", "Conteúdo da Matéria", "Apostila Completa", "PDF Completo", "Material Geral" ou similares. 
+   - É PROIBIDO usar "Parte X", "Bloco X" ou "Conteúdo X" de forma genérica se não houver um assunto acompanhando.
+   - O título deve ser o ASSUNTO REAL e ESPECÍFICO (ex: "Controle de Constitucionalidade", "Atos Administrativos - Atributos").
 2. SUBDIVISÃO OBRIGATÓRIA: Não crie um bloco único para o material inteiro. Divida o material em unidades temáticas menores.
-3. TAMANHO DOS BLOCOS: Cada bloco deve ter preferencialmente entre 5 e 12 páginas. Se um assunto for muito longo, divida-o em "Parte 1", "Parte 2", etc.
-4. TÍTULOS ESPECÍFICOS: Use os títulos de capítulos e subtítulos encontrados no texto.
-5. DESCRIÇÕES OBJETIVAS: Explique em uma frase o que o estudante aprenderá neste bloco.
+3. TAMANHO DOS BLOCOS: Cada bloco deve ter preferencialmente entre 5 e 12 páginas. Se um assunto for muito longo, divida-o por subtemas reais.
+4. TÍTULOS ESPECÍFICOS: Use os títulos de capítulos, seções, temas e subtítulos encontrados no texto.
+5. DESCRIÇÕES OBJETIVAS: Explique em uma frase o que o estudante aprenderá neste bloco. Seja específico.
 6. ESTIMATIVA REALISTA: Calcule o tempo de estudo baseando-se em ~3-4 minutos por página de conteúdo técnico.
 7. COERÊNCIA: O bloco deve ter um início e fim que façam sentido temático.
 
 Regras de quantidade mínima:
-- Se o PDF for longo (> 50 páginas), crie pelo menos 8 blocos.
-- Se o PDF tiver entre 21 e 50 páginas, crie pelo menos 5 blocos.
-- Se o PDF tiver entre 6 e 20 páginas, crie pelo menos 3 blocos.
-- Se o PDF for muito curto (<= 5 páginas), tente criar 2 blocos se houver mudança de assunto.
+- Se o PDF for longo (> 50 páginas), crie pelo menos 8 blocos temáticos.
+- Se o PDF tiver entre 21 e 50 páginas, crie pelo menos 5 blocos temáticos.
+- Se o PDF tiver entre 6 e 20 páginas, crie pelo menos 3 blocos temáticos.
+- Se o PDF tiver até 5 páginas úteis, crie 2 blocos se houver mudança de assunto.
 
 Formato esperado (JSON):
 [
   {
-    "title": "Nome do Tópico Específico (Ex: Atos Administrativos - Conceitos)",
-    "description": "Estudo sobre os conceitos fundamentais e atributos dos atos administrativos.",
+    "title": "Nome do Tópico Específico (Ex: Princípios do Direito do Trabalho)",
+    "description": "Estudo detalhado sobre os princípios fundamentais e protetivos do Direito do Trabalho.",
     "pageStart": 1,
     "pageEnd": 10,
     "sourceHeading": "Título original no PDF",

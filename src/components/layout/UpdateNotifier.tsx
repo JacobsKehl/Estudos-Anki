@@ -18,12 +18,16 @@ export function UpdateNotifier() {
 
     const { receive, send } = (window as any).electron;
 
-    receive("checking_updates", () => setStatus("checking"));
+    receive("checking_updates", () => {
+      setStatus("checking");
+      toast.loading("Verificando atualizações...", { id: "update-toast" });
+    });
     
     receive("update_available", (info: any) => {
       setStatus("available");
-      toast.info(`Nova versão disponível: ${info.version}`, {
-        description: "Deseja baixar agora?",
+      toast.info("Nova versão disponível.", {
+        id: "update-toast",
+        description: `Versão ${info.version} encontrada. Deseja baixar?`,
         action: {
           label: "Baixar",
           onClick: () => send("start-download"),
@@ -34,12 +38,14 @@ export function UpdateNotifier() {
     receive("download_progress", (progressObj: any) => {
       setStatus("downloading");
       setProgress(Math.round(progressObj.percent));
+      toast.loading("Baixando atualização...", { id: "update-toast" });
     });
 
     receive("update_downloaded", () => {
       setStatus("downloaded");
-      toast.success("Atualização baixada!", {
-        description: "O aplicativo precisa ser reiniciado para aplicar as mudanças.",
+      toast.success("Atualização baixada.", {
+        id: "update-toast",
+        description: "Reinicie o aplicativo para instalar.",
         action: {
           label: "Reiniciar",
           onClick: () => send("quit-and-install"),
@@ -50,10 +56,16 @@ export function UpdateNotifier() {
     receive("update_error", (err: string) => {
       setStatus("error");
       setError(err);
-      toast.error("Erro na atualização", { description: err });
+      toast.error("Não foi possível verificar atualizações agora.", { 
+        id: "update-toast",
+        description: "Tente novamente mais tarde." 
+      });
     });
 
-    receive("update_not_available", () => setStatus("idle"));
+    receive("update_not_available", () => {
+      setStatus("idle");
+      toast.dismiss("update-toast");
+    });
 
   }, []);
 

@@ -23,8 +23,10 @@ Regras para CLOZE:
 - Exemplo: "A capital da França é {{c1::Paris}}." -> answer: "Paris"
 
 Regras de Formatação:
-- Retorne entre 6 e 12 cards por bloco de texto.
-- Varie entre os dois tipos.
+- Gere no máximo 15 flashcards para este bloco de estudo.
+- Priorize os conceitos mais importantes: definições, regras, exceções, prazos, classificações e pontos com maior potencial de cobrança em provas.
+- Não gere cards redundantes. Prefira qualidade em vez de quantidade.
+- Varie entre os dois tipos (QUESTION_ANSWER e CLOZE).
 - Retorne exclusivamente JSON válido.
 
 Formato obrigatório (JSON):

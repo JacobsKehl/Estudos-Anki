@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { completeStudyBlock } from "@/lib/study/completion";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 

@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, CheckCircle2, FileText, BrainCircuit, AlertCircle } from "lucide-react";
+import { Sparkles, Loader2, CheckCircle2, FileText, BrainCircuit, AlertCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 interface OrganizeAllButtonProps {
   unorganizedCount: number;
+  force?: boolean;
 }
 
 type PipelineStep = "idle" | "extracting" | "analyzing" | "blocking" | "flashcards" | "done" | "error";
@@ -22,7 +23,7 @@ const STEP_LABELS: Record<PipelineStep, string> = {
   error: "Erro na organização",
 };
 
-export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) {
+export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeAllButtonProps) {
   const [step, setStep] = useState<PipelineStep>("idle");
   const [processed, setProcessed] = useState(0);
   const [totalFlashcards, setTotalFlashcards] = useState(0);
@@ -32,8 +33,12 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
   const isSuccess = step === "done";
 
   const handleOrganize = async () => {
-    if (unorganizedCount === 0) {
+    if (!force && unorganizedCount === 0) {
       toast.info("Tudo organizado! Seus PDFs já foram analisados.");
+      return;
+    }
+
+    if (force && !confirm("Isso irá apagar os blocos e cards atuais para re-organizar tudo com IA. Deseja continuar?")) {
       return;
     }
 
@@ -45,18 +50,21 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
     let totalCards = 0;
     let totalBlocks = 0;
     let totalErrors = 0;
-    const remaining = unorganizedCount;
+    // No modo force, processamos todos os materiais (um por um via API)
+    const totalToProcess = force ? 999 : unorganizedCount; 
 
-    for (let i = 0; i < remaining; i++) {
+    for (let i = 0; i < totalToProcess; i++) {
       const toastId = `organize-${i}`;
       const pdfNum = i + 1;
 
       try {
         setStep("extracting");
-        toast.loading(`PDF ${pdfNum}/${remaining}: Processando...`, { id: toastId });
+        toast.loading(force ? `Reorganizando PDF ${pdfNum}...` : `PDF ${pdfNum}/${totalToProcess}: Processando...`, { id: toastId });
 
         const res = await fetch("/api/materials/organize-all", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force }),
         });
         const data = await res.json();
 
@@ -105,6 +113,7 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
             <p>• PDFs processados: {totalProcessed + totalErrors}</p>
             <p>• Blocos criados: {totalBlocks}</p>
             <p>• Flashcards gerados: {totalCards}</p>
+            <p>• Limite aplicado: máximo de 15 por bloco</p>
             <p>• Cards aguardando aprovação: {totalCards}</p>
             <p>• Cronograma atualizado: Sim</p>
           </div>
@@ -129,7 +138,7 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
     }
   };
 
-  if (unorganizedCount === 0) {
+  if (!force && unorganizedCount === 0) {
     return (
       <Button
         variant="outline"
@@ -163,8 +172,8 @@ export function OrganizeAllButton({ unorganizedCount }: OrganizeAllButtonProps) 
           </>
         ) : (
           <>
-            <Sparkles className="w-5 h-5 mr-3" />
-            Organizar meus estudos ({unorganizedCount})
+            {force ? <RefreshCw className="w-5 h-5 mr-3" /> : <Sparkles className="w-5 h-5 mr-3" />}
+            {force ? "Reorganizar meus estudos" : `Organizar meus estudos (${unorganizedCount})`}
           </>
         )}
       </Button>

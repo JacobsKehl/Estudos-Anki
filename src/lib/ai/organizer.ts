@@ -74,10 +74,20 @@ export interface DetectedBlock {
   createdBy?: string;
 }
 
+const FORBIDDEN_GENERIC_PATTERNS = [
+  /^parte\s+\d+/i,
+  /^conteúdo\s+\d+/i,
+  /^conteudo\s+\d+/i,
+  /^bloco\s+\d+$/i
+];
+
 const GENERIC_TITLES = [
-  "TODO CONTEUDO", "CONTEUDO COMPLETO", "MATERIAL COMPLETO", "RESUMO GERAL", 
-  "MATERIAL INTEIRO", "MATERIAL GERAL", "PDF COMPLETO", "APOSTILA COMPLETA",
-  "TODOS OS TOPICOS", "CONTEUDO DA MATERIA", "MATERIAL INTEGRA", "TODO O PDF",
+  "TODO CONTEUDO", "TODO O CONTEUDO", "CONTEUDO COMPLETO", "CONTEUDO COMPLETO", 
+  "MATERIAL COMPLETO", "MATERIAL GERAL", "RESUMO GERAL", "CONTEUDO GERAL",
+  "CONTEUDO GERAL", "CONTEUDO DA MATERIA", "CONTEUDO DA MATERIA",
+  "APOSTILA COMPLETA", "PDF COMPLETO", "PARTE 1 DO CONTEUDO",
+  "PARTE 2 DO CONTEUDO", "PARTE 3 DO CONTEUDO", "PARTE DO CONTEUDO",
+  "PARTE DO CONTEUDO", "MATERIAL INTEGRA", "TODO O PDF",
   "CONTEUDO INTEGRAL", "VISAO GERAL", "ESTUDO COMPLETO", "APOSTILA", "PDF", 
   "CONTEUDO", "SUMARIO", "CAPITULO", "INTRODUCAO"
 ];
@@ -101,21 +111,28 @@ export async function detectStructure(summaryContent: string, totalPages: number
       const response = await result.response;
       lastResponse = response.text();
       
-      const cleanJson = lastResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+      const startIndex = lastResponse.indexOf("[");
+      const endIndex = lastResponse.lastIndexOf("]");
+      if (startIndex === -1) throw new Error("JSON não encontrado");
+      
+      const cleanJson = lastResponse.substring(startIndex, endIndex + 1);
       const blocks: DetectedBlock[] = JSON.parse(cleanJson);
 
       // --- Validação ---
       const errors: string[] = [];
 
       // 1. Títulos genéricos
-      const hasGenericTitle = blocks.some(b => 
-        GENERIC_TITLES.some(gt => b.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(gt))
-      );
-      if (hasGenericTitle) errors.push("Contém títulos genéricos proibidos.");
+      const hasGenericTitle = blocks.some(b => {
+        const titleNorm = b.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
+        const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(b.title));
+        return isForbiddenLiteral || isForbiddenPattern;
+      });
+      if (hasGenericTitle) errors.push("Contém títulos genéricos proibidos (Parte X, Conteúdo Completo, etc).");
 
       // 2. Bloco único para material longo
       if (blocks.length === 1 && totalPages > 5) {
-        errors.push("Criou apenas um bloco para um material com mais de 5 páginas.");
+        errors.push("Criou apenas um bloco para um material longo. Divida por assuntos específicos.");
       }
 
       // 3. Quantidade mínima de blocos
@@ -128,10 +145,6 @@ export async function detectStructure(summaryContent: string, totalPages: number
         errors.push(`Quantidade insuficiente de blocos (encontrado ${blocks.length}, esperado no mínimo ${minBlocks}).`);
       }
 
-      // 4. Blocos muito grandes
-      const hasHugeBlock = blocks.some(b => (b.pageEnd - b.pageStart + 1) > 12 && totalPages > 12);
-      if (hasHugeBlock) errors.push("Alguns blocos estão grandes demais (mais de 12 páginas).");
-
       if (errors.length === 0) {
         return blocks;
       }
@@ -139,7 +152,7 @@ export async function detectStructure(summaryContent: string, totalPages: number
       // Se falhou na validação, tenta de novo com prompt de correção
       attempts++;
       console.warn(`[AI] Tentativa ${attempts} falhou: ${errors.join(" ")}`);
-      currentPrompt = initialPrompt + `\n\nERRO NA TENTATIVA ANTERIOR: ${errors.join(" ")}\nPOR FAVOR, DIVIDA O MATERIAL EM MAIS BLOCOS E USE TÍTULOS ESPECÍFICOS DO CONTEÚDO. É PROIBIDO USAR TÍTULOS GENÉRICOS.`;
+      currentPrompt = initialPrompt + `\n\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros: ${errors.join(" ")}\nPOR FAVOR, extraia títulos reais do PDF. Não use "Parte X" ou "Conteúdo Completo".`;
       
     } catch (error) {
       console.error("Erro ao detectar estrutura:", error);
@@ -148,7 +161,7 @@ export async function detectStructure(summaryContent: string, totalPages: number
   }
 
   // --- Fallback Seguro se falhou após retries ---
-  console.warn(`[AI] Usando fallback para ${totalPages} páginas.`);
+  console.warn(`[AI] Usando fallback temático para ${totalPages} páginas.`);
   const fallbackBlocks: DetectedBlock[] = [];
   const pageSize = totalPages > 50 ? 10 : 6;
   const numBlocks = Math.ceil(totalPages / pageSize);
@@ -156,12 +169,17 @@ export async function detectStructure(summaryContent: string, totalPages: number
   for (let i = 0; i < numBlocks; i++) {
     const start = i * pageSize + 1;
     const end = Math.min((i + 1) * pageSize, totalPages);
+    
+    let fallbackTitle = `Tópicos centrais do material (Bloco ${i + 1})`;
+    if (i === 0) fallbackTitle = "Tópicos iniciais e fundamentos";
+    if (i === numBlocks - 1 && numBlocks > 1) fallbackTitle = "Questões e consolidação do conteúdo";
+
     fallbackBlocks.push({
-      title: `Parte ${i + 1} do Conteúdo`,
-      description: "Divisão automática provisória por páginas. Revise os blocos se necessário.",
+      title: fallbackTitle,
+      description: "Divisão automática provisória baseada no volume de páginas. Revise o conteúdo.",
       pageStart: start,
       pageEnd: end,
-      sourceHeading: "Divisão Automática",
+      sourceHeading: "Divisão Automática (Fallback)",
       estimatedStudyMinutes: (end - start + 1) * 3,
       confidence: 0.3,
       createdBy: "AI_FALLBACK"

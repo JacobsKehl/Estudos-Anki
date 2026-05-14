@@ -16,6 +16,8 @@ interface DetectedBlock {
   pageEnd: number;
   estimatedStudyMinutes: number;
   sourceHeading?: string;
+  createdBy?: string;
+  confidence?: number;
 }
 
 interface PageContent {
@@ -72,7 +74,7 @@ async function extractAllPages(filePath: string): Promise<{ pages: PageContent[]
 
 // ─── Pipeline por material ─────────────────────────────────────────────────────
 
-async function processMaterial(material: any, userId: string) {
+async function processMaterial(material: any, userId: string, isReorganizing: boolean = false) {
   const log = (msg: string) => console.log(`[ORGANIZE] ${material.fileName}: ${msg}`);
   const result = { blocks: 0, flashcards: 0, subjectCreated: false };
 
@@ -133,7 +135,7 @@ async function processMaterial(material: any, userId: string) {
     if (!subject) {
       const allSubjects = await prisma.studySubject.findMany({
         where: { userId },
-        select: { id: true, name: true }
+        select: { id: true, name: true, createdAt: true, updatedAt: true, description: true, priority: true, examWeight: true, progress: true, userId: true }
       });
       subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;
     }
@@ -245,6 +247,25 @@ async function processMaterial(material: any, userId: string) {
 
     result.blocks++;
 
+    // ── REORGANIZAÇÃO: Re-vincular cards órfãos ──────────────────────────
+    if (isReorganizing) {
+      log(`[Relink] Buscando cards para o novo bloco: ${studyBlock.title} (p.${pageStart}-${pageEnd})`);
+      const relinkResult = await prisma.flashcard.updateMany({
+        where: {
+          materialId: material.id,
+          studyBlockId: null,
+          sourcePageStart: { gte: pageStart, lte: pageEnd }
+        },
+        data: {
+          studyBlockId: studyBlock.id
+        }
+      });
+      if (relinkResult.count > 0) {
+        log(`[Relink] ${relinkResult.count} cards re-vinculados a este bloco.`);
+        result.flashcards += relinkResult.count;
+      }
+    }
+
     // Buscar texto das páginas deste bloco
     const blockPages = pages.filter(
       p => p.pageNumber >= pageStart && p.pageNumber <= pageEnd && p.text.length > 10
@@ -256,9 +277,21 @@ async function processMaterial(material: any, userId: string) {
       continue;
     }
 
+    // Gerar flashcards com IA (Apenas se NÃO for reorganização)
+    if (isReorganizing) {
+      log(`[Reorganize] Pulando geração de novos flashcards.`);
+      continue;
+    }
+
     // Gerar flashcards com IA (Apenas se o bloco for confiável/temático)
-    if (studyBlock.confidence && studyBlock.confidence < 0.5) {
-      log(`Bloco "${studyBlock.title}": baixa confiança (fallback), pulando geração de flashcards.`);
+    const isGenericTitle = 
+      studyBlock.title.toLowerCase().includes("parte ") || 
+      studyBlock.title.toLowerCase().includes("conteúdo ") ||
+      studyBlock.title.toLowerCase().includes("bloco ") ||
+      studyBlock.title.toLowerCase().includes("fallback");
+
+    if (isGenericTitle || (studyBlock.confidence && studyBlock.confidence < 0.5)) {
+      log(`Bloco "${studyBlock.title}": título genérico ou baixa confiança, pulando geração automática de flashcards.`);
       continue;
     }
 
@@ -267,37 +300,71 @@ async function processMaterial(material: any, userId: string) {
       log(`[Flashcards] Iniciando geração para blockId=${studyBlock.id}`);
       log(`[Flashcards] Texto do bloco: ${charCount} caracteres`);
       
-      log(`[Flashcards] Chamando Gemini...`);
-      const cards = await generateFlashcards(blockText.substring(0, 6000));
-      log(`[Flashcards] Gemini retornou: ${cards.length} cards`);
+        log(`[Flashcards] Chamando Gemini...`);
+        const cards = await generateFlashcards(blockText.substring(0, 6000));
+        log(`[Flashcards] Gemini retornou: ${cards.length} cards`);
 
-      if (cards.length > 0) {
-        // Inicializar campos SRS como NULL para pending cards conforme solicitado
-        const flashcardsData = cards.map(card => ({
-          userId,
-          subjectId: subjectId as string,
-          materialId: material.id,
-          studyBlockId: studyBlock.id,
-          question: card.question,
-          answer: card.answer,
-          type: card.type,
-          difficulty: card.difficulty,
-          status: "APPROVED",
-          reviewState: "NEW",       
-          nextReviewAt: new Date(),      
-          approvedAt: new Date(),        
-          learningStep: 0,
-          easeFactor: 2.5,
-          intervalDays: 0,
-          repetitionCount: 0,
-          lapseCount: 0,
-          sourcePageStart: pageStart,
-          sourcePageEnd: pageEnd,
-        }));
+        if (cards.length > 0) {
+          // Semantic deduplication before saving
+          const existingCards = await prisma.flashcard.findMany({
+            where: { studyBlockId: studyBlock.id },
+            select: { question: true, answer: true }
+          });
 
-        const createResult = await prisma.flashcard.createMany({
-          data: flashcardsData
-        });
+          const { normalizeText } = await import("@/lib/srs/srs-utils");
+          const normalizedExisting = existingCards.map(c => ({
+            q: normalizeText(c.question),
+            a: normalizeText(c.answer)
+          }));
+
+          // 1. Remover duplicados
+          const uniqueNewCards = cards.filter(newCard => {
+            const normQ = normalizeText(newCard.question);
+            const normA = normalizeText(newCard.answer);
+            const isDuplicate = normalizedExisting.some(ext => 
+              ext.q === normQ || (ext.q === normQ && ext.a === normA)
+            );
+            return !isDuplicate;
+          });
+
+          log(`[Flashcards] Após deduplicação: ${uniqueNewCards.length} cards únicos.`);
+
+          // 2. Limitar a 15
+          const MAX_FLASHCARDS_PER_BLOCK = 15;
+          const limitedCards = uniqueNewCards.slice(0, MAX_FLASHCARDS_PER_BLOCK);
+
+          if (limitedCards.length === 0) {
+            log(`[Flashcards] Nenhum card novo para salvar.`);
+            continue;
+          }
+
+          log(`[Flashcards] Salvos após limite: ${limitedCards.length} cards.`);
+
+          const flashcardsData = limitedCards.map(card => ({
+            userId,
+            subjectId: subjectId as string,
+            materialId: material.id,
+            studyBlockId: studyBlock.id,
+            question: card.question,
+            answer: card.answer,
+            type: card.type,
+            difficulty: card.difficulty,
+            status: "APPROVED",
+            reviewState: "NEW",       
+            nextReviewAt: new Date(),      
+            approvedAt: new Date(),        
+            learningStep: 0,
+            easeFactor: 2.5,
+            intervalDays: 0,
+            repetitionCount: 0,
+            lapseCount: 0,
+            sourcePageStart: pageStart,
+            sourcePageEnd: pageEnd,
+          }));
+
+          const createResult = await prisma.flashcard.createMany({
+            data: flashcardsData
+          });
 
         result.flashcards += createResult.count;
         log(`[Flashcards] Cards salvos no banco: ${createResult.count}`);
@@ -339,6 +406,9 @@ async function processMaterial(material: any, userId: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json().catch(() => ({}));
+    const force = body.force === true;
+
     // 1. Usuário real
     let user = await prisma.user.findFirst();
     if (!user) {
@@ -347,23 +417,29 @@ export async function POST(req: NextRequest) {
       });
     }
     const userId = user.id;
-    console.log(`[ORGANIZE ALL] Iniciando para: ${userId}`);
+    console.log(`[ORGANIZE ALL] Iniciando para: ${userId} (force=${force})`);
 
-    // 2. Materiais não organizados (até 1 por chamada para não dar timeout)
-    const unorganizedMaterials = await prisma.studyMaterial.findMany({
+    // 2. Materiais a organizar
+    // Se force=true, pegamos qualquer material LOCAL_INBOX.
+    // Se force=false, pegamos apenas os não organizados.
+    const statusFilter = force 
+      ? ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS", "ORGANIZED", "ERROR"] as any[]
+      : ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS"] as any[];
+
+    const materialsToProcess = await prisma.studyMaterial.findMany({
       where: {
         userId,
-        organizationStatus: { in: ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS"] as any },
+        organizationStatus: { in: statusFilter },
         sourceType: "LOCAL_INBOX"
       },
       take: 1
     });
 
-    console.log(`[ORGANIZE ALL] ${unorganizedMaterials.length} materiais encontrados.`);
+    console.log(`[ORGANIZE ALL] ${materialsToProcess.length} materiais encontrados.`);
 
-    if (unorganizedMaterials.length === 0) {
+    if (materialsToProcess.length === 0) {
       return NextResponse.json({
-        message: "Nenhum material pendente de organização encontrado.",
+        message: force ? "Nenhum material encontrado para reorganizar." : "Nenhum material pendente de organização encontrado.",
         count: 0
       });
     }
@@ -379,9 +455,25 @@ export async function POST(req: NextRequest) {
     };
 
     // 3. Processar cada material
-    for (const material of unorganizedMaterials) {
+    for (const material of materialsToProcess) {
       try {
-        const result = await processMaterial(material, userId);
+        // Se force=true, precisamos limpar os blocos mas PRESERVAR os cards
+        if (force) {
+          console.log(`[REORGANIZE] Preservando cards e limpando blocos para: ${material.fileName}`);
+          
+          // 1. Desvincular cards dos blocos atuais (para não serem deletados pelo Cascade)
+          await prisma.flashcard.updateMany({
+            where: { materialId: material.id },
+            data: { studyBlockId: null }
+          });
+
+          // 2. Deletar blocos e conteúdo extraído
+          await prisma.studyBlock.deleteMany({ where: { materialId: material.id } });
+          await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
+        }
+
+        // Passar flag 'reorganizeOnly' para o processMaterial
+        const result = await processMaterial(material, userId, force);
         summary.success++;
         summary.totalBlocks += result.blocks;
         summary.totalFlashcards += result.flashcards;

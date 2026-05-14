@@ -36,7 +36,10 @@ export default async function SchedulePage() {
 
   // Group items by day, excluding flashcard reviews from the main schedule view
   const groupedItems = schedule.items
-    .filter((item: any) => item.actionType !== "REVIEW_FLASHCARDS")
+    .filter((item: any) => 
+      item.actionType !== "REVIEW_FLASHCARDS" && 
+      item.actionType !== "PRACTICE_CARDS"
+    )
     .reduce((acc: any, item: any) => {
       const day = item.dayNumber;
       if (!acc[day]) acc[day] = [];

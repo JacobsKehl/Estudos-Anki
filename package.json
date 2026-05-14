@@ -1,5 +1,8 @@
 {
   "name": "kehl",
+  "version": "0.1.0",
+  "description": "Plataforma de estudos inteligente com SRS e IA",
+  "author": "Jacobs Kehl",
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
@@ -7,18 +10,18 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "electron .",
-    "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
     "electron:build:win": "next build && electron-builder --win",
+    "electron:build:mac": "next build && electron-builder --mac",
+    "electron:build:mac:arm64": "next build && electron-builder --mac --arm64",
+    "electron:build:mac:x64": "next build && electron-builder --mac --x64",
+    "electron:rebuild": "electron-rebuild",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/client": "^6.19.3",
     "@types/jsdom": "^28.0.2",
     "@types/tesseract.js": "^0.0.2",
-    "better-sqlite3": "^12.10.0",
-    "canvas": "^3.2.3",
     "clsx": "^2.1.1",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.14.0",
@@ -35,7 +38,8 @@
     "tailwind-merge": "^3.5.0",
     "tesseract.js": "^5.1.1",
     "tesseract.js-node": "^0.1.0",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.0",
+    "prisma": "^6.19.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -54,7 +58,6 @@
     "electron-updater": "^6.8.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
-    "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "wait-on": "^9.0.10"
@@ -71,13 +74,45 @@
       ".next/standalone/**/*",
       ".next/static/**/*",
       "public/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/prisma/**/*",
+      "node_modules/@prisma/client/**/*"
     ],
     "win": {
       "target": "nsis",
       "icon": "public/brand/icon.png",
       "publish": [
         "github"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "public/brand/icon.png",
+      "category": "public.app-category.education",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "electron/entitlements.mac.plist",
+      "entitlementsInherit": "electron/entitlements.mac.plist",
+      "publish": [
+        "github"
+      ]
+    },
+    "dmg": {
+      "title": "Kehl Study",
+      "contents": [
+        {
+          "x": 130,
+          "y": 150
+        },
+        {
+          "x": 410,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "nsis": {

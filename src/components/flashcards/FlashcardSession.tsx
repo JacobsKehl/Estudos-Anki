@@ -25,6 +25,7 @@ interface Flashcard {
   reviewState: string;
   intervalDays: number;
   learningStep: number;
+  easeFactor: number;
 }
 
 interface FlashcardSessionProps {
@@ -59,6 +60,12 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
       });
 
       if (!res.ok) throw new Error("Falha ao salvar revisão");
+      
+      const intervalLabel = getIntervalLabel(rating);
+      toast.success(`Voltará em ${intervalLabel}`, {
+        duration: 2000,
+        position: "bottom-center"
+      });
 
       // Move to next or finish
       if (currentIndex < cards.length - 1) {
@@ -79,8 +86,10 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
     if (!currentCard) return "";
     
     const state = currentCard.reviewState;
+    const ease = currentCard.easeFactor || 2.5;
+    const ivl = currentCard.intervalDays || 0;
     
-    // Simplified labels for the UI based on the SRS logic
+    // NEW logic
     if (state === "NEW") {
       if (rating === 1) return "1 min";
       if (rating === 2) return "6 min";
@@ -88,22 +97,29 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
       if (rating === 4) return "4 dias";
     }
     
+    // LEARNING logic
     if (state === "LEARNING") {
       if (rating === 1) return "1 min";
-      if (rating === 2) return "10 min";
+      if (rating === 2) return currentCard.learningStep === 0 ? "6 min" : "10 min";
       if (rating === 3) return currentCard.learningStep === 0 ? "10 min" : "1 dia";
       if (rating === 4) return "4 dias";
     }
     
+    // REVIEW logic
     if (state === "REVIEW") {
-      const ivl = currentCard.intervalDays || 1;
       if (rating === 1) return "10 min";
       if (rating === 2) return `${Math.max(1, Math.round(ivl * 1.2))} dias`;
-      if (rating === 3) return `${Math.max(1, Math.round(ivl * 2.5))} dias`; // Assuming 2.5 ease
-      if (rating === 4) return `${Math.max(1, Math.round(ivl * 2.5 * 1.3))} dias`;
+      if (rating === 3) return `${Math.max(1, Math.round(ivl * ease))} dias`;
+      if (rating === 4) return `${Math.max(1, Math.round(ivl * ease * 1.3))} dias`;
     }
 
-    if (rating === 1) return "1 min";
+    // RELEARNING logic
+    if (state === "RELEARNING") {
+      if (rating === 1 || rating === 2) return "10 min";
+      if (rating === 3) return "1 dia";
+      if (rating === 4) return `${Math.max(1, Math.round(Math.max(ivl, 1) * 1.3))} dias`;
+    }
+
     return "Próximo";
   };
 

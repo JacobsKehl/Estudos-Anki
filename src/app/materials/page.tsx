@@ -113,8 +113,13 @@ export default async function MaterialsPage() {
               Use a IA para identificar as matérias, fatiar seus PDFs em blocos de leitura e atualizar seu cronograma automaticamente.
             </p>
           </div>
-          <div className="shrink-0">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
             <OrganizeAllButton unorganizedCount={unorganizedCount} />
+            {materials.length > 0 && (
+              <div className="opacity-70 hover:opacity-100 transition-opacity">
+                <OrganizeAllButton unorganizedCount={0} force={true} />
+              </div>
+            )}
           </div>
         </div>
         <Sparkles className="absolute -right-8 -bottom-8 w-64 h-64 text-accent/5 -rotate-12 pointer-events-none" />

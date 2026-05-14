@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
+app.name = "Kehl Study";
 const path = require('path');
 const { spawn } = require('child_process');
 const isDev = require('electron-is-dev');
@@ -18,18 +19,21 @@ const defaultInboxPath = path.join(downloadsPath, 'KehlStudy_Inbox');
 
 // Database Setup Function
 function setupDatabase() {
+  if (isDev) return; // Dev uses local dev.db mostly
+  
   console.log(`Ensuring database exists at: ${dbPath}`);
   
-  // Run Prisma generate
-  spawnSync('npx.cmd', ['prisma', 'generate'], { 
-    shell: true,
-    stdio: 'inherit' 
-  });
-
+  // Use internal electron node to run prisma
+  const prismaPath = path.join(app.getAppPath(), 'node_modules/prisma/build/index.js');
+  
   // Push schema to DB (handles creation and migrations)
-  spawnSync('npx.cmd', ['prisma', 'db', 'push', '--skip-generate'], {
+  spawnSync(process.execPath, [prismaPath, 'db', 'push', '--skip-generate'], {
     shell: true,
-    env: { ...process.env, DATABASE_URL: dbUrl },
+    env: { 
+      ...process.env, 
+      DATABASE_URL: dbUrl,
+      ELECTRON_RUN_AS_NODE: '1'
+    },
     stdio: 'inherit'
   });
 }
@@ -61,7 +65,8 @@ function createWindow() {
   const startNext = () => {
     if (isDev) {
       console.log('Starting Next.js in Dev mode...');
-      nextProcess = spawn('npm.cmd', ['run', 'dev'], {
+      const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+      nextProcess = spawn(npmCmd, ['run', 'dev'], {
         cwd: path.join(__dirname, '..'),
         shell: true,
         env: { ...process.env, PORT: '3000' }
@@ -69,9 +74,15 @@ function createWindow() {
     } else {
       console.log('Starting Next.js in Production mode...');
       const serverPath = path.join(app.getAppPath(), '.next/standalone/server.js');
-      nextProcess = spawn('node', [serverPath], {
+      
+      // Use internal electron node to run server
+      nextProcess = spawn(process.execPath, [serverPath], {
         cwd: path.join(app.getAppPath(), '.next/standalone'),
-        env: { ...process.env, PORT: '3000' }
+        env: { 
+          ...process.env, 
+          PORT: '3000',
+          ELECTRON_RUN_AS_NODE: '1'
+        }
       });
     }
 
