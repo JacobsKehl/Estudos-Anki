@@ -105,7 +105,7 @@ export async function POST(
       });
 
       if (!subject) {
-        const allSubjects = await prisma.studySubject.findMany({ where: { userId }, select: { id: true, name: true } });
+        const allSubjects = await prisma.studySubject.findMany({ where: { userId } });
         subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;
       }
 

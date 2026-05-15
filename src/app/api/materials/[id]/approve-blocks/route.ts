@@ -26,7 +26,7 @@ export async function POST(
       }
     });
 
-    if (!material) {
+    if (!material || !material.subjectId) {
       return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
     }
 
@@ -35,7 +35,7 @@ export async function POST(
     
     // Obter o último orderIndex existente para esta matéria
     const lastBlock = await prisma.studyBlock.findFirst({
-      where: { subjectId: material.subjectId },
+      where: { subjectId: material.subjectId as string },
       orderBy: { orderIndex: 'desc' },
       select: { orderIndex: true }
     });
@@ -58,6 +58,7 @@ export async function POST(
     // Usamos um loop simples para garantir que cada um seja criado e possamos logar se necessário
     const results = [];
     for (const block of validBlocks) {
+      if (!material.subjectId) continue;
       const created = await prisma.studyBlock.create({
         data: {
           userId: mockUserId,

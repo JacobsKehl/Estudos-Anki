@@ -30,13 +30,13 @@ export async function POST(req: NextRequest) {
     const block = await (prisma as any).studyBlock.create({
       data: {
         userId,
-        subjectId,
-        materialId,
-        title,
-        description,
+        subjectId: subjectId as string,
+        materialId: materialId as string,
+        title: title as string,
+        description: description || null,
         pageStart,
         pageEnd,
-        estimatedStudyMinutes,
+        estimatedStudyMinutes: estimatedStudyMinutes || null,
         status: "NOT_STARTED",
       }
     });
