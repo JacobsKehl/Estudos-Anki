@@ -47,3 +47,10 @@ jobs:
         env:
           # Use the default GitHub token for publishing
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kehl-Study-${{ matrix.os }}
+          path: dist/*.${{ matrix.os == 'macos-latest' && '{dmg,zip}' || '{exe,msi}' }}
+          if-no-files-found: warn
