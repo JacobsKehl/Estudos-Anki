@@ -24,7 +24,9 @@ function setupDatabase() {
   console.log(`Ensuring database exists at: ${dbPath}`);
   
   // Use internal electron node to run prisma
-  const prismaPath = path.join(app.getAppPath(), 'node_modules/prisma/build/index.js');
+  const appPath = app.getAppPath();
+  const unpackedPath = appPath.replace('app.asar', 'app.asar.unpacked');
+  const prismaPath = path.join(unpackedPath, 'node_modules/prisma/build/index.js');
   
   // Push schema to DB (handles creation and migrations)
   spawnSync(process.execPath, [prismaPath, 'db', 'push', '--skip-generate'], {
@@ -73,11 +75,13 @@ function createWindow() {
       });
     } else {
       console.log('Starting Next.js in Production mode...');
-      const serverPath = path.join(app.getAppPath(), '.next/standalone/server.js');
+      const appPath = app.getAppPath();
+      const unpackedPath = appPath.replace('app.asar', 'app.asar.unpacked');
+      const serverPath = path.join(unpackedPath, '.next/standalone/server.js');
       
       // Use internal electron node to run server
       nextProcess = spawn(process.execPath, [serverPath], {
-        cwd: path.join(app.getAppPath(), '.next/standalone'),
+        cwd: path.join(unpackedPath, '.next/standalone'),
         env: { 
           ...process.env, 
           PORT: '3000',

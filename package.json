@@ -128,6 +128,12 @@
         "owner": "JacobsKehl",
         "repo": "Estudos-Anki"
       }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      ".next/standalone/**/*",
+      "node_modules/prisma/**/*",
+      "node_modules/@prisma/client/**/*"
     ]
   },
   "prisma": {
