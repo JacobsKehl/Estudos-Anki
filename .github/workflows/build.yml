@@ -45,12 +45,21 @@ jobs:
           # If on macOS, we build for Mac. If on Windows, we build for Windows.
           args: --${{ matrix.os == 'macos-latest' && 'mac' || 'win' }} ${{ matrix.os == 'macos-latest' && '--arm64 --x64' || '' }}
         env:
-          # Use the default GitHub token for publishing
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+      - name: List Output Directory (Debug)
+        run: ls -R dist || echo "Dist directory not found"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Kehl-Study-${{ matrix.os }}
-          path: dist/*.${{ matrix.os == 'macos-latest' && '{dmg,zip}' || '{exe,msi}' }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.msi
+            dist/mac/*.zip
+            dist/mac/*.dmg
           if-no-files-found: warn
