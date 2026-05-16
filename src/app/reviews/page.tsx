@@ -23,9 +23,6 @@ export default async function ReviewsPage() {
         nextReviewAt: { lte: now },
         reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] }
       },
-      include: {
-        subject: { select: { name: true } }
-      },
       select: {
         id: true,
         question: true,

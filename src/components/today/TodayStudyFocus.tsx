@@ -68,7 +68,7 @@ export function TodayStudyFocus({ item, pendingReviews }: TodayStudyFocusProps) 
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="hidden sm:flex bg-muted text-muted-foreground border-none px-3 py-1">
-                {Math.floor(item.extractedText?.length / 1000) || 1} min de leitura
+                {item.extractedText ? Math.max(1, Math.floor(item.extractedText.length / 1500)) : 1} min de leitura
               </Badge>
             </div>
           </div>

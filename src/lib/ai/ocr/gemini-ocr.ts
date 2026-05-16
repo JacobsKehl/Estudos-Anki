@@ -5,15 +5,20 @@ import { PDFDocument } from "pdf-lib";
 /**
  * Gemini-based PDF OCR with Chunking and Retry support
  */
-export async function extractTextWithGeminiOCR(filePath: string): Promise<{ pageNumber: number, text: string }[]> {
+export async function extractTextWithGeminiOCR(source: string | Buffer): Promise<{ pageNumber: number, text: string }[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não está configurada.");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Usando gemini-flash-latest para maior estabilidade nesta versão da API
   const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
-  const dataBuffer = fs.readFileSync(filePath);
+  let dataBuffer: Buffer;
+  if (typeof source === "string") {
+    dataBuffer = fs.readFileSync(source);
+  } else {
+    dataBuffer = source;
+  }
+
   const pdfDoc = await PDFDocument.load(dataBuffer, { ignoreEncryption: true });
   const totalPages = pdfDoc.getPageCount();
   

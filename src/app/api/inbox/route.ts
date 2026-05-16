@@ -8,20 +8,19 @@ export async function GET() {
   const inboxDir = process.env.PDF_INBOX_DIR;
 
   if (!inboxDir) {
-    return NextResponse.json({ error: "PDF_INBOX_DIR não configurado no .env" }, { status: 500 });
+    return NextResponse.json({ 
+      inboxDir: "Modo Nuvem (Local não configurado)",
+      files: [] 
+    });
   }
 
   try {
-    // Garantir que o diretório existe
+    // Garantir que o diretório existe (apenas se configurado)
     if (!fs.existsSync(inboxDir)) {
-      try {
-        fs.mkdirSync(inboxDir, { recursive: true });
-      } catch (e) {
-        return NextResponse.json({ 
-          error: "Não conseguimos acessar ou criar a pasta configurada.",
-          details: inboxDir 
-        }, { status: 403 });
-      }
+      return NextResponse.json({ 
+        inboxDir: "Pasta local não encontrada",
+        files: [] 
+      });
     }
 
     const files = fs.readdirSync(inboxDir);

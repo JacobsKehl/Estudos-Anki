@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import fs from "fs";
 import { identifySubject, detectStructure } from "@/lib/ai/organizer";
 
@@ -20,10 +20,20 @@ async function getPdfjsLib() {
   return lib;
 }
 
-async function extractText(filePath: string, maxPages = 15): Promise<{ text: string; numPages: number }> {
+async function extractText(sourcePath: string, isLocal: boolean, maxPages = 15): Promise<{ text: string; numPages: number }> {
   const pdfjsLib = await getPdfjsLib();
-  const fileBuffer = fs.readFileSync(filePath);
-  const uint8Array = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength);
+  let uint8Array: Uint8Array;
+
+  if (isLocal) {
+    const fileBuffer = fs.readFileSync(sourcePath);
+    uint8Array = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength);
+  } else {
+    // Download from Supabase Storage
+    const { data, error } = await supabase.storage.from('materials').download(sourcePath);
+    if (error) throw new Error(`Erro ao baixar arquivo do Storage: ${error.message}`);
+    const arrayBuffer = await data.arrayBuffer();
+    uint8Array = new Uint8Array(arrayBuffer);
+  }
 
   const loadingTask = pdfjsLib.getDocument({
     data: uint8Array,
@@ -69,13 +79,10 @@ export async function POST(
       return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
     }
 
-    if (!material.sourcePath || !fs.existsSync(material.sourcePath)) {
-      return NextResponse.json({ error: "Arquivo original não encontrado em disco" }, { status: 400 });
-    }
+    const isLocal = material.sourceType === "LOCAL_INBOX";
 
-    const stats = fs.statSync(material.sourcePath);
-    if (stats.size === 0) {
-      return NextResponse.json({ error: "O arquivo PDF está vazio (0 bytes)" }, { status: 400 });
+    if (isLocal && (!material.sourcePath || !fs.existsSync(material.sourcePath))) {
+      return NextResponse.json({ error: "Arquivo original não encontrado em disco" }, { status: 400 });
     }
 
     // 2. Marcar como analisando
@@ -85,7 +92,7 @@ export async function POST(
     });
 
     // 3. Extrair texto com pdfjs-dist
-    const { text: extractedText, numPages } = await extractText(material.sourcePath, 15);
+    const { text: extractedText, numPages } = await extractText(material.sourcePath, isLocal, 15);
 
     if (!extractedText || extractedText.trim().length < 50) {
       await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "Texto insuficiente" } });

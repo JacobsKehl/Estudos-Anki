@@ -148,7 +148,6 @@ export async function getAllSubjectsMetrics(userId: string) {
 export async function getGlobalMetrics(userId: string) {
   const subjectsMetrics = await getAllSubjectsMetrics(userId);
   const now = new Date();
-  const todayStart = new Date(now.setHours(0, 0, 0, 0));
   
   // Total summary
   const summary = {

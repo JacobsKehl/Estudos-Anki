@@ -23,8 +23,6 @@ interface SRSOutput {
   nextReviewAt: Date;
 }
 
-const LEARNING_STEPS_MINUTES = [1, 10];
-const RELEARNING_STEPS_MINUTES = [10];
 const MIN_EASE_FACTOR = 1.3;
 const DEFAULT_EASE_FACTOR = 2.5;
 const GRADUATING_INTERVAL = 1;

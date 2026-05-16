@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { getMockUserId } from "@/lib/auth-mock";
 import fs from "fs";
 import path from "path";
 import { PDFDocument } from "pdf-lib";
 import { extractTextWithGeminiOCR } from "@/lib/ai/ocr/gemini-ocr";
-import { extractTextWithLocalOCR } from "@/lib/ai/ocr/local-ocr";
 
 // pdf2json para extração nativa robusta (lida melhor com layouts complexos)
 const PDFParser = require("pdf2json");
@@ -14,7 +13,7 @@ const PDFParser = require("pdf2json");
 /**
  * Função auxiliar para extrair texto de forma nativa usando pdf2json
  */
-async function extractTextWithPdf2Json(filePath: string): Promise<{ pageNumber: number, text: string }[]> {
+async function extractTextWithPdf2Json(source: string | Buffer): Promise<{ pageNumber: number, text: string }[]> {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
     
@@ -30,7 +29,11 @@ async function extractTextWithPdf2Json(filePath: string): Promise<{ pageNumber: 
       resolve(pages);
     });
 
-    pdfParser.loadPDF(filePath);
+    if (typeof source === "string") {
+      pdfParser.loadPDF(source);
+    } else {
+      pdfParser.parseBuffer(source);
+    }
   });
 }
 
@@ -45,12 +48,20 @@ export async function POST(
     const material = await prisma.studyMaterial.findUnique({ where: { id } });
     if (!material) return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
 
-    const projectRoot = process.cwd();
-    let cleanFilePath = material.filePath;
-    if (!cleanFilePath) throw new Error("Caminho do arquivo não encontrado.");
-    
-    if (cleanFilePath.startsWith("/")) cleanFilePath = cleanFilePath.substring(1);
-    const fullPath = path.join(projectRoot, cleanFilePath.replace(/\//g, path.sep));
+    const isLocal = material.sourceType === "LOCAL_INBOX";
+    let dataBuffer: Buffer;
+
+    if (isLocal) {
+      if (!material.sourcePath || !fs.existsSync(material.sourcePath)) {
+        throw new Error("Arquivo local não encontrado.");
+      }
+      dataBuffer = fs.readFileSync(material.sourcePath);
+    } else {
+      // Download from Supabase Storage
+      const { data, error } = await supabase.storage.from('materials').download(material.sourcePath!);
+      if (error) throw new Error(`Erro ao baixar do Storage: ${error.message}`);
+      dataBuffer = Buffer.from(await data.arrayBuffer());
+    }
 
     await prisma.studyMaterial.update({
       where: { id },
@@ -62,7 +73,6 @@ export async function POST(
 
     // 1. Contagem de páginas confiável via pdf-lib
     try {
-      const dataBuffer = fs.readFileSync(fullPath);
       const pdfDoc = await PDFDocument.load(dataBuffer, { ignoreEncryption: true });
       totalPagesInDoc = pdfDoc.getPageCount();
       
@@ -78,7 +88,7 @@ export async function POST(
     // 2. Extração Nativa Robusta (pdf2json)
     try {
       console.log("⚡ Iniciando extração nativa robusta (pdf2json)...");
-      finalPages = await extractTextWithPdf2Json(fullPath);
+      finalPages = await extractTextWithPdf2Json(dataBuffer);
       console.log(`✅ Extração nativa concluída. Páginas com texto: ${finalPages.length}/${totalPagesInDoc}`);
     } catch (nativeError: any) {
       console.warn("Extração nativa falhou:", nativeError.message);
@@ -91,14 +101,10 @@ export async function POST(
     if (finalPages.length < (totalPagesInDoc * 0.1) || averageCharsPerPage < 200) {
       console.log("🔍 PDF parece ser uma imagem ou extração nativa foi pobre. Ativando OCR via IA...");
       try {
-        finalPages = await extractTextWithGeminiOCR(fullPath);
+        finalPages = await extractTextWithGeminiOCR(dataBuffer);
       } catch (ocrError: any) {
         console.error("Gemini OCR falhou:", ocrError.message);
-        try {
-          finalPages = await extractTextWithLocalOCR(fullPath);
-        } catch (localError: any) {
-           throw new Error(`Extração falhou. Motivo: ${ocrError.message}`);
-        }
+        throw new Error(`Extração de texto via OCR falhou. Motivo: ${ocrError.message}`);
       }
     }
 

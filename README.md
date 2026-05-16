@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎓 Kehl Study: Sua Mente Aumentada por IA
 
-## Getting Started
+[![Vercel](https://img.shields.io/badge/deployed_on-vercel-black?logo=vercel&style=flat-square)](https://vercel.com)
+[![Next.js](https://img.shields.io/badge/built_with-next.js-black?logo=next.js&style=flat-square)](https://nextjs.org)
+[![Supabase](https://img.shields.io/badge/database-supabase-emerald?logo=supabase&style=flat-square)](https://supabase.com)
+[![Prisma](https://img.shields.io/badge/orm-prisma-indigo?logo=prisma&style=flat-square)](https://prisma.io)
 
-First, run the development server:
+O **Kehl Study** é uma plataforma de aprendizagem inteligente projetada para transformar PDFs brutos em conhecimento estruturado. Utilizando o poder do Google Gemini e técnicas avançadas de SRS (Spaced Repetition System), o sistema organiza sua rotina de estudos automaticamente.
 
+---
+
+## ✨ Funcionalidades Principais
+
+*   **🚀 Upload Inteligente:** Suba seus PDFs direto para a nuvem via Supabase Storage.
+*   **🧠 Organizador Autônomo:** A IA identifica a matéria, fatias o conteúdo em blocos lógicos e cria um cronograma de leitura.
+*   **📇 Flashcards Automáticos:** Geração de cards baseada no conteúdo real do seu material, prontos para revisão.
+*   **📅 Cronograma Dinâmico:** Gerenciamento de revisões e progresso diário.
+*   **📱 Cloud-Native:** Acesse seus materiais e revisões de qualquer dispositivo através da Web.
+
+---
+
+## 🛠️ Stack Tecnológica
+
+- **Frontend:** Next.js 16 (App Router), Tailwind CSS, Lucide React.
+- **Backend:** Next.js API Routes (Serverless).
+- **Banco de Dados:** PostgreSQL via Supabase.
+- **ORM:** Prisma.
+- **IA:** Google Gemini (Gemini-Flash).
+- **Storage:** Supabase Storage.
+
+---
+
+## 🚀 Guia de Configuração (Cloud Mode)
+
+### 1. Clonar e Instalar
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/JacobsKehl/Estudos-Anki.git
+cd Kehl-Study
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Variáveis de Ambiente
+Crie um arquivo `.env` na raiz com as seguintes chaves:
+```env
+# Banco de Dados (Supabase)
+DATABASE_URL="sua_url_de_pooler"
+DIRECT_URL="sua_url_direta"
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# IA (Google)
+GEMINI_API_KEY="sua_chave_gemini"
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Supabase Auth/Storage
+NEXT_PUBLIC_SUPABASE_URL="https://seu-projeto.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="sua_chave_anon"
+```
 
-## Learn More
+### 3. Sincronizar Banco
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Rodar Localmente
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## ☁️ Deploy na Vercel
 
-## Deploy on Vercel
+O projeto está configurado para deploy contínuo. Ao conectar seu repositório à Vercel:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1.  Certifique-se de adicionar todas as variáveis de ambiente acima nas **Environment Variables** da Vercel.
+2.  O build rodará automaticamente `prisma generate && next build`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 📄 Licença
+
+Desenvolvido com ❤️ por Jacobs Kehl.

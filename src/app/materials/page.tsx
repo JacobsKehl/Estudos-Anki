@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
 import { InboxPanel } from "@/components/materials/InboxPanel";
+import { CloudUploadButton } from "@/components/materials/CloudUploadButton";
 
 type MaterialItem = {
   id: string;
@@ -40,7 +41,7 @@ export default async function MaterialsPage() {
     const dbMaterials = await prisma.studyMaterial.findMany({
       where: { 
         userId: mockUserId,
-        sourceType: "LOCAL_INBOX"
+        sourceType: { in: ["LOCAL_INBOX", "CLOUD_UPLOAD"] }
       },
       include: {
         subject: true,
@@ -97,8 +98,20 @@ export default async function MaterialsPage() {
         description="Gerencie e organize os materiais importados da sua pasta local."
       />
 
-      <div className="mb-10">
+      <div className="grid md:grid-cols-2 gap-8 mb-10">
         <InboxPanel />
+        <div className="bg-card rounded-[2.5rem] border border-dashed border-accent/30 p-8 flex flex-col items-center justify-center text-center space-y-6">
+          <div className="bg-accent/10 p-4 rounded-full">
+            <Sparkles className="w-8 h-8 text-accent" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold">Modo Web (Nuvem)</h3>
+            <p className="text-sm text-muted-foreground max-w-[280px]">
+              Suba seus PDFs diretamente para o banco de dados e acesse de qualquer lugar.
+            </p>
+          </div>
+          <CloudUploadButton />
+        </div>
       </div>
 
       {/* Hero: Bulk Organization Action */}
@@ -139,7 +152,7 @@ export default async function MaterialsPage() {
             <EmptyState 
               icon={Import}
               title="Sua biblioteca está vazia"
-              description="Importe seus materiais a partir da pasta de entrada local acima."
+              description="Importe materiais da inbox local ou faça upload para a nuvem acima."
             />
           ) : (
             materials.map((material) => (

@@ -65,9 +65,6 @@ export default async function ReviewSessionPage() {
         reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] },
         studyBlockId: { notIn: todayBlockIds }
       },
-      include: {
-        subject: { select: { name: true } }
-      },
       select: {
         id: true,
         question: true,

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import fs from "fs";
 import { identifySubject, detectStructure } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
@@ -42,10 +43,20 @@ async function getPdfjsLib() {
 
 // ─── Extração por página ───────────────────────────────────────────────────────
 
-async function extractAllPages(filePath: string): Promise<{ pages: PageContent[]; numPages: number }> {
+async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ pages: PageContent[]; numPages: number }> {
   const pdfjsLib = await getPdfjsLib();
-  const fileBuffer = fs.readFileSync(filePath);
-  const uint8Array = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength);
+  let uint8Array: Uint8Array;
+
+  if (isLocal) {
+    const fileBuffer = fs.readFileSync(sourcePath);
+    uint8Array = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength);
+  } else {
+    // Download from Supabase Storage
+    const { data, error } = await supabase.storage.from('materials').download(sourcePath);
+    if (error) throw new Error(`Erro ao baixar arquivo do Storage: ${error.message}`);
+    const arrayBuffer = await data.arrayBuffer();
+    uint8Array = new Uint8Array(arrayBuffer);
+  }
 
   const loadingTask = pdfjsLib.getDocument({
     data: uint8Array,
@@ -78,11 +89,10 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   const log = (msg: string) => console.log(`[ORGANIZE] ${material.fileName}: ${msg}`);
   const result = { blocks: 0, flashcards: 0, subjectCreated: false };
 
-  if (!material.sourcePath || !fs.existsSync(material.sourcePath)) {
+  const isLocal = material.sourceType === "LOCAL_INBOX";
+  
+  if (isLocal && (!material.sourcePath || !fs.existsSync(material.sourcePath))) {
     throw new Error("Arquivo local não encontrado no disco.");
-  }
-  if (fs.statSync(material.sourcePath).size === 0) {
-    throw new Error("O arquivo PDF está vazio (0 bytes).");
   }
 
   // ── Etapa 1: Extraindo texto por página ──────────────────────────────────
@@ -94,7 +104,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   });
 
   log("Extraindo texto por página...");
-  const { pages, numPages } = await extractAllPages(material.sourcePath);
+  const { pages, numPages } = await extractAllPages(material.sourcePath, isLocal);
   log(`[Organize] Texto extraído: ${numPages} páginas`);
 
   const nonEmptyPages = pages.filter(p => p.text.length > 10);
@@ -430,7 +440,7 @@ export async function POST(req: NextRequest) {
       where: {
         userId,
         organizationStatus: { in: statusFilter },
-        sourceType: "LOCAL_INBOX"
+        sourceType: { in: ["LOCAL_INBOX", "CLOUD_UPLOAD"] }
       },
       take: 1
     });
