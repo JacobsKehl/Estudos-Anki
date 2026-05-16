@@ -99,10 +99,8 @@ function createWindow() {
 
     nextProcess.stdout.on('data', (data) => {
       const output = data.toString();
-      console.log(`Next: ${output}`);
-      
-      // Envia o log direto para o console que você está vendo no Mac
-      mainWindow?.webContents.executeJavaScript(`console.log("SERVER STDOUT: ${output.replace(/[`\\$]/g, '\\$&')}")`);
+      // Envia o log de forma segura usando JSON.stringify
+      mainWindow?.webContents.executeJavaScript(`console.log("SERVER STDOUT:", ${JSON.stringify(output)})`);
 
       if (output.includes('Ready in') || 
           output.includes('started server on') || 
@@ -114,9 +112,8 @@ function createWindow() {
 
     nextProcess.stderr.on('data', (data) => {
       const errorOutput = data.toString();
-      console.error(`Next Error: ${errorOutput}`);
-      // Envia o erro direto para o seu console no Mac em VERMELHO
-      mainWindow?.webContents.executeJavaScript(`console.error("SERVER ERROR: ${errorOutput.replace(/[`\\$]/g, '\\$&')}")`);
+      // Envia o erro de forma segura usando JSON.stringify
+      mainWindow?.webContents.executeJavaScript(`console.error("SERVER ERROR:", ${JSON.stringify(errorOutput)})`);
     });
 
     // Fallback: se em 15 segundos não carregar, tenta forçar o carregamento
