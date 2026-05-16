@@ -60,8 +60,14 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: true, // Garante que possamos depurar
     },
   });
+
+  // Abre o console automaticamente para vermos o erro da tela branca
+  if (!isDev) {
+    mainWindow.webContents.openDevTools();
+  }
 
   // Start Next.js
   const startNext = () => {
@@ -91,11 +97,25 @@ function createWindow() {
     }
 
     nextProcess.stdout.on('data', (data) => {
-      console.log(`Next: ${data}`);
-      if (data.toString().includes('Ready in') || data.toString().includes('started server on')) {
+      const output = data.toString();
+      console.log(`Next: ${output}`);
+      
+      // Detecção mais flexível de que o servidor subiu
+      if (output.includes('Ready in') || 
+          output.includes('started server on') || 
+          output.includes('0.0.0.0:3000') ||
+          output.includes('localhost:3000')) {
         mainWindow.loadURL('http://localhost:3000');
       }
     });
+
+    // Fallback: se em 15 segundos não carregar, tenta forçar o carregamento
+    setTimeout(() => {
+      if (mainWindow.getURL() === '') {
+        console.log('Fallback: Forçando carregamento da URL...');
+        mainWindow.loadURL('http://localhost:3000');
+      }
+    }, 15000);
 
     nextProcess.stderr.on('data', (data) => {
       console.error(`Next Error: ${data}`);
