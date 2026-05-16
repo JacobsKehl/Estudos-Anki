@@ -75,8 +75,9 @@
       ".next/static/**/*",
       "public/**/*",
       "package.json",
-      "node_modules/prisma/**/*",
-      "node_modules/@prisma/client/**/*"
+      "node_modules/**/*",
+      "!node_modules/*/{README,readme,test,tests,example,examples}/**/*",
+      "!node_modules/.bin/**/*"
     ],
     "win": {
       "target": "nsis",
