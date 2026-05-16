@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+export const dynamic = "force-dynamic";
 import { Calendar, Layers, CheckCircle2, Clock, Play } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getMockUserId } from "@/lib/auth-mock";
