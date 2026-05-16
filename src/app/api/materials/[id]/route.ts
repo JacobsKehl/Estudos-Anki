@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { unlink } from "fs/promises";
-import path from "path";
 
 export async function GET(
   req: NextRequest,
@@ -41,31 +39,14 @@ export async function DELETE(
       return NextResponse.json({ error: "Material não encontrado." }, { status: 404 });
     }
 
-    // 2. Delete file from disk or storage if it exists
-    if (material.sourcePath) {
-      if (material.sourceType === "LOCAL_INBOX") {
-        try {
-          const fullPath = path.join(process.cwd(), material.sourcePath);
-          await unlink(fullPath);
-        } catch (err) {
-          console.error("Failed to delete file from disk:", err);
-        }
-      } else if (material.sourceType === "CLOUD_UPLOAD") {
-        const { error: storageError } = await supabase.storage
-          .from('materials')
-          .remove([material.sourcePath]);
-        
-        if (storageError) {
-          console.error("Erro ao deletar do storage:", storageError);
-        }
-      }
-    } else if (material.filePath) {
-      // Legacy support for filePath
-      try {
-        const fullPath = path.join(process.cwd(), material.filePath);
-        await unlink(fullPath);
-      } catch (err) {
-        console.error("Failed to delete legacy file from disk:", err);
+    // 2. Delete file from storage if it exists (Cloud only for Web)
+    if (material.sourcePath && material.sourceType === "CLOUD_UPLOAD") {
+      const { error: storageError } = await supabase.storage
+        .from('materials')
+        .remove([material.sourcePath]);
+      
+      if (storageError) {
+        console.error("Erro ao deletar do storage:", storageError);
       }
     }
 
@@ -83,7 +64,7 @@ export async function DELETE(
       prisma.studyScheduleItem.deleteMany({
         where: { materialId: id },
       }),
-      // Finally delete the material itself
+      // Finalmente deletar o material
       prisma.studyMaterial.delete({
         where: { id },
       }),

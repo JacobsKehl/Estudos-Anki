@@ -2,18 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { getMockUserId } from "@/lib/auth-mock";
-import fs from "fs";
-import path from "path";
 import { PDFDocument } from "pdf-lib";
 import { extractTextWithGeminiOCR } from "@/lib/ai/ocr/gemini-ocr";
 
-// pdf2json para extração nativa robusta (lida melhor com layouts complexos)
+// pdf2json para extração nativa robusta
 const PDFParser = require("pdf2json");
 
 /**
  * Função auxiliar para extrair texto de forma nativa usando pdf2json
  */
-async function extractTextWithPdf2Json(source: string | Buffer): Promise<{ pageNumber: number, text: string }[]> {
+async function extractTextWithPdf2Json(source: Buffer): Promise<{ pageNumber: number, text: string }[]> {
   return new Promise((resolve, reject) => {
     const pdfParser = new PDFParser();
     
@@ -29,11 +27,7 @@ async function extractTextWithPdf2Json(source: string | Buffer): Promise<{ pageN
       resolve(pages);
     });
 
-    if (typeof source === "string") {
-      pdfParser.loadPDF(source);
-    } else {
-      pdfParser.parseBuffer(source);
-    }
+    pdfParser.parseBuffer(source);
   });
 }
 
@@ -48,20 +42,15 @@ export async function POST(
     const material = await prisma.studyMaterial.findUnique({ where: { id } });
     if (!material) return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
 
-    const isLocal = material.sourceType === "LOCAL_INBOX";
-    let dataBuffer: Buffer;
-
-    if (isLocal) {
-      if (!material.sourcePath || !fs.existsSync(material.sourcePath)) {
-        throw new Error("Arquivo local não encontrado.");
-      }
-      dataBuffer = fs.readFileSync(material.sourcePath);
-    } else {
-      // Download from Supabase Storage
-      const { data, error } = await supabase.storage.from('materials').download(material.sourcePath!);
-      if (error) throw new Error(`Erro ao baixar do Storage: ${error.message}`);
-      dataBuffer = Buffer.from(await data.arrayBuffer());
+    // Na Nuvem, ignoramos o processamento de arquivos locais do Windows
+    if (material.sourceType === "LOCAL_INBOX") {
+       throw new Error("O processamento de arquivos locais não é suportado na Web. Por favor, faça o upload do arquivo novamente via botão 'Nuvem'.");
     }
+
+    // Download from Supabase Storage
+    const { data, error } = await supabase.storage.from('materials').download(material.sourcePath!);
+    if (error) throw new Error(`Erro ao baixar do Storage: ${error.message}`);
+    const dataBuffer = Buffer.from(await data.arrayBuffer());
 
     await prisma.studyMaterial.update({
       where: { id },
@@ -80,16 +69,13 @@ export async function POST(
         where: { id },
         data: { totalPages: totalPagesInDoc } as any,
       });
-      console.log(`📊 Páginas detectadas: ${totalPagesInDoc}`);
     } catch (countError: any) {
       console.warn("Erro ao contar páginas:", countError.message);
     }
 
     // 2. Extração Nativa Robusta (pdf2json)
     try {
-      console.log("⚡ Iniciando extração nativa robusta (pdf2json)...");
       finalPages = await extractTextWithPdf2Json(dataBuffer);
-      console.log(`✅ Extração nativa concluída. Páginas com texto: ${finalPages.length}/${totalPagesInDoc}`);
     } catch (nativeError: any) {
       console.warn("Extração nativa falhou:", nativeError.message);
     }
@@ -99,11 +85,9 @@ export async function POST(
     const averageCharsPerPage = finalPages.length > 0 ? totalCharCount / finalPages.length : 0;
 
     if (finalPages.length < (totalPagesInDoc * 0.1) || averageCharsPerPage < 200) {
-      console.log("🔍 PDF parece ser uma imagem ou extração nativa foi pobre. Ativando OCR via IA...");
       try {
         finalPages = await extractTextWithGeminiOCR(dataBuffer);
       } catch (ocrError: any) {
-        console.error("Gemini OCR falhou:", ocrError.message);
         throw new Error(`Extração de texto via OCR falhou. Motivo: ${ocrError.message}`);
       }
     }
@@ -134,7 +118,6 @@ export async function POST(
       } as any,
     });
 
-    console.log("✨ Sucesso! Documento processado.");
     return NextResponse.json({ message: "Sucesso" });
   } catch (error: any) {
     console.error("Erro no pipeline:", error.message);

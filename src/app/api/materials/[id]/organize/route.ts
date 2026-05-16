@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import fs from "fs";
 import { identifySubject, detectStructure } from "@/lib/ai/organizer";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +24,7 @@ async function extractText(sourcePath: string, isLocal: boolean, maxPages = 15):
   let uint8Array: Uint8Array;
 
   if (isLocal) {
-    const fileBuffer = fs.readFileSync(sourcePath);
-    uint8Array = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength);
+     throw new Error("Arquivos locais não suportados na Web.");
   } else {
     // Download from Supabase Storage
     const { data, error } = await supabase.storage.from('materials').download(sourcePath);
@@ -81,8 +79,8 @@ export async function POST(
 
     const isLocal = material.sourceType === "LOCAL_INBOX";
 
-    if (isLocal && (!material.sourcePath || !fs.existsSync(material.sourcePath))) {
-      return NextResponse.json({ error: "Arquivo original não encontrado em disco" }, { status: 400 });
+    if (isLocal) {
+      return NextResponse.json({ error: "Arquivos locais não são suportados na Web. Faça o upload via Nuvem." }, { status: 400 });
     }
 
     // 2. Marcar como analisando
@@ -92,7 +90,7 @@ export async function POST(
     });
 
     // 3. Extrair texto com pdfjs-dist
-    const { text: extractedText, numPages } = await extractText(material.sourcePath, isLocal, 15);
+    const { text: extractedText, numPages } = await extractText(material.sourcePath!, isLocal, 15);
 
     if (!extractedText || extractedText.trim().length < 50) {
       await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "Texto insuficiente" } });

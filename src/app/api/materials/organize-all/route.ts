@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import fs from "fs";
 import { identifySubject, detectStructure } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { generateSmartSchedule } from "@/lib/scheduler";
@@ -48,8 +47,7 @@ async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ 
   let uint8Array: Uint8Array;
 
   if (isLocal) {
-    const fileBuffer = fs.readFileSync(sourcePath);
-    uint8Array = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength);
+     throw new Error("Arquivos locais não são suportados na Web. Use o upload em nuvem.");
   } else {
     // Download from Supabase Storage
     const { data, error } = await supabase.storage.from('materials').download(sourcePath);
@@ -91,8 +89,8 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
 
   const isLocal = material.sourceType === "LOCAL_INBOX";
   
-  if (isLocal && (!material.sourcePath || !fs.existsSync(material.sourcePath))) {
-    throw new Error("Arquivo local não encontrado no disco.");
+  if (isLocal) {
+    throw new Error("Arquivos locais não são suportados na Web.");
   }
 
   // ── Etapa 1: Extraindo texto por página ──────────────────────────────────
@@ -187,7 +185,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     pageNumber: p.pageNumber,
     text: p.text,
     orderIndex: idx,
-    estimatedStudyMinutes: 0, // Ajustado para número válido
+    estimatedStudyMinutes: 0, 
   }));
 
   await prisma.extractedContent.createMany({ data: contentRecords });
@@ -430,8 +428,6 @@ export async function POST(req: NextRequest) {
     console.log(`[ORGANIZE ALL] Iniciando para: ${userId} (force=${force})`);
 
     // 2. Materiais a organizar
-    // Se force=true, pegamos qualquer material LOCAL_INBOX.
-    // Se force=false, pegamos apenas os não organizados.
     const statusFilter = force 
       ? ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS", "ORGANIZED", "ERROR"] as any[]
       : ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS"] as any[];
@@ -440,7 +436,7 @@ export async function POST(req: NextRequest) {
       where: {
         userId,
         organizationStatus: { in: statusFilter },
-        sourceType: { in: ["LOCAL_INBOX", "CLOUD_UPLOAD"] }
+        sourceType: { in: ["CLOUD_UPLOAD"] } // Apenas Nuvem na Web
       },
       take: 1
     });
@@ -467,22 +463,18 @@ export async function POST(req: NextRequest) {
     // 3. Processar cada material
     for (const material of materialsToProcess) {
       try {
-        // Se force=true, precisamos limpar os blocos mas PRESERVAR os cards
         if (force) {
           console.log(`[REORGANIZE] Preservando cards e limpando blocos para: ${material.fileName}`);
           
-          // 1. Desvincular cards dos blocos atuais (para não serem deletados pelo Cascade)
           await prisma.flashcard.updateMany({
             where: { materialId: material.id },
             data: { studyBlockId: null }
           });
 
-          // 2. Deletar blocos e conteúdo extraído
           await prisma.studyBlock.deleteMany({ where: { materialId: material.id } });
           await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
         }
 
-        // Passar flag 'reorganizeOnly' para o processMaterial
         const result = await processMaterial(material, userId, force);
         summary.success++;
         summary.totalBlocks += result.blocks;
@@ -520,7 +512,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5. Mensagem de resultado realista
+    // 5. Mensagem de resultado
     const messageParts: string[] = [];
     if (summary.success > 0) {
       messageParts.push(`${summary.success} PDF(s) organizados`);
