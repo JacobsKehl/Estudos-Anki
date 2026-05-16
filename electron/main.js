@@ -13,7 +13,8 @@ let nextProcess;
 // Configure paths
 const userDataPath = app.getPath('userData');
 const dbPath = path.join(userDataPath, 'database.db');
-const dbUrl = `file:${dbPath}`;
+// Encode the URI to handle spaces in macOS paths correctly for Prisma
+const dbUrl = `file:${encodeURI(dbPath)}`;
 const downloadsPath = app.getPath('downloads');
 const defaultInboxPath = path.join(downloadsPath, 'KehlStudy_Inbox');
 
@@ -100,13 +101,22 @@ function createWindow() {
       const output = data.toString();
       console.log(`Next: ${output}`);
       
-      // Detecção mais flexível de que o servidor subiu
+      // Envia o log direto para o console que você está vendo no Mac
+      mainWindow?.webContents.executeJavaScript(`console.log("SERVER STDOUT: ${output.replace(/[`\\$]/g, '\\$&')}")`);
+
       if (output.includes('Ready in') || 
           output.includes('started server on') || 
           output.includes('0.0.0.0:3000') ||
           output.includes('localhost:3000')) {
         mainWindow.loadURL('http://localhost:3000');
       }
+    });
+
+    nextProcess.stderr.on('data', (data) => {
+      const errorOutput = data.toString();
+      console.error(`Next Error: ${errorOutput}`);
+      // Envia o erro direto para o seu console no Mac em VERMELHO
+      mainWindow?.webContents.executeJavaScript(`console.error("SERVER ERROR: ${errorOutput.replace(/[`\\$]/g, '\\$&')}")`);
     });
 
     // Fallback: se em 15 segundos não carregar, tenta forçar o carregamento
@@ -116,10 +126,6 @@ function createWindow() {
         mainWindow.loadURL('http://localhost:3000');
       }
     }, 15000);
-
-    nextProcess.stderr.on('data', (data) => {
-      console.error(`Next Error: ${data}`);
-    });
   };
 
   startNext();
