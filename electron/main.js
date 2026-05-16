@@ -92,7 +92,8 @@ function createWindow() {
         env: { 
           ...process.env, 
           PORT: '3000',
-          ELECTRON_RUN_AS_NODE: '1'
+          ELECTRON_RUN_AS_NODE: '1',
+          NODE_PATH: path.join(unpackedPath, 'node_modules')
         }
       });
     }
