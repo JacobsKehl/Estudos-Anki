@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useRef } from "react";
-import { Upload, Loader2, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { Upload, Loader2, FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -44,10 +44,7 @@ export function CloudUploadButton() {
       setProgress(100);
       toast.success("PDF salvo na nuvem com sucesso!", { id: toastId });
       
-      // Limpar o input
       if (fileInputRef.current) fileInputRef.current.value = "";
-      
-      // Atualizar a página para mostrar o novo material
       router.refresh();
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer upload", { id: toastId });
@@ -58,7 +55,7 @@ export function CloudUploadButton() {
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3 w-full max-w-[280px]">
       <input
         type="file"
         accept=".pdf"
@@ -71,24 +68,27 @@ export function CloudUploadButton() {
       <Button
         onClick={() => fileInputRef.current?.click()}
         disabled={isUploading}
-        className="rounded-2xl h-14 px-8 bg-accent text-white hover:bg-accent/90 shadow-lg shadow-accent/20 transition-all hover:scale-105 active:scale-95 group relative overflow-hidden"
+        className="w-full rounded-2xl h-14 bg-white text-accent hover:bg-white/90 shadow-xl shadow-black/5 transition-all hover:scale-[1.02] active:scale-95 group relative overflow-hidden border-none font-bold"
       >
         {isUploading ? (
-          <>
+          <div className="flex items-center justify-center">
             <Loader2 className="w-5 h-5 mr-3 animate-spin" />
-            Subindo... {progress}%
-          </>
+            <span className="text-sm">{progress}%</span>
+          </div>
         ) : (
-          <>
-            <Upload className="w-5 h-5 mr-3 group-hover:-translate-y-1 transition-transform" />
-            Adicionar PDF (Nuvem)
-          </>
+          <div className="flex items-center justify-center">
+            <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
+            <span>Adicionar Material</span>
+          </div>
         )}
       </Button>
       
-      <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold opacity-60">
-        Limite de 10MB por arquivo no plano grátis
-      </p>
+      <div className="flex items-center gap-1.5 opacity-40">
+         <FileText className="w-3 h-3 text-white" />
+         <p className="text-[9px] text-white uppercase tracking-widest font-bold">
+           PDF • MÁX 10MB
+         </p>
+      </div>
     </div>
   );
 }

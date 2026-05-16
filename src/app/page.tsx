@@ -53,7 +53,7 @@ export default async function Dashboard() {
     });
 
     if (materialsCount === 0) {
-      nextAction = { type: "NO_MATERIALS", title: "Importe seus PDFs", description: "Coloque seus arquivos na pasta local e importe-os para a Biblioteca.", cta: "Ir para Biblioteca", href: "/materials" };
+      nextAction = { type: "NO_MATERIALS", title: "Suba seus PDFs", description: "Envie seus arquivos para a nuvem para começar a organizar seus estudos com IA.", cta: "Ir para Biblioteca", href: "/materials" };
     } else if (unorganizedMaterial) {
       nextAction = { type: "NEEDS_ORGANIZATION", title: "Organize seus Estudos", description: "Você tem PDFs aguardando a IA. Organize-os para atualizar seu roteiro.", cta: "Ir para Biblioteca", href: "/materials" };
     } else if (blocksCount === 0) {
