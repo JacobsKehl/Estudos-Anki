@@ -9,7 +9,7 @@ import { BlockGenerator } from "@/components/materials/BlockGenerator";
 import { StudyBlockItem } from "@/components/subjects/StudyBlockItem";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RefreshButton } from "@/components/materials/RefreshButton";
+
 
 export default async function MaterialDetailsPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -89,7 +89,7 @@ export default async function MaterialDetailsPage({ params }: { params: { id: st
             {material.studyBlocks.length === 0 ? (
               <div className="py-12 text-center bg-muted/10 rounded-3xl border-2 border-dashed border-border/60">
                 <p className="text-muted-foreground">Nenhum bloco criado para este material.</p>
-                <RefreshButton />
+
               </div>
             ) : (
               material.studyBlocks.map((block: any) => (
