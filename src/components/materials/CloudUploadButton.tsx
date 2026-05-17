@@ -204,16 +204,16 @@ export function CloudUploadButton() {
           </div>
 
           {/* Scrollable File List */}
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3 max-h-[40vh] custom-scrollbar scrollbar-thin">
+          <div className="flex-1 overflow-y-auto pr-2 space-y-3 max-h-[40vh] scrollbar-thin" style={{ scrollbarGutter: "stable" }}>
             {uploadResults.map((result, idx) => (
               <div 
                 key={idx}
-                className={`flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-xl border transition-colors ${
+                className={`flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-xl border transition-all duration-200 ${
                   result.status === "success" 
-                    ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-800" 
+                    ? "bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/10 hover:border-emerald-500/20 text-emerald-800" 
                     : result.status === "duplicate"
-                    ? "bg-amber-500/5 border-amber-500/10 text-amber-800"
-                    : "bg-rose-500/5 border-rose-500/10 text-rose-800"
+                    ? "bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/10 hover:border-amber-500/20 text-amber-800"
+                    : "bg-rose-500/5 hover:bg-rose-500/10 border-rose-500/10 hover:border-rose-500/20 text-rose-800"
                 }`}
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
