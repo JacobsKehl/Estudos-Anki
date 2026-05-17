@@ -285,12 +285,6 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
       continue;
     }
 
-    // Gerar flashcards com IA (Apenas se NÃO for reorganização)
-    if (isReorganizing) {
-      log(`[Reorganize] Pulando geração de novos flashcards.`);
-      continue;
-    }
-
     // Gerar flashcards com IA (Apenas se o bloco for confiável/temático)
     const isGenericTitle = 
       studyBlock.title.toLowerCase().includes("parte ") || 
@@ -464,11 +458,10 @@ export async function POST(req: NextRequest) {
     for (const material of materialsToProcess) {
       try {
         if (force) {
-          console.log(`[REORGANIZE] Preservando cards e limpando blocos para: ${material.fileName}`);
+          console.log(`[REORGANIZE] Apagando cards antigos e limpando blocos para: ${material.fileName}`);
           
-          await prisma.flashcard.updateMany({
-            where: { materialId: material.id },
-            data: { studyBlockId: null }
+          await prisma.flashcard.deleteMany({
+            where: { materialId: material.id }
           });
 
           await prisma.studyBlock.deleteMany({ where: { materialId: material.id } });
