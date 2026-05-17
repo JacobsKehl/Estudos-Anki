@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Trash2, Eye, RotateCw, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { FileText, Trash2, Eye, RotateCw, Loader2, Sparkles, AlertCircle, Brain, BookOpen } from "lucide-react";
 import { MaterialStatusBadge } from "./MaterialStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,50 +52,53 @@ export function MaterialCard({
   const [newSubjectName, setNewSubjectName] = React.useState("");
   const [selectedSubjectId, setSelectedSubjectId] = React.useState("");
 
-  const handleOrganize = async () => {
+  const [showActionsDialog, setShowActionsDialog] = React.useState(false);
+
+  const executeOrganizationAction = async (mode: string) => {
     setIsOrganizing(true);
-    const toastId = toast.loading("Iniciando pipeline completo: PDF → Blocos → Flashcards...");
+    setShowActionsDialog(false);
+    
+    let loadingMsg = "Processando requisição...";
+    if (mode === "general") loadingMsg = "Iniciando pipeline completo: PDF → Blocos → Flashcards...";
+    if (mode === "content_only") loadingMsg = "Analisando estrutura e criando blocos temáticos...";
+    if (mode === "flashcards_only") loadingMsg = "Gerando flashcards com IA para os blocos...";
+    if (mode === "clear_flashcards") loadingMsg = "Excluindo flashcards deste material...";
+    if (mode === "unorganize") loadingMsg = "Apagando blocos e chaves de estudo do zero...";
+
+    const toastId = toast.loading(loadingMsg);
     try {
-      const res = await fetch("/api/materials/organize-all", {
+      const res = await fetch(`/api/materials/${material.id}/organize`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode })
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao organizar material");
+      if (!res.ok) throw new Error(data.error || "Erro ao realizar ação");
 
-      toast.success(data.message, { id: toastId });
+      toast.success(data.message || "Ação realizada com sucesso!", { id: toastId });
       router.refresh();
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message, { id: toastId });
+      toast.error(error.message || "Erro desconhecido", { 
+        id: toastId,
+        duration: 8000
+      });
     } finally {
       setIsOrganizing(false);
     }
   };
 
-  const handleReorganize = async (e: React.MouseEvent) => {
+  const handleOrganizeClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (!confirm("Isso removerá os blocos atuais e criará uma nova divisão temática. Deseja continuar?")) return;
+    setShowActionsDialog(true);
+  };
 
-    setIsOrganizing(true);
-    const toastId = toast.loading("Reorganizando material com IA...");
-    try {
-      const res = await fetch(`/api/materials/${material.id}/organize`, {
-        method: "POST",
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao reorganizar");
-
-      toast.success("Material reorganizado com sucesso!", { id: toastId });
-      router.refresh();
-    } catch (error: any) {
-      toast.error(error.message, { id: toastId });
-    } finally {
-      setIsOrganizing(false);
-    }
+  const handleReorganizeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowActionsDialog(true);
   };
 
   const date = new Date(material.uploadedAt).toLocaleDateString("pt-BR", {
@@ -318,30 +321,30 @@ export function MaterialCard({
             {material.organizationStatus !== "ORGANIZED" ? (
               <Button 
                 size="sm" 
-                className="flex-1 rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm"
-                onClick={handleOrganize}
+                className="flex-1 rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm animate-pulse-subtle"
+                onClick={handleOrganizeClick}
                 disabled={isOrganizing}
               >
                 {isOrganizing ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Organizando...</>
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processando...</>
                 ) : (
-                  <><Sparkles className="w-3.5 h-3.5" /> Organizar</>
+                  <><Sparkles className="w-3.5 h-3.5 animate-pulse" /> Organizar</>
                 )}
               </Button>
             ) : (
               <>
-                <Button size="sm" variant="outline" className="flex-1 rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5" asChild>
+                <Button size="sm" variant="outline" className="flex-1 rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5 font-bold text-xs" asChild>
                   <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
                 </Button>
                 <Button 
                   size="sm" 
                   variant="ghost"
-                  className="flex-1 rounded-xl h-9 text-muted-foreground hover:text-accent gap-2 text-[10px] font-bold uppercase"
-                  onClick={handleReorganize}
+                  className="flex-1 rounded-xl h-9 text-muted-foreground hover:text-accent gap-2 text-[10px] font-bold uppercase transition-colors"
+                  onClick={handleReorganizeClick}
                   disabled={isOrganizing}
                 >
                   {isOrganizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCw className="w-3 h-3" />}
-                  Reorganizar
+                  Gerenciar
                 </Button>
               </>
             )}
@@ -350,7 +353,7 @@ export function MaterialCard({
               <Button 
                 size="sm" 
                 variant="secondary" 
-                className="rounded-xl h-9 px-3 gap-2"
+                className="rounded-xl h-9 px-3 gap-2 hover:bg-muted"
                 asChild
               >
                 <Link href={`/materials/${material.id}`}>
@@ -439,6 +442,121 @@ export function MaterialCard({
                 Atualizar Matéria
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Ações de Organização Granular */}
+        <Dialog open={showActionsDialog} onOpenChange={setShowActionsDialog}>
+          <DialogContent className="max-w-2xl bg-card border border-border/80 shadow-2xl rounded-2xl p-6">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
+                <Sparkles className="w-5 h-5 text-accent animate-pulse" />
+                Opções de Organização com IA
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                Escolha o nível de processamento e organização para o material: <span className="font-bold text-accent">{material.title}</span>.
+              </p>
+            </DialogHeader>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6">
+              {/* Opção Completa / Geral */}
+              <button
+                onClick={() => executeOrganizationAction("general")}
+                disabled={isOrganizing}
+                className="flex items-start gap-4 p-4 rounded-xl border border-accent/20 bg-accent/[0.02] hover:bg-accent/[0.06] hover:border-accent/40 text-left transition-all duration-300 group"
+              >
+                <div className="mt-1 shrink-0 p-2.5 rounded-lg bg-accent text-white group-hover:scale-110 transition-transform">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground group-hover:text-accent transition-colors flex items-center gap-2">
+                    Opção Geral (Completa)
+                    <Badge className="bg-accent text-white text-[9px] px-1.5 py-0 h-4">Recomendado</Badge>
+                  </h4>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground mt-1">
+                    Pipeline completo. Lê o PDF, cria blocos de estudos temáticos e gera flashcards para o Anki integrados.
+                  </p>
+                </div>
+              </button>
+
+              {/* Opção Apenas Conteúdo */}
+              <button
+                onClick={() => executeOrganizationAction("content_only")}
+                disabled={isOrganizing}
+                className="flex items-start gap-4 p-4 rounded-xl border border-border hover:bg-muted/30 hover:border-accent/30 text-left transition-all duration-300 group"
+              >
+                <div className="mt-1 shrink-0 p-2.5 rounded-lg bg-cyan-500 text-white group-hover:scale-110 transition-transform">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground group-hover:text-cyan-500 transition-colors">
+                    Organizar Apenas Conteúdo
+                  </h4>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground mt-1">
+                    Cria os blocos de estudo temáticos mapeando os tópicos do PDF, mas <strong>não</strong> gera os flashcards.
+                  </p>
+                </div>
+              </button>
+
+              {/* Opção Apenas Flashcards */}
+              <button
+                onClick={() => executeOrganizationAction("flashcards_only")}
+                disabled={isOrganizing}
+                className="flex items-start gap-4 p-4 rounded-xl border border-border hover:bg-muted/30 hover:border-accent/30 text-left transition-all duration-300 group"
+              >
+                <div className="mt-1 shrink-0 p-2.5 rounded-lg bg-emerald-500 text-white group-hover:scale-110 transition-transform">
+                  <Brain className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground group-hover:text-emerald-500 transition-colors">
+                    Gerar Apenas Flashcards
+                  </h4>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground mt-1">
+                    Gera flashcards da IA baseados nos blocos temáticos já existentes. Ideal para completar uma organização pendente.
+                  </p>
+                </div>
+              </button>
+
+              {/* Opção Apagar Flashcards */}
+              <button
+                onClick={() => executeOrganizationAction("clear_flashcards")}
+                disabled={isOrganizing}
+                className="flex items-start gap-4 p-4 rounded-xl border border-border hover:bg-amber-500/[0.02] hover:border-amber-500/30 text-left transition-all duration-300 group"
+              >
+                <div className="mt-1 shrink-0 p-2.5 rounded-lg bg-amber-500 text-white group-hover:scale-110 transition-transform">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground group-hover:text-amber-500 transition-colors">
+                    Apagar Apenas Flashcards
+                  </h4>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground mt-1">
+                    Remove todos os flashcards criados para este material, mantendo a divisão de blocos de estudo intacta.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Divisória para opção destrutiva */}
+            <div className="border-t border-border/80 pt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex gap-2.5 items-start">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <h5 className="text-xs font-bold text-foreground">Resetar do Zero?</h5>
+                  <p className="text-[10px] text-muted-foreground">Isso remove permanentemente toda a divisão de blocos e cards.</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => executeOrganizationAction("unorganize")}
+                disabled={isOrganizing}
+                className="rounded-xl px-4 gap-2 bg-red-500/10 hover:bg-red-500 hover:text-white border border-red-500/20 text-red-500 shrink-0 h-9 font-semibold text-xs transition-all"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                Desorganizar Conteúdo
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </CardContent>

@@ -91,7 +91,185 @@ export async function POST(
       return NextResponse.json({ error: "Arquivos locais não são suportados na Web. Faça o upload via Nuvem." }, { status: 400 });
     }
 
-    // 2. Marcar como analisando
+    // 2. Extrair parâmetros do corpo
+    let mode = "general";
+    try {
+      const body = await req.json();
+      if (body && body.mode) {
+        mode = body.mode;
+      }
+    } catch (e) {
+      // Ignora erro se não houver JSON no body, usando "general" como fallback
+    }
+
+    // ==========================================
+    // MODO: APAGAR APENAS FLASHCARDS
+    // ==========================================
+    if (mode === "clear_flashcards") {
+      await prisma.$transaction([
+        prisma.flashcard.deleteMany({ where: { materialId: material.id } }),
+        prisma.studyBlock.updateMany({
+          where: { materialId: material.id },
+          data: {
+            flashcardsStatus: "NOT_STARTED",
+            flashcardsGeneratedAt: null
+          }
+        })
+      ]);
+
+      return NextResponse.json({
+        message: "Todos os flashcards deste material foram removidos com sucesso."
+      });
+    }
+
+    // ==========================================
+    // MODO: DESORGANIZAR CONTEÚDO (RESET COMPLETO)
+    // ==========================================
+    if (mode === "unorganize") {
+      await prisma.$transaction([
+        prisma.studyScheduleItem.deleteMany({
+          where: {
+            materialId: material.id,
+            studyBlockId: { not: null }
+          }
+        }),
+        prisma.flashcard.deleteMany({ where: { materialId: material.id } }),
+        prisma.studyBlock.deleteMany({ where: { materialId: material.id } }),
+        prisma.studyMaterial.update({
+          where: { id: material.id },
+          data: {
+            organizationStatus: "IMPORTED",
+            detectedStructure: null
+          }
+        })
+      ]);
+
+      return NextResponse.json({
+        message: "Material desorganizado com sucesso! Blocos, flashcards e agendamentos foram removidos."
+      });
+    }
+
+    // ==========================================
+    // MODO: APENAS FLASHCARDS (GERAR PARA BLOCOS EXISTENTES)
+    // ==========================================
+    if (mode === "flashcards_only") {
+      const blocks = await prisma.studyBlock.findMany({
+        where: { materialId: material.id },
+        orderBy: { orderIndex: "asc" }
+      });
+
+      if (blocks.length === 0) {
+        return NextResponse.json({
+          error: "Não existem blocos de estudo criados para este material. Por favor, organize o conteúdo primeiro."
+        }, { status: 400 });
+      }
+
+      await prisma.studyMaterial.update({
+        where: { id },
+        data: { organizationStatus: "GENERATING_FLASHCARDS" }
+      });
+
+      // Extrair ou recuperar as páginas
+      let extractedPages = await prisma.extractedContent.findMany({
+        where: { materialId: material.id },
+        orderBy: { pageNumber: "asc" }
+      });
+
+      if (extractedPages.length === 0) {
+        const { pages } = await extractAllPages(material.sourcePath!, isLocal);
+        const nonEmptyPages = pages.filter(p => p.text.length > 10);
+        
+        await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
+        
+        const contentRecords = nonEmptyPages.map((p, idx) => ({
+          userId,
+          subjectId: material.subjectId || "",
+          materialId: material.id,
+          pageNumber: p.pageNumber,
+          text: p.text,
+          orderIndex: idx,
+          estimatedStudyMinutes: 0
+        }));
+
+        await prisma.extractedContent.createMany({ data: contentRecords });
+        extractedPages = await prisma.extractedContent.findMany({
+          where: { materialId: material.id },
+          orderBy: { pageNumber: "asc" }
+        });
+      }
+
+      await prisma.flashcard.deleteMany({ where: { materialId: material.id } });
+
+      let flashcardCount = 0;
+
+      for (const block of blocks) {
+        const blockPages = extractedPages.filter(p => p.pageNumber >= block.pageStart && p.pageNumber <= block.pageEnd);
+        const blockText = blockPages.map(p => p.text).join("\n");
+
+        if (blockText.trim().length >= 50) {
+          try {
+            const cards = await generateFlashcards(blockText.substring(0, 6000));
+            if (cards && cards.length > 0) {
+              const limitedCards = cards.slice(0, 15);
+              const flashcardsData = limitedCards.map(card => ({
+                userId,
+                subjectId: block.subjectId,
+                materialId: material.id,
+                studyBlockId: block.id,
+                question: card.question,
+                answer: card.answer,
+                type: card.type,
+                difficulty: card.difficulty,
+                status: "APPROVED",
+                reviewState: "NEW",
+                nextReviewAt: new Date(),
+                approvedAt: new Date(),
+                learningStep: 0,
+                easeFactor: 2.5,
+                intervalDays: 0,
+                repetitionCount: 0,
+                lapseCount: 0,
+                sourcePageStart: block.pageStart,
+                sourcePageEnd: block.pageEnd
+              }));
+
+              const createResult = await prisma.flashcard.createMany({ data: flashcardsData });
+              flashcardCount += createResult.count;
+
+              await prisma.studyBlock.update({
+                where: { id: block.id },
+                data: {
+                  flashcardsStatus: "GENERATED",
+                  flashcardsGeneratedAt: new Date()
+                }
+              });
+            }
+          } catch (flashErr: any) {
+            console.error(`[Flashcards Only] Erro para bloco ${block.title}:`, flashErr.message);
+            if (flashErr.message.includes("key was reported as leaked") || flashErr.message.includes("API key not valid")) {
+              throw new Error("Sua chave de API do Gemini foi desativada pelo Google por motivo de vazamento em repositório público. Acesse o Google AI Studio, gere uma nova chave de API gratuita e atualize seu arquivo .env local!");
+            }
+            throw flashErr;
+          }
+        }
+      }
+
+      await prisma.studyMaterial.update({
+        where: { id },
+        data: { organizationStatus: "ORGANIZED" }
+      });
+
+      return NextResponse.json({
+        message: `${flashcardCount} flashcards gerados com sucesso para os blocos existentes.`,
+        flashcardsCount: flashcardCount
+      });
+    }
+
+    // ==========================================
+    // MODOS: GENERAL (COMPLETO) E CONTENT_ONLY (APENAS CONTEÚDO)
+    // ==========================================
+    
+    // Marcar como analisando
     await prisma.studyMaterial.update({
       where: { id },
       data: { organizationStatus: "ANALYZING" }
@@ -115,7 +293,7 @@ export async function POST(
 
     const contentRecords = nonEmptyPages.map((p, idx) => ({
       userId,
-      subjectId: material.subjectId || "", // preenchido temporariamente, atualizado depois
+      subjectId: material.subjectId || "",
       materialId: material.id,
       pageNumber: p.pageNumber,
       text: p.text,
@@ -156,7 +334,6 @@ export async function POST(
       });
     }
 
-    // Corrigir subjectId nos registros de conteúdo extraído
     const updatedContentRecords = contentRecords.map(rec => ({
       ...rec,
       subjectId: subjectId as string
@@ -179,15 +356,16 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 7. Remover blocos antigos e flashcards antigos deste material (reorganização limpa)
+    // 7. Remover blocos antigos e flashcards antigos deste material
     await prisma.$transaction([
       prisma.studyBlock.deleteMany({ where: { materialId: material.id } }),
       prisma.flashcard.deleteMany({ where: { materialId: material.id } })
     ]);
 
     let flashcardCount = 0;
+    const shouldGenerateFlashcards = mode === "general";
 
-    // 8. Criar novos blocos e gerar flashcards
+    // 8. Criar novos blocos e gerar flashcards (se for general)
     for (let i = 0; i < detectedBlocks.length; i++) {
       const blockDef = detectedBlocks[i];
       const pageStart = blockDef.pageStart || 1;
@@ -215,55 +393,58 @@ export async function POST(
         }
       });
 
-      // Pegar texto deste bloco específico
-      const blockPages = nonEmptyPages.filter(p => p.pageNumber >= pageStart && p.pageNumber <= pageEnd);
-      const blockText = blockPages.map(p => p.text).join("\n");
+      if (shouldGenerateFlashcards) {
+        const blockPages = nonEmptyPages.filter(p => p.pageNumber >= pageStart && p.pageNumber <= pageEnd);
+        const blockText = blockPages.map(p => p.text).join("\n");
 
-      if (blockText.trim().length >= 50) {
-        try {
-          const cards = await generateFlashcards(blockText.substring(0, 6000));
-          if (cards && cards.length > 0) {
-            const MAX_FLASHCARDS_PER_BLOCK = 15;
-            const limitedCards = cards.slice(0, MAX_FLASHCARDS_PER_BLOCK);
+        if (blockText.trim().length >= 50) {
+          try {
+            const cards = await generateFlashcards(blockText.substring(0, 6000));
+            if (cards && cards.length > 0) {
+              const limitedCards = cards.slice(0, 15);
 
-            const flashcardsData = limitedCards.map(card => ({
-              userId,
-              subjectId: subjectId as string,
-              materialId: material.id,
-              studyBlockId: studyBlock.id,
-              question: card.question,
-              answer: card.answer,
-              type: card.type,
-              difficulty: card.difficulty,
-              status: "APPROVED",
-              reviewState: "NEW",       
-              nextReviewAt: new Date(),      
-              approvedAt: new Date(),        
-              learningStep: 0,
-              easeFactor: 2.5,
-              intervalDays: 0,
-              repetitionCount: 0,
-              lapseCount: 0,
-              sourcePageStart: pageStart,
-              sourcePageEnd: pageEnd,
-            }));
+              const flashcardsData = limitedCards.map(card => ({
+                userId,
+                subjectId: subjectId as string,
+                materialId: material.id,
+                studyBlockId: studyBlock.id,
+                question: card.question,
+                answer: card.answer,
+                type: card.type,
+                difficulty: card.difficulty,
+                status: "APPROVED",
+                reviewState: "NEW",       
+                nextReviewAt: new Date(),      
+                approvedAt: new Date(),        
+                learningStep: 0,
+                easeFactor: 2.5,
+                intervalDays: 0,
+                repetitionCount: 0,
+                lapseCount: 0,
+                sourcePageStart: pageStart,
+                sourcePageEnd: pageEnd,
+              }));
 
-            const createResult = await prisma.flashcard.createMany({
-              data: flashcardsData
-            });
+              const createResult = await prisma.flashcard.createMany({
+                data: flashcardsData
+              });
 
-            flashcardCount += createResult.count;
+              flashcardCount += createResult.count;
 
-            await prisma.studyBlock.update({
-              where: { id: studyBlock.id },
-              data: { 
-                flashcardsStatus: "GENERATED",
-                flashcardsGeneratedAt: new Date()
-              }
-            });
+              await prisma.studyBlock.update({
+                where: { id: studyBlock.id },
+                data: { 
+                  flashcardsStatus: "GENERATED",
+                  flashcardsGeneratedAt: new Date()
+                }
+              });
+            }
+          } catch (flashErr: any) {
+            console.error(`[Flashcards Reorganize] Erro para bloco ${studyBlock.title}:`, flashErr.message);
+            if (flashErr.message.includes("key was reported as leaked") || flashErr.message.includes("API key not valid")) {
+              throw new Error("Sua chave de API do Gemini foi desativada pelo Google por motivo de vazamento em repositório público. Acesse o Google AI Studio, gere uma nova chave de API gratuita e atualize seu arquivo .env local!");
+            }
           }
-        } catch (flashErr: any) {
-          console.error(`[Flashcards Reorganize] Erro para bloco ${studyBlock.title}:`, flashErr.message);
         }
       }
     }
@@ -278,18 +459,29 @@ export async function POST(
       }
     });
 
+    const successMessage = shouldGenerateFlashcards 
+      ? `${detectedBlocks.length} blocos de estudo criados e ${flashcardCount} flashcards importados com sucesso.`
+      : `${detectedBlocks.length} blocos de estudo criados com sucesso (sem flashcards).`;
+
     return NextResponse.json({
-      message: `${detectedBlocks.length} blocos de estudo criados e ${flashcardCount} flashcards enviados para curadoria com sucesso.`,
+      message: successMessage,
       blocksCount: detectedBlocks.length,
       flashcardsCount: flashcardCount
     });
 
   } catch (error: any) {
     console.error("[ORGANIZE SINGLE] Erro:", error);
+    
+    let userFriendlyError = error.message || "Falha ao organizar material";
+    if (userFriendlyError.includes("key was reported as leaked") || userFriendlyError.includes("API key not valid")) {
+      userFriendlyError = "Sua chave de API do Gemini foi desativada pelo Google por motivo de vazamento em repositório público. Acesse o Google AI Studio (aistudio.google.com), gere uma nova chave de API gratuita e atualize seu arquivo .env local!";
+    }
+
     await prisma.studyMaterial.update({
       where: { id },
-      data: { organizationStatus: "ERROR", processingError: error.message }
+      data: { organizationStatus: "ERROR", processingError: userFriendlyError.substring(0, 250) }
     }).catch(() => {});
-    return NextResponse.json({ error: "Falha ao organizar material", details: error.message }, { status: 500 });
+
+    return NextResponse.json({ error: userFriendlyError }, { status: 500 });
   }
 }
