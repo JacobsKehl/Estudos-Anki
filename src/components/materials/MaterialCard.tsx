@@ -31,9 +31,17 @@ interface MaterialCardProps {
     hasExistingBlocks?: boolean;
     blocksCount?: number;
   };
+  isSelected?: boolean;
+  onSelect?: (id: string) => void;
+  isSelectionMode?: boolean;
 }
 
-export function MaterialCard({ material }: MaterialCardProps) {
+export function MaterialCard({ 
+  material, 
+  isSelected = false, 
+  onSelect, 
+  isSelectionMode = false 
+}: MaterialCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isOrganizing, setIsOrganizing] = React.useState(false);
@@ -206,16 +214,31 @@ export function MaterialCard({ material }: MaterialCardProps) {
     }
   };
 
+  const ContentContainer = isSelectionMode ? "div" : Link;
+  const containerProps = isSelectionMode 
+    ? { className: "flex items-start gap-3 flex-grow select-none cursor-pointer" }
+    : { href: `/materials/${material.id}`, className: "flex items-start gap-3 flex-grow group/link hover:opacity-80 transition-opacity" };
+
   return (
-    <Card className="group hover:border-accent/30 transition-colors overflow-hidden h-full flex flex-col">
+    <Card 
+      onClick={() => isSelectionMode && onSelect && onSelect(material.id)}
+      className={`group hover:border-accent/30 transition-all duration-300 overflow-hidden h-full flex flex-col ${
+        isSelectionMode 
+          ? isSelected 
+            ? "border-accent ring-2 ring-accent/20 bg-accent/[0.02]" 
+            : "cursor-pointer hover:bg-muted/10" 
+          : ""
+      }`}
+    >
       <CardContent className="p-0 flex flex-col h-full">
         <div className="p-5 flex flex-col gap-4 flex-grow">
           <div className="flex justify-between items-start gap-4">
-            <Link 
-              href={`/materials/${material.id}`} 
-              className="flex items-start gap-3 flex-grow group/link hover:opacity-80 transition-opacity"
-            >
-              <div className="mt-1 flex-shrink-0 w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover/link:bg-accent group-hover/link:text-white transition-colors">
+            <ContentContainer {...(containerProps as any)}>
+              <div className={`mt-1 flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                isSelectionMode && isSelected
+                  ? "bg-accent text-white"
+                  : "bg-accent/10 text-accent group-hover/link:bg-accent group-hover/link:text-white"
+              }`}>
                 <FileText className="w-5 h-5" />
               </div>
               <div>
@@ -227,12 +250,14 @@ export function MaterialCard({ material }: MaterialCardProps) {
                     <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                     {material.subjectName}
                   </p>
-                  <button 
-                    onClick={openSubjectDialog}
-                    className="text-[10px] text-accent hover:underline font-bold"
-                  >
-                    Alterar
-                  </button>
+                  {!isSelectionMode && (
+                    <button 
+                      onClick={openSubjectDialog}
+                      className="text-[10px] text-accent hover:underline font-bold"
+                    >
+                      Alterar
+                    </button>
+                  )}
                 </div>
                 {material.organizationStatus === "ERROR" && material.processingError && (
                   <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg flex gap-2 text-[10px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1">
@@ -241,19 +266,36 @@ export function MaterialCard({ material }: MaterialCardProps) {
                   </div>
                 )}
               </div>
-            </Link>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="flex-shrink-0 -mr-2 -mt-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors h-8 w-8"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowDeleteDialog(true);
-              }}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            </ContentContainer>
+            
+            {isSelectionMode ? (
+              <div 
+                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 mt-1 ${
+                  isSelected 
+                    ? "bg-accent border-accent text-white" 
+                    : "border-border bg-background group-hover:border-accent/40"
+                }`}
+              >
+                {isSelected && (
+                  <svg className="w-3.5 h-3.5 stroke-current stroke-[3] fill-none animate-in zoom-in-50 duration-200" viewBox="0 0 24 24">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </div>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="flex-shrink-0 -mr-2 -mt-2 text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors h-8 w-8"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowDeleteDialog(true);
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/20">
@@ -271,51 +313,53 @@ export function MaterialCard({ material }: MaterialCardProps) {
           </div>
         </div>
 
-        <div className="bg-muted/30 px-5 py-3 border-t border-border/50 flex gap-2">
-          {material.organizationStatus !== "ORGANIZED" ? (
-            <Button 
-              size="sm" 
-              className="flex-1 rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm"
-              onClick={handleOrganize}
-              disabled={isOrganizing}
-            >
-              {isOrganizing ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Organizando...</>
-              ) : (
-                <><Sparkles className="w-3.5 h-3.5" /> Organizar</>
-              )}
-            </Button>
-          ) : (
-            <>
-              <Button size="sm" variant="outline" className="flex-1 rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5" asChild>
-                <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
-              </Button>
+        {!isSelectionMode && (
+          <div className="bg-muted/30 px-5 py-3 border-t border-border/50 flex gap-2">
+            {material.organizationStatus !== "ORGANIZED" ? (
               <Button 
                 size="sm" 
-                variant="ghost"
-                className="flex-1 rounded-xl h-9 text-muted-foreground hover:text-accent gap-2 text-[10px] font-bold uppercase"
-                onClick={handleReorganize}
+                className="flex-1 rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm"
+                onClick={handleOrganize}
                 disabled={isOrganizing}
               >
-                {isOrganizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCw className="w-3 h-3" />}
-                Reorganizar
+                {isOrganizing ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Organizando...</>
+                ) : (
+                  <><Sparkles className="w-3.5 h-3.5" /> Organizar</>
+                )}
               </Button>
-            </>
-          )}
-          
-          {material.organizationStatus !== "ORGANIZED" && (
-            <Button 
-              size="sm" 
-              variant="secondary" 
-              className="rounded-xl h-9 px-3 gap-2"
-              asChild
-            >
-              <Link href={`/materials/${material.id}`}>
-                <Eye className="w-3.5 h-3.5" />
-              </Link>
-            </Button>
-          )}
-        </div>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" className="flex-1 rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5" asChild>
+                  <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  className="flex-1 rounded-xl h-9 text-muted-foreground hover:text-accent gap-2 text-[10px] font-bold uppercase"
+                  onClick={handleReorganize}
+                  disabled={isOrganizing}
+                >
+                  {isOrganizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCw className="w-3 h-3" />}
+                  Reorganizar
+                </Button>
+              </>
+            )}
+            
+            {material.organizationStatus !== "ORGANIZED" && (
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                className="rounded-xl h-9 px-3 gap-2"
+                asChild
+              >
+                <Link href={`/materials/${material.id}`}>
+                  <Eye className="w-3.5 h-3.5" />
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Dialog de Exclusão */}
         <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

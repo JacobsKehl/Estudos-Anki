@@ -1,14 +1,12 @@
-import { MaterialFilters } from "@/components/materials/MaterialFilters";
-import { MaterialCard } from "@/components/materials/MaterialCard";
 import { Sparkles, Cloud, LayoutGrid, Library, Plus, Info, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
 import { CloudUploadButton } from "@/components/materials/CloudUploadButton";
 import { getMockUserId } from "@/lib/auth-mock";
+import { MaterialsListClient } from "@/components/materials/MaterialsListClient";
 
 type MaterialItem = {
   id: string;
@@ -153,22 +151,17 @@ export default async function MaterialsPage() {
             <h3 className="text-xl font-bold tracking-tight">Meus Documentos</h3>
             <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           </div>
-          {materials.length > 0 && <MaterialFilters />}
         </div>
         
-        <div className="grid gap-4">
-          {materials.length === 0 ? (
-            <EmptyState 
-              icon={Cloud}
-              title="Ainda não há arquivos na sua nuvem"
-              description="Suba seu primeiro material de estudo clicando no botão acima."
-            />
-          ) : (
-            materials.map((material) => (
-              <MaterialCard key={material.id} material={material} />
-            ))
-          )}
-        </div>
+        {materials.length === 0 ? (
+          <EmptyState 
+            icon={Cloud}
+            title="Ainda não há arquivos na sua nuvem"
+            description="Suba seu primeiro material de estudo clicando no botão acima."
+          />
+        ) : (
+          <MaterialsListClient initialMaterials={materials} />
+        )}
       </div>
     </div>
   );
