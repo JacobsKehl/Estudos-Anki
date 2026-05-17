@@ -169,21 +169,28 @@ export async function getGlobalMetrics(userId: string) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
-  const dailyActivity = await prisma.flashcardReview.groupBy({
-    by: ['reviewedAt'],
+  const reviews = await prisma.flashcardReview.findMany({
     where: {
       userId,
       reviewedAt: { gte: thirtyDaysAgo }
     },
-    _count: { _all: true }
+    select: {
+      reviewedAt: true
+    }
   });
 
   // Group by date (ignoring time)
   const heatmap: Record<string, number> = {};
-  dailyActivity.forEach(activity => {
-    const dateStr = activity.reviewedAt.toISOString().split('T')[0];
-    heatmap[dateStr] = (heatmap[dateStr] || 0) + activity._count._all;
+  reviews.forEach(review => {
+    try {
+      const dateStr = review.reviewedAt.toISOString().split('T')[0];
+      heatmap[dateStr] = (heatmap[dateStr] || 0) + 1;
+    } catch (e) {
+      // Ignore
+    }
   });
+
+
 
   // Study states (Mastery breakdown)
   const flashcards = await (prisma as any).flashcard.groupBy({

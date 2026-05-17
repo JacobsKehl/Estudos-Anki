@@ -272,7 +272,20 @@ export function MaterialCard({
                     </button>
                   )}
                 </div>
-                {material.organizationStatus === "ERROR" && material.processingError && (
+                {material.organizationStatus === "ERROR" && (
+                  <div className="mt-3 p-3 bg-red-500/[0.04] border border-red-500/20 rounded-2xl flex flex-col gap-1.5 text-[10px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1">
+                    <div className="flex gap-2 items-start">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <span className="block font-black text-foreground">Não conseguimos processar este PDF</span>
+                        <p className="leading-relaxed text-red-500">
+                          Motivo: {getFriendlyErrorMessage(material.processingError)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {false && material.processingError && (
                   <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg flex gap-2 text-[10px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1">
                     <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
                     <p className="leading-tight">{material.processingError}</p>
@@ -329,7 +342,32 @@ export function MaterialCard({
         {!isSelectionMode && (
           <div className="bg-muted/30 border-t border-border/50 flex flex-col relative w-full">
             <div className="px-5 py-3 flex gap-2 w-full">
-              {material.organizationStatus !== "ORGANIZED" ? (
+              {material.organizationStatus === "ERROR" ? (
+                <>
+                  <Button 
+                    size="sm" 
+                    className="flex-grow rounded-xl h-9 bg-red-500 text-white hover:bg-red-600 gap-2 shadow-sm font-bold text-xs"
+                    onClick={() => executeOrganizationAction("general")}
+                    disabled={isOrganizing}
+                  >
+                    {isOrganizing ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reprocessando...</>
+                    ) : (
+                      <><RotateCw className="w-3.5 h-3.5" /> Tentar Novamente</>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl h-9 px-3 text-muted-foreground hover:text-accent hover:border-accent flex items-center gap-1.5 font-bold text-xs"
+                    onClick={handleOrganizeClick}
+                    disabled={isOrganizing}
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                    Opções
+                  </Button>
+                </>
+              ) : material.organizationStatus !== "ORGANIZED" ? (
                 <>
                   <Button 
                     size="sm" 
@@ -587,4 +625,26 @@ export function MaterialCard({
     </Card>
   );
 }
+
+function getFriendlyErrorMessage(err: string | null | undefined): string {
+  if (!err) return "Erro desconhecido ao processar arquivo.";
+  const lower = err.toLowerCase();
+  if (lower.includes("api key") || lower.includes("key was reported as leaked")) {
+    return "Chave Gemini desativada pelo Google por motivo de segurança. Gere uma nova chave gratuita no Google AI Studio e atualize seu .env local!";
+  }
+  if (lower.includes("quota") || lower.includes("resource_exhausted") || lower.includes("rate limit") || lower.includes("exhausted")) {
+    return "Limite temporário da IA atingido. Aguarde alguns instantes e clique em Tentar Novamente.";
+  }
+  if (lower.includes("texto insuficiente") || lower.includes("texto legivel") || lower.includes("imagem escaneada") || lower.includes("protegido")) {
+    return "PDF sem texto selecionável ou protegido. Certifique-se de que o documento não seja composto apenas de imagens digitalizadas.";
+  }
+  if (lower.includes("not found") || lower.includes("arquivo nao encontrado")) {
+    return "Arquivo não encontrado no Storage. Remova e envie o PDF novamente.";
+  }
+  if (lower.includes("banco") || lower.includes("database") || lower.includes("prisma")) {
+    return "Falha local ao salvar os blocos no banco de dados. Tente reprocessar.";
+  }
+  return err;
+}
+
 

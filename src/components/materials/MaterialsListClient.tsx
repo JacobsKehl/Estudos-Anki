@@ -10,7 +10,12 @@ import {
   X, 
   Loader2, 
   Info,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles,
+  BookOpen,
+  Brain,
+  RotateCw,
+  AlertCircle
 } from "lucide-react";
 import { 
   Dialog, 
@@ -45,7 +50,24 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
   const router = useRouter();
   const [materials, setMaterials] = React.useState<MaterialItem[]>(initialMaterials);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [activeFilter, setActiveFilter] = React.useState<"ALL" | "PROCESSED" | "PENDING">("ALL");
+  const [activeFilter, setActiveFilter] = React.useState<"ALL" | "PROCESSED" | "PENDING" | "ERROR">("ALL");
+  
+  // Bulk Action Processing States
+  const [isProcessingBulkAction, setIsProcessingBulkAction] = React.useState(false);
+  const [bulkActionCurrentIndex, setBulkActionCurrentIndex] = React.useState(0);
+  const [bulkActionTotal, setBulkActionTotal] = React.useState(0);
+  const [bulkActionStep, setBulkActionStep] = React.useState("");
+  
+  // Consolidation Report Modal State
+  const [showReportDialog, setShowReportDialog] = React.useState(false);
+  const [reportData, setReportData] = React.useState<{
+    processedCount: number;
+    subjectsCreatedOrLinked: number;
+    blocksCreated: number;
+    flashcardsCount: number;
+    errorCount: number;
+    failedMaterials: { id: string; title: string; error: string }[];
+  } | null>(null);
   
   // Selection States
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
@@ -70,7 +92,8 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
 
       // Category filter
       if (activeFilter === "PROCESSED") return m.organizationStatus === "ORGANIZED";
-      if (activeFilter === "PENDING") return m.organizationStatus !== "ORGANIZED";
+      if (activeFilter === "PENDING") return m.organizationStatus !== "ORGANIZED" && m.organizationStatus !== "ERROR";
+      if (activeFilter === "ERROR") return m.organizationStatus === "ERROR";
       
       return true;
     });
@@ -133,6 +156,93 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
     } finally {
       setIsDeletingBulk(false);
     }
+  };
+
+  const runBulkAction = async (mode: "general" | "flashcards_only" | "clear_flashcards" | "unorganize") => {
+    const ids = Array.from(selectedIds);
+    setBulkActionTotal(ids.length);
+    setBulkActionCurrentIndex(0);
+    setIsProcessingBulkAction(true);
+    
+    let processedCount = 0;
+    let blocksCreated = 0;
+    let flashcardsCount = 0;
+    let errorCount = 0;
+    const failedMaterials: { id: string; title: string; error: string }[] = [];
+    const subjectsLinked = new Set<string>();
+
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const material = materials.find(m => m.id === id);
+      const title = material?.title || "PDF Desconhecido";
+      
+      setBulkActionCurrentIndex(i + 1);
+      
+      // Update dynamic steps
+      if (mode === "general") {
+        setBulkActionStep("Lendo páginas e extraindo texto do PDF...");
+        await new Promise(r => setTimeout(r, 600));
+        setBulkActionStep("Identificando matéria correspondente...");
+        await new Promise(r => setTimeout(r, 600));
+        setBulkActionStep("Criando blocos de estudos temáticos com IA...");
+      } else if (mode === "flashcards_only") {
+        setBulkActionStep("Carregando blocos de estudo...");
+        await new Promise(r => setTimeout(r, 650));
+        setBulkActionStep("Gerando flashcards com IA (máx 15 por bloco)...");
+      } else if (mode === "clear_flashcards") {
+        setBulkActionStep("Limpando flashcards...");
+      } else if (mode === "unorganize") {
+        setBulkActionStep("Resetando blocos, cards e cronograma...");
+      }
+
+      try {
+        const res = await fetch(`/api/materials/${id}/organize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          processedCount++;
+          blocksCreated += data.blocksCount || 0;
+          flashcardsCount += data.flashcardsCount || 0;
+          if (material?.subjectName) subjectsLinked.add(material.subjectName);
+        } else {
+          errorCount++;
+          failedMaterials.push({
+            id,
+            title,
+            error: data.error || "Falha ao executar ação"
+          });
+        }
+      } catch (err: any) {
+        errorCount++;
+        failedMaterials.push({
+          id,
+          title,
+          error: err.message || "Erro de rede / timeout"
+        });
+      }
+    }
+
+    setIsProcessingBulkAction(false);
+    
+    // Set report data and show report
+    setReportData({
+      processedCount,
+      subjectsCreatedOrLinked: subjectsLinked.size,
+      blocksCreated,
+      flashcardsCount,
+      errorCount,
+      failedMaterials
+    });
+    
+    setShowReportDialog(true);
+    setSelectedIds(new Set());
+    setIsSelectionMode(false);
+    router.refresh();
   };
 
   const toggleSelectionMode = () => {
@@ -201,6 +311,18 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
             >
               Pendentes
             </Button>
+            <Button 
+              variant={activeFilter === "ERROR" ? "outline" : "ghost"} 
+              size="sm" 
+              onClick={() => setActiveFilter("ERROR")}
+              className={`rounded-xl px-4 py-1.5 text-xs font-semibold ${
+                activeFilter === "ERROR" 
+                  ? "border-red-500/20 bg-red-500/5 text-red-600 hover:bg-red-500/10" 
+                  : "text-muted-foreground"
+              }`}
+            >
+              Erros
+            </Button>
 
             <div className="w-px h-6 bg-border mx-2 hidden md:block" />
 
@@ -257,16 +379,60 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
             </div>
 
             {selectedIds.size > 0 && (
-              <Button 
-                variant="default"
-                size="sm"
-                onClick={() => setShowBulkDeleteDialog(true)}
-                className="rounded-xl font-bold gap-2 px-5 py-2 text-xs bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/10 hover:shadow-red-600/20 active:scale-95 transition-all animate-in zoom-in-95 duration-200 border-none"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Excluir Selecionados ({selectedIds.size})
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runBulkAction("general")}
+                  disabled={isProcessingBulkAction}
+                  className="rounded-xl font-bold gap-1.5 px-3 py-1.5 text-xs text-accent border-accent/20 hover:bg-accent/5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Organizar Conteúdo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runBulkAction("flashcards_only")}
+                  disabled={isProcessingBulkAction}
+                  className="rounded-xl font-bold gap-1.5 px-3 py-1.5 text-xs text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/5"
+                >
+                  <Brain className="w-3.5 h-3.5" />
+                  Gerar Cards
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runBulkAction("clear_flashcards")}
+                  disabled={isProcessingBulkAction}
+                  className="rounded-xl font-bold gap-1.5 px-3 py-1.5 text-xs text-amber-600 border-amber-500/20 hover:bg-amber-500/5"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-amber-500" />
+                  Apagar Cards
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runBulkAction("unorganize")}
+                  disabled={isProcessingBulkAction}
+                  className="rounded-xl font-bold gap-1.5 px-3 py-1.5 text-xs text-red-500 border-red-500/20 hover:bg-red-500/5"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  Desorganizar
+                </Button>
+                <Button 
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowBulkDeleteDialog(true)}
+                  disabled={isProcessingBulkAction}
+                  className="rounded-xl font-bold gap-1.5 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white shadow-md border-none"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Excluir ({selectedIds.size})
+                </Button>
+              </div>
             )}
+
           </div>
         )}
       </div>
@@ -346,6 +512,128 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
         </DialogContent>
       </Dialog>
 
+      {/* Progress HUD Dialog */}
+      <Dialog open={isProcessingBulkAction} onOpenChange={() => {}}>
+        <DialogContent className="max-w-md bg-card border border-border/80 shadow-2xl rounded-[2rem] p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-extrabold flex items-center gap-2 text-accent">
+              <Loader2 className="w-5 h-5 text-accent animate-spin" />
+              Processando em Lote
+            </DialogTitle>
+            <div className="text-muted-foreground text-sm space-y-4 mt-3">
+              <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <span>Progresso</span>
+                <span>{bulkActionCurrentIndex} de {bulkActionTotal} PDFs</span>
+              </div>
+              
+              {/* Custom Progress Bar */}
+              <div className="w-full bg-muted h-2.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-accent h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${(bulkActionCurrentIndex / bulkActionTotal) * 100}%` }}
+                />
+              </div>
+
+              <div className="p-4 bg-accent/5 rounded-2xl border border-accent/10 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-accent">
+                  <Sparkles className="w-4 h-4 animate-pulse" />
+                  <span>Ação Atual: {bulkActionStep}</span>
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Por favor, não feche esta janela ou recarregue a página até que a organização do lote seja concluída.
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      {/* Consolidated Report Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="max-w-lg bg-card border border-border/80 shadow-2xl rounded-[2rem] p-6 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-extrabold flex items-center gap-2 text-emerald-600">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              Organização Concluída!
+            </DialogTitle>
+            
+            <div className="space-y-4 mt-4 text-sm text-muted-foreground">
+              <p>O processamento do seu lote foi concluído com sucesso. Aqui está o resumo das ações realizadas:</p>
+              
+              {/* Telemetry Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-muted/40 rounded-2xl border border-border/50 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">PDFs Processados</span>
+                  <div className="text-xl font-extrabold text-foreground">{reportData?.processedCount || 0}</div>
+                </div>
+                <div className="p-3 bg-muted/40 rounded-2xl border border-border/50 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Matérias Vinculadas</span>
+                  <div className="text-xl font-extrabold text-foreground">{reportData?.subjectsCreatedOrLinked || 0}</div>
+                </div>
+                <div className="p-3 bg-muted/40 rounded-2xl border border-border/50 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Blocos Criados</span>
+                  <div className="text-xl font-extrabold text-foreground">{reportData?.blocksCreated || 0}</div>
+                </div>
+                <div className="p-3 bg-muted/40 rounded-2xl border border-border/50 space-y-1 col-span-2">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Flashcards Gerados</span>
+                  <div className="text-xl font-extrabold text-foreground">{reportData?.flashcardsCount || 0} cards</div>
+                </div>
+              </div>
+
+              {/* Errored Files Section */}
+              {reportData && reportData.errorCount > 0 && (
+                <div className="space-y-2 mt-4">
+                  <h4 className="font-bold text-red-500 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                    Arquivos com Erro ({reportData.errorCount})
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {reportData.failedMaterials.map((f, i) => (
+                      <div key={i} className="p-3 bg-red-500/[0.03] border border-red-500/10 rounded-xl space-y-1 text-xs">
+                        <span className="block font-bold text-foreground truncate">{f.title}</span>
+                        <span className="block text-[10px] leading-tight text-red-500 font-medium">
+                          Motivo: {getFriendlyErrorMessage(f.error)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-6 pt-4 border-t border-border/40">
+            <Button 
+              onClick={() => setShowReportDialog(false)}
+              className="w-full bg-accent text-white hover:bg-accent/90 rounded-xl h-10 font-bold"
+            >
+              Concluído
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
+
+function getFriendlyErrorMessage(err: string | null | undefined): string {
+  if (!err) return "Erro desconhecido ao processar arquivo.";
+  const lower = err.toLowerCase();
+  if (lower.includes("api key") || lower.includes("key was reported as leaked")) {
+    return "Chave Gemini desativada pelo Google por motivo de segurança. Gere uma nova chave gratuita no Google AI Studio e atualize seu .env local!";
+  }
+  if (lower.includes("quota") || lower.includes("resource_exhausted") || lower.includes("rate limit") || lower.includes("exhausted")) {
+    return "Limite temporário da IA atingido. Aguarde alguns instantes e clique em Tentar Novamente.";
+  }
+  if (lower.includes("texto insuficiente") || lower.includes("texto legivel") || lower.includes("imagem escaneada") || lower.includes("protegido")) {
+    return "PDF sem texto selecionável ou protegido. Certifique-se de que o documento não seja composto apenas de imagens digitalizadas.";
+  }
+  if (lower.includes("not found") || lower.includes("arquivo nao encontrado")) {
+    return "Arquivo não encontrado no Storage. Remova e envie o PDF novamente.";
+  }
+  if (lower.includes("banco") || lower.includes("database") || lower.includes("prisma")) {
+    return "Falha local ao salvar os blocos no banco de dados. Tente reprocessar.";
+  }
+  return err;
+}
+

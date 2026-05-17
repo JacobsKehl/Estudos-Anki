@@ -21,6 +21,17 @@ export async function POST(
       }
     });
 
+    // Bloquear geração múltipla: Verificar se já existem flashcards vinculados a este bloco
+    const existingCardsCount = await prisma.flashcard.count({
+      where: { studyBlockId: id }
+    });
+
+    if (existingCardsCount > 0) {
+      return NextResponse.json({ 
+        error: "Você já gerou flashcards para este bloco. Não é possível gerar novamente para evitar duplicidade." 
+      }, { status: 400 });
+    }
+
     if (!block) {
       return NextResponse.json({ error: "Ops! Não encontramos esse bloco de estudo." }, { status: 404 });
     }
@@ -56,7 +67,7 @@ export async function POST(
     }
 
     // 5. Save to database as PENDING_APPROVAL with full traceability
-    const limitedCards = generatedCards.slice(0, 20);
+    const limitedCards = generatedCards.slice(0, 15);
     const savedCards = await prisma.$transaction(
       limitedCards.map(card => 
         (prisma as any).flashcard.create({

@@ -99,7 +99,7 @@ export default async function Dashboard() {
 
     // Fallback to adaptive queue if no schedule
     if (todayItems.length === 0) {
-      const queue = await getAdaptiveStudyQueue(userId, 5);
+      const queue = await getAdaptiveStudyQueue(userId, 2);
       for (const task of queue) {
         if (task.studyBlockId) {
           const block = await (prisma as any).studyBlock.findUnique({
