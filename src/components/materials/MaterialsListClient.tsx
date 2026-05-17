@@ -45,7 +45,7 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
   const router = useRouter();
   const [materials, setMaterials] = React.useState<MaterialItem[]>(initialMaterials);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [activeFilter, setActiveFilter] = React.useState<"ALL" | "ORGANIZED" | "PENDING" | "ERROR">("ALL");
+  const [activeFilter, setActiveFilter] = React.useState<"ALL" | "PROCESSED" | "PENDING">("ALL");
   
   // Selection States
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
@@ -69,9 +69,8 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
       if (!matchesSearch) return false;
 
       // Category filter
-      if (activeFilter === "ORGANIZED") return m.organizationStatus === "ORGANIZED";
-      if (activeFilter === "PENDING") return m.organizationStatus !== "ORGANIZED" && m.organizationStatus !== "ERROR";
-      if (activeFilter === "ERROR") return m.organizationStatus === "ERROR";
+      if (activeFilter === "PROCESSED") return m.organizationStatus === "ORGANIZED";
+      if (activeFilter === "PENDING") return m.organizationStatus !== "ORGANIZED";
       
       return true;
     });
@@ -179,16 +178,16 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
               Todos
             </Button>
             <Button 
-              variant={activeFilter === "ORGANIZED" ? "outline" : "ghost"} 
+              variant={activeFilter === "PROCESSED" ? "outline" : "ghost"} 
               size="sm" 
-              onClick={() => setActiveFilter("ORGANIZED")}
+              onClick={() => setActiveFilter("PROCESSED")}
               className={`rounded-xl px-4 py-1.5 text-xs font-semibold ${
-                activeFilter === "ORGANIZED" 
+                activeFilter === "PROCESSED" 
                   ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10" 
                   : "text-muted-foreground"
               }`}
             >
-              Organizados
+              Processados
             </Button>
             <Button 
               variant={activeFilter === "PENDING" ? "outline" : "ghost"} 
@@ -200,19 +199,7 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
                   : "text-muted-foreground"
               }`}
             >
-              Aguardando IA
-            </Button>
-            <Button 
-              variant={activeFilter === "ERROR" ? "outline" : "ghost"} 
-              size="sm" 
-              onClick={() => setActiveFilter("ERROR")}
-              className={`rounded-xl px-4 py-1.5 text-xs font-semibold ${
-                activeFilter === "ERROR" 
-                  ? "border-rose-500/20 bg-rose-500/5 text-rose-600 hover:bg-rose-500/10" 
-                  : "text-muted-foreground"
-              }`}
-            >
-              Erros
+              Pendentes
             </Button>
 
             <div className="w-px h-6 bg-border mx-2 hidden md:block" />
