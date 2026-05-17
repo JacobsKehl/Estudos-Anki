@@ -1,3 +1,5 @@
+"use client";
+
 import { useRouter } from "next/navigation";
 import { BookOpen, Blocks, Sparkles, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
