@@ -9,6 +9,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { GenerateScheduleCTA } from "@/components/schedule/GenerateScheduleCTA";
 import { PageHeader } from "@/components/ui/page-header";
+import { ReorganizeScheduleButton } from "@/components/schedule/ReorganizeScheduleButton";
 
 export default async function SchedulePage() {
   const mockUserId = await getMockUserId();
@@ -63,9 +64,12 @@ export default async function SchedulePage() {
         title="Roteiro de Estudo"
         description="Visualize sua jornada de aprendizado completa organizada por blocos teóricos."
       >
-        <Link href="/">
-          <Button variant="outline" className="rounded-xl">Voltar ao Hoje</Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <ReorganizeScheduleButton />
+          <Link href="/">
+            <Button variant="outline" className="rounded-xl">Voltar ao Hoje</Button>
+          </Link>
+        </div>
       </PageHeader>
 
       <div className="space-y-10 relative before:absolute before:left-[19px] before:top-2 before:h-[calc(100%-16px)] before:w-[2px] before:bg-border/40">
