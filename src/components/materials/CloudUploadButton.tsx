@@ -47,11 +47,22 @@ export function CloudUploadButton() {
     const results: UploadResult[] = [];
 
     try {
+      const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // Limite de 4.5 MB do Vercel Serverless
+
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i];
         setCurrentFileIndex(i + 1);
         
         toast.loading(`Subindo (${i + 1}/${validFiles.length}): ${file.name}`, { id: toastId });
+
+        if (file.size > MAX_FILE_SIZE) {
+          results.push({
+            name: file.name,
+            status: "error",
+            message: `Arquivo muito grande (${(file.size / (1024 * 1024)).toFixed(2)} MB). Excede o limite máximo de 4.5 MB permitido para uploads na nuvem.`
+          });
+          continue;
+        }
 
         try {
           const formData = new FormData();
@@ -167,7 +178,7 @@ export function CloudUploadButton() {
 
       {/* Upload recap dialog */}
       <Dialog open={showReport} onOpenChange={handleCloseReport}>
-        <DialogContent className="max-w-2xl w-full max-h-[85vh] flex flex-col p-8 overflow-hidden bg-card border border-border/80 shadow-2xl rounded-[2.5rem]">
+        <DialogContent className="max-w-3xl w-full max-h-[85vh] flex flex-col p-8 overflow-hidden bg-card border border-border/80 shadow-2xl rounded-[2.5rem]">
           <DialogHeader className="mb-4">
             <DialogTitle className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2.5">
               <span>Recibo de Envio de Arquivos</span>
@@ -208,8 +219,8 @@ export function CloudUploadButton() {
                   {result.status === "duplicate" && <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />}
                   {result.status === "error" && <XCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />}
                   
-                  <div className="space-y-0.5 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate">{result.name}</p>
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <p className="text-sm font-bold text-foreground break-all md:break-words whitespace-normal">{result.name}</p>
                     <p className="text-xs text-muted-foreground leading-relaxed">{result.message}</p>
                   </div>
                 </div>
