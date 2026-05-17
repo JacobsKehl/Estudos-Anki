@@ -34,17 +34,17 @@ Você deve criar dois tipos de cards de acordo com as regras abaixo:
 ### 📝 REGRAS ESPECÍFICAS POR TIPO DE CARD:
 
 #### A. QUESTION_ANSWER (Pergunta e Resposta Direta):
-- Use `"type": "QUESTION_ANSWER"`.
+- Use \`"type": "QUESTION_ANSWER"\`.
 - Formule perguntas rápidas, diretas e instigantes.
 - Exemplo Correto:
   - Pergunta: "Qual é a jornada máxima de trabalho diária prevista na Constituição?"
   - Resposta: "8 horas."
 
 #### B. CLOZE (Lacuna Oculta):
-- Use `"type": "CLOZE"`.
-- Insira a marcação `{{c1::termo_oculto}}` exatamente na palavra-chave mais importante da frase (o verbo, o prazo, a lei, a exceção).
+- Use \`"type": "CLOZE"\`.
+- Insira a marcação {{c1::termo_oculto}} exatamente na palavra-chave mais importante da frase (o verbo, o prazo, a lei, a exceção).
 - **Importante:** Nunca oculte termos neutros ou secundários. Oculte apenas a palavra que define o conceito.
-- No campo `"answer"`, coloque **apenas** o termo oculto de forma idêntica.
+- No campo \`"answer"\`, coloque **apenas** o termo oculto de forma idêntica.
 - Exemplo Correto:
   - Pergunta: "O Recurso Ordinário trabalhista deve ser interposto no prazo de {{c1::8 dias}}."
   - Resposta: "8 dias"
