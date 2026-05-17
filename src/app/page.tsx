@@ -85,7 +85,14 @@ export default async function Dashboard() {
       },
       include: {
         subject: true,
-        studyBlock: { include: { material: true } },
+        studyBlock: { 
+          include: { 
+            material: true,
+            _count: {
+              select: { flashcards: true }
+            }
+          } 
+        },
       },
       orderBy: { priorityScore: "desc" },
     });
@@ -97,7 +104,12 @@ export default async function Dashboard() {
         if (task.studyBlockId) {
           const block = await (prisma as any).studyBlock.findUnique({
             where: { id: task.studyBlockId },
-            include: { material: true },
+            include: { 
+              material: true,
+              _count: {
+                select: { flashcards: true }
+              }
+            },
           });
           const subject = await prisma.studySubject.findUnique({ where: { id: task.subjectId } });
           if (block && subject) {

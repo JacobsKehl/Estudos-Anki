@@ -248,11 +248,11 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
 
   log(`[Organize] Blocos criados: ${detectedBlocks.length}`);
 
-  // ── Etapa 5: Criar StudyBlocks e gerar flashcards ───────────────────────
+  // ── Etapa 5: Criar StudyBlocks ──────────────────────────────────────────
 
   await prisma.studyMaterial.update({
     where: { id: material.id },
-    data: { organizationStatus: "GENERATING_FLASHCARDS" }
+    data: { organizationStatus: "ORGANIZING" }
   });
 
   for (let i = 0; i < detectedBlocks.length; i++) {
@@ -300,111 +300,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
         result.flashcards += relinkResult.count;
       }
     }
-
-    // Buscar texto das páginas deste bloco
-    const blockPages = nonEmptyPages.filter(
-      (p: PageContent) => p.pageNumber >= pageStart && p.pageNumber <= pageEnd && p.text.length > 10
-    );
-    const blockText = blockPages.map(p => p.text).join("\n");
-
-    if (blockText.trim().length < 50) {
-      log(`Bloco "${studyBlock.title}": texto insuficiente, pulando flashcards.`);
-      continue;
-    }
-
-
-
-    try {
-      const charCount = blockText.trim().length;
-      log(`[Flashcards] Iniciando geração para blockId=${studyBlock.id}`);
-      log(`[Flashcards] Texto do bloco: ${charCount} caracteres`);
-      
-        log(`[Flashcards] Chamando Gemini...`);
-        const cards = await generateFlashcards(blockText.substring(0, 6000));
-        log(`[Flashcards] Gemini retornou: ${cards.length} cards`);
-
-        if (cards.length > 0) {
-          // Semantic deduplication before saving
-          const existingCards = await prisma.flashcard.findMany({
-            where: { studyBlockId: studyBlock.id },
-            select: { question: true, answer: true }
-          });
-
-          const { normalizeText } = await import("@/lib/srs/srs-utils");
-          const normalizedExisting = existingCards.map(c => ({
-            q: normalizeText(c.question),
-            a: normalizeText(c.answer)
-          }));
-
-          // 1. Remover duplicados
-          const uniqueNewCards = cards.filter(newCard => {
-            const normQ = normalizeText(newCard.question);
-            const normA = normalizeText(newCard.answer);
-            const isDuplicate = normalizedExisting.some(ext => 
-              ext.q === normQ || (ext.q === normQ && ext.a === normA)
-            );
-            return !isDuplicate;
-          });
-
-          log(`[Flashcards] Após deduplicação: ${uniqueNewCards.length} cards únicos.`);
-
-          // 2. Limitar a 20
-          const MAX_FLASHCARDS_PER_BLOCK = 20;
-          const limitedCards = uniqueNewCards.slice(0, MAX_FLASHCARDS_PER_BLOCK);
-
-          if (limitedCards.length === 0) {
-            log(`[Flashcards] Nenhum card novo para salvar.`);
-            continue;
-          }
-
-          log(`[Flashcards] Salvos após limite: ${limitedCards.length} cards.`);
-
-          const flashcardsData = limitedCards.map(card => ({
-            userId,
-            subjectId: subjectId as string,
-            materialId: material.id,
-            studyBlockId: studyBlock.id,
-            question: card.question,
-            answer: card.answer,
-            type: card.type,
-            difficulty: card.difficulty,
-            status: "APPROVED",
-            reviewState: "NEW",       
-            nextReviewAt: new Date(),      
-            approvedAt: new Date(),        
-            learningStep: 0,
-            easeFactor: 2.5,
-            intervalDays: 0,
-            repetitionCount: 0,
-            lapseCount: 0,
-            sourcePageStart: pageStart,
-            sourcePageEnd: pageEnd,
-          }));
-
-          const createResult = await prisma.flashcard.createMany({
-            data: flashcardsData
-          });
-
-        result.flashcards += createResult.count;
-        log(`[Flashcards] Cards salvos no banco: ${createResult.count}`);
-        
-        // Atualizar status do bloco
-        await prisma.studyBlock.update({
-          where: { id: studyBlock.id },
-          data: { 
-            flashcardsStatus: "GENERATED",
-            flashcardsGeneratedAt: new Date()
-          }
-        });
-      } else {
-        log(`[Flashcards] ⚠️ Nenhum card retornado para "${studyBlock.title}".`);
-      }
-    } catch (flashErr: any) {
-      log(`[Flashcards] ❌ Erro ao gerar cards para blockId=${studyBlock.id}: ${flashErr.message}`);
-    }
   }
-
-  log(`[Organize] Total de flashcards salvos: ${result.flashcards}`);
 
   // ── Etapa 6: Finalizar ───────────────────────────────────────────────────
 
@@ -417,7 +313,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     }
   });
 
-  log(`✅ Concluído: ${result.blocks} blocos, ${result.flashcards} flashcards.`);
+  log(`✅ Concluído: ${result.blocks} blocos.`);
   return result;
 }
 

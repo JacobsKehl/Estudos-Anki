@@ -419,7 +419,7 @@ export async function POST(
     }
 
     let flashcardCount = 0;
-    const shouldGenerateFlashcards = mode === "general";
+    const shouldGenerateFlashcards = false;
 
     // 5. Criar novos blocos e gerar flashcards (se for general)
     for (let i = 0; i < detectedBlocks.length; i++) {

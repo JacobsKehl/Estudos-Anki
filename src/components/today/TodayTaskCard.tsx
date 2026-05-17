@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   BookOpen, RotateCw, CheckCircle2,
-  Clock, Layers, Loader2, Sparkles
+  Clock, Layers, Loader2, Sparkles, BrainCircuit
 } from "lucide-react";
 
 
@@ -50,12 +50,36 @@ const ACTION_CONFIG: Record<ActionType, {
 
 export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isDone, setIsDone] = useState(item.status === "COMPLETED");
   const router = useRouter();
 
   const actionType = ((item.actionType === "THEORY" || item.actionType === "REVIEW_BLOCK") ? item.actionType : "THEORY") as ActionType;
   const config = ACTION_CONFIG[actionType];
 
+  const flashcardCount = item.studyBlock?._count?.flashcards ?? 0;
+  const hasFlashcards = flashcardCount > 0;
+
+  const handleGenerateCards = async () => {
+    if (!item.studyBlockId) return;
+    setIsGenerating(true);
+    const toastId = toast.loading("Analisando conteúdo e gerando flashcards de alta fidelidade...");
+    try {
+      const res = await fetch(`/api/blocks/${item.studyBlockId}/flashcards/generate`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao gerar flashcards");
+      }
+      toast.success(data.message || `${data.count} flashcards gerados com sucesso!`, { id: toastId });
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar flashcards com IA.", { id: toastId });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleCompleteStep = async () => {
     if (!item.studyBlockId) return;
@@ -152,6 +176,37 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
             >
               Ver detalhes
             </Button>
+          )}
+
+          {item.studyBlockId && (
+            <>
+              {hasFlashcards ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-lg h-9 px-3 text-xs font-semibold border-accent/20 text-accent hover:bg-accent/5 flex items-center gap-1.5 transition-all"
+                  onClick={() => router.push(`/practice?blockId=${item.studyBlockId}`)}
+                >
+                  <BrainCircuit className="w-3.5 h-3.5" />
+                  Praticar Cards ({flashcardCount})
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-lg h-9 px-3 text-xs font-semibold border-accent/20 text-accent hover:bg-accent/5 flex items-center gap-1.5 transition-all"
+                  onClick={handleGenerateCards}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5 text-accent" />
+                  )}
+                  {isGenerating ? "Gerando..." : "Gerar Cards (IA)"}
+                </Button>
+              )}
+            </>
           )}
 
           <Button
