@@ -85,7 +85,9 @@ export function CloudUploadButton() {
             results.push({
               name: file.name,
               status: "error",
-              message: data.message || data.error || "Erro desconhecido no servidor"
+              message: data.details 
+                ? `${data.message} (Detalhes: ${data.details})` 
+                : (data.message || data.error || "Erro desconhecido no servidor")
             });
           } else {
             results.push({
