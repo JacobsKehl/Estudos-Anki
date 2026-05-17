@@ -273,79 +273,137 @@ export async function POST(
     // MODOS: GENERAL (COMPLETO) E CONTENT_ONLY (APENAS CONTEÚDO)
     // ==========================================
     
-    // Marcar como analisando
-    await prisma.studyMaterial.update({
-      where: { id },
-      data: { organizationStatus: "ANALYZING" }
-    });
+    // 1. ANTES DE TUDO: Limpeza e reset completo do material
+    const existingSubjectId = material.subjectId;
+    
+    await prisma.$transaction([
+      prisma.studyScheduleItem.deleteMany({
+        where: { materialId: material.id }
+      }),
+      prisma.flashcard.deleteMany({
+        where: { materialId: material.id }
+      }),
+      prisma.studyBlock.deleteMany({
+        where: { materialId: material.id }
+      }),
+      prisma.studyMaterial.update({
+        where: { id: material.id },
+        data: {
+          subjectId: null,
+          detectedSubjectName: null,
+          organizationStatus: "ANALYZING"
+        }
+      })
+    ]);
 
-    // 3. Extrair texto de todas as páginas
-    const { pages, numPages } = await extractAllPages(material.sourcePath!, isLocal);
-    const nonEmptyPages = pages.filter(p => p.text.length > 10);
-
-    if (nonEmptyPages.length === 0) {
-      await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "Texto insuficiente" } });
-      return NextResponse.json({
-        error: "Não foi possível extrair texto deste PDF. Ele pode ser uma imagem escaneada ou estar protegido."
-      }, { status: 400 });
+    // Se a matéria ficou sem nenhum outro material associado, removemos ela também para evitar órfãs
+    if (existingSubjectId) {
+      const otherMaterialsCount = await prisma.studyMaterial.count({
+        where: { subjectId: existingSubjectId, id: { not: material.id } }
+      });
+      if (otherMaterialsCount === 0) {
+        try {
+          await prisma.studyScheduleItem.deleteMany({ where: { subjectId: existingSubjectId } });
+          await prisma.studySchedule.deleteMany({ where: { studySubjectId: existingSubjectId } });
+          await prisma.studySubject.delete({ where: { id: existingSubjectId } });
+          console.log(`[Reorganize] Matéria órfã ${existingSubjectId} removida com sucesso.`);
+        } catch (subErr) {
+          console.error("[Reorganize] Erro ao deletar matéria órfã:", subErr);
+        }
+      }
     }
 
-    // 4. Salvar ExtractedContent por página para este material (limpando o antigo)
-    await prisma.extractedContent.deleteMany({
-      where: { materialId: material.id }
+    // 2. Extrair ou reutilizar as páginas extraídas (otimização extrema contra timeouts)
+    let nonEmptyPages: PageContent[] = [];
+    let numPages = material.totalPages || 0;
+
+    const existingExtracted = await prisma.extractedContent.findMany({
+      where: { materialId: material.id },
+      orderBy: { pageNumber: "asc" }
     });
 
-    const contentRecords = nonEmptyPages.map((p, idx) => ({
-      userId,
-      subjectId: material.subjectId || "",
-      materialId: material.id,
-      pageNumber: p.pageNumber,
-      text: p.text,
-      orderIndex: idx,
-      estimatedStudyMinutes: 0, 
-    }));
+    if (existingExtracted.length > 0) {
+      nonEmptyPages = existingExtracted.map(p => ({
+        pageNumber: p.pageNumber,
+        text: p.text
+      }));
+      console.log(`[Reorganize] Usando ${nonEmptyPages.length} páginas já extraídas em cache do banco de dados.`);
+    } else {
+      console.log(`[Reorganize] Extraindo páginas do zero do Supabase Storage...`);
+      const { pages, numPages: parsedNumPages } = await extractAllPages(material.sourcePath!, isLocal);
+      numPages = parsedNumPages;
+      nonEmptyPages = pages.filter(p => p.text.length > 10);
 
-    // 5. Identificar matéria se não tiver
-    let subjectId = material.subjectId;
+      if (nonEmptyPages.length === 0) {
+        await prisma.studyMaterial.update({ 
+          where: { id }, 
+          data: { 
+            organizationStatus: "ERROR", 
+            processingError: "Texto insuficiente" 
+          } 
+        });
+        return NextResponse.json({
+          error: "Não foi possível extrair texto deste PDF. Ele pode ser uma imagem escaneada ou estar protegido."
+        }, { status: 400 });
+      }
+
+      // Salvar as páginas extraídas no banco de dados para evitar re-processamento no futuro
+      const contentRecords = nonEmptyPages.map((p, idx) => ({
+        userId,
+        subjectId: "", // Será atualizado após a identificação da matéria
+        materialId: material.id,
+        pageNumber: p.pageNumber,
+        text: p.text,
+        orderIndex: idx,
+        estimatedStudyMinutes: 0, 
+      }));
+      await prisma.extractedContent.createMany({ data: contentRecords });
+    }
+
+    // 3. Identificar matéria
+    let subjectId: string | null = null;
     const sampleText = nonEmptyPages
       .slice(0, Math.min(5, nonEmptyPages.length))
       .map(p => p.text)
       .join("\n\n");
 
-    if (!subjectId) {
-      const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName);
-      const detectedSubject = idResult.subjectName;
+    const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName);
+    const detectedSubject = idResult.subjectName;
 
-      let subject = await prisma.studySubject.findFirst({
-        where: { userId, name: { contains: detectedSubject } }
-      });
+    let subject = await prisma.studySubject.findFirst({
+      where: { userId, name: { contains: detectedSubject } }
+    });
 
-      if (!subject) {
-        const allSubjects = await prisma.studySubject.findMany({ where: { userId } });
-        subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;
-      }
+    if (!subject) {
+      const allSubjects = await prisma.studySubject.findMany({ where: { userId } });
+      subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;
+    }
 
-      if (!subject) {
-        subject = await prisma.studySubject.create({
-          data: { name: detectedSubject, userId, priority: 1 }
-        });
-      }
-
-      subjectId = subject.id;
-      await prisma.studyMaterial.update({
-        where: { id },
-        data: { subjectId, detectedSubjectName: detectedSubject }
+    if (!subject) {
+      subject = await prisma.studySubject.create({
+        data: { name: detectedSubject, userId, priority: 1 }
       });
     }
 
-    const updatedContentRecords = contentRecords.map(rec => ({
-      ...rec,
-      subjectId: subjectId as string
-    }));
+    subjectId = subject.id;
+    
+    // Atualiza o material com a matéria identificada
+    await prisma.studyMaterial.update({
+      where: { id: material.id },
+      data: { 
+        subjectId, 
+        detectedSubjectName: detectedSubject,
+        totalPages: numPages
+      }
+    });
 
-    await prisma.extractedContent.createMany({ data: updatedContentRecords });
+    // Vincula todos os ExtractedContent deste material à matéria correta
+    await prisma.extractedContent.updateMany({
+      where: { materialId: material.id },
+      data: { subjectId }
+    });
 
-    // 6. Detectar estrutura com IA
+    // 4. Detectar estrutura com IA
     const fullTextForStructure = nonEmptyPages
       .slice(0, 15)
       .map(p => p.text)
@@ -360,16 +418,10 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 7. Remover blocos antigos e flashcards antigos deste material
-    await prisma.$transaction([
-      prisma.studyBlock.deleteMany({ where: { materialId: material.id } }),
-      prisma.flashcard.deleteMany({ where: { materialId: material.id } })
-    ]);
-
     let flashcardCount = 0;
     const shouldGenerateFlashcards = mode === "general";
 
-    // 8. Criar novos blocos e gerar flashcards (se for general)
+    // 5. Criar novos blocos e gerar flashcards (se for general)
     for (let i = 0; i < detectedBlocks.length; i++) {
       const blockDef = detectedBlocks[i];
       const pageStart = blockDef.pageStart || 1;
@@ -405,7 +457,7 @@ export async function POST(
           try {
             const cards = await generateFlashcards(blockText.substring(0, 6000));
             if (cards && cards.length > 0) {
-              const limitedCards = cards.slice(0, 20);
+              const limitedCards = cards.slice(0, 20); // strictly respect the new 20 limit!
 
               const flashcardsData = limitedCards.map(card => ({
                 userId,
@@ -453,7 +505,7 @@ export async function POST(
       }
     }
 
-    // 9. Atualizar status final do material
+    // 6. Atualizar status final do material
     await prisma.studyMaterial.update({
       where: { id },
       data: {

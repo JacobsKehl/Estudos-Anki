@@ -21,20 +21,36 @@ interface StudyStatsProps {
 
 export function StudyStats({ data }: StudyStatsProps) {
   const { summary, heatmap, mastery, subjects } = data;
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Process Heatmap for rendering
-  const last30Days = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (29 - i));
-    const dateStr = d.toISOString().split('T')[0];
-    return {
-      date: dateStr,
-      count: heatmap[dateStr] || 0,
-      label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-    };
-  });
+  const last30Days = React.useMemo(() => {
+    if (!mounted) return [];
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (29 - i));
+      const dateStr = d.toISOString().split('T')[0];
+      return {
+        date: dateStr,
+        count: heatmap[dateStr] || 0,
+        label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+      };
+    });
+  }, [mounted, heatmap]);
 
-  const maxActivity = Math.max(...last30Days.map(d => d.count), 1);
+  const maxActivity = React.useMemo(() => {
+    if (last30Days.length === 0) return 1;
+    return Math.max(...last30Days.map(d => d.count), 1);
+  }, [last30Days]);
+
+  if (!mounted) {
+    return <div className="h-96 w-full animate-pulse bg-muted/10 rounded-[2.5rem]" />;
+  }
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">

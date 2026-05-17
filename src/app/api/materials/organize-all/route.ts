@@ -100,20 +100,37 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   // ── Etapa 1: Extraindo texto por página ──────────────────────────────────
   log(`[Organize] PDF iniciado: ${material.fileName}`);
 
-  await prisma.studyMaterial.update({
-    where: { id: material.id },
-    data: { organizationStatus: "EXTRACTING" }
+  let nonEmptyPages: PageContent[] = [];
+  let numPages = material.totalPages || 0;
+
+  const existingExtracted = await prisma.extractedContent.findMany({
+    where: { materialId: material.id },
+    orderBy: { pageNumber: "asc" }
   });
 
-  log("Extraindo texto por página...");
-  const { pages, numPages } = await extractAllPages(material.sourcePath, isLocal);
-  log(`[Organize] Texto extraído: ${numPages} páginas`);
+  if (existingExtracted.length > 0) {
+    nonEmptyPages = existingExtracted.map(p => ({
+      pageNumber: p.pageNumber,
+      text: p.text
+    }));
+    log(`Usando ${nonEmptyPages.length} páginas já extraídas em cache do banco.`);
+  } else {
+    await prisma.studyMaterial.update({
+      where: { id: material.id },
+      data: { organizationStatus: "EXTRACTING" }
+    });
 
-  const nonEmptyPages = pages.filter(p => p.text.length > 10);
-  if (nonEmptyPages.length === 0) {
-    throw new Error(
-      "Este PDF não possui texto selecionável. OCR ainda não está disponível."
-    );
+    log("Extraindo texto por página...");
+    const { pages, numPages: parsedNumPages } = await extractAllPages(material.sourcePath, isLocal);
+    numPages = parsedNumPages;
+    log(`[Organize] Texto extraído: ${numPages} páginas`);
+
+    nonEmptyPages = pages.filter(p => p.text.length > 10);
+    if (nonEmptyPages.length === 0) {
+      throw new Error(
+        "Este PDF não possui texto selecionável. OCR ainda não está disponível."
+      );
+    }
   }
 
   log(`${nonEmptyPages.length}/${numPages} páginas com texto extraído.`);
@@ -175,25 +192,31 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
 
   // ── Etapa 3: Salvar ExtractedContent por página ─────────────────────────
 
-  log("Salvando conteúdo extraído...");
+  if (existingExtracted.length === 0) {
+    log("Salvando conteúdo extraído no banco de dados...");
+    await prisma.extractedContent.deleteMany({
+      where: { materialId: material.id }
+    });
 
-  // Remover conteúdo antigo do mesmo material (re-extração limpa)
-  await prisma.extractedContent.deleteMany({
-    where: { materialId: material.id }
-  });
+    const contentRecords = nonEmptyPages.map((p, idx) => ({
+      userId,
+      subjectId: subjectId as string,
+      materialId: material.id,
+      pageNumber: p.pageNumber,
+      text: p.text,
+      orderIndex: idx,
+      estimatedStudyMinutes: 0, 
+    }));
 
-  const contentRecords = nonEmptyPages.map((p, idx) => ({
-    userId,
-    subjectId: subjectId as string,
-    materialId: material.id,
-    pageNumber: p.pageNumber,
-    text: p.text,
-    orderIndex: idx,
-    estimatedStudyMinutes: 0, 
-  }));
-
-  await prisma.extractedContent.createMany({ data: contentRecords });
-  log(`${contentRecords.length} páginas salvas em ExtractedContent.`);
+    await prisma.extractedContent.createMany({ data: contentRecords });
+    log(`${contentRecords.length} páginas salvas em ExtractedContent.`);
+  } else {
+    // Garante que o subjectId esteja correto para os registros já existentes
+    await prisma.extractedContent.updateMany({
+      where: { materialId: material.id },
+      data: { subjectId }
+    });
+  }
 
   // ── Etapa 4: Detectar estrutura (blocos) ────────────────────────────────
 
@@ -279,8 +302,8 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     }
 
     // Buscar texto das páginas deste bloco
-    const blockPages = pages.filter(
-      p => p.pageNumber >= pageStart && p.pageNumber <= pageEnd && p.text.length > 10
+    const blockPages = nonEmptyPages.filter(
+      (p: PageContent) => p.pageNumber >= pageStart && p.pageNumber <= pageEnd && p.text.length > 10
     );
     const blockText = blockPages.map(p => p.text).join("\n");
 

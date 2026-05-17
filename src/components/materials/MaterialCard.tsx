@@ -102,10 +102,19 @@ export function MaterialCard({
     setShowActionsDialog(true);
   };
 
-  const date = new Date(material.uploadedAt).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-  });
+  const [formattedDate, setFormattedDate] = React.useState("");
+
+  React.useEffect(() => {
+    try {
+      const parsedDate = new Date(material.uploadedAt).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "short",
+      });
+      setFormattedDate(parsedDate);
+    } catch (e) {
+      setFormattedDate("");
+    }
+  }, [material.uploadedAt]);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -312,7 +321,7 @@ export function MaterialCard({
               </span>
             </div>
             <div className="text-[10px] text-muted-foreground font-medium text-right">
-              {material.pageCount} págs • {date}
+              {material.pageCount} págs{formattedDate ? ` • ${formattedDate}` : ""}
             </div>
           </div>
         </div>
