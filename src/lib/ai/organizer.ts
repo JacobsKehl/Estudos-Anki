@@ -10,8 +10,8 @@ export interface SubjectIdentification {
 const KNOWN_SUBJECTS_MAP: Record<string, string> = {
   "CONSTITUCIONAL": "Direito Constitucional",
   "ADMINISTRATIVO": "Direito Administrativo",
-  "PORTUGUES": "Português",
-  "LINGUA PORTUGUESA": "Português",
+  "PORTUGUES": "Língua Portuguesa",
+  "LINGUA PORTUGUESA": "Língua Portuguesa",
   "RLM": "Matemática e Raciocínio Lógico",
   "RACIOCINIO LOGICO": "Matemática e Raciocínio Lógico",
   "CIVIL": "Direito Civil",
@@ -20,7 +20,7 @@ const KNOWN_SUBJECTS_MAP: Record<string, string> = {
   "TRABALHO": "Direito do Trabalho",
   "PROCESSO DO TRABALHO": "Direito Processual do Trabalho",
   "PROCESSUAL DO TRABALHO": "Direito Processual do Trabalho",
-  "PREVIDENCIARIO": "Direito Previdenciário",
+  "PREVIDENCIARIO": "Legislação específica",
   "INFORMATICA": "Informática",
 };
 
@@ -36,7 +36,10 @@ export async function identifySubject(firstPagesContent: string, fileName?: stri
   try {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
-    const cleanJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+    const startIndex = responseText.indexOf("{");
+    const endIndex = responseText.lastIndexOf("}");
+    if (startIndex === -1) throw new Error("JSON de matéria não encontrado");
+    const cleanJson = responseText.substring(startIndex, endIndex + 1);
     const parsed: SubjectIdentification = JSON.parse(cleanJson);
 
     // Normalização básica
