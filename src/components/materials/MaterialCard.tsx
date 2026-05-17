@@ -318,174 +318,176 @@ export function MaterialCard({
         </div>
 
         {!isSelectionMode && (
-          <div className="bg-muted/30 px-5 py-3 border-t border-border/50 flex gap-2 relative">
-            {material.organizationStatus !== "ORGANIZED" ? (
-              <>
-                <Button 
-                  size="sm" 
-                  className="flex-grow rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm animate-pulse-subtle"
-                  onClick={handleOrganizeClick}
-                  disabled={isOrganizing}
-                >
-                  {isOrganizing ? (
-                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processando...</>
-                  ) : (
-                    <><Sparkles className="w-3.5 h-3.5 animate-pulse" /> Organizar</>
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-xl h-9 px-2 text-muted-foreground hover:text-accent hover:border-accent"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDropdown(!showDropdown);
-                  }}
-                  disabled={isOrganizing}
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button size="sm" variant="outline" className="flex-grow rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5 font-bold text-xs" asChild>
-                  <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost"
-                  className="rounded-xl h-9 px-3 text-muted-foreground hover:text-accent gap-1.5 text-[10px] font-bold uppercase transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDropdown(!showDropdown);
-                  }}
-                  disabled={isOrganizing}
-                >
-                  {isOrganizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCw className="w-3.5 h-3.5" />}
-                  Opções
-                </Button>
-              </>
-            )}
-            
-            {material.organizationStatus !== "ORGANIZED" && (
-              <Button 
-                size="sm" 
-                variant="secondary" 
-                className="rounded-xl h-9 px-3 gap-2 hover:bg-muted"
-                asChild
-              >
-                <Link href={`/materials/${material.id}`}>
-                  <Eye className="w-3.5 h-3.5" />
-                </Link>
-              </Button>
-            )}
-
-            {/* Dropdown de Ações Granulares */}
+          <div className="bg-muted/30 border-t border-border/50 flex flex-col relative w-full">
+            {/* Painel Inline de Ações Granulares */}
             {showDropdown && (
-              <>
-                <div 
-                  className="fixed inset-0 z-40 cursor-default" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDropdown(false);
-                  }} 
-                />
-                <div className="absolute bottom-14 right-5 left-5 z-50 bg-card border border-border shadow-2xl rounded-2xl p-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 py-1.5 border-b border-border/50">
-                    Ações de Organização
-                  </div>
-                  <div className="flex flex-col gap-1 mt-1.5">
-                    {/* Opção Geral */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowDropdown(false);
-                        executeOrganizationAction("general");
-                      }}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-accent/15 hover:text-accent text-xs font-semibold transition-all group w-full"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-accent" />
-                      <div className="flex-1">
-                        <p className="font-bold">Opção Geral (Completa)</p>
-                        <p className="text-[9px] text-muted-foreground group-hover:text-accent/80 font-normal">PDF → Blocos → Flashcards</p>
-                      </div>
-                    </button>
-
-                    {/* Apenas Conteúdo */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowDropdown(false);
-                        executeOrganizationAction("content_only");
-                      }}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-cyan-500/10 hover:text-cyan-500 text-xs font-semibold transition-all group w-full"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-cyan-500" />
-                      <div className="flex-1">
-                        <p className="font-bold">Organizar Apenas Conteúdo</p>
-                        <p className="text-[9px] text-muted-foreground group-hover:text-cyan-500/80 font-normal">Blocos de estudo sem cards</p>
-                      </div>
-                    </button>
-
-                    {/* Apenas Flashcards */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowDropdown(false);
-                        executeOrganizationAction("flashcards_only");
-                      }}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-semibold transition-all group w-full"
-                    >
-                      <Brain className="w-3.5 h-3.5 text-emerald-500" />
-                      <div className="flex-1">
-                        <p className="font-bold">Gerar Apenas Flashcards</p>
-                        <p className="text-[9px] text-muted-foreground group-hover:text-emerald-500/80 font-normal">Cria cards nos blocos existentes</p>
-                      </div>
-                    </button>
-
-                    {/* Apagar Flashcards */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowDropdown(false);
-                        executeOrganizationAction("clear_flashcards");
-                      }}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-amber-500/10 hover:text-amber-500 text-xs font-semibold transition-all group w-full"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-amber-500" />
-                      <div className="flex-1">
-                        <p className="font-bold">Apagar Apenas Flashcards</p>
-                        <p className="text-[9px] text-muted-foreground group-hover:text-amber-500/80 font-normal">Remove todos os flashcards</p>
-                      </div>
-                    </button>
-
-                    {/* Desorganizar Conteúdo */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowDropdown(false);
-                        executeOrganizationAction("unorganize");
-                      }}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-red-500/10 hover:text-red-500 text-xs font-semibold transition-all group border-t border-border/50 pt-2 w-full"
-                    >
-                      <RotateCw className="w-3.5 h-3.5 text-red-500" />
-                      <div className="flex-1">
-                        <p className="font-bold">Desorganizar Conteúdo</p>
-                        <p className="text-[9px] text-muted-foreground group-hover:text-red-500/80 font-normal">Reseta tudo do zero (limpa tudo)</p>
-                      </div>
-                    </button>
-                  </div>
+              <div className="px-5 py-4 border-b border-border/40 bg-background/50 animate-in slide-in-from-top-2 duration-200 w-full">
+                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pb-2 border-b border-border/40 flex justify-between items-center w-full">
+                  <span>Opções de Organização (IA)</span>
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(false);
+                    }} 
+                    className="text-muted-foreground hover:text-accent font-bold text-[10px] uppercase tracking-wider"
+                  >
+                    Fechar
+                  </button>
                 </div>
-              </>
+                <div className="flex flex-col gap-1.5 mt-2.5 w-full">
+                  {/* Opção Geral */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(false);
+                      executeOrganizationAction("general");
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-accent/15 hover:text-accent text-xs font-semibold transition-all group w-full"
+                  >
+                    <Sparkles className="w-4 h-4 text-accent shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">Opção Geral (Completa)</p>
+                      <p className="text-[9px] text-muted-foreground group-hover:text-accent/80 font-normal truncate">PDF → Blocos → Flashcards</p>
+                    </div>
+                  </button>
+
+                  {/* Apenas Conteúdo */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(false);
+                      executeOrganizationAction("content_only");
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-cyan-500/10 hover:text-cyan-500 text-xs font-semibold transition-all group w-full"
+                  >
+                    <BookOpen className="w-4 h-4 text-cyan-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">Organizar Apenas Conteúdo</p>
+                      <p className="text-[9px] text-muted-foreground group-hover:text-cyan-500/80 font-normal truncate">Blocos de estudo sem cards</p>
+                    </div>
+                  </button>
+
+                  {/* Apenas Flashcards */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(false);
+                      executeOrganizationAction("flashcards_only");
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-semibold transition-all group w-full"
+                  >
+                    <Brain className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">Gerar Apenas Flashcards</p>
+                      <p className="text-[9px] text-muted-foreground group-hover:text-emerald-500/80 font-normal truncate">Cria cards nos blocos existentes</p>
+                    </div>
+                  </button>
+
+                  {/* Apagar Flashcards */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(false);
+                      executeOrganizationAction("clear_flashcards");
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-amber-500/10 hover:text-amber-500 text-xs font-semibold transition-all group w-full"
+                  >
+                    <Trash2 className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">Apagar Apenas Flashcards</p>
+                      <p className="text-[9px] text-muted-foreground group-hover:text-amber-500/80 font-normal truncate">Remove todos os flashcards</p>
+                    </div>
+                  </button>
+
+                  {/* Desorganizar Conteúdo */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(false);
+                      executeOrganizationAction("unorganize");
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-red-500/10 hover:text-red-500 text-xs font-semibold transition-all group border-t border-border/50 pt-2 w-full"
+                  >
+                    <RotateCw className="w-4 h-4 text-red-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">Desorganizar Conteúdo</p>
+                      <p className="text-[9px] text-muted-foreground group-hover:text-red-500/80 font-normal truncate">Reseta tudo do zero (limpa tudo)</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
             )}
+
+            <div className="px-5 py-3 flex gap-2 w-full">
+              {material.organizationStatus !== "ORGANIZED" ? (
+                <>
+                  <Button 
+                    size="sm" 
+                    className="flex-grow rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm animate-pulse-subtle"
+                    onClick={handleOrganizeClick}
+                    disabled={isOrganizing}
+                  >
+                    {isOrganizing ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processando...</>
+                    ) : (
+                      <><Sparkles className="w-3.5 h-3.5 animate-pulse" /> Organizar</>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl h-9 px-2 text-muted-foreground hover:text-accent hover:border-accent"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(!showDropdown);
+                    }}
+                    disabled={isOrganizing}
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" className="flex-grow rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5 font-bold text-xs" asChild>
+                    <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    className="rounded-xl h-9 px-3 text-muted-foreground hover:text-accent gap-1.5 text-[10px] font-bold uppercase transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowDropdown(!showDropdown);
+                    }}
+                    disabled={isOrganizing}
+                  >
+                    {isOrganizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCw className="w-3.5 h-3.5" />}
+                    Opções
+                  </Button>
+                </>
+              )}
+              
+              {material.organizationStatus !== "ORGANIZED" && (
+                <Button 
+                  size="sm" 
+                  variant="secondary" 
+                  className="rounded-xl h-9 px-3 gap-2 hover:bg-muted"
+                  asChild
+                >
+                  <Link href={`/materials/${material.id}`}>
+                    <Eye className="w-3.5 h-3.5" />
+                  </Link>
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
