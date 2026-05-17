@@ -52,7 +52,7 @@ Você deve criar dois tipos de cards de acordo com as regras abaixo:
 ---
 
 ### 📊 DIRETRIZES DE QUANTIDADE E FORMATO:
-- Gere no máximo **15 flashcards** por bloco de estudos. Prefira 8 a 10 cards excelentes a 15 cards repetitivos ou superficiais.
+- **QUANTIDADE OBRIGATÓRIA (CRÍTICA):** Você DEVE gerar obrigatoriamente entre 10 e 20 flashcards por bloco de estudos. Nunca crie menos de 10 cards e nunca crie mais de 20 cards. Esta regra é absoluta e deve ser seguida rigorosamente.
 - Evite redundâncias semânticas (não gere dois cards cobrando a mesma informação de formas ligeiramente diferentes).
 - Retorne **estritamente um array JSON válido** sem qualquer texto explicativo fora da estrutura JSON.
 

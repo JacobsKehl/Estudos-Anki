@@ -51,8 +51,9 @@ export async function POST(
       try {
         const generatedCards = await generateFlashcards(fullText);
         if (generatedCards && generatedCards.length > 0) {
+          const limitedCards = generatedCards.slice(0, 20);
           const saved = await prisma.$transaction(
-            generatedCards.map((card: any) => 
+            limitedCards.map((card: any) => 
               (prisma as any).flashcard.create({
                 data: {
                   userId: mockUserId,

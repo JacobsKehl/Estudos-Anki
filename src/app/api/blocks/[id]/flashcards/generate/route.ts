@@ -56,8 +56,9 @@ export async function POST(
     }
 
     // 5. Save to database as PENDING_APPROVAL with full traceability
+    const limitedCards = generatedCards.slice(0, 20);
     const savedCards = await prisma.$transaction(
-      generatedCards.map(card => 
+      limitedCards.map(card => 
         (prisma as any).flashcard.create({
           data: {
             userId: mockUserId,

@@ -405,7 +405,7 @@ export async function POST(
           try {
             const cards = await generateFlashcards(blockText.substring(0, 6000));
             if (cards && cards.length > 0) {
-              const limitedCards = cards.slice(0, 15);
+              const limitedCards = cards.slice(0, 20);
 
               const flashcardsData = limitedCards.map(card => ({
                 userId,

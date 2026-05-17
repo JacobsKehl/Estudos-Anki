@@ -325,8 +325,8 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
 
           log(`[Flashcards] Após deduplicação: ${uniqueNewCards.length} cards únicos.`);
 
-          // 2. Limitar a 15
-          const MAX_FLASHCARDS_PER_BLOCK = 15;
+          // 2. Limitar a 20
+          const MAX_FLASHCARDS_PER_BLOCK = 20;
           const limitedCards = uniqueNewCards.slice(0, MAX_FLASHCARDS_PER_BLOCK);
 
           if (limitedCards.length === 0) {
