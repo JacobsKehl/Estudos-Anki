@@ -54,10 +54,14 @@ async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ 
   for (let i = 1; i <= numPages; i++) {
     const page = await pdfDocument.getPage(i);
     const textContent = await page.getTextContent();
-    const text = textContent.items
+    let text = textContent.items
       .map((item: any) => ("str" in item ? item.str : ""))
       .join(" ")
       .trim();
+    
+    // Sanitize null bytes (\u0000) to prevent Postgres invalid byte sequence error
+    text = text.replace(/\u0000/g, "");
+    
     pages.push({ pageNumber: i, text });
   }
 

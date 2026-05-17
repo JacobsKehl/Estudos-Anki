@@ -71,10 +71,14 @@ async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ 
   for (let i = 1; i <= numPages; i++) {
     const page = await pdfDocument.getPage(i);
     const textContent = await page.getTextContent();
-    const text = textContent.items
+    let text = textContent.items
       .map((item: any) => ("str" in item ? item.str : ""))
       .join(" ")
       .trim();
+    
+    // Sanitize null bytes (\u0000) to prevent Postgres invalid byte sequence error
+    text = text.replace(/\u0000/g, "");
+    
     pages.push({ pageNumber: i, text });
   }
 
@@ -285,17 +289,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
       continue;
     }
 
-    // Gerar flashcards com IA (Apenas se o bloco for confiável/temático)
-    const isGenericTitle = 
-      studyBlock.title.toLowerCase().includes("parte ") || 
-      studyBlock.title.toLowerCase().includes("conteúdo ") ||
-      studyBlock.title.toLowerCase().includes("bloco ") ||
-      studyBlock.title.toLowerCase().includes("fallback");
 
-    if (isGenericTitle || (studyBlock.confidence && studyBlock.confidence < 0.5)) {
-      log(`Bloco "${studyBlock.title}": título genérico ou baixa confiança, pulando geração automática de flashcards.`);
-      continue;
-    }
 
     try {
       const charCount = blockText.trim().length;

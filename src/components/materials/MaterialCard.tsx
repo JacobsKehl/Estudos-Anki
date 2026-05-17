@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Trash2, Eye, RotateCw, Loader2, Sparkles, AlertCircle, Brain, BookOpen } from "lucide-react";
+import { FileText, Trash2, Eye, RotateCw, Loader2, Sparkles, AlertCircle, Brain, BookOpen, ChevronDown } from "lucide-react";
 import { MaterialStatusBadge } from "./MaterialStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,7 @@ export function MaterialCard({
   const [selectedSubjectId, setSelectedSubjectId] = React.useState("");
 
   const [showActionsDialog, setShowActionsDialog] = React.useState(false);
+  const [showDropdown, setShowDropdown] = React.useState(false);
 
   const executeOrganizationAction = async (mode: string) => {
     setIsOrganizing(true);
@@ -317,34 +318,53 @@ export function MaterialCard({
         </div>
 
         {!isSelectionMode && (
-          <div className="bg-muted/30 px-5 py-3 border-t border-border/50 flex gap-2">
+          <div className="bg-muted/30 px-5 py-3 border-t border-border/50 flex gap-2 relative">
             {material.organizationStatus !== "ORGANIZED" ? (
-              <Button 
-                size="sm" 
-                className="flex-1 rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm animate-pulse-subtle"
-                onClick={handleOrganizeClick}
-                disabled={isOrganizing}
-              >
-                {isOrganizing ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processando...</>
-                ) : (
-                  <><Sparkles className="w-3.5 h-3.5 animate-pulse" /> Organizar</>
-                )}
-              </Button>
+              <>
+                <Button 
+                  size="sm" 
+                  className="flex-grow rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm animate-pulse-subtle"
+                  onClick={handleOrganizeClick}
+                  disabled={isOrganizing}
+                >
+                  {isOrganizing ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processando...</>
+                  ) : (
+                    <><Sparkles className="w-3.5 h-3.5 animate-pulse" /> Organizar</>
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl h-9 px-2 text-muted-foreground hover:text-accent hover:border-accent"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowDropdown(!showDropdown);
+                  }}
+                  disabled={isOrganizing}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </>
             ) : (
               <>
-                <Button size="sm" variant="outline" className="flex-1 rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5 font-bold text-xs" asChild>
+                <Button size="sm" variant="outline" className="flex-grow rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5 font-bold text-xs" asChild>
                   <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
                 </Button>
                 <Button 
                   size="sm" 
                   variant="ghost"
-                  className="flex-1 rounded-xl h-9 text-muted-foreground hover:text-accent gap-2 text-[10px] font-bold uppercase transition-colors"
-                  onClick={handleReorganizeClick}
+                  className="rounded-xl h-9 px-3 text-muted-foreground hover:text-accent gap-1.5 text-[10px] font-bold uppercase transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowDropdown(!showDropdown);
+                  }}
                   disabled={isOrganizing}
                 >
-                  {isOrganizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCw className="w-3 h-3" />}
-                  Gerenciar
+                  {isOrganizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCw className="w-3.5 h-3.5" />}
+                  Opções
                 </Button>
               </>
             )}
@@ -360,6 +380,111 @@ export function MaterialCard({
                   <Eye className="w-3.5 h-3.5" />
                 </Link>
               </Button>
+            )}
+
+            {/* Dropdown de Ações Granulares */}
+            {showDropdown && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40 cursor-default" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowDropdown(false);
+                  }} 
+                />
+                <div className="absolute bottom-14 right-5 left-5 z-50 bg-card border border-border shadow-2xl rounded-2xl p-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 py-1.5 border-b border-border/50">
+                    Ações de Organização
+                  </div>
+                  <div className="flex flex-col gap-1 mt-1.5">
+                    {/* Opção Geral */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowDropdown(false);
+                        executeOrganizationAction("general");
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-accent/15 hover:text-accent text-xs font-semibold transition-all group w-full"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-accent" />
+                      <div className="flex-1">
+                        <p className="font-bold">Opção Geral (Completa)</p>
+                        <p className="text-[9px] text-muted-foreground group-hover:text-accent/80 font-normal">PDF → Blocos → Flashcards</p>
+                      </div>
+                    </button>
+
+                    {/* Apenas Conteúdo */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowDropdown(false);
+                        executeOrganizationAction("content_only");
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-cyan-500/10 hover:text-cyan-500 text-xs font-semibold transition-all group w-full"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-cyan-500" />
+                      <div className="flex-1">
+                        <p className="font-bold">Organizar Apenas Conteúdo</p>
+                        <p className="text-[9px] text-muted-foreground group-hover:text-cyan-500/80 font-normal">Blocos de estudo sem cards</p>
+                      </div>
+                    </button>
+
+                    {/* Apenas Flashcards */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowDropdown(false);
+                        executeOrganizationAction("flashcards_only");
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-emerald-500/10 hover:text-emerald-500 text-xs font-semibold transition-all group w-full"
+                    >
+                      <Brain className="w-3.5 h-3.5 text-emerald-500" />
+                      <div className="flex-1">
+                        <p className="font-bold">Gerar Apenas Flashcards</p>
+                        <p className="text-[9px] text-muted-foreground group-hover:text-emerald-500/80 font-normal">Cria cards nos blocos existentes</p>
+                      </div>
+                    </button>
+
+                    {/* Apagar Flashcards */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowDropdown(false);
+                        executeOrganizationAction("clear_flashcards");
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-amber-500/10 hover:text-amber-500 text-xs font-semibold transition-all group w-full"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-amber-500" />
+                      <div className="flex-1">
+                        <p className="font-bold">Apagar Apenas Flashcards</p>
+                        <p className="text-[9px] text-muted-foreground group-hover:text-amber-500/80 font-normal">Remove todos os flashcards</p>
+                      </div>
+                    </button>
+
+                    {/* Desorganizar Conteúdo */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowDropdown(false);
+                        executeOrganizationAction("unorganize");
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-red-500/10 hover:text-red-500 text-xs font-semibold transition-all group border-t border-border/50 pt-2 w-full"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-red-500" />
+                      <div className="flex-1">
+                        <p className="font-bold">Desorganizar Conteúdo</p>
+                        <p className="text-[9px] text-muted-foreground group-hover:text-red-500/80 font-normal">Reseta tudo do zero (limpa tudo)</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
