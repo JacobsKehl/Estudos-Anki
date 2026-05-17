@@ -22,7 +22,7 @@ export async function GET(
     }
 
     const isLocal = material.sourceType === "LOCAL_INBOX";
-    let fileBuffer: Buffer | Uint8Array;
+    let fileBuffer: Buffer;
 
     if (isLocal) {
        // Na Web não servimos arquivos locais do Windows
@@ -35,12 +35,12 @@ export async function GET(
         return new NextResponse("Erro ao carregar arquivo da nuvem", { status: 500 });
       }
       const arrayBuffer = await data.arrayBuffer();
-      fileBuffer = new Uint8Array(arrayBuffer);
+      fileBuffer = Buffer.from(arrayBuffer);
     }
 
     const fileName = material.originalFileName || material.fileName || "document.pdf";
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(fileBuffer as any, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${encodeURIComponent(fileName)}"`,

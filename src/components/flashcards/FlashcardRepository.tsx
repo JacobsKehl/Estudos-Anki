@@ -49,6 +49,7 @@ interface FlashcardRepositoryProps {
 }
 
 const STATE_CONFIG = [
+  { id: "PENDING", label: "Aguardando Curadoria" },
   { id: "NEW", label: "Novos" },
   { id: "LEARNING", label: "Em aprendizado" },
   { id: "REVIEW", label: "Em revisão" },
@@ -59,7 +60,9 @@ const STATE_CONFIG = [
 
 export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryProps) {
   const [flashcards, setFlashcards] = useState<Flashcard[]>(initialFlashcards);
+  
   const [activeTab, setActiveTab] = useState<string>("NEW");
+  
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
 
@@ -67,6 +70,7 @@ export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryPr
   // For this, we'll assume status = "ARCHIVED" maps to "ARCHIVED", 
   // and reviewState = "SUSPENDED" maps to "SUSPENDED", others are based on reviewState + status="APPROVED"
   const filteredCards = flashcards.filter(card => {
+    if (activeTab === "PENDING") return card.status === "PENDING_APPROVAL";
     if (activeTab === "ARCHIVED") return card.status === "ARCHIVED";
     if (activeTab === "SUSPENDED") return card.reviewState === "SUSPENDED" && card.status !== "ARCHIVED";
     return card.reviewState === activeTab && card.status === "APPROVED";
@@ -125,6 +129,7 @@ export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryPr
         <div className="flex p-1 bg-muted/30 rounded-2xl border border-border/50 w-max">
           {STATE_CONFIG.map(tab => {
             const count = flashcards.filter(c => {
+              if (tab.id === "PENDING") return c.status === "PENDING_APPROVAL";
               if (tab.id === "ARCHIVED") return c.status === "ARCHIVED";
               if (tab.id === "SUSPENDED") return c.reviewState === "SUSPENDED" && c.status !== "ARCHIVED";
               return c.reviewState === tab.id && c.status === "APPROVED";
@@ -254,7 +259,30 @@ export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryPr
                   </Button>
                 )}
 
-                {activeTab !== "ARCHIVED" && activeTab !== "SUSPENDED" && (
+                {activeTab === "PENDING" && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl border-emerald-100 text-emerald-600 hover:bg-emerald-50 h-8 text-xs font-semibold"
+                      onClick={() => handleStateChange(card.id, "NEW", "APPROVED")}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                      Aprovar Card
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl border-rose-100 text-rose-600 hover:bg-rose-50 h-8 text-xs font-semibold"
+                      onClick={() => handleDelete(card.id)}
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" />
+                      Rejeitar Card
+                    </Button>
+                  </>
+                )}
+
+                {activeTab !== "ARCHIVED" && activeTab !== "SUSPENDED" && activeTab !== "PENDING" && (
                   <>
                     <Button
                       variant="outline"

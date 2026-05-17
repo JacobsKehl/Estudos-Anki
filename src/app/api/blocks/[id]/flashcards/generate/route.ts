@@ -71,7 +71,7 @@ export async function POST(
             status: "APPROVED",
             reviewState: "NEW",       
             nextReviewAt: new Date(),      
-            approvedAt: new Date(),        
+            approvedAt: new Date(),
             learningStep: 0,
             easeFactor: 2.5,
             intervalDays: 0,

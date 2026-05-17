@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { identifySubject, detectStructure } from "@/lib/ai/organizer";
+import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export const dynamic = "force-dynamic";
+
+interface PageContent {
+  pageNumber: number;
+  text: string;
+}
 
 // Cache do pdfjs para não reconfigurar o worker a cada chamada
 let pdfjsCache: typeof import("pdfjs-dist/legacy/build/pdf.mjs") | null = null;
@@ -19,12 +25,12 @@ async function getPdfjsLib() {
   return lib;
 }
 
-async function extractText(sourcePath: string, isLocal: boolean, maxPages = 15): Promise<{ text: string; numPages: number }> {
+async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ pages: PageContent[]; numPages: number }> {
   const pdfjsLib = await getPdfjsLib();
   let uint8Array: Uint8Array;
 
   if (isLocal) {
-     throw new Error("Arquivos locais não suportados na Web.");
+     throw new Error("Arquivos locais não são suportados na Web. Use o upload em nuvem.");
   } else {
     // Download from Supabase Storage
     const { data, error } = await supabase.storage.from('materials').download(sourcePath);
@@ -41,18 +47,21 @@ async function extractText(sourcePath: string, isLocal: boolean, maxPages = 15):
     disableFontFace: true,
   });
 
-  const doc = await loadingTask.promise;
-  const numPages = doc.numPages;
-  const pagesToRead = Math.min(maxPages, numPages);
-  let text = "";
+  const pdfDocument = await loadingTask.promise;
+  const numPages = pdfDocument.numPages;
+  const pages: PageContent[] = [];
 
-  for (let i = 1; i <= pagesToRead; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map((item: any) => ("str" in item ? item.str : "")).join(" ") + "\n";
+  for (let i = 1; i <= numPages; i++) {
+    const page = await pdfDocument.getPage(i);
+    const textContent = await page.getTextContent();
+    const text = textContent.items
+      .map((item: any) => ("str" in item ? item.str : ""))
+      .join(" ")
+      .trim();
+    pages.push({ pageNumber: i, text });
   }
 
-  return { text, numPages };
+  return { pages, numPages };
 }
 
 export async function POST(
@@ -69,8 +78,7 @@ export async function POST(
     const userId = user.id;
 
     const material = await prisma.studyMaterial.findFirst({
-      where: { id, userId },
-      include: { _count: { select: { studyBlocks: true } } }
+      where: { id, userId }
     });
 
     if (!material) {
@@ -89,20 +97,41 @@ export async function POST(
       data: { organizationStatus: "ANALYZING" }
     });
 
-    // 3. Extrair texto com pdfjs-dist
-    const { text: extractedText, numPages } = await extractText(material.sourcePath!, isLocal, 15);
+    // 3. Extrair texto de todas as páginas
+    const { pages, numPages } = await extractAllPages(material.sourcePath!, isLocal);
+    const nonEmptyPages = pages.filter(p => p.text.length > 10);
 
-    if (!extractedText || extractedText.trim().length < 50) {
+    if (nonEmptyPages.length === 0) {
       await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "Texto insuficiente" } });
       return NextResponse.json({
         error: "Não foi possível extrair texto deste PDF. Ele pode ser uma imagem escaneada ou estar protegido."
       }, { status: 400 });
     }
 
-    // 4. Identificar matéria se não tiver
+    // 4. Salvar ExtractedContent por página para este material (limpando o antigo)
+    await prisma.extractedContent.deleteMany({
+      where: { materialId: material.id }
+    });
+
+    const contentRecords = nonEmptyPages.map((p, idx) => ({
+      userId,
+      subjectId: material.subjectId || "", // preenchido temporariamente, atualizado depois
+      materialId: material.id,
+      pageNumber: p.pageNumber,
+      text: p.text,
+      orderIndex: idx,
+      estimatedStudyMinutes: 0, 
+    }));
+
+    // 5. Identificar matéria se não tiver
     let subjectId = material.subjectId;
+    const sampleText = nonEmptyPages
+      .slice(0, Math.min(5, nonEmptyPages.length))
+      .map(p => p.text)
+      .join("\n\n");
+
     if (!subjectId) {
-      const idResult = await identifySubject(extractedText.substring(0, 3000), material.fileName);
+      const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName);
       const detectedSubject = idResult.subjectName;
 
       let subject = await prisma.studySubject.findFirst({
@@ -127,8 +156,21 @@ export async function POST(
       });
     }
 
-    // 5. Detectar estrutura com IA
-    const detectedBlocks = await detectStructure(extractedText, numPages);
+    // Corrigir subjectId nos registros de conteúdo extraído
+    const updatedContentRecords = contentRecords.map(rec => ({
+      ...rec,
+      subjectId: subjectId as string
+    }));
+
+    await prisma.extractedContent.createMany({ data: updatedContentRecords });
+
+    // 6. Detectar estrutura com IA
+    const fullTextForStructure = nonEmptyPages
+      .slice(0, 15)
+      .map(p => p.text)
+      .join("\n");
+
+    const detectedBlocks = await detectStructure(fullTextForStructure, numPages);
 
     if (!detectedBlocks || detectedBlocks.length === 0) {
       await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "IA não detectou estrutura" } });
@@ -137,34 +179,96 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 6. Remover blocos antigos se existirem (Reorganização)
-    await prisma.studyBlock.deleteMany({
-      where: { materialId: material.id }
-    });
+    // 7. Remover blocos antigos e flashcards antigos deste material (reorganização limpa)
+    await prisma.$transaction([
+      prisma.studyBlock.deleteMany({ where: { materialId: material.id } }),
+      prisma.flashcard.deleteMany({ where: { materialId: material.id } })
+    ]);
 
-    // 7. Criar blocos
+    let flashcardCount = 0;
+
+    // 8. Criar novos blocos e gerar flashcards
     for (let i = 0; i < detectedBlocks.length; i++) {
-      const block = detectedBlocks[i];
-      await prisma.studyBlock.create({
+      const blockDef = detectedBlocks[i];
+      const pageStart = blockDef.pageStart || 1;
+      const pageEnd = blockDef.pageEnd || pageStart || 1;
+
+      const studyBlock = await prisma.studyBlock.create({
         data: {
           userId,
           subjectId: subjectId as string,
           materialId: material.id,
-          title: block.title || `Parte ${i + 1}`,
-          description: block.description || "",
-          pageStart: block.pageStart || 1,
-          pageEnd: block.pageEnd || block.pageStart || 1,
+          title: blockDef.title || `Parte ${i + 1}`,
+          description: blockDef.description || "",
+          pageStart,
+          pageEnd,
           orderIndex: i,
-          estimatedStudyMinutes: block.estimatedStudyMinutes || 60,
-          createdBy: block.createdBy || "AI",
-          confidence: block.confidence ?? 1.0,
-          sourceHeading: block.sourceHeading,
-          status: "NOT_STARTED"
+          estimatedStudyMinutes: blockDef.estimatedStudyMinutes || 60,
+          createdBy: blockDef.createdBy || "AI",
+          confidence: blockDef.confidence ?? 1.0,
+          sourceHeading: blockDef.sourceHeading,
+          status: "NOT_STARTED",
+          theoryStatus: "NOT_STARTED",
+          questionsStatus: "NOT_STARTED",
+          flashcardsStatus: "NOT_STARTED",
+          nextActionType: "THEORY"
         }
       });
+
+      // Pegar texto deste bloco específico
+      const blockPages = nonEmptyPages.filter(p => p.pageNumber >= pageStart && p.pageNumber <= pageEnd);
+      const blockText = blockPages.map(p => p.text).join("\n");
+
+      if (blockText.trim().length >= 50) {
+        try {
+          const cards = await generateFlashcards(blockText.substring(0, 6000));
+          if (cards && cards.length > 0) {
+            const MAX_FLASHCARDS_PER_BLOCK = 15;
+            const limitedCards = cards.slice(0, MAX_FLASHCARDS_PER_BLOCK);
+
+            const flashcardsData = limitedCards.map(card => ({
+              userId,
+              subjectId: subjectId as string,
+              materialId: material.id,
+              studyBlockId: studyBlock.id,
+              question: card.question,
+              answer: card.answer,
+              type: card.type,
+              difficulty: card.difficulty,
+              status: "APPROVED",
+              reviewState: "NEW",       
+              nextReviewAt: new Date(),      
+              approvedAt: new Date(),        
+              learningStep: 0,
+              easeFactor: 2.5,
+              intervalDays: 0,
+              repetitionCount: 0,
+              lapseCount: 0,
+              sourcePageStart: pageStart,
+              sourcePageEnd: pageEnd,
+            }));
+
+            const createResult = await prisma.flashcard.createMany({
+              data: flashcardsData
+            });
+
+            flashcardCount += createResult.count;
+
+            await prisma.studyBlock.update({
+              where: { id: studyBlock.id },
+              data: { 
+                flashcardsStatus: "GENERATED",
+                flashcardsGeneratedAt: new Date()
+              }
+            });
+          }
+        } catch (flashErr: any) {
+          console.error(`[Flashcards Reorganize] Erro para bloco ${studyBlock.title}:`, flashErr.message);
+        }
+      }
     }
 
-    // 7. Atualizar status do material
+    // 9. Atualizar status final do material
     await prisma.studyMaterial.update({
       where: { id },
       data: {
@@ -175,8 +279,9 @@ export async function POST(
     });
 
     return NextResponse.json({
-      message: `${detectedBlocks.length} blocos de estudo criados com sucesso.`,
-      blocksCount: detectedBlocks.length
+      message: `${detectedBlocks.length} blocos de estudo criados e ${flashcardCount} flashcards enviados para curadoria com sucesso.`,
+      blocksCount: detectedBlocks.length,
+      flashcardsCount: flashcardCount
     });
 
   } catch (error: any) {
