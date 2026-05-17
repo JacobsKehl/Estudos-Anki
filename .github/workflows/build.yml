@@ -1,21 +1,19 @@
-name: Build and Release
+name: Web Code Verification
 
 on:
   push:
     branches:
       - main
       - master
-    tags:
-      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
+  validate:
+    name: Type Check and Compile Verification
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
@@ -33,33 +31,9 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      - name: Build Next.js
+      - name: Verify TypeScript and Build Next.js
         run: npm run build
-
-      - name: Build and Publish Electron App
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Set to true to release the build after it's been published
-          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          # If on macOS, we build for Mac. If on Windows, we build for Windows.
-          args: --${{ matrix.os == 'macos-latest' && 'mac' || 'win' }} ${{ matrix.os == 'macos-latest' && '--arm64 --x64' || '' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-      - name: List Output Directory (Debug)
-        run: ls -R dist || echo "Dist directory not found"
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kehl-Study-${{ matrix.os }}
-          path: |
-            dist/*.dmg
-            dist/*.zip
-            dist/*.exe
-            dist/*.msi
-            dist/mac/*.zip
-            dist/mac/*.dmg
-          if-no-files-found: warn
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
