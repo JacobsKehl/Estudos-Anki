@@ -25,19 +25,14 @@ async function getPdfjsLib() {
   return lib;
 }
 
-async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ pages: PageContent[]; numPages: number }> {
+async function extractAllPages(sourcePath: string): Promise<{ pages: PageContent[]; numPages: number }> {
   const pdfjsLib = await getPdfjsLib();
-  let uint8Array: Uint8Array;
-
-  if (isLocal) {
-     throw new Error("Arquivos locais não são suportados na Web. Use o upload em nuvem.");
-  } else {
-    // Download from Supabase Storage
-    const { data, error } = await supabase.storage.from('materials').download(sourcePath);
-    if (error) throw new Error(`Erro ao baixar arquivo do Storage: ${error.message}`);
-    const arrayBuffer = await data.arrayBuffer();
-    uint8Array = new Uint8Array(arrayBuffer);
-  }
+  
+  // Download from Supabase Storage
+  const { data, error } = await supabase.storage.from('materials').download(sourcePath);
+  if (error) throw new Error(`Erro ao baixar arquivo do Storage: ${error.message}`);
+  const arrayBuffer = await data.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
 
   const loadingTask = pdfjsLib.getDocument({
     data: uint8Array,
@@ -89,11 +84,7 @@ export async function POST(
       return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
     }
 
-    const isLocal = material.sourceType === "LOCAL_INBOX";
-
-    if (isLocal) {
-      return NextResponse.json({ error: "Arquivos locais não são suportados na Web. Faça o upload via Nuvem." }, { status: 400 });
-    }
+    // Não bloqueamos mais por sourceType pois todos estão no Supabase agora.
 
     // 2. Extrair parâmetros do corpo
     let mode = "general";
@@ -180,7 +171,7 @@ export async function POST(
       });
 
       if (extractedPages.length === 0) {
-        const { pages } = await extractAllPages(material.sourcePath!, isLocal);
+        const { pages } = await extractAllPages(material.sourcePath!);
         const nonEmptyPages = pages.filter(p => p.text.length > 10);
         
         await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
@@ -330,7 +321,7 @@ export async function POST(
       console.log(`[Reorganize] Usando ${nonEmptyPages.length} páginas já extraídas em cache do banco de dados.`);
     } else {
       console.log(`[Reorganize] Extraindo páginas do zero do Supabase Storage...`);
-      const { pages, numPages: parsedNumPages } = await extractAllPages(material.sourcePath!, isLocal);
+      const { pages, numPages: parsedNumPages } = await extractAllPages(material.sourcePath!);
       numPages = parsedNumPages;
       nonEmptyPages = pages.filter(p => p.text.length > 10);
 

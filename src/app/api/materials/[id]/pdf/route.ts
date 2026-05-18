@@ -21,25 +21,13 @@ export async function GET(
       return new NextResponse("Material não encontrado", { status: 404 });
     }
 
-    const isLocal = material.sourceType === "LOCAL_INBOX" || material.sourceType === "LOCAL_UPLOAD";
-    let fileBuffer: Buffer;
-
-    if (isLocal) {
-      const fs = await import("fs");
-      if (!material.sourcePath || !fs.existsSync(material.sourcePath)) {
-        return new NextResponse("Arquivo local não encontrado no disco.", { status: 404 });
-      }
-      fileBuffer = fs.readFileSync(material.sourcePath);
-    } else {
-      // Download from Supabase Storage
-      const { data, error } = await supabase.storage.from('materials').download(material.sourcePath!);
-      if (error) {
-        console.error("Erro ao baixar do Storage:", error);
-        return new NextResponse("Erro ao carregar arquivo da nuvem", { status: 500 });
-      }
-      const arrayBuffer = await data.arrayBuffer();
-      fileBuffer = Buffer.from(arrayBuffer);
+    const { data, error } = await supabase.storage.from('materials').download(material.sourcePath!);
+    if (error) {
+      console.error("Erro ao baixar do Storage:", error);
+      return new NextResponse("Erro ao carregar arquivo da nuvem", { status: 500 });
     }
+    const arrayBuffer = await data.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
 
     const fileName = material.originalFileName || material.fileName || "document.pdf";
 

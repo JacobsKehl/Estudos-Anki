@@ -48,24 +48,14 @@ async function getPdfjsLib() {
 
 // ─── Extração por página ───────────────────────────────────────────────────────
 
-async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ pages: PageContent[]; numPages: number }> {
+async function extractAllPages(sourcePath: string): Promise<{ pages: PageContent[]; numPages: number }> {
   const pdfjsLib = await getPdfjsLib();
-  let uint8Array: Uint8Array;
-
-  if (isLocal) {
-    const fs = await import("fs");
-    if (!fs.existsSync(sourcePath)) {
-      throw new Error(`Arquivo local não encontrado: ${sourcePath}`);
-    }
-    const buffer = fs.readFileSync(sourcePath);
-    uint8Array = new Uint8Array(buffer);
-  } else {
-    // Download from Supabase Storage
-    const { data, error } = await supabase.storage.from('materials').download(sourcePath);
-    if (error) throw new Error(`Erro ao baixar arquivo do Storage: ${error.message}`);
-    const arrayBuffer = await data.arrayBuffer();
-    uint8Array = new Uint8Array(arrayBuffer);
-  }
+  
+  // Download from Supabase Storage always
+  const { data, error } = await supabase.storage.from('materials').download(sourcePath);
+  if (error) throw new Error(`Erro ao baixar arquivo do Storage: ${error.message}`);
+  const arrayBuffer = await data.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
 
   const loadingTask = pdfjsLib.getDocument({
     data: uint8Array,
@@ -128,7 +118,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     });
 
     log("Extraindo texto por página...");
-    const { pages, numPages: parsedNumPages } = await extractAllPages(material.sourcePath, isLocal);
+    const { pages, numPages: parsedNumPages } = await extractAllPages(material.sourcePath);
     numPages = parsedNumPages;
     log(`[Organize] Texto extraído: ${numPages} páginas`);
 

@@ -1,0 +1,149 @@
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\api\materials\[id]\organize\route.ts
+  96:14  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\api\materials\[id]\pdf\route.ts
+  33:5  error  'fileBuffer' is never reassigned. Use 'const' instead  prefer-const
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\api\materials\[id]\update-subject\route.ts
+  25:13  warning  'subject' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\api\materials\organize-all\route.ts
+    6:10  warning  'generateFlashcards' is defined but never used  @typescript-eslint/no-unused-vars
+   95:9   warning  'isLocal' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  238:12  warning  'err' is defined but never used                 @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\api\schedule\reorganize\route.ts
+  2:10  warning  'prisma' is defined but never used  @typescript-eslint/no-unused-vars
+  8:28  warning  'req' is defined but never used     @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\flashcards\page.tsx
+  3:10  warning  'Logo' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\materials\[id]\page.tsx
+   4:10  warning  'MaterialStatusBadge' is defined but never used         @typescript-eslint/no-unused-vars
+   5:10  warning  'ProcessMaterialButton' is defined but never used       @typescript-eslint/no-unused-vars
+   6:41  warning  'AlertCircle' is defined but never used                 @typescript-eslint/no-unused-vars
+   9:10  warning  'BlockGenerator' is defined but never used              @typescript-eslint/no-unused-vars
+  41:9   warning  'hasExistingBlocks' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  43:9   warning  'isPendingOrError' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\materials\page.tsx
+  1:54  warning  'Info' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\page.tsx
+   3:3   warning  'CheckCircle2' is defined but never used            @typescript-eslint/no-unused-vars
+   5:3   warning  'BrainCircuit' is defined but never used            @typescript-eslint/no-unused-vars
+   6:3   warning  'RotateCw' is defined but never used                @typescript-eslint/no-unused-vars
+  28:9   warning  'now' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  32:18  warning  'todayCards' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  47:5   warning  'subjectsCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\app\subjects\[id]\page.tsx
+   5:47  warning  'FileText' is defined but never used                  @typescript-eslint/no-unused-vars
+  11:10  warning  'GenerateFlashcardsButton' is defined but never used  @typescript-eslint/no-unused-vars
+  12:10  warning  'EmptyState' is defined but never used                @typescript-eslint/no-unused-vars
+  13:20  warning  'Plus' is defined but never used                      @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\blocks\BlockStudyView.tsx
+  10:3   warning  'Sparkles' is defined but never used  @typescript-eslint/no-unused-vars
+  65:14  warning  'error' is defined but never used     @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\flashcards\EditFlashcardDialog.tsx
+  12:10  warning  'Input' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\flashcards\FlashcardRepository.tsx
+   5:3   warning  'Check' is defined but never used         @typescript-eslint/no-unused-vars
+  11:3   warning  'BrainCircuit' is defined but never used  @typescript-eslint/no-unused-vars
+  15:3   warning  'Loader2' is defined but never used       @typescript-eslint/no-unused-vars
+  24:10  warning  'useRouter' is defined but never used     @typescript-eslint/no-unused-vars
+  25:10  warning  'Logo' is defined but never used          @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\flashcards\FlashcardSession.tsx
+  39:17  warning  'setCards' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\layout\sidebar.tsx
+   7:3  warning  'LayoutDashboard' is defined but never used  @typescript-eslint/no-unused-vars
+  12:3  warning  'Blocks' is defined but never used           @typescript-eslint/no-unused-vars
+  13:3  warning  'BrainCircuit' is defined but never used     @typescript-eslint/no-unused-vars
+  14:3  warning  'RotateCw' is defined but never used         @typescript-eslint/no-unused-vars
+  15:3  warning  'Heart' is defined but never used            @typescript-eslint/no-unused-vars
+  17:3  warning  'FolderDown' is defined but never used       @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\materials\BlockGenerator.tsx
+  5:36  warning  'X' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\materials\CloudUploadButton.tsx
+    5:10  warning  'Upload' is defined but never used  @typescript-eslint/no-unused-vars
+  123:14  warning  'error' is defined but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\materials\MaterialCard.tsx
+    5:10  warning  'MaterialStatusBadge' is defined but never used       @typescript-eslint/no-unused-vars
+   58:10  warning  'showDropdown' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   58:24  warning  'setShowDropdown' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  116:14  warning  'e' is defined but never used                         @typescript-eslint/no-unused-vars
+  224:14  warning  'error' is defined but never used                     @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\materials\MaterialsListClient.tsx
+  15:3  warning  'BookOpen' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\materials\OrganizeAllButton.tsx
+   11:3   warning  'AlertCircle' is defined but never used  @typescript-eslint/no-unused-vars
+  112:16  warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+  214:16  warning  'err' is defined but never used          @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\materials\ProcessMaterialButton.tsx
+  7:10  warning  'cn' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\reviews\ReviewDashboard.tsx
+   3:10  warning  'useState' is defined but never used          @typescript-eslint/no-unused-vars
+  14:10  warning  'FlashcardSession' is defined but never used  @typescript-eslint/no-unused-vars
+  30:9   warning  'router' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\schedule\GenerateScheduleCTA.tsx
+  4:20  warning  'Plus' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\stats\StudyStats.tsx
+    5:3   warning  'BarChart3' is defined but never used  @typescript-eslint/no-unused-vars
+    9:3   warning  'Trophy' is defined but never used     @typescript-eslint/no-unused-vars
+   16:10  warning  'Badge' is defined but never used      @typescript-eslint/no-unused-vars
+  100:37  warning  'i' is defined but never used          @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\subjects\GenerateAllFlashcardsButton.tsx
+  5:33  warning  'Sparkles' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\subjects\GenerateFlashcardsButton.tsx
+  5:33  warning  'Check' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\subjects\StudyBlockItem.tsx
+   4:44  warning  'MoreVertical' is defined but never used  @typescript-eslint/no-unused-vars
+  45:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  70:14  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\subjects\SubjectPerformancePanel.tsx
+   6:3   warning  'BrainCircuit' is defined but never used   @typescript-eslint/no-unused-vars
+  13:26  warning  'SubjectHealth' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\today\TodayStudyFocus.tsx
+  6:3  warning  'BrainCircuit' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\ui\command-palette.tsx
+  6:33  warning  'RotateCw' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\components\ui\select.tsx
+  39:47  warning  'value' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\lib\ai\providers\gemini.ts
+  47:14  warning  '_parseError' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\lib\scheduler.ts
+   62:5   warning  'subjectsPerDay' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   63:5   warning  'minutesPerSubject' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  217:10  warning  'buildItem' is defined but never used                   @typescript-eslint/no-unused-vars
+
+C:\Users\henrique.kehl\OneDrive - DropReal\Área de Trabalho\kehl\src\lib\services\subject-metrics.ts
+  150:9   warning  'now' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  188:14  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+✖ 78 problems (1 error, 77 warnings)
+
