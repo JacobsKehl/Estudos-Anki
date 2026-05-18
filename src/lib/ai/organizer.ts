@@ -30,7 +30,12 @@ export async function identifySubject(firstPagesContent: string, fileName?: stri
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.0-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+    }
+  });
 
   const prompt = buildSubjectPrompt(firstPagesContent, fileName);
 
@@ -123,7 +128,12 @@ export async function detectStructure(
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.0-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+    }
+  });
 
   // 1. Filtrar os tópicos oficiais relevantes para esta matéria
   const relevantTopics = OFFICIAL_TOPICS.filter(

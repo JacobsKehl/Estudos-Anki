@@ -10,7 +10,12 @@ export async function extractTextWithGeminiOCR(source: string | Buffer): Promise
   if (!apiKey) throw new Error("GEMINI_API_KEY não está configurada.");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.0-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+    }
+  });
 
   let dataBuffer: Buffer;
   if (typeof source === "string") {
@@ -22,7 +27,7 @@ export async function extractTextWithGeminiOCR(source: string | Buffer): Promise
   const pdfDoc = await PDFDocument.load(dataBuffer, { ignoreEncryption: true });
   const totalPages = pdfDoc.getPageCount();
   
-  console.log(`🚀 Starting Chunked OCR for ${totalPages} pages (gemini-flash-latest)...`);
+  console.log(`🚀 Starting Chunked OCR for ${totalPages} pages (gemini-2.0-flash)...`);
   
   const allPages: { pageNumber: number, text: string }[] = [];
   const chunkSize = 5; // Reduzido para 5 páginas para diminuir carga e tokens

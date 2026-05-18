@@ -15,7 +15,12 @@ export async function suggestStudyBlocks(materialId: string, pages: { pageNumber
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.0-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+    }
+  });
 
   // Formata as páginas para o prompt
   const pagesText = pages
