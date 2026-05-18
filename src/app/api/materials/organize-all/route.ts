@@ -505,9 +505,10 @@ export async function POST(req: NextRequest) {
       await prisma.studyPlan.deleteMany({
         where: { userId }
       });
-      await prisma.extractedContent.deleteMany({
-        where: { userId }
-      });
+      // Preserva o ExtractedContent para evitar custos de extração/OCR desnecessários
+      // await prisma.extractedContent.deleteMany({
+      //   where: { userId }
+      // });
 
       // Reset progress of all study subjects to 0
       await prisma.studySubject.updateMany({
@@ -593,7 +594,8 @@ export async function POST(req: NextRequest) {
           });
 
           await prisma.studyBlock.deleteMany({ where: { materialId: material.id } });
-          await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
+          // Preserva o ExtractedContent para evitar custos de extração/OCR desnecessários
+          // await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
         }
 
         const result = await processMaterial(material, userId, force);
