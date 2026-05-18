@@ -15,7 +15,7 @@ export function MaterialFilters() {
       </div>
 
       <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-        <Button variant="outline" size="sm" className="rounded-xl border-accent/20 bg-accent/5 text-accent hover:bg-accent/10">
+        <Button variant="soft" size="sm" className="rounded-xl">
           Todos
         </Button>
         <Button variant="ghost" size="sm" className="rounded-xl text-muted-foreground">

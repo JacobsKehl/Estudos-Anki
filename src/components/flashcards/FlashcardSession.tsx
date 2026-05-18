@@ -172,7 +172,12 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
           </div>
         </div>
 
-        <Button onClick={onComplete} size="lg" className="rounded-2xl px-12 h-16 text-xl shadow-xl hover:scale-105 transition-transform bg-accent text-white font-bold">
+        <Button 
+          variant="primary"
+          size="lg"
+          onClick={onComplete} 
+          className="rounded-2xl px-12 shadow-xl hover:scale-105 transition-all font-bold"
+        >
           Finalizar Sessão
         </Button>
       </div>
@@ -243,9 +248,10 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
       <div className="flex flex-col items-center gap-4">
         {!showAnswer ? (
           <Button 
+            variant="primary"
+            size="lg"
             onClick={() => setShowAnswer(true)} 
-            size="lg" 
-            className="w-full max-w-sm rounded-2xl h-16 text-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all bg-accent text-white font-bold"
+            className="w-full max-w-sm rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all font-bold"
           >
             <Eye className="w-6 h-6 mr-3" />
             Revelar Resposta
@@ -255,7 +261,7 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
             <Button 
               variant="outline"
               disabled={isSaving}
-              className="h-20 rounded-3xl border-red-100 hover:bg-red-50 hover:border-red-200 text-red-600 font-black transition-all hover:-translate-y-1 active:translate-y-0"
+              className="h-20 rounded-3xl bg-rose-50/40 border-rose-100 hover:bg-rose-100/60 hover:border-rose-200 text-rose-600 font-black transition-all hover:-translate-y-1 active:translate-y-0"
               onClick={() => handleRating(1)}
             >
               <div className="flex flex-col items-center gap-0.5">
@@ -266,7 +272,7 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
             <Button 
               variant="outline"
               disabled={isSaving}
-              className="h-20 rounded-3xl border-orange-100 hover:bg-orange-50 hover:border-orange-200 text-orange-600 font-black transition-all hover:-translate-y-1 active:translate-y-0"
+              className="h-20 rounded-3xl bg-amber-50/40 border-amber-100 hover:bg-amber-100/60 hover:border-amber-200 text-amber-600 font-black transition-all hover:-translate-y-1 active:translate-y-0"
               onClick={() => handleRating(2)}
             >
               <div className="flex flex-col items-center gap-0.5">
@@ -277,7 +283,7 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
             <Button 
               variant="outline"
               disabled={isSaving}
-              className="h-20 rounded-3xl border-blue-100 hover:bg-blue-50 hover:border-blue-200 text-blue-600 font-black transition-all hover:-translate-y-1 active:translate-y-0"
+              className="h-20 rounded-3xl bg-sage-light/20 border-accent/20 hover:bg-sage-light/40 hover:border-accent/30 text-accent font-black transition-all hover:-translate-y-1 active:translate-y-0"
               onClick={() => handleRating(3)}
             >
               <div className="flex flex-col items-center gap-0.5">
@@ -288,7 +294,7 @@ export function FlashcardSession({ mode, title, cards: initialCards, onComplete 
             <Button 
               variant="outline"
               disabled={isSaving}
-              className="h-20 rounded-3xl border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200 text-emerald-600 font-black transition-all hover:-translate-y-1 active:translate-y-0"
+              className="h-20 rounded-3xl bg-blue-50/40 border-blue-100 hover:bg-blue-100/60 hover:border-blue-200 text-blue-600 font-black transition-all hover:-translate-y-1 active:translate-y-0"
               onClick={() => handleRating(4)}
             >
               <div className="flex flex-col items-center gap-0.5">

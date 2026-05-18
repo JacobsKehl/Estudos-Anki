@@ -277,7 +277,8 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
     return (
       <Button
         variant="outline"
-        className="rounded-2xl h-14 px-8 border-emerald-200 text-emerald-700 bg-emerald-50/50 cursor-default"
+        size="lg"
+        className="rounded-2xl border-emerald-200 text-emerald-700 bg-emerald-50/50 cursor-default"
         disabled
       >
         <CheckCircle2 className="w-5 h-5 mr-2" />
@@ -297,7 +298,9 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
   return (
     <div className="flex flex-col items-center gap-2">
       <Button
-        className="rounded-2xl h-14 px-10 bg-accent text-white hover:bg-accent/90 shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98] font-bold text-lg"
+        variant="primary"
+        size="lg"
+        className="rounded-2xl font-bold transition-transform hover:scale-[1.02]"
         disabled={isLoading || isSuccess}
         onClick={handleButtonClick}
       >
@@ -355,14 +358,16 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
           <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
-              className="rounded-xl font-bold h-11 flex-grow sm:flex-grow-0"
+              size="md"
+              className="font-bold flex-grow sm:flex-grow-0"
               onClick={() => setShowConfirmModal(false)}
             >
               Cancelar
             </Button>
             <Button
               variant="destructive"
-              className="rounded-xl font-bold h-11 bg-red-600 hover:bg-red-700 text-white flex-grow"
+              size="md"
+              className="font-bold flex-grow"
               onClick={() => {
                 setShowConfirmModal(false);
                 handleOrganize();

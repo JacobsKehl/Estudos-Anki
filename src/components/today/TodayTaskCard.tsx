@@ -202,7 +202,7 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
             <Button
               size="sm"
               variant="ghost"
-              className="rounded-lg h-9 text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5"
+              className="rounded-lg font-semibold hover:bg-black/5 dark:hover:bg-white/5"
               onClick={() => router.push(`/blocks/${item.studyBlockId}`)}
             >
               Ver detalhes
@@ -214,8 +214,8 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
               {hasFlashcards ? (
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="rounded-lg h-9 px-3 text-xs font-semibold border-accent/20 text-accent hover:bg-accent/5 flex items-center gap-1.5 transition-all"
+                  variant="soft"
+                  className="rounded-lg font-semibold flex items-center gap-1.5 transition-all"
                   onClick={() => router.push(`/practice?blockId=${item.studyBlockId}`)}
                 >
                   <BrainCircuit className="w-3.5 h-3.5" />
@@ -224,8 +224,8 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
               ) : (
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="rounded-lg h-9 px-3 text-xs font-semibold border-accent/20 text-accent hover:bg-accent/5 flex items-center gap-1.5 transition-all"
+                  variant="soft"
+                  className="rounded-lg font-semibold flex items-center gap-1.5 transition-all"
                   onClick={handleGenerateCards}
                   disabled={isGenerating}
                 >
@@ -241,8 +241,9 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
           )}
 
           <Button
+            variant="primary"
             size="sm"
-            className="rounded-lg h-9 px-4 text-xs font-bold bg-primary text-primary-foreground shadow-sm hover:opacity-90"
+            className="rounded-lg font-bold shadow-sm"
             onClick={handleCompleteStep}
             disabled={isCompleting}
           >

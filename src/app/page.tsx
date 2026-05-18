@@ -174,7 +174,7 @@ export default async function Dashboard() {
             </p>
           </div>
           <Link href={nextAction.href}>
-            <Button className="w-full md:w-auto gap-2 px-7 rounded-xl h-11 text-sm font-bold transition-all hover:scale-105 bg-accent text-white hover:bg-accent/90 shadow-lg shadow-accent/20">
+            <Button variant="primary" size="md" className="w-full md:w-auto gap-2 px-7 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-accent/20">
               {nextAction.cta}
               <ArrowRight className="h-4 w-4" />
             </Button>
@@ -295,8 +295,9 @@ export default async function Dashboard() {
 
               <div className="shrink-0">
                 <Button 
+                  variant="primary"
                   size="lg" 
-                  className="rounded-2xl h-14 px-10 text-base font-black bg-accent text-white shadow-xl shadow-accent/20 hover:scale-105 transition-all gap-3"
+                  className="rounded-2xl px-10 font-black shadow-xl shadow-accent/20 hover:scale-105 transition-all gap-3"
                   asChild
                 >
                   <Link href="/practice?source=today">

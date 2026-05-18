@@ -49,8 +49,8 @@ export function GenerateFlashcardsButton({ blockId, hasFlashcards }: GenerateFla
       <div className="flex gap-2">
         <Button
           size="sm"
-          variant="outline"
-          className="rounded-xl h-8 text-xs gap-1.5 hover:bg-accent/5 border-accent/20 text-accent"
+          variant="soft"
+          className="rounded-xl gap-1.5"
           onClick={handleGenerate}
         >
           <Sparkles className="w-3.5 h-3.5" />
@@ -58,8 +58,8 @@ export function GenerateFlashcardsButton({ blockId, hasFlashcards }: GenerateFla
         </Button>
         <Button
           size="sm"
-          variant="secondary"
-          className="rounded-xl h-8 text-xs gap-1.5 bg-accent text-white hover:bg-accent/90"
+          variant="primary"
+          className="rounded-xl gap-1.5"
           asChild
         >
           <Link href={`/flashcards?blockId=${blockId}`}>
@@ -74,8 +74,8 @@ export function GenerateFlashcardsButton({ blockId, hasFlashcards }: GenerateFla
   return (
     <Button
       size="sm"
-      variant="outline"
-      className="rounded-xl h-9 px-4 gap-2 font-medium hover:border-accent/50 hover:bg-accent/5"
+      variant="soft"
+      className="rounded-xl gap-2 font-medium w-full h-11"
       onClick={handleGenerate}
       disabled={isLoading}
     >

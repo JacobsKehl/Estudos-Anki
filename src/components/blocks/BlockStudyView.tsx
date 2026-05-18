@@ -86,7 +86,7 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
       {/* Header Focado */}
       <header className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" className="rounded-full h-10 w-10 p-0 hover:bg-accent/5" asChild>
+          <Button variant="ghost" size="iconOnly" className="rounded-full hover:bg-accent/5" asChild>
             <Link href={`/subjects/${block.subjectId}`}>
               <ArrowLeft className="w-5 h-5" />
             </Link>
@@ -125,19 +125,22 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
           <div className="flex items-center gap-3">
             {block.status !== "COMPLETED" ? (
               <Button 
+                variant="primary"
+                size="lg"
                 onClick={() => updateStatus("COMPLETED")} 
                 disabled={isUpdatingStatus}
-                className="rounded-2xl h-12 px-6 gap-2 bg-accent text-white hover:bg-accent/90 shadow-md transition-all active:scale-95"
+                className="rounded-2xl gap-2 font-bold transition-all active:scale-95"
               >
                 {isUpdatingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
                 Marcar como estudado
               </Button>
             ) : (
               <Button 
-                variant="outline"
+                variant="soft"
+                size="lg"
                 onClick={() => updateStatus("IN_PROGRESS")} 
                 disabled={isUpdatingStatus}
-                className="rounded-2xl h-12 px-6 gap-2 border-accent/20 text-accent hover:bg-accent/5"
+                className="rounded-2xl gap-2 font-bold"
               >
                 Retomar estudo
               </Button>
@@ -283,7 +286,7 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
 
               <div className="pt-2 flex flex-col gap-3">
                 {stats.approved > 0 && (
-                  <Button className="w-full rounded-2xl gap-2 h-12 bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200 transition-all hover:scale-[1.02]" asChild>
+                  <Button variant="primary" size="lg" className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-blue-200 transition-all hover:scale-[1.02]" asChild>
                     <Link href={`/practice?blockId=${block.id}`}>
                       <Play className="w-4 h-4 fill-current" />
                       Praticar cards

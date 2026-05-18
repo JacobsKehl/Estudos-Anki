@@ -421,11 +421,11 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
                   Desorganizar
                 </Button>
                 <Button 
-                  variant="default"
+                  variant="destructive"
                   size="sm"
                   onClick={() => setShowBulkDeleteDialog(true)}
                   disabled={isProcessingBulkAction}
-                  className="rounded-xl font-bold gap-1.5 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white shadow-md border-none"
+                  className="rounded-xl font-bold gap-1.5 transition-all shadow-md"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Excluir ({selectedIds.size})
@@ -499,8 +499,8 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
             <Button 
               onClick={handleBulkDelete} 
               disabled={isDeletingBulk}
-              variant="default"
-              className="rounded-xl h-10 px-5 font-bold bg-red-600 text-white hover:bg-red-700 shadow-sm border-none"
+              variant="destructive"
+              className="rounded-xl h-10 px-5 font-bold transition-all shadow-sm"
             >
               {isDeletingBulk ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Excluindo...</>
@@ -603,8 +603,9 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
           </DialogHeader>
           <DialogFooter className="mt-6 pt-4 border-t border-border/40">
             <Button 
+              variant="primary"
               onClick={() => setShowReportDialog(false)}
-              className="w-full bg-accent text-white hover:bg-accent/90 rounded-xl h-10 font-bold"
+              className="w-full rounded-xl h-10 font-bold"
             >
               Concluído
             </Button>

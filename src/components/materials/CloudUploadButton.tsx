@@ -244,8 +244,10 @@ export function CloudUploadButton() {
 
           <DialogFooter className="mt-8">
             <Button 
+              variant="primary"
+              size="lg"
               onClick={handleCloseReport}
-              className="w-full sm:w-auto px-8 rounded-xl h-12 text-sm font-bold bg-accent text-white hover:bg-accent/90 transition-all shadow-md shadow-accent/10"
+              className="w-full sm:w-auto rounded-xl font-bold transition-all"
             >
               Ok, Entendido
             </Button>

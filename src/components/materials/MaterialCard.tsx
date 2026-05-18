@@ -363,8 +363,9 @@ export function MaterialCard({
               {material.organizationStatus === "ERROR" ? (
                 <>
                   <Button 
+                    variant="destructive"
                     size="sm" 
-                    className="flex-grow rounded-xl h-9 bg-red-500 text-white hover:bg-red-600 gap-2 shadow-sm font-bold text-xs"
+                    className="flex-grow rounded-xl gap-2 font-bold"
                     onClick={() => executeOrganizationAction("general")}
                     disabled={isOrganizing}
                   >
@@ -388,8 +389,9 @@ export function MaterialCard({
               ) : material.organizationStatus !== "ORGANIZED" ? (
                 <>
                   <Button 
+                    variant="primary"
                     size="sm" 
-                    className="flex-grow rounded-xl h-9 bg-accent text-white hover:bg-accent/90 gap-2 shadow-sm animate-pulse-subtle"
+                    className="flex-grow rounded-xl gap-2 font-bold animate-pulse-subtle"
                     onClick={handleOrganizeClick}
                     disabled={isOrganizing}
                   >
@@ -412,7 +414,7 @@ export function MaterialCard({
                 </>
               ) : (
                 <>
-                  <Button size="sm" variant="outline" className="flex-grow rounded-xl h-9 border-accent/20 text-accent hover:bg-accent/5 font-bold text-xs" asChild>
+                  <Button size="sm" variant="soft" className="flex-grow rounded-xl font-bold" asChild>
                     <Link href={`/materials/${material.id}`}>Ver Blocos</Link>
                   </Button>
                   <Button 
@@ -458,9 +460,9 @@ export function MaterialCard({
                 Cancelar
               </Button>
               <Button 
+                variant="destructive"
                 onClick={handleDelete} 
                 disabled={isDeleting}
-                className="bg-red-500 text-white hover:bg-red-600"
               >
                 {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
                 Excluir
@@ -514,9 +516,9 @@ export function MaterialCard({
                 Cancelar
               </Button>
               <Button 
+                variant="primary"
                 onClick={handleUpdateSubject} 
                 disabled={isUpdatingSubject || (!selectedSubjectId) || (selectedSubjectId === "NEW" && !newSubjectName)}
-                className="bg-accent text-white"
               >
                 {isUpdatingSubject ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
                 Atualizar Matéria
@@ -627,11 +629,11 @@ export function MaterialCard({
                 </div>
               </div>
               <Button
-                variant="ghost"
+                variant="destructive"
                 size="sm"
                 onClick={() => executeOrganizationAction("unorganize")}
                 disabled={isOrganizing}
-                className="rounded-xl px-4 gap-2 bg-red-500/10 hover:bg-red-500 hover:text-white border border-red-500/20 text-red-500 shrink-0 h-9 font-semibold text-xs transition-all"
+                className="rounded-xl px-4 gap-2 font-semibold shrink-0"
               >
                 <RotateCw className="w-3.5 h-3.5" />
                 Desorganizar Conteúdo

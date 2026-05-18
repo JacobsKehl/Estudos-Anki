@@ -164,7 +164,7 @@ export default async function SchedulePage() {
                         </div>
                       ) : (
                         <Link href="/" className="flex-1">
-                          <Button size="sm" className="w-full rounded-xl gap-2 h-9">
+                          <Button variant="primary" size="sm" className="w-full rounded-xl gap-2 font-bold">
                             <Play className="w-3 h-3 fill-current" />
                             {ACTION_LABELS[item.actionType] || "Começar agora"}
                           </Button>

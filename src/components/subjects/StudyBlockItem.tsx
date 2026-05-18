@@ -179,7 +179,7 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
           </div>
           <DialogFooter className="gap-3 sm:gap-0 mt-6">
             <Button variant="ghost" onClick={() => setIsEditing(false)} className="rounded-xl">Cancelar</Button>
-            <Button onClick={handleUpdate} disabled={isUpdating} className="rounded-xl bg-accent text-white hover:bg-accent/90 px-8">
+            <Button variant="primary" onClick={handleUpdate} disabled={isUpdating} className="rounded-xl px-8">
               {isUpdating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Salvar Alterações
             </Button>
@@ -198,9 +198,11 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
           </DialogHeader>
           <DialogFooter className="flex flex-col gap-3 sm:gap-3 mt-8">
             <Button 
+              variant="destructive"
+              size="lg"
               onClick={handleDelete} 
               disabled={isDeleting}
-              className="w-full rounded-xl bg-red-500 text-white hover:bg-red-600 h-12"
+              className="w-full rounded-xl"
             >
               {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
               Excluir permanentemente

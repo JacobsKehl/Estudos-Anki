@@ -61,9 +61,10 @@ export function ReorganizeScheduleButton() {
   return (
     <>
       <Button
-        variant="outline"
+        variant="soft"
+        size="md"
         onClick={() => setIsOpen(true)}
-        className="rounded-xl font-bold gap-2 px-4 h-10 border-accent/20 text-accent hover:bg-accent/5 hover:text-accent transition-all active:scale-95 shrink-0"
+        className="rounded-xl font-bold gap-2 active:scale-95 shrink-0"
       >
         <RefreshCw className="w-4 h-4" />
         Reorganizar Cronograma
@@ -130,8 +131,9 @@ export function ReorganizeScheduleButton() {
                 </Button>
                 <Button
                   onClick={handleReorganize}
-                  variant="default"
-                  className="rounded-xl h-10 px-5 font-bold bg-accent hover:bg-accent/90 text-white shadow-sm border-none active:scale-95 transition-all"
+                  variant="primary"
+                  size="md"
+                  className="rounded-xl font-bold active:scale-95 transition-all"
                 >
                   Reorganizar cronograma
                 </Button>
