@@ -2,9 +2,25 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, CheckCircle2, FileText, BrainCircuit, AlertCircle, RefreshCw } from "lucide-react";
+import { 
+  Sparkles, 
+  Loader2, 
+  CheckCircle2, 
+  FileText, 
+  BrainCircuit, 
+  AlertCircle, 
+  RefreshCw, 
+  AlertTriangle 
+} from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
 
 interface OrganizeAllButtonProps {
   unorganizedCount: number;
@@ -27,10 +43,21 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
   const [step, setStep] = useState<PipelineStep>("idle");
   const [processed, setProcessed] = useState(0);
   const [totalFlashcards, setTotalFlashcards] = useState(0);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [totalToProcess, setTotalToProcess] = useState(0);
+  const [currentPdfIndex, setCurrentPdfIndex] = useState(0);
   const router = useRouter();
 
   const isLoading = step !== "idle" && step !== "done" && step !== "error";
   const isSuccess = step === "done";
+
+  const handleButtonClick = () => {
+    if (force) {
+      setShowConfirmModal(true);
+    } else {
+      handleOrganize();
+    }
+  };
 
   const handleOrganize = async () => {
     if (!force && unorganizedCount === 0) {
@@ -38,43 +65,120 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
       return;
     }
 
-    if (force && !confirm("Isso irá apagar os blocos e cards atuais para re-organizar tudo com IA. Deseja continuar?")) {
-      return;
-    }
-
     setStep("extracting");
     setProcessed(0);
     setTotalFlashcards(0);
+    setCurrentPdfIndex(0);
 
     let totalProcessed = 0;
     let totalCards = 0;
     let totalBlocks = 0;
     let totalErrors = 0;
-    // No modo force, processamos todos os materiais (um por um via API)
-    const totalToProcess = force ? 999 : unorganizedCount; 
+    let totalSubjectsCreated = 0;
 
-    for (let i = 0; i < totalToProcess; i++) {
+    let materialIds: string[] = [];
+    let localTotalToProcess = force ? 0 : unorganizedCount;
+
+    // 1. Etapa de Reset Inicial se for Reorganização Completa
+    if (force) {
+      const resetToastId = "reorganize-reset";
+      toast.loading("Limpando organização anterior...", { id: resetToastId });
+
+      try {
+        const res = await fetch("/api/materials/organize-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reset: true }),
+        });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          toast.error(`Erro ao limpar materiais: ${data.error || "Falha técnica"}`, { id: resetToastId });
+          setStep("error");
+          setTimeout(() => setStep("idle"), 3000);
+          return;
+        }
+
+        materialIds = data.materialIds || [];
+        localTotalToProcess = data.count || 0;
+        setTotalToProcess(localTotalToProcess);
+
+        if (localTotalToProcess === 0) {
+          toast.info("Nenhum material importado encontrado para reorganizar.", { id: resetToastId });
+          setStep("idle");
+          return;
+        }
+        toast.success("Limpeza concluída! Iniciando reorganização...", { id: resetToastId, duration: 2000 });
+      } catch (err) {
+        toast.error("Erro de rede ao limpar materiais.", { id: resetToastId });
+        setStep("error");
+        setTimeout(() => setStep("idle"), 3000);
+        return;
+      }
+    }
+
+    // 2. Loop de Processamento Seguro (Material por Material)
+    for (let i = 0; i < localTotalToProcess; i++) {
       const toastId = `organize-${i}`;
       const pdfNum = i + 1;
+      setCurrentPdfIndex(pdfNum);
 
       try {
         setStep("extracting");
-        toast.loading(force ? `Reorganizando PDF ${pdfNum}...` : `PDF ${pdfNum}/${totalToProcess}: Processando...`, { id: toastId });
+        toast.loading(
+          force 
+            ? `PDF ${pdfNum} de ${localTotalToProcess}: Extraindo texto...`
+            : `PDF ${pdfNum}/${localTotalToProcess}: Processando...`,
+          { id: toastId }
+        );
+
+        // Simula a transição sequencial de estados da pipeline de IA
+        let t1: any, t2: any, t3: any;
+        if (force) {
+          t1 = setTimeout(() => {
+            setStep("analyzing");
+            toast.loading(`PDF ${pdfNum} de ${localTotalToProcess}: Identificando matéria...`, { id: toastId });
+          }, 2000);
+
+          t2 = setTimeout(() => {
+            setStep("blocking");
+            toast.loading(`PDF ${pdfNum} de ${localTotalToProcess}: Criando blocos...`, { id: toastId });
+          }, 4500);
+
+          t3 = setTimeout(() => {
+            setStep("flashcards");
+            toast.loading(`PDF ${pdfNum} de ${localTotalToProcess}: Gerando flashcards...`, { id: toastId });
+          }, 7000);
+        }
 
         const res = await fetch("/api/materials/organize-all", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ force }),
+          body: JSON.stringify({ 
+            force,
+            ...(force && materialIds[i] ? { materialId: materialIds[i] } : {})
+          }),
         });
         const data = await res.json();
 
+        if (force) {
+          clearTimeout(t1);
+          clearTimeout(t2);
+          clearTimeout(t3);
+        }
+
         if (!res.ok) {
           totalErrors++;
-          toast.error(`PDF ${pdfNum}: ${data.error || "Falha técnica"}`, { id: toastId, duration: 4000 });
+          toast.error(
+            force 
+              ? `PDF ${pdfNum} de ${localTotalToProcess}: ${data.error || "Falha técnica"}`
+              : `PDF ${pdfNum}: ${data.error || "Falha técnica"}`,
+            { id: toastId, duration: 4000 }
+          );
           continue;
         }
 
-        if (data.count === 0) {
+        if (!force && data.count === 0) {
           toast.dismiss(toastId);
           break;
         }
@@ -84,29 +188,60 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
           totalProcessed += r.success;
           totalCards += r.totalFlashcards ?? 0;
           totalBlocks += r.totalBlocks ?? 0;
+          if (r.subjectsCreated > 0) {
+            totalSubjectsCreated += r.subjectsCreated;
+          }
           setProcessed(p => p + r.success);
           setTotalFlashcards(c => c + (r.totalFlashcards ?? 0));
           setStep("flashcards");
+          
           toast.success(
-            `PDF ${pdfNum}: ${r.totalBlocks} blocos · ${r.totalFlashcards} cards`,
+            force
+              ? `PDF ${pdfNum} de ${localTotalToProcess}: ${r.totalBlocks} blocos · ${r.totalFlashcards} cards`
+              : `PDF ${pdfNum}: ${r.totalBlocks} blocos · ${r.totalFlashcards} cards`,
             { id: toastId, duration: 3000 }
           );
         } else if (r?.errors > 0) {
           totalErrors += r.errors;
-          toast.warning(`PDF ${pdfNum}: ${data.message || "Não organizado"}`, { id: toastId, duration: 4000 });
+          toast.warning(
+            force
+              ? `PDF ${pdfNum} de ${localTotalToProcess}: ${data.message || "Não organizado"}`
+              : `PDF ${pdfNum}: ${data.message || "Não organizado"}`,
+            { id: toastId, duration: 4000 }
+          );
         }
 
       } catch (err: any) {
         totalErrors++;
-        toast.error(`PDF ${pdfNum}: Erro de rede`, { id: `err-${i}`, duration: 4000 });
+        toast.error(
+          force 
+            ? `PDF ${pdfNum} de ${localTotalToProcess}: Erro de rede`
+            : `PDF ${pdfNum}: Erro de rede`,
+          { id: `err-${i}`, duration: 4000 }
+        );
       }
     }
 
-    // Resumo Final Detalhado
+    // 3. Resumo Final Detalhado
     if (totalProcessed > 0) {
       setStep("done");
       
-      const summaryMessage = (
+      const summaryMessage = force ? (
+        <div className="space-y-1.5 py-1 text-card-foreground">
+          <p className="font-bold text-sm text-foreground">Reorganização concluída.</p>
+          <div className="text-xs space-y-1 opacity-90">
+            <p>• PDFs reprocessados: {totalProcessed}</p>
+            <p>• Matérias criadas/vinculadas: {totalSubjectsCreated || totalProcessed}</p>
+            <p>• Blocos criados: {totalBlocks}</p>
+            <p>• Cronograma recriado: Sim</p>
+            {totalErrors > 0 && (
+              <p className="text-[10px] text-amber-500 font-bold mt-1">
+                ⚠️ {totalErrors} erro(s) durante o processo.
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
         <div className="space-y-1 py-1">
           <p className="font-bold text-sm">Organização concluída!</p>
           <div className="text-xs space-y-0.5 opacity-90">
@@ -151,19 +286,25 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
     );
   }
 
-  const currentLabel = STEP_LABELS[step];
+  const getLoadingLabel = () => {
+    const label = STEP_LABELS[step];
+    if (force && totalToProcess > 0) {
+      return `PDF ${currentPdfIndex} de ${totalToProcess}: ${label}`;
+    }
+    return label;
+  };
 
   return (
     <div className="flex flex-col items-center gap-2">
       <Button
         className="rounded-2xl h-14 px-10 bg-accent text-white hover:bg-accent/90 shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98] font-bold text-lg"
         disabled={isLoading || isSuccess}
-        onClick={handleOrganize}
+        onClick={handleButtonClick}
       >
         {isLoading ? (
           <>
             <Loader2 className="w-5 h-5 mr-3 animate-spin" />
-            {currentLabel}
+            {getLoadingLabel()}
           </>
         ) : isSuccess ? (
           <>
@@ -190,6 +331,49 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
           )}
         </div>
       )}
+
+      {/* Modal de Confirmação Forte para Reorganização */}
+      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <DialogContent className="max-w-md bg-card border border-border/80 shadow-2xl rounded-[2rem] p-6">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-xl font-extrabold flex items-center gap-2.5 text-amber-600">
+              <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
+              Atenção: reorganização completa
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Esta ação apagará toda a organização atual dos seus estudos, incluindo blocos, cronograma, flashcards, histórico de revisões e progresso registrado.
+            </p>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm font-semibold text-foreground">
+              Seus PDFs importados serão mantidos, mas todo o planejamento será reconstruído do zero.
+            </p>
+            <p className="text-sm mt-3 font-bold text-foreground">
+              Deseja continuar?
+            </p>
+          </div>
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              className="rounded-xl font-bold h-11 flex-grow sm:flex-grow-0"
+              onClick={() => setShowConfirmModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="rounded-xl font-bold h-11 bg-red-600 hover:bg-red-700 text-white flex-grow"
+              onClick={() => {
+                setShowConfirmModal(false);
+                handleOrganize();
+              }}
+            >
+              Reorganizar tudo do zero
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

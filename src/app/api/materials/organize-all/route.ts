@@ -329,6 +329,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const force = body.force === true;
+    const reset = body.reset === true;
+    const materialId = body.materialId as string | undefined;
 
     // 1. Usuário real
     let user = await prisma.user.findFirst();
@@ -338,17 +340,86 @@ export async function POST(req: NextRequest) {
       });
     }
     const userId = user.id;
-    console.log(`[ORGANIZE ALL] Iniciando para: ${userId} (force=${force})`);
 
-    // 2. Materiais a organizar
+    // Handle full reorganization reset
+    if (reset) {
+      console.log(`[REORGANIZE RESET] Iniciando reset completo para o usuário: ${userId}`);
+
+      // Delete all derived data in safe dependency order
+      await prisma.flashcardReview.deleteMany({
+        where: { flashcard: { userId } }
+      });
+      await prisma.flashcard.deleteMany({
+        where: { userId }
+      });
+      await prisma.studyScheduleItem.deleteMany({
+        where: { userId }
+      });
+      await prisma.studySchedule.deleteMany({
+        where: { userId }
+      });
+      await prisma.studyBlock.deleteMany({
+        where: { userId }
+      });
+      await prisma.studyPlanDay.deleteMany({
+        where: { studyPlan: { userId } }
+      });
+      await prisma.studyPlan.deleteMany({
+        where: { userId }
+      });
+      await prisma.extractedContent.deleteMany({
+        where: { userId }
+      });
+
+      // Reset progress of all study subjects to 0
+      await prisma.studySubject.updateMany({
+        where: { userId },
+        data: { progress: 0 }
+      });
+
+      // Reset all study materials back to IMPORTED state
+      await prisma.studyMaterial.updateMany({
+        where: { userId },
+        data: {
+          organizationStatus: "IMPORTED",
+          processingError: null,
+          detectedSubjectName: null,
+          detectedStructure: null,
+          subjectId: null
+        }
+      });
+
+      // Fetch all CLOUD_UPLOAD study material IDs to return to client
+      const materials = await prisma.studyMaterial.findMany({
+        where: {
+          userId,
+          sourceType: { in: ["CLOUD_UPLOAD"] }
+        },
+        select: { id: true }
+      });
+
+      const materialIds = materials.map(m => m.id);
+      console.log(`[REORGANIZE RESET] Reset concluído com sucesso. ${materialIds.length} materiais prontos para reprocessar.`);
+
+      return NextResponse.json({
+        message: "Reset completo realizado. Materiais prontos para reorganização.",
+        count: materialIds.length,
+        materialIds,
+        success: true
+      });
+    }
+
+    console.log(`[ORGANIZE ALL] Iniciando processamento para: ${userId} (force=${force}, materialId=${materialId || "todos"})`);
+
+    // 2. Materiais a organizar (exclui "ORGANIZED" da busca padrão de force para evitar loop infinito)
     const statusFilter = force 
-      ? ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS", "ORGANIZED", "ERROR"] as any[]
+      ? ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS", "ERROR"] as any[]
       : ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS"] as any[];
 
     const materialsToProcess = await prisma.studyMaterial.findMany({
       where: {
         userId,
-        organizationStatus: { in: statusFilter },
+        ...(materialId ? { id: materialId } : { organizationStatus: { in: statusFilter } }),
         sourceType: { in: ["CLOUD_UPLOAD"] } // Apenas Nuvem na Web
       },
       take: 1
