@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { detectQuestionsOrGabaritoHeuristic } from "@/lib/ai/organizer";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 5 min
 
 export async function GET(req: NextRequest) {
   return repairMaterials(req);

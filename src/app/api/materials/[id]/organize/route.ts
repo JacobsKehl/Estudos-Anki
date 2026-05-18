@@ -5,6 +5,7 @@ import { identifySubject, detectStructure } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 5 min
 
 interface PageContent {
   pageNumber: number;

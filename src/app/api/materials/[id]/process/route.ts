@@ -5,6 +5,9 @@ import { getMockUserId } from "@/lib/auth-mock";
 import { PDFDocument } from "pdf-lib";
 import { extractTextWithGeminiOCR } from "@/lib/ai/ocr/gemini-ocr";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 5 min
+
 // pdf2json para extração nativa robusta
 const PDFParser = require("pdf2json");
 
