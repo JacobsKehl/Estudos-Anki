@@ -479,6 +479,24 @@ export async function POST(req: NextRequest) {
     }
     const userId = user.id;
 
+    // Retorna IDs de todos os materiais pendentes para polling real no frontend
+    if (body.getPendingIds === true) {
+      const pendingMaterials = await prisma.studyMaterial.findMany({
+        where: {
+          userId,
+          organizationStatus: { in: ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS", "ERROR"] },
+          sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] }
+        },
+        select: { id: true },
+        orderBy: { createdAt: 'desc' }
+      });
+      return NextResponse.json({
+        materialIds: pendingMaterials.map(m => m.id),
+        count: pendingMaterials.length,
+        success: true
+      });
+    }
+
     // Handle full reorganization reset
     if (reset) {
       console.log(`[REORGANIZE RESET] Iniciando reset completo para o usuário: ${userId}`);

@@ -79,7 +79,7 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
     let materialIds: string[] = [];
     let localTotalToProcess = force ? 0 : unorganizedCount;
 
-    // 1. Etapa de Reset Inicial se for Reorganização Completa
+    // 1. Etapa de Reset Inicial ou Busca de IDs Pendentes
     if (force) {
       const resetToastId = "reorganize-reset";
       toast.loading("Limpando organização anterior...", { id: resetToastId });
@@ -115,40 +115,76 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
         setTimeout(() => setStep("idle"), 3000);
         return;
       }
+    } else {
+      // Obter os IDs pendentes para permitir o polling correto de progresso
+      try {
+        const res = await fetch("/api/materials/organize-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ getPendingIds: true }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          materialIds = data.materialIds || [];
+          localTotalToProcess = data.count || 0;
+          setTotalToProcess(localTotalToProcess);
+        }
+      } catch (err) {
+        console.error("Erro ao obter IDs pendentes:", err);
+      }
     }
 
     // 2. Loop de Processamento Seguro (Material por Material)
     for (let i = 0; i < localTotalToProcess; i++) {
       const toastId = `organize-${i}`;
       const pdfNum = i + 1;
+      const currentMaterialId = materialIds[i];
       setCurrentPdfIndex(pdfNum);
+
+      let pollInterval: any = null;
 
       try {
         setStep("extracting");
         toast.loading(
-          force 
-            ? `PDF ${pdfNum} de ${localTotalToProcess}: Extraindo texto...`
-            : `PDF ${pdfNum}/${localTotalToProcess}: Processando...`,
+          `PDF ${pdfNum} de ${localTotalToProcess}: Extraindo texto...`,
           { id: toastId }
         );
 
-        // Simula a transição sequencial de estados da pipeline de IA
-        let t1: any, t2: any, t3: any;
-        if (force) {
-          t1 = setTimeout(() => {
-            setStep("analyzing");
-            toast.loading(`PDF ${pdfNum} de ${localTotalToProcess}: Identificando matéria...`, { id: toastId });
-          }, 2000);
-
-          t2 = setTimeout(() => {
-            setStep("blocking");
-            toast.loading(`PDF ${pdfNum} de ${localTotalToProcess}: Criando blocos...`, { id: toastId });
-          }, 4500);
-
-          t3 = setTimeout(() => {
-            setStep("flashcards");
-            toast.loading(`PDF ${pdfNum} de ${localTotalToProcess}: Gerando flashcards...`, { id: toastId });
-          }, 7000);
+        // Polling de status real a cada 1.5 segundos
+        if (currentMaterialId) {
+          let lastStatus = "IMPORTED";
+          pollInterval = setInterval(async () => {
+            try {
+              const pollRes = await fetch(`/api/materials/${currentMaterialId}`);
+              if (pollRes.ok) {
+                const pollData = await pollRes.json();
+                const status = pollData.organizationStatus;
+                
+                if (status && status !== lastStatus) {
+                  lastStatus = status;
+                  
+                  let label = `PDF ${pdfNum} de ${localTotalToProcess}: Extraindo texto...`;
+                  if (status === "ANALYZING") {
+                    setStep("analyzing");
+                    label = `PDF ${pdfNum} de ${localTotalToProcess}: Identificando matéria...`;
+                  } else if (status === "ORGANIZING") {
+                    setStep("blocking");
+                    label = `PDF ${pdfNum} de ${localTotalToProcess}: Criando blocos de estudo...`;
+                  } else if (status === "GENERATING_FLASHCARDS") {
+                    setStep("flashcards");
+                    label = `PDF ${pdfNum} de ${localTotalToProcess}: Gerando flashcards com IA...`;
+                  } else if (status === "ORGANIZED") {
+                    setStep("done");
+                    label = `PDF ${pdfNum} de ${localTotalToProcess}: Concluído!`;
+                  }
+                  
+                  toast.loading(label, { id: toastId });
+                }
+              }
+            } catch (pollErr) {
+              console.error("Erro no polling de status:", pollErr);
+            }
+          }, 1500);
         }
 
         const res = await fetch("/api/materials/organize-all", {
@@ -156,14 +192,12 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             force,
-            ...(force && materialIds[i] ? { materialId: materialIds[i] } : {})
+            ...(currentMaterialId ? { materialId: currentMaterialId } : {})
           }),
         });
 
-        if (force) {
-          clearTimeout(t1);
-          clearTimeout(t2);
-          clearTimeout(t3);
+        if (pollInterval) {
+          clearInterval(pollInterval);
         }
 
         const data = await res.json();
@@ -171,9 +205,7 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
         if (!res.ok) {
           totalErrors++;
           toast.error(
-            force 
-              ? `PDF ${pdfNum} de ${localTotalToProcess}: ${data.error || "Falha técnica"}`
-              : `PDF ${pdfNum}: ${data.error || "Falha técnica"}`,
+            `PDF ${pdfNum} de ${localTotalToProcess}: ${data.error || "Falha técnica"}`,
             { id: toastId, duration: 4000 }
           );
           continue;
@@ -194,35 +226,27 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
           }
           setProcessed(p => p + r.success);
           setTotalFlashcards(c => c + (r.totalFlashcards ?? 0));
-          setStep("flashcards");
+          setStep("done");
           
           toast.success(
-            force
-              ? `PDF ${pdfNum} de ${localTotalToProcess}: ${r.totalBlocks} blocos · ${r.totalFlashcards} cards`
-              : `PDF ${pdfNum}: ${r.totalBlocks} blocos · ${r.totalFlashcards} cards`,
+            `PDF ${pdfNum} de ${localTotalToProcess}: ${r.totalBlocks} blocos · ${r.totalFlashcards} cards`,
             { id: toastId, duration: 3000 }
           );
         } else if (r?.errors > 0) {
           totalErrors += r.errors;
           toast.warning(
-            force
-              ? `PDF ${pdfNum} de ${localTotalToProcess}: ${data.message || "Não organizado"}`
-              : `PDF ${pdfNum}: ${data.message || "Não organizado"}`,
+            `PDF ${pdfNum} de ${localTotalToProcess}: ${data.message || "Não organizado"}`,
             { id: toastId, duration: 4000 }
           );
         }
 
       } catch (err: any) {
-        if (force) {
-          clearTimeout(t1);
-          clearTimeout(t2);
-          clearTimeout(t3);
+        if (pollInterval) {
+          clearInterval(pollInterval);
         }
         totalErrors++;
         toast.error(
-          force 
-            ? `PDF ${pdfNum} de ${localTotalToProcess}: Erro no servidor`
-            : `PDF ${pdfNum}: Erro no servidor`,
+          `PDF ${pdfNum} de ${localTotalToProcess}: Erro no servidor`,
           { id: toastId, duration: 4000 }
         );
       }
