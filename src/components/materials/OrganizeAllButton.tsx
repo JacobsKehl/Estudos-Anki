@@ -159,13 +159,14 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
             ...(force && materialIds[i] ? { materialId: materialIds[i] } : {})
           }),
         });
-        const data = await res.json();
 
         if (force) {
           clearTimeout(t1);
           clearTimeout(t2);
           clearTimeout(t3);
         }
+
+        const data = await res.json();
 
         if (!res.ok) {
           totalErrors++;
@@ -212,12 +213,17 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
         }
 
       } catch (err: any) {
+        if (force) {
+          clearTimeout(t1);
+          clearTimeout(t2);
+          clearTimeout(t3);
+        }
         totalErrors++;
         toast.error(
           force 
-            ? `PDF ${pdfNum} de ${localTotalToProcess}: Erro de rede`
-            : `PDF ${pdfNum}: Erro de rede`,
-          { id: `err-${i}`, duration: 4000 }
+            ? `PDF ${pdfNum} de ${localTotalToProcess}: Erro no servidor`
+            : `PDF ${pdfNum}: Erro no servidor`,
+          { id: toastId, duration: 4000 }
         );
       }
     }
