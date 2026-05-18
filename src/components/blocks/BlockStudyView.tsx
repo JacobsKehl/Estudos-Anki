@@ -186,36 +186,105 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
 
           {activeTab === "apoios" ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-card p-8 rounded-[2.5rem] border border-border/40 shadow-sm">
-                <h3 className="text-xl font-bold mb-6">Materiais de Apoio</h3>
-                <div className="grid gap-4">
-                  {block.supportMaterials.map((support: any) => (
-                    <div key={support.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-accent" />
-                          <span className="font-semibold text-foreground">{support.material?.fileName || "Material"}</span>
-                        </div>
-                        {support.pageStart && (
-                          <p className="text-xs text-muted-foreground ml-6">
-                            Páginas {support.pageStart} a {support.pageEnd || support.pageStart}
-                          </p>
-                        )}
-                        {support.supportType && (
-                          <Badge variant="outline" className="ml-6 mt-2 text-[10px] uppercase">
-                            {support.supportType}
-                          </Badge>
-                        )}
+              {(() => {
+                const supports = block.supportMaterials || [];
+                
+                const summaries = supports.filter((s: any) => 
+                  ["SUMMARY", "BIZU", "MIND_MAP", "CHECKLIST", "REVIEW", "OTHER"].includes(s.supportType) || !s.supportType
+                );
+                
+                const questions = supports.filter((s: any) => 
+                  ["QUESTIONS", "COMMENTED_QUESTIONS", "SIMULATED_EXAM"].includes(s.supportType)
+                );
+                
+                const answerKeys = supports.filter((s: any) => 
+                  s.supportType === "ANSWER_KEY"
+                );
+
+                const SUPPORT_TYPE_LABELS: Record<string, string> = {
+                  SUMMARY: "Resumo Teórico",
+                  BIZU: "Bizu / Dica Rápida",
+                  MIND_MAP: "Mapa Mental",
+                  CHECKLIST: "Checklist",
+                  REVIEW: "Revisão Rápida",
+                  QUESTIONS: "Questões Práticas",
+                  COMMENTED_QUESTIONS: "Questões Comentadas",
+                  SIMULATED_EXAM: "Simulado de Prova",
+                  ANSWER_KEY: "Gabarito de Conferência",
+                  OTHER: "Material de Apoio",
+                };
+
+                const renderSupportCard = (support: any) => (
+                  <div key={support.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border border-border/40 bg-card hover:bg-muted/10 hover:border-accent/20 transition-all">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-accent" />
+                        <span className="font-semibold text-foreground">{support.material?.fileName || "Material"}</span>
                       </div>
-                      <Button variant="outline" size="sm" className="rounded-xl shrink-0" asChild>
-                        <Link href={`/materials/${support.materialId}`}>
-                          Abrir Material
-                        </Link>
-                      </Button>
+                      <div className="flex items-center gap-3 ml-6 mt-1 flex-wrap">
+                        {support.pageStart && (
+                          <span className="text-xs text-muted-foreground">
+                            Páginas {support.pageStart} a {support.pageEnd || support.pageStart}
+                          </span>
+                        )}
+                        {support.pageStart && <span className="text-muted-foreground/30">•</span>}
+                        <Badge variant="secondary" className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md font-bold bg-muted/60 text-muted-foreground border-none">
+                          {SUPPORT_TYPE_LABELS[support.supportType] || support.supportType || "Outros"}
+                        </Badge>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <Button variant="outline" size="sm" className="rounded-xl shrink-0 gap-1.5 hover:bg-accent/5 hover:text-accent hover:border-accent/20 transition-all font-bold" asChild>
+                      <Link href={`/materials/${support.materialId}`}>
+                        Abrir Material
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Link>
+                    </Button>
+                  </div>
+                );
+
+                return (
+                  <div className="space-y-6">
+                    {/* Seção de Resumos */}
+                    {summaries.length > 0 && (
+                      <div className="bg-card p-6 rounded-[2rem] border border-border/40 shadow-sm space-y-4">
+                        <h3 className="text-lg font-bold text-accent flex items-center gap-2">
+                          <Layers className="w-5 h-5" />
+                          Teoria Complementar e Resumos
+                        </h3>
+                        <div className="grid gap-3">
+                          {summaries.map(renderSupportCard)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Seção de Exercícios */}
+                    {questions.length > 0 && (
+                      <div className="bg-card p-6 rounded-[2rem] border border-border/40 shadow-sm space-y-4">
+                        <h3 className="text-lg font-bold text-blue-600 flex items-center gap-2">
+                          <BrainCircuit className="w-5 h-5" />
+                          Prática e Questões
+                        </h3>
+                        <div className="grid gap-3">
+                          {questions.map(renderSupportCard)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Seção de Gabaritos */}
+                    {answerKeys.length > 0 && (
+                      <div className="bg-card p-6 rounded-[2rem] border border-border/40 shadow-sm space-y-4">
+                        <h3 className="text-lg font-bold text-amber-600 flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5" />
+                          Gabaritos e Resoluções
+                        </h3>
+                        <div className="grid gap-3">
+                          {answerKeys.map(renderSupportCard)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : activeTab === "pdf" ? (
             <PdfBlockViewer 

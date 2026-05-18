@@ -400,7 +400,9 @@ export async function POST(
       .map(p => p.text)
       .join("\n");
 
-    const detectedBlocks = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
+    const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
+    const materialRole = structResult.materialRole || "UNKNOWN";
+    const detectedBlocks = structResult.blocks || [];
 
     if (!detectedBlocks || detectedBlocks.length === 0) {
       await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "IA não detectou estrutura" } });
@@ -411,89 +413,224 @@ export async function POST(
 
     let flashcardCount = 0;
     const shouldGenerateFlashcards = false;
+    let createdBlocksCount = 0;
 
-    // 5. Criar novos blocos e gerar flashcards (se for general)
-    for (let i = 0; i < detectedBlocks.length; i++) {
-      const blockDef = detectedBlocks[i];
-      const pageStart = blockDef.pageStart || 1;
-      const pageEnd = blockDef.pageEnd || pageStart || 1;
+    if (materialRole === "SUPPORT_MATERIAL") {
+      // Para material de apoio puro, não criamos StudyBlock principais.
+      // Identificamos os tópicos suportados e criamos StudyBlockSupport se o bloco teórico correspondente já existir.
+      for (const blockDef of detectedBlocks) {
+        if (!blockDef.officialTopicId) continue;
 
-      const studyBlock = await prisma.studyBlock.create({
-        data: {
-          userId,
-          subjectId: subjectId as string,
-          materialId: material.id,
-          title: blockDef.title || `Parte ${i + 1}`,
-          description: blockDef.description || "",
-          pageStart,
-          pageEnd,
-          orderIndex: i,
-          estimatedStudyMinutes: blockDef.estimatedStudyMinutes || 60,
-          createdBy: blockDef.createdBy || "AI",
-          confidence: blockDef.confidence ?? 1.0,
-          sourceHeading: blockDef.sourceHeading,
-          officialTopicId: blockDef.officialTopicId,
-          officialTopicName: blockDef.officialTopicName,
-          topicCode: blockDef.topicCode,
-          status: "NOT_STARTED",
-          theoryStatus: "NOT_STARTED",
-          questionsStatus: "NOT_STARTED",
-          flashcardsStatus: "NOT_STARTED",
-          nextActionType: "THEORY"
+        const existingBlock = await prisma.studyBlock.findFirst({
+          where: { userId, subjectId: subjectId as string, officialTopicId: blockDef.officialTopicId }
+        });
+
+        if (existingBlock) {
+          console.log(`Vinculando apoio ao bloco principal encontrado: ${existingBlock.title}`);
+          await prisma.studyBlockSupport.create({
+            data: {
+              studyBlockId: existingBlock.id,
+              materialId: material.id,
+              pageStart: blockDef.pageStart,
+              pageEnd: blockDef.pageEnd,
+              supportType: blockDef.supportType || "QUESTIONS",
+              confidence: blockDef.confidence || 0.8
+            }
+          });
+        } else {
+          // Bloco ainda não existe, marca o material para vincular no futuro
+          console.log(`Bloco principal não encontrado para o tópico ${blockDef.officialTopicId}. Deixando pendente.`);
+          await prisma.studyMaterial.update({
+            where: { id: material.id },
+            data: { supportForTopicId: blockDef.officialTopicId }
+          });
+          // Se houver múltiplos tópicos em um só material de apoio, salvamos a pendência do primeiro.
+          break; 
         }
-      });
+      }
+    } else {
+      // MAIN_MATERIAL ou MIXED_MATERIAL
+      const mainBlocksCreated: Record<string, string> = {}; // Mapeia officialTopicId -> studyBlock.id criado nesta leva
 
-      if (shouldGenerateFlashcards) {
-        const blockPages = nonEmptyPages.filter(p => p.pageNumber >= pageStart && p.pageNumber <= pageEnd);
-        const blockText = blockPages.map(p => p.text).join("\n");
+      // Primeiro passo: criar todos os blocos principais teóricos (MAIN_BLOCK)
+      for (let i = 0; i < detectedBlocks.length; i++) {
+        const blockDef = detectedBlocks[i];
+        if (blockDef.type === "SUPPORT_BLOCK") continue; // Processados no segundo passo
 
-        if (blockText.trim().length >= 50) {
-          try {
-            const cards = await generateFlashcards(blockText.substring(0, 6000));
-            if (cards && cards.length > 0) {
-              const limitedCards = cards.slice(0, 20); // strictly respect the new 20 limit!
+        const pageStart = blockDef.pageStart || 1;
+        const pageEnd = blockDef.pageEnd || pageStart || 1;
 
-              const flashcardsData = limitedCards.map(card => ({
-                userId,
-                subjectId: subjectId as string,
-                materialId: material.id,
+        const studyBlock = await prisma.studyBlock.create({
+          data: {
+            userId,
+            subjectId: subjectId as string,
+            materialId: material.id,
+            title: blockDef.title || `Parte ${i + 1}`,
+            description: blockDef.description || "",
+            pageStart,
+            pageEnd,
+            orderIndex: i,
+            estimatedStudyMinutes: blockDef.estimatedStudyMinutes || 60,
+            createdBy: blockDef.createdBy || "AI",
+            confidence: blockDef.confidence ?? 1.0,
+            sourceHeading: blockDef.sourceHeading,
+            officialTopicId: blockDef.officialTopicId,
+            officialTopicName: blockDef.officialTopicName,
+            topicCode: blockDef.topicCode,
+            status: "NOT_STARTED",
+            theoryStatus: "NOT_STARTED",
+            questionsStatus: "NOT_STARTED",
+            flashcardsStatus: "NOT_STARTED",
+            nextActionType: "THEORY"
+          }
+        });
+
+        createdBlocksCount++;
+        if (blockDef.officialTopicId) {
+          mainBlocksCreated[blockDef.officialTopicId] = studyBlock.id;
+        }
+
+        // Vínculo retroativo: busca StudyMaterials (SUPPORT) pendentes para este tópico
+        if (blockDef.officialTopicId) {
+          const pendingSupports = await prisma.studyMaterial.findMany({
+            where: {
+              userId,
+              subjectId: subjectId as string,
+              materialRole: "SUPPORT_MATERIAL",
+              supportForTopicId: blockDef.officialTopicId
+            }
+          });
+
+          for (const ps of pendingSupports) {
+            console.log(`[Relink Support] Vinculando material de apoio pendente (${ps.fileName}) ao novo bloco ${studyBlock.title}`);
+            await prisma.studyBlockSupport.create({
+              data: {
                 studyBlockId: studyBlock.id,
-                question: card.question,
-                answer: card.answer,
-                type: card.type,
-                difficulty: card.difficulty,
-                status: "APPROVED",
-                reviewState: "NEW",       
-                nextReviewAt: new Date(),      
-                approvedAt: new Date(),        
-                learningStep: 0,
-                easeFactor: 2.5,
-                intervalDays: 0,
-                repetitionCount: 0,
-                lapseCount: 0,
-                sourcePageStart: pageStart,
-                sourcePageEnd: pageEnd,
-              }));
+                materialId: ps.id,
+                supportType: "QUESTIONS", // Default para questões pendentes
+                confidence: 1.0
+              }
+            });
+            // Limpar a pendência para evitar links futuros desnecessários
+            await prisma.studyMaterial.update({
+              where: { id: ps.id },
+              data: { supportForTopicId: null }
+            });
+          }
+        }
 
-              const createResult = await prisma.flashcard.createMany({
-                data: flashcardsData
-              });
+        if (shouldGenerateFlashcards) {
+          const blockPages = nonEmptyPages.filter(p => p.pageNumber >= pageStart && p.pageNumber <= pageEnd);
+          const blockText = blockPages.map(p => p.text).join("\n");
 
-              flashcardCount += createResult.count;
+          if (blockText.trim().length >= 50) {
+            try {
+              const cards = await generateFlashcards(blockText.substring(0, 6000));
+              if (cards && cards.length > 0) {
+                const limitedCards = cards.slice(0, 20); // strictly respect the new 20 limit!
 
-              await prisma.studyBlock.update({
-                where: { id: studyBlock.id },
-                data: { 
-                  flashcardsStatus: "GENERATED",
-                  flashcardsGeneratedAt: new Date()
-                }
-              });
+                const flashcardsData = limitedCards.map(card => ({
+                  userId,
+                  subjectId: subjectId as string,
+                  materialId: material.id,
+                  studyBlockId: studyBlock.id,
+                  question: card.question,
+                  answer: card.answer,
+                  type: card.type,
+                  difficulty: card.difficulty,
+                  status: "APPROVED",
+                  reviewState: "NEW",       
+                  nextReviewAt: new Date(),      
+                  approvedAt: new Date(),        
+                  learningStep: 0,
+                  easeFactor: 2.5,
+                  intervalDays: 0,
+                  repetitionCount: 0,
+                  lapseCount: 0,
+                  sourcePageStart: pageStart,
+                  sourcePageEnd: pageEnd,
+                }));
+
+                const createResult = await prisma.flashcard.createMany({
+                  data: flashcardsData
+                });
+
+                flashcardCount += createResult.count;
+
+                await prisma.studyBlock.update({
+                  where: { id: studyBlock.id },
+                  data: { 
+                    flashcardsStatus: "GENERATED",
+                    flashcardsGeneratedAt: new Date()
+                  }
+                });
+              }
+            } catch (flashErr: any) {
+              console.error(`[Flashcards Reorganize] Erro para bloco ${studyBlock.title}:`, flashErr.message);
+              if (flashErr.message.includes("key was reported as leaked") || flashErr.message.includes("API key not valid")) {
+                throw new Error("Sua chave de API do Gemini foi desativada pelo Google por motivo de vazamento em repositório público. Acesse o Google AI Studio, gere uma nova chave de API gratuita e atualize seu arquivo .env local!");
+              }
             }
-          } catch (flashErr: any) {
-            console.error(`[Flashcards Reorganize] Erro para bloco ${studyBlock.title}:`, flashErr.message);
-            if (flashErr.message.includes("key was reported as leaked") || flashErr.message.includes("API key not valid")) {
-              throw new Error("Sua chave de API do Gemini foi desativada pelo Google por motivo de vazamento em repositório público. Acesse o Google AI Studio, gere uma nova chave de API gratuita e atualize seu arquivo .env local!");
+          }
+        }
+      }
+
+      // Segundo passo: criar blocos de apoio (SUPPORT_BLOCK) contidos no próprio PDF e vinculá-los aos blocos teóricos correspondentes
+      for (let i = 0; i < detectedBlocks.length; i++) {
+        const blockDef = detectedBlocks[i];
+        if (blockDef.type !== "SUPPORT_BLOCK") continue;
+
+        const pageStart = blockDef.pageStart || 1;
+        const pageEnd = blockDef.pageEnd || pageStart;
+
+        // Tenta achar bloco teórico criado na mesma leva
+        let targetBlockId: string | null = null;
+        if (blockDef.officialTopicId && mainBlocksCreated[blockDef.officialTopicId]) {
+          targetBlockId = mainBlocksCreated[blockDef.officialTopicId];
+        } else {
+          // Tenta buscar no banco um bloco teórico já existente para o mesmo tópico
+          const existingMainBlock = await prisma.studyBlock.findFirst({
+            where: {
+              userId,
+              subjectId: subjectId as string,
+              officialTopicId: blockDef.officialTopicId || undefined
             }
+          });
+          if (existingMainBlock) {
+            targetBlockId = existingMainBlock.id;
+          }
+        }
+
+        if (targetBlockId) {
+          console.log(`[Mixed Support] Criando apoio p.${pageStart}-${pageEnd} do tipo ${blockDef.supportType || "OTHER"} no bloco ${targetBlockId}`);
+          await prisma.studyBlockSupport.create({
+            data: {
+              studyBlockId: targetBlockId,
+              materialId: material.id,
+              pageStart,
+              pageEnd,
+              supportType: blockDef.supportType || "OTHER",
+              confidence: blockDef.confidence || 0.8
+            }
+          });
+        } else {
+          console.log(`[Mixed Support] Bloco teórico principal não encontrado para o apoio do tópico ${blockDef.officialTopicId || "GERAL"}.`);
+          // Fallback: Vincula ao primeiro bloco teórico do assunto para não perder o apoio
+          const firstBlockOfSubject = await prisma.studyBlock.findFirst({
+            where: { userId, subjectId: subjectId as string }
+          });
+          if (firstBlockOfSubject) {
+            console.log(`[Mixed Support Fallback] Vinculando ao primeiro bloco do assunto: ${firstBlockOfSubject.title}`);
+            await prisma.studyBlockSupport.create({
+              data: {
+                studyBlockId: firstBlockOfSubject.id,
+                materialId: material.id,
+                pageStart,
+                pageEnd,
+                supportType: blockDef.supportType || "OTHER",
+                confidence: 0.5
+              }
+            });
           }
         }
       }
@@ -504,18 +641,18 @@ export async function POST(
       where: { id },
       data: {
         organizationStatus: "ORGANIZED",
-        detectedStructure: JSON.stringify(detectedBlocks),
+        detectedStructure: JSON.stringify(structResult),
         totalPages: numPages
       }
     });
 
     const successMessage = shouldGenerateFlashcards 
-      ? `${detectedBlocks.length} blocos de estudo criados e ${flashcardCount} flashcards importados com sucesso.`
-      : `${detectedBlocks.length} blocos de estudo criados com sucesso (sem flashcards).`;
+      ? `${createdBlocksCount} blocos de estudo criados e ${flashcardCount} flashcards importados com sucesso.`
+      : `${createdBlocksCount} blocos de estudo criados com sucesso (sem flashcards).`;
 
     return NextResponse.json({
       message: successMessage,
-      blocksCount: detectedBlocks.length,
+      blocksCount: createdBlocksCount,
       flashcardsCount: flashcardCount
     });
 

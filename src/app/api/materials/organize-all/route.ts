@@ -264,8 +264,8 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   log(`[Organize] Blocos processados/detectados: ${detectedBlocks.length}. Material Role: ${materialRole}`);
 
   if (materialRole === "SUPPORT_MATERIAL") {
-    // Para material de apoio, não criamos StudyBlock. 
-    // Identificamos os tópicos suportados e criamos StudyBlockSupport se o bloco já existir.
+    // Para material de apoio puro, não criamos StudyBlock principais.
+    // Identificamos os tópicos suportados e criamos StudyBlockSupport se o bloco teórico correspondente já existir.
     for (const blockDef of detectedBlocks) {
       if (!blockDef.officialTopicId) continue;
 
@@ -281,7 +281,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
             materialId: material.id,
             pageStart: blockDef.pageStart,
             pageEnd: blockDef.pageEnd,
-            supportType: blockDef.supportType || "MATERIAL_DE_APOIO",
+            supportType: blockDef.supportType || "QUESTIONS",
             confidence: blockDef.confidence || 0.8
           }
         });
@@ -292,16 +292,18 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
           where: { id: material.id },
           data: { supportForTopicId: blockDef.officialTopicId }
         });
-        // Se houver múltiplos tópicos em um só material de apoio, precisaremos lidar com array. 
-        // Por ora, salva o primeiro que encontrar.
+        // Se houver múltiplos tópicos em um só material de apoio, salvamos a pendência do primeiro.
         break; 
       }
     }
   } else {
     // MAIN_MATERIAL ou MIXED_MATERIAL
+    const mainBlocksCreated: Record<string, string> = {}; // Mapeia officialTopicId -> studyBlock.id criado nesta leva
+    
+    // Primeiro passo: criar todos os blocos principais teóricos (MAIN_BLOCK)
     for (let i = 0; i < detectedBlocks.length; i++) {
       const blockDef = detectedBlocks[i];
-      if (blockDef.type === "SUPPORT_BLOCK") continue; // Pula blocos de apoio dentro do material misto (por enquanto não vincula partes mistas retroativas no próprio material para evitar loops infinitos de IA)
+      if (blockDef.type === "SUPPORT_BLOCK") continue; // Processados no segundo passo
 
       const pageStart = blockDef.pageStart || 1;
       const pageEnd = blockDef.pageEnd || pageStart;
@@ -330,6 +332,9 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
       });
 
       result.blocks++;
+      if (blockDef.officialTopicId) {
+        mainBlocksCreated[blockDef.officialTopicId] = studyBlock.id;
+      }
 
       // Vínculo retroativo: busca StudyMaterials (SUPPORT) pendentes para este tópico
       if (blockDef.officialTopicId) {
@@ -348,7 +353,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
             data: {
               studyBlockId: studyBlock.id,
               materialId: ps.id,
-              supportType: "MATERIAL_DE_APOIO",
+              supportType: "QUESTIONS", // Default para questões pendentes
               confidence: 1.0
             }
           });
@@ -376,6 +381,66 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
         if (relinkResult.count > 0) {
           log(`[Relink] ${relinkResult.count} cards re-vinculados a este bloco.`);
           result.flashcards += relinkResult.count;
+        }
+      }
+    }
+
+    // Segundo passo: criar blocos de apoio (SUPPORT_BLOCK) contidos no próprio PDF e vinculá-los aos blocos teóricos correspondentes
+    for (let i = 0; i < detectedBlocks.length; i++) {
+      const blockDef = detectedBlocks[i];
+      if (blockDef.type !== "SUPPORT_BLOCK") continue;
+
+      const pageStart = blockDef.pageStart || 1;
+      const pageEnd = blockDef.pageEnd || pageStart;
+
+      // Tenta achar bloco teórico criado na mesma leva
+      let targetBlockId: string | null = null;
+      if (blockDef.officialTopicId && mainBlocksCreated[blockDef.officialTopicId]) {
+        targetBlockId = mainBlocksCreated[blockDef.officialTopicId];
+      } else {
+        // Tenta buscar no banco um bloco teórico já existente para o mesmo tópico
+        const existingMainBlock = await prisma.studyBlock.findFirst({
+          where: {
+            userId,
+            subjectId: subjectId as string,
+            officialTopicId: blockDef.officialTopicId || undefined
+          }
+        });
+        if (existingMainBlock) {
+          targetBlockId = existingMainBlock.id;
+        }
+      }
+
+      if (targetBlockId) {
+        log(`[Mixed Support] Criando apoio p.${pageStart}-${pageEnd} do tipo ${blockDef.supportType || "OTHER"} no bloco ${targetBlockId}`);
+        await prisma.studyBlockSupport.create({
+          data: {
+            studyBlockId: targetBlockId,
+            materialId: material.id,
+            pageStart,
+            pageEnd,
+            supportType: blockDef.supportType || "OTHER",
+            confidence: blockDef.confidence || 0.8
+          }
+        });
+      } else {
+        log(`[Mixed Support] Bloco teórico principal não encontrado para o apoio do tópico ${blockDef.officialTopicId || "GERAL"}.`);
+        // Fallback: Vincula ao primeiro bloco teórico do assunto para não perder o apoio
+        const firstBlockOfSubject = await prisma.studyBlock.findFirst({
+          where: { userId, subjectId: subjectId as string }
+        });
+        if (firstBlockOfSubject) {
+          log(`[Mixed Support Fallback] Vinculando ao primeiro bloco do assunto: ${firstBlockOfSubject.title}`);
+          await prisma.studyBlockSupport.create({
+            data: {
+              studyBlockId: firstBlockOfSubject.id,
+              materialId: material.id,
+              pageStart,
+              pageEnd,
+              supportType: blockDef.supportType || "OTHER",
+              confidence: 0.5
+            }
+          });
         }
       }
     }

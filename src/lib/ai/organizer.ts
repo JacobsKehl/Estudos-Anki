@@ -197,13 +197,25 @@ export async function detectStructure(
         errors.push(`Quantidade insuficiente de blocos (encontrado ${blocks.length}, esperado no mínimo ${minBlocks}).`);
       }
 
-      // 4. Validação de Páginas de Resumo/Bizus vs Explicação Principal
+      // 4. Validação de Páginas de Resumo/Bizus vs Explicação Principal & Detecção de Questões/Gabaritos
       if (pageTexts && pageTexts.length > 0) {
         for (const b of blocks) {
           const blockPages = pageTexts.filter(p => p.pageNumber >= b.pageStart && p.pageNumber <= b.pageEnd);
-          const fullBlockText = blockPages.map(p => p.text).join("\n").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const fullBlockText = blockPages.map(p => p.text).join("\n");
+          const normalizedBlockText = fullBlockText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-          if (fullBlockText.trim().length > 0) {
+          if (normalizedBlockText.trim().length > 0) {
+            // Executar heurística programática de Questões/Gabaritos
+            const qgResult = detectQuestionsOrGabaritoHeuristic(fullBlockText);
+            if (qgResult.isQuestions || qgResult.isAnswerKey) {
+              console.log(`[Heuristic Match] Bloco "${b.title}" (p.${b.pageStart}-${b.pageEnd}) detectado como Questões/Gabarito pelo backend. Convertendo para Apoio.`);
+              b.type = "SUPPORT_BLOCK";
+              b.supportType = qgResult.isQuestions ? "QUESTIONS" : "ANSWER_KEY";
+              b.estimatedStudyMinutes = 0;
+              b.description = b.description || `Banco de questões/gabarito de apoio para o assunto.`;
+              continue;
+            }
+
             // Contagem de palavras-chave negativas (resumos/bizus/questões)
             const negativeKeywords = [
               "resumo", "bizu", "mapa mental", "mapas mentais", "gabarito", "questoes", "questões",
@@ -213,7 +225,7 @@ export async function detectStructure(
             let negativeScore = 0;
             negativeKeywords.forEach(kw => {
               const regex = new RegExp(kw, "g");
-              const matches = fullBlockText.match(regex);
+              const matches = normalizedBlockText.match(regex);
               if (matches) negativeScore += matches.length;
             });
 
@@ -226,7 +238,7 @@ export async function detectStructure(
             let positiveScore = 0;
             positiveKeywords.forEach(kw => {
               const regex = new RegExp(kw, "g");
-              const matches = fullBlockText.match(regex);
+              const matches = normalizedBlockText.match(regex);
               if (matches) positiveScore += matches.length;
             });
 
@@ -241,6 +253,15 @@ export async function detectStructure(
               break;
             }
           }
+        }
+      }
+
+      // 5. Validação de Fatiamento Mecânico por número fixo de páginas
+      if (errors.length === 0) {
+        const hasMechanicalCutting = detectMechanicalCuttingHeuristic(blocks);
+        if (hasMechanicalCutting) {
+          console.warn("[AI Validation] Rejeitando divisão por fatiamento mecânico de páginas detectado pelo backend.");
+          errors.push("A divisão anterior parece ter sido feita por cortes fixos de páginas (ex: de 10 em 10 páginas), e não por unidade temática. Refaça a divisão respeitando a estrutura real do conteúdo (títulos, subtítulos), os tópicos oficiais, a continuidade do assunto e o desenvolvimento teórico principal. Não divida o PDF de forma regular/mecânica.");
         }
       }
 
@@ -409,4 +430,96 @@ function calculateEstimatedMinutes(blocks: DetectedBlock[]): DetectedBlock[] {
       estimatedStudyMinutes: calcMinutes
     };
   });
+}
+
+export function detectQuestionsOrGabaritoHeuristic(text: string): { isQuestions: boolean; isAnswerKey: boolean; confidence: number } {
+  const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  // Contagem de alternativas (ex: A), B), C), D), E))
+  const alternativeRegex = /\b[a-e]\s*[\).\-]\s*/gi;
+  const altMatches = textLower.match(alternativeRegex) || [];
+  
+  // Contagem de questões numeradas (ex: 1., 2), 3 -)
+  const questionNumRegex = /\b\d+\s*[\).\-]\s+/gi;
+  const numMatches = textLower.match(questionNumRegex) || [];
+
+  // Contagem de palavras-chave de questões
+  const questionKeywords = ["questao", "questoes", "exercicio", "exercicios", "simulado", "prova", "assinale", "julgue", "certo ou errado", "alternativa"];
+  let questionKeywordCount = 0;
+  questionKeywords.forEach(kw => {
+    const regex = new RegExp(kw, "g");
+    const m = textLower.match(regex);
+    if (m) questionKeywordCount += m.length;
+  });
+
+  // Contagem de palavras-chave de gabaritos
+  const answerKeyKeywords = ["gabarito", "gabaritos", "resposta correta", "letra a", "letra b", "letra c", "letra d", "letra e", "alternativa correta"];
+  let answerKeyKeywordCount = 0;
+  answerKeyKeywords.forEach(kw => {
+    const regex = new RegExp(kw, "g");
+    const m = textLower.match(regex);
+    if (m) answerKeyKeywordCount += m.length;
+  });
+
+  // Heurística de decisão baseada em densidade relativa
+  const hasManyAlternatives = altMatches.length >= 5;
+  const hasManyQuestionNumbers = numMatches.length >= 3;
+  const hasManyQuestionKeywords = questionKeywordCount >= 4;
+  const hasManyAnswerKeyKeywords = answerKeyKeywordCount >= 3;
+
+  const isAnswerKey = hasManyAnswerKeyKeywords && (answerKeyKeywordCount > questionKeywordCount || altMatches.length < 3);
+  const isQuestions = (hasManyAlternatives || hasManyQuestionNumbers || hasManyQuestionKeywords) && !isAnswerKey;
+
+  const confidence = Math.min(
+    1.0,
+    ((altMatches.length * 0.1) + (numMatches.length * 0.15) + (questionKeywordCount * 0.1) + (answerKeyKeywordCount * 0.1)) / 2
+  );
+
+  return {
+    isQuestions,
+    isAnswerKey,
+    confidence: confidence > 0.3 ? confidence : 0.0
+  };
+}
+
+export function detectMechanicalCuttingHeuristic(blocks: DetectedBlock[]): boolean {
+  const mainBlocks = blocks.filter(b => !b.type || b.type === "MAIN_BLOCK");
+  if (mainBlocks.length < 3) return false;
+
+  const sizes = mainBlocks.map(b => (b.pageEnd - b.pageStart) + 1);
+  
+  // Contar frequências dos tamanhos
+  const frequencies: Record<number, number> = {};
+  sizes.forEach(s => {
+    frequencies[s] = (frequencies[s] || 0) + 1;
+  });
+
+  // Encontrar a maior frequência
+  let maxFreq = 0;
+  let mostCommonSize = 0;
+  for (const [sizeStr, freq] of Object.entries(frequencies)) {
+    if (freq > maxFreq) {
+      maxFreq = freq;
+      mostCommonSize = Number(sizeStr);
+    }
+  }
+
+  // Se mais de 75% dos blocos têm exatamente o mesmo tamanho (ex: 10 em 10 páginas)
+  const ratio = maxFreq / mainBlocks.length;
+  if (ratio >= 0.75 && mostCommonSize >= 5) {
+    // Também checar se o primeiro bloco começa exatamente no 1 ou 2, e os outros são contíguos perfeitos (ex: 1-10, 11-20, 21-30)
+    let isSuspiciouslySequential = true;
+    for (let i = 0; i < mainBlocks.length - 1; i++) {
+      if (mainBlocks[i + 1].pageStart !== mainBlocks[i].pageEnd + 1) {
+        isSuspiciouslySequential = false;
+        break;
+      }
+    }
+    if (isSuspiciouslySequential) {
+      console.warn(`[AI Validation] Fatiamento mecânico detectado! Tamanho mais comum: ${mostCommonSize} páginas (${maxFreq}/${mainBlocks.length} blocos).`);
+      return true;
+    }
+  }
+
+  return false;
 }

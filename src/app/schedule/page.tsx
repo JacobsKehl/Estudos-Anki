@@ -144,16 +144,59 @@ export default async function SchedulePage() {
                     </div>
 
                     <div className="flex flex-col gap-2 pt-1 border-t border-border/40">
-                      {item.studyBlock?.supportMaterials && item.studyBlock.supportMaterials.length > 0 && (
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
-                          <span className="font-bold uppercase tracking-widest">
-                            Apoios: {item.studyBlock.supportMaterials.length} materiais
-                          </span>
-                          <Link href={`/blocks/${item.studyBlock.id}`} className="text-accent hover:underline font-bold">
-                            [Ver apoios]
-                          </Link>
-                        </div>
-                      )}
+                      {(() => {
+                        const supports = item.studyBlock?.supportMaterials || [];
+                        if (supports.length === 0) return null;
+
+                        const questionsCount = supports.filter((s: any) => 
+                          ["QUESTIONS", "COMMENTED_QUESTIONS", "SIMULATED_EXAM"].includes(s.supportType)
+                        ).length;
+
+                        const summaryCount = supports.filter((s: any) => 
+                          ["SUMMARY", "BIZU", "MIND_MAP", "CHECKLIST", "REVIEW"].includes(s.supportType)
+                        ).length;
+
+                        const answerKeyCount = supports.filter((s: any) => 
+                          s.supportType === "ANSWER_KEY"
+                        ).length;
+
+                        const otherCount = supports.length - (questionsCount + summaryCount + answerKeyCount);
+
+                        return (
+                          <div className="text-[10px] text-muted-foreground flex flex-col gap-1 mt-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-muted-foreground uppercase tracking-wider">
+                                Materiais de Apoio
+                              </span>
+                              <Link href={`/blocks/${item.studyBlock.id}`} className="text-accent hover:underline font-bold">
+                                Visualizar
+                              </Link>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 mt-0.5">
+                              {summaryCount > 0 && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-accent/5 text-accent border-accent/20 rounded-md">
+                                  {summaryCount} Resumo{summaryCount > 1 ? "s" : ""}
+                                </Badge>
+                              )}
+                              {questionsCount > 0 && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-blue-50 text-blue-600 border-blue-200 rounded-md">
+                                  {questionsCount} Lista{questionsCount > 1 ? "s" : ""} de Questões
+                                </Badge>
+                              )}
+                              {answerKeyCount > 0 && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-50 text-amber-600 border-amber-200 rounded-md">
+                                  {answerKeyCount} Gabarito{answerKeyCount > 1 ? "s" : ""}
+                                </Badge>
+                              )}
+                              {otherCount > 0 && (
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-gray-50 text-gray-600 border-gray-200 rounded-md">
+                                  {otherCount} Outro{otherCount > 1 ? "s" : ""}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="pt-2 flex gap-2">

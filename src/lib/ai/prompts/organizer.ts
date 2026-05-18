@@ -42,25 +42,42 @@ Diretrizes Críticas (P0):
    - "SUPPORT_MATERIAL": O PDF é predominantemente ou inteiramente constituído de resumos, bizus, revisões rápidas, mapas mentais, simulados, checklists ou apenas questões/gabaritos.
    - "MIXED_MATERIAL": O PDF contém tanto uma seção longa de teoria principal quanto uma seção de resumos ou questões.
 
-2. CRIAÇÃO DE BLOCOS vs. APOIO:
+2. CRIAÇÃO DE BLOCOS vs. APOIO (QUESTÕES/GABARITOS NUNCA SÃO BLOCOS PRINCIPAIS):
    - APENAS crie "blocks" normais (MAIN_BLOCK) se a seção do PDF contiver TEORIA PRINCIPAL.
-   - NUNCA crie um bloco principal onde as páginas consistem apenas de resumos, bizus, mapas mentais ou questões.
-   - Se um conjunto de páginas for de "apoio" (resumo, bizu, mapa mental), identifique o tópico oficial que ele cobre, mas não o liste como um bloco principal capaz de gerar um longo ciclo de estudo. A aplicação o usará como "apoio" a blocos principais.
+   - NUNCA crie um bloco principal a partir de páginas de questões, simulados, baterias de exercícios, questões comentadas ou gabaritos. Questões são material de prática, não teoria principal.
+   - Se encontrar páginas de questões, classifique-as como material de apoio (SUPPORT_BLOCK) e configure o campo "supportType" para "QUESTIONS" ou "COMMENTED_QUESTIONS".
+   - Se encontrar gabaritos ou resoluções de provas, classifique como "SUPPORT_BLOCK" com "supportType" como "ANSWER_KEY".
+   - Se encontrar simulados completos, use "SIMULATED_EXAM".
+   - Associar esses blocos de apoio ("SUPPORT_BLOCK") ao tópico oficial correto ("officialTopicId") e a mesma disciplina, pois eles serão acoplados ao bloco teórico correspondente pelo backend.
 
-3. PROIBIÇÃO DE TÍTULOS GENÉRICOS (Para blocos teóricos):
-   - Títulos devem refletir o assunto exato. (Ruim: "Parte 1", "Conteúdo Completo". Bom: "Atos Administrativos: Requisitos e Atributos").
+3. PROIBIÇÃO DE DIVISÃO MECÂNICA POR NÚMERO FIXO DE PÁGINAS (NOVO):
+   - A criação de blocos NUNCA deve seguir uma divisão mecânica por intervalos fixos de páginas (como cortar o PDF de 10 em 10 páginas, 8 em 8 páginas, ou qualquer padrão artificial similar).
+   - A divisão deve refletir exclusivamente a estrutura real do conteúdo: títulos de capítulos, subtítulos, tópicos oficiais do edital, continuidade temática e desenvolvimento teórico do assunto.
+   - O tamanho ideal de 5 a 12 páginas úteis para um bloco teórico principal (MAIN_BLOCK) é APENAS uma referência de qualidade para criar sessões de aproximadamente 45 minutos, e NUNCA uma régua de corte rígido.
+   - Se um tema contínuo e indivisível exigir 13 a 15 páginas, mantenha o assunto inteiro em um único bloco.
+   - Se um assunto for curto, denso e autônomo de 4 páginas, crie o bloco e justifique em "shortBlockJustification".
+   - NUNCA quebre um assunto no meio apenas para forçar uma quantidade fixa de páginas.
 
-4. MAPEAMENTO DE TÓPICO OFICIAL:
+4. NOVOS TIPOS DE APOIO (supportType):
+   - Se o bloco for um "SUPPORT_BLOCK", configure obrigatoriamente o campo "supportType" usando um dos valores a seguir:
+     * "SUMMARY": resumos tradicionais.
+     * "BIZU": dicas/bizus curtos e focados.
+     * "MIND_MAP": mapas mentais.
+     * "QUESTIONS": cadernos/listas de questões sem comentários.
+     * "COMMENTED_QUESTIONS": cadernos/baterias de questões comentadas.
+     * "ANSWER_KEY": gabaritos puros ou comentados de provas/simulados.
+     * "SIMULATED_EXAM": provas simuladas completas.
+     * "CHECKLIST": listas de verificação/checklists de estudos.
+     * "REVIEW": revisões rápidas ou materiais de véspera.
+     * "OTHER": outros materiais de apoio que não se encaixam nos anteriores.
+   - Para blocos principais (MAIN_BLOCK), o campo "supportType" deve ser null.
+
+5. PROIBIÇÃO DE TÍTULOS GENÉRICOS (Para blocos teóricos):
+   - Títulos de blocos teóricos principais devem refletir o assunto exato. (Ruim: "Parte 1", "Conteúdo Completo", "Tópico de 1 a 10". Bom: "Atos Administrativos: Requisitos e Atributos").
+
+6. MAPEAMENTO DE TÓPICO OFICIAL:
    - Preencha os campos "officialTopicId", "topicCode" e "officialTopicName" baseado na lista oficial.
-   - Se não houver correspondência, defina null e "GERAL".
-
-5. DIRETRIZES DE TAMANHO E 45 MINUTOS (NOVO):
-   - Você está criando blocos para sessões reais de estudo de aproximadamente 45 minutos.
-   - O tamanho ideal de um bloco principal (MAIN_BLOCK) é de 5 a 12 páginas úteis.
-   - Evite blocos muito curtos (1 a 3 páginas). Só crie blocos com menos de 4 páginas se o conteúdo for extremamente denso, normativo e autônomo.
-   - Não divida o material em subtópicos pequenos demais apenas porque encontrou um subtítulo. Agrupe subtítulos relacionados e complementares (Ex: Conceito + Classificação + Competência Territorial).
-   - Se dois ou mais tópicos curtos formam uma unidade coesa, combine-os em um único bloco.
-   - Exceção para cima: blocos de 13 a 15 páginas são aceitáveis se o assunto for leve ou contínuo sem quebra.
+   - Se não houver correspondência direta, defina null e "GERAL".
 
 Formato de Retorno Esperado (JSON estrito contendo o papel do material e os blocos/apoios mapeados):
 {
@@ -84,7 +101,7 @@ Formato de Retorno Esperado (JSON estrito contendo o papel do material e os bloc
       "topicCode": "Tópico XX",
       "justification": "Explicação do motivo pela qual é um bloco principal ou um apoio",
       "pageTypes": ["MAIN_THEORY", "EXPLANATION"],
-      "supportType": null
+      "supportType": null // String válida apenas se type for "SUPPORT_BLOCK", caso contrário null
     }
   ]
 }`;
