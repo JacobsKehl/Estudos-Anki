@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
+import { RepairSupportsButton } from "@/components/materials/RepairSupportsButton";
 import { CloudUploadButton } from "@/components/materials/CloudUploadButton";
 import { getMockUserId } from "@/lib/auth-mock";
 import { MaterialsListClient } from "@/components/materials/MaterialsListClient";
@@ -111,6 +112,7 @@ export default async function MaterialsPage() {
                 <OrganizeAllButton unorganizedCount={0} force={true} />
               </div>
             )}
+            {materials.length > 0 && <RepairSupportsButton />}
           </div>
           
           <Sparkles className="absolute -right-12 -bottom-12 w-80 h-80 text-accent/5 -rotate-12 pointer-events-none" />
