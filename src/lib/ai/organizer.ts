@@ -83,6 +83,11 @@ export interface DetectedBlock {
   justification?: string;
   pageTypes?: string[];
   supportType?: string | null;
+  contentDensity?: "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH";
+  isShortBlock?: boolean;
+  shortBlockJustification?: string | null;
+  mergeRationale?: string | null;
+  selectionJustification?: string | null;
 }
 
 export interface DetectedStructureResult {
@@ -230,6 +235,18 @@ export async function detectStructure(
       }
 
       if (errors.length === 0) {
+        // Validação de blocos muito curtos sem justificativa
+        const hasUnjustifiedShortBlock = blocks.some(b => {
+          const pageCount = (b.pageEnd - b.pageStart) + 1;
+          return pageCount < 4 && !b.shortBlockJustification && (!b.type || b.type === "MAIN_BLOCK");
+        });
+        
+        if (hasUnjustifiedShortBlock) {
+          errors.push("Existem blocos muito curtos (1 a 3 páginas) sem justificativa ('shortBlockJustification'). Agrupe esses subtópicos menores em blocos maiores de 5 a 12 páginas, mantendo a coerência temática.");
+        }
+      }
+
+      if (errors.length === 0) {
         // Mapear tópicos oficiais com segurança (limpar correspondências vazias ou inválidas se houver)
         const mappedBlocks = blocks.map(b => {
           let topicId = b.officialTopicId || null;
@@ -256,9 +273,12 @@ export async function detectStructure(
           };
         });
         
+        let finalBlocks = tryMergeShortBlocks(mappedBlocks);
+        finalBlocks = calculateEstimatedMinutes(finalBlocks);
+
         return {
           materialRole: role,
-          blocks: mappedBlocks
+          blocks: finalBlocks
         };
       }
 
@@ -317,4 +337,66 @@ export async function detectStructure(
     materialRole: "UNKNOWN",
     blocks: fallbackBlocks
   };
+}
+
+function tryMergeShortBlocks(blocks: DetectedBlock[]): DetectedBlock[] {
+  if (blocks.length === 0) return blocks;
+  const merged: DetectedBlock[] = [];
+  let current = { ...blocks[0] };
+
+  for (let i = 1; i < blocks.length; i++) {
+    const next = blocks[i];
+    const currentPages = (current.pageEnd - current.pageStart) + 1;
+    const nextPages = (next.pageEnd - next.pageStart) + 1;
+    const combinedPages = currentPages + nextPages;
+    
+    const isCurrentShort = currentPages < 4 && !current.shortBlockJustification;
+    const isNextShort = nextPages < 4 && !next.shortBlockJustification;
+    
+    const sameTopic = current.officialTopicId === next.officialTopicId;
+    const contiguous = (next.pageStart <= current.pageEnd + 2); // Pode ter uma página vazia no meio
+    const sameType = (current.type || "MAIN_BLOCK") === (next.type || "MAIN_BLOCK");
+    const isMainBlock = (current.type || "MAIN_BLOCK") === "MAIN_BLOCK";
+
+    // Tentamos mesclar se forem blocos principais, mesmo tópico, contíguos e o tamanho final <= 15
+    // Condição forte: se um dos dois for pequeno (< 4 páginas), forçamos o merge para evitar quebra excessiva
+    if (isMainBlock && sameTopic && contiguous && sameType && combinedPages <= 15 && (isCurrentShort || isNextShort || currentPages < 5)) {
+      current.pageEnd = Math.max(current.pageEnd, next.pageEnd);
+      current.title = `${current.title} + ${next.title}`.substring(0, 100);
+      current.description = `${current.description} | ${next.description}`.substring(0, 200);
+      current.mergeRationale = "Backend auto-merged consecutive short blocks of the same topic to reach 45 min target.";
+      current.isShortBlock = (current.pageEnd - current.pageStart) + 1 < 4;
+      if (!current.isShortBlock) current.shortBlockJustification = null;
+    } else {
+      merged.push(current);
+      current = { ...next };
+    }
+  }
+  merged.push(current);
+  return merged;
+}
+
+function calculateEstimatedMinutes(blocks: DetectedBlock[]): DetectedBlock[] {
+  return blocks.map(b => {
+    if (b.type === "SUPPORT_BLOCK") return { ...b, estimatedStudyMinutes: 0 };
+    
+    const pageCount = (b.pageEnd - b.pageStart) + 1;
+    let minutesPerPage = 5; // MEDIUM default
+
+    switch (b.contentDensity) {
+      case "LOW": minutesPerPage = 3; break;
+      case "MEDIUM": minutesPerPage = 5; break;
+      case "HIGH": minutesPerPage = 8; break;
+      case "VERY_HIGH": minutesPerPage = 10; break;
+    }
+
+    let calcMinutes = pageCount * minutesPerPage;
+    // Tenta aproximar a sessão ao range 30-60 (idealmente 45)
+    calcMinutes = Math.max(30, Math.min(60, calcMinutes));
+
+    return {
+      ...b,
+      estimatedStudyMinutes: calcMinutes
+    };
+  });
 }

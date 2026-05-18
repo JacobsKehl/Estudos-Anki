@@ -54,24 +54,37 @@ Diretrizes Críticas (P0):
    - Preencha os campos "officialTopicId", "topicCode" e "officialTopicName" baseado na lista oficial.
    - Se não houver correspondência, defina null e "GERAL".
 
+5. DIRETRIZES DE TAMANHO E 45 MINUTOS (NOVO):
+   - Você está criando blocos para sessões reais de estudo de aproximadamente 45 minutos.
+   - O tamanho ideal de um bloco principal (MAIN_BLOCK) é de 5 a 12 páginas úteis.
+   - Evite blocos muito curtos (1 a 3 páginas). Só crie blocos com menos de 4 páginas se o conteúdo for extremamente denso, normativo e autônomo.
+   - Não divida o material em subtópicos pequenos demais apenas porque encontrou um subtítulo. Agrupe subtítulos relacionados e complementares (Ex: Conceito + Classificação + Competência Territorial).
+   - Se dois ou mais tópicos curtos formam uma unidade coesa, combine-os em um único bloco.
+   - Exceção para cima: blocos de 13 a 15 páginas são aceitáveis se o assunto for leve ou contínuo sem quebra.
+
 Formato de Retorno Esperado (JSON estrito contendo o papel do material e os blocos/apoios mapeados):
 {
   "materialRole": "MAIN_MATERIAL", // ou SUPPORT_MATERIAL ou MIXED_MATERIAL
   "blocks": [
     {
       "type": "MAIN_BLOCK", // ou "SUPPORT_BLOCK"
-      "title": "Assunto Específico (Ex: Fontes do Direito do Trabalho)",
-      "description": "Estudo das fontes formais, informais e hierarquia de normas jurídicas.",
+      "title": "Assunto Específico e Amplo (Ex: Competência da Justiça do Trabalho — conceitos e classificação)",
+      "description": "Estudo dos fundamentos da competência trabalhista e suas regras territoriais.",
       "pageStart": 1,
       "pageEnd": 8,
-      "sourceHeading": "Título original que aparece na página ou no sumário",
-      "estimatedStudyMinutes": 32, // Coloque 0 para SUPPORT_BLOCK
+      "sourceHeading": "Título original aglomerado",
+      "estimatedStudyMinutes": 45, // Tente mirar próximo de 45 minutos para blocos teóricos
+      "contentDensity": "MEDIUM", // "LOW", "MEDIUM", "HIGH" ou "VERY_HIGH"
+      "isShortBlock": false, // true se tiver menos de 4 páginas
+      "shortBlockJustification": null, // obrigatório explicar se isShortBlock for true (ex: "Conteúdo extremamente denso e autônomo")
+      "mergeRationale": "Foram agrupados os subtópicos curtos de conceito e classificação para formar uma sessão completa.", // se você agrupou tópicos para chegar no volume ideal
+      "selectionJustification": "O intervalo contém a explicação principal e exemplos da matéria.",
       "officialTopicId": "id_do_topico_aqui",
       "officialTopicName": "Titulo completo do topico oficial associado",
       "topicCode": "Tópico XX",
       "justification": "Explicação do motivo pela qual é um bloco principal ou um apoio",
-      "pageTypes": ["MAIN_THEORY", "EXPLANATION"], // ou ["SUMMARY", "QUESTIONS"]
-      "supportType": null // se SUPPORT_BLOCK, preencha com "RESUMO", "BIZU", "MAPA_MENTAL", "QUESTOES"
+      "pageTypes": ["MAIN_THEORY", "EXPLANATION"],
+      "supportType": null
     }
   ]
 }`;
