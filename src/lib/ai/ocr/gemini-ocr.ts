@@ -11,7 +11,7 @@ export async function extractTextWithGeminiOCR(source: string | Buffer): Promise
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     generationConfig: {
       responseMimeType: "application/json",
     }
@@ -27,7 +27,7 @@ export async function extractTextWithGeminiOCR(source: string | Buffer): Promise
   const pdfDoc = await PDFDocument.load(dataBuffer, { ignoreEncryption: true });
   const totalPages = pdfDoc.getPageCount();
   
-  console.log(`🚀 Starting Chunked OCR for ${totalPages} pages (gemini-2.0-flash)...`);
+  console.log(`🚀 Starting Chunked OCR for ${totalPages} pages (gemini-2.5-flash)...`);
   
   const allPages: { pageNumber: number, text: string }[] = [];
   const chunkSize = 5; // Reduzido para 5 páginas para diminuir carga e tokens
