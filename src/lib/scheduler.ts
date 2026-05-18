@@ -101,6 +101,15 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
     dbCompletedBlocks.map((b: any) => b.id)
   );
 
+  // Busca TODOS os blocos pendentes do usuário em uma única consulta rápida
+  const allPendingBlocks = await (prisma as any).studyBlock.findMany({
+    where: {
+      userId,
+      status: { not: "COMPLETED" }
+    },
+    orderBy: { orderIndex: "asc" }
+  });
+
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const candidateDate = addDays(startDate, dayOffset);
     if (!isStudyDay(candidateDate)) continue;
@@ -141,18 +150,13 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
           }
         }
 
-        // Buscar o próximo bloco pendente desta matéria que NÃO esteja agendado
-        let nextBlock = await (prisma as any).studyBlock.findFirst({
-          where: {
-            subjectId: subject.id,
-            userId,
-            status: { not: "COMPLETED" },
-            id: { notIn: Array.from(scheduledBlockIds) }
-          },
-          orderBy: { orderIndex: "asc" },
-        });
+        // Buscar o próximo bloco pendente desta matéria que NÃO esteja agendado (EM MEMÓRIA)
+        let nextBlock = allPendingBlocks.find((b: any) =>
+          b.subjectId === subject.id &&
+          !scheduledBlockIds.has(b.id)
+        );
 
-        // Fallback Inteligente: Se não achar bloco para essa matéria do ciclo, busca de outra das 7 matérias principais
+        // Fallback Inteligente: Se não achar bloco para essa matéria do ciclo, busca de outra das 7 matérias principais (EM MEMÓRIA)
         if (!nextBlock) {
           const otherMainSubjects = userSubjects.filter(s => {
             const isOtherMain = MAIN_7_SUBJECTS.some(m => s.name.toLowerCase().includes(m.toLowerCase()));
@@ -169,15 +173,10 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
           });
 
           for (const otherSub of otherMainSubjects) {
-            nextBlock = await (prisma as any).studyBlock.findFirst({
-              where: {
-                subjectId: otherSub.id,
-                userId,
-                status: { not: "COMPLETED" },
-                id: { notIn: Array.from(scheduledBlockIds) }
-              },
-              orderBy: { orderIndex: "asc" },
-            });
+            nextBlock = allPendingBlocks.find((b: any) =>
+              b.subjectId === otherSub.id &&
+              !scheduledBlockIds.has(b.id)
+            );
             if (nextBlock) break;
           }
         }

@@ -252,9 +252,28 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
       }
     }
 
-    // 3. Resumo Final Detalhado
+    // 3. Resumo Final Detalhado e Geração Consolidada de Cronograma
     if (totalProcessed > 0) {
       setStep("done");
+      
+      const scheduleToastId = "schedule-generation";
+      toast.loading("Atualizando seu cronograma inteligente de estudos...", { id: scheduleToastId });
+
+      try {
+        await fetch("/api/schedule/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "Meu Cronograma de Estudos",
+            dailyMinutes: 120,
+            daysAhead: 30
+          })
+        });
+        toast.success("Cronograma inteligente atualizado!", { id: scheduleToastId, duration: 3000 });
+      } catch (schedErr) {
+        console.error("Erro ao gerar cronograma final:", schedErr);
+        toast.dismiss(scheduleToastId);
+      }
       
       const summaryMessage = force ? (
         <div className="space-y-1.5 py-1 text-card-foreground">
@@ -289,7 +308,6 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
           )}
         </div>
       );
-
       toast.success(summaryMessage, { duration: 10000 });
       router.refresh();
       setTimeout(() => setStep("idle"), 10000);

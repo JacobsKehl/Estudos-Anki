@@ -638,20 +638,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Atualizar cronograma
-    if (summary.success > 0) {
-      try {
-        console.log("[ORGANIZE ALL] Atualizando cronograma...");
-        await generateSmartSchedule(userId, {
-          title: "Meu Cronograma de Estudos",
-          dailyMinutes: 120,
-          daysAhead: 30,
-        });
-        console.log("[ORGANIZE ALL] ✅ Cronograma atualizado.");
-      } catch (schedErr: any) {
-        console.error("[ORGANIZE ALL] Erro no cronograma:", schedErr.message);
-      }
-    }
+    // 4. Cronograma será atualizado de forma otimizada ao final do lote pelo frontend.
+
 
     // 5. Mensagem de resultado
     const messageParts: string[] = [];
