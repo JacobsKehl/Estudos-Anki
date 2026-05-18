@@ -5,10 +5,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Impedir que o Next.js tente empacotar dependências pesadas ou do Electron na Nuvem
+  // Impedir que o Next.js tente empacotar dependências pesadas na Nuvem
   serverExternalPackages: [
-    'electron',
-    'electron-builder',
     'tesseract.js',
     'pdfreader',
     'pdf2pic',
