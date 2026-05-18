@@ -165,6 +165,37 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
         </div>
       )}
 
+      {item.studyBlock?.supportMaterials && item.studyBlock.supportMaterials.length > 0 && (
+        <div className="flex flex-col gap-1.5 pl-[52px] pt-1 border-t border-border/40 mt-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              Apoios: {item.studyBlock.supportMaterials.length} materiais
+            </span>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-[10px] text-accent hover:text-accent/80 font-bold"
+              onClick={() => router.push(`/blocks/${item.studyBlockId}`)}
+            >
+              [Ver apoios]
+            </Button>
+          </div>
+          <div className="flex flex-col gap-1">
+            {item.studyBlock.supportMaterials.map((support: any) => (
+              <div key={support.id} className="text-xs text-muted-foreground flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                <span className="font-medium truncate max-w-[200px] md:max-w-xs" title={support.material?.fileName}>
+                  {support.material?.fileName || "Material"}
+                </span>
+                {support.pageStart && (
+                  <span className="opacity-60 text-[10px]">— págs {support.pageStart}–{support.pageEnd || support.pageStart}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!isDone && (
         <div className="flex items-center gap-2 pl-[52px] pt-1">
           {item.studyBlockId && (

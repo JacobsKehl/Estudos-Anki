@@ -88,6 +88,9 @@ export default async function Dashboard() {
         studyBlock: { 
           include: { 
             material: true,
+            supportMaterials: {
+              include: { material: true }
+            },
             _count: {
               select: { flashcards: true }
             }
@@ -106,6 +109,9 @@ export default async function Dashboard() {
             where: { id: task.studyBlockId },
             include: { 
               material: true,
+              supportMaterials: {
+                include: { material: true }
+              },
               _count: {
                 select: { flashcards: true }
               }

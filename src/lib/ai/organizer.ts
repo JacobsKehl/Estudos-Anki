@@ -68,6 +68,7 @@ export async function identifySubject(firstPagesContent: string, fileName?: stri
 }
 
 export interface DetectedBlock {
+  type?: string;
   title: string;
   description: string;
   pageStart: number;
@@ -80,6 +81,13 @@ export interface DetectedBlock {
   officialTopicName?: string | null;
   topicCode?: string | null;
   justification?: string;
+  pageTypes?: string[];
+  supportType?: string | null;
+}
+
+export interface DetectedStructureResult {
+  materialRole: string; // MAIN_MATERIAL | SUPPORT_MATERIAL | MIXED_MATERIAL | UNKNOWN
+  blocks: DetectedBlock[];
 }
 
 const FORBIDDEN_GENERIC_PATTERNS = [
@@ -105,7 +113,7 @@ export async function detectStructure(
   totalPages: number,
   subjectName: string,
   pageTexts?: { pageNumber: number; text: string }[]
-): Promise<DetectedBlock[]> {
+): Promise<DetectedStructureResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
@@ -135,12 +143,15 @@ export async function detectStructure(
       const response = await result.response;
       lastResponse = response.text();
       
-      const startIndex = lastResponse.indexOf("[");
-      const endIndex = lastResponse.lastIndexOf("]");
+      const startIndex = lastResponse.indexOf("{");
+      const endIndex = lastResponse.lastIndexOf("}");
       if (startIndex === -1) throw new Error("JSON não encontrado");
       
       const cleanJson = lastResponse.substring(startIndex, endIndex + 1);
-      const blocks: DetectedBlock[] = JSON.parse(cleanJson);
+      const parsedResult: DetectedStructureResult = JSON.parse(cleanJson);
+      
+      const role = parsedResult.materialRole || "UNKNOWN";
+      const blocks = parsedResult.blocks || [];
 
       // --- Validação Técnica & Pedagógica ---
       const errors: string[] = [];
@@ -207,10 +218,11 @@ export async function detectStructure(
             console.log(`[AI Validation] Bloco "${b.title}" (Páginas ${b.pageStart}-${b.pageEnd}): negativeScore=${negativeScore}, positiveScore=${positiveScore}`);
 
             // Critério de Rejeição: Mais de 80% do texto do bloco consiste em termos resumitivos E há baixíssima densidade teórica explicativa
+            // Apenas para MAIN_BLOCK (blocos teóricos)
             const isResumoOnly = negativeScore > 6 && positiveScore <= 2;
-            if (isResumoOnly) {
+            if (isResumoOnly && (!b.type || b.type === "MAIN_BLOCK")) {
               console.warn(`[AI Validation] Bloco "${b.title}" (Páginas ${b.pageStart}-${b.pageEnd}) REJEITADO por parecer resumo/bizu/questões (negativo=${negativeScore}, positivo=${positiveScore})`);
-              errors.push(`A seleção de páginas ${b.pageStart}-${b.pageEnd} para o bloco "${b.title}" foi rejeitada porque parece conter apenas resumo, bizu, simulado ou revisão rápida. É obrigatório incluir as páginas de desenvolvimento conceitual e explicação teórica.`);
+              errors.push(`A seleção de páginas ${b.pageStart}-${b.pageEnd} para o bloco principal "${b.title}" foi rejeitada porque parece conter apenas resumo, bizu, simulado ou revisão rápida. É obrigatório incluir as páginas de desenvolvimento conceitual e explicação teórica em blocos MAIN_BLOCK.`);
               break;
             }
           }
@@ -219,7 +231,7 @@ export async function detectStructure(
 
       if (errors.length === 0) {
         // Mapear tópicos oficiais com segurança (limpar correspondências vazias ou inválidas se houver)
-        return blocks.map(b => {
+        const mappedBlocks = blocks.map(b => {
           let topicId = b.officialTopicId || null;
           let code = b.topicCode || "GERAL";
           let name = b.officialTopicName || "Tópico não identificado";
@@ -243,6 +255,11 @@ export async function detectStructure(
             officialTopicName: name
           };
         });
+        
+        return {
+          materialRole: role,
+          blocks: mappedBlocks
+        };
       }
 
       // Se falhou na validação, tenta de novo com prompt de correção
@@ -281,6 +298,7 @@ export async function detectStructure(
     }
 
     fallbackBlocks.push({
+      type: "MAIN_BLOCK",
       title: fallbackTitle,
       description: `Estudo focado de tópicos centrais da disciplina ${subjectName}.`,
       pageStart: start,
@@ -295,5 +313,8 @@ export async function detectStructure(
     });
   }
 
-  return fallbackBlocks;
+  return {
+    materialRole: "UNKNOWN",
+    blocks: fallbackBlocks
+  };
 }

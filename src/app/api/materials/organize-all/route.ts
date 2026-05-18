@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 min
 
 interface DetectedBlock {
+  type?: string;
   title: string;
   description: string;
   pageStart: number;
@@ -21,6 +22,8 @@ interface DetectedBlock {
   officialTopicId?: string | null;
   officialTopicName?: string | null;
   topicCode?: string | null;
+  pageTypes?: string[];
+  supportType?: string | null;
 }
 
 interface PageContent {
@@ -50,7 +53,12 @@ async function extractAllPages(sourcePath: string, isLocal: boolean): Promise<{ 
   let uint8Array: Uint8Array;
 
   if (isLocal) {
-     throw new Error("Arquivos locais não são suportados na Web. Use o upload em nuvem.");
+    const fs = await import("fs");
+    if (!fs.existsSync(sourcePath)) {
+      throw new Error(`Arquivo local não encontrado: ${sourcePath}`);
+    }
+    const buffer = fs.readFileSync(sourcePath);
+    uint8Array = new Uint8Array(buffer);
   } else {
     // Download from Supabase Storage
     const { data, error } = await supabase.storage.from('materials').download(sourcePath);
@@ -94,11 +102,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   const log = (msg: string) => console.log(`[ORGANIZE] ${material.fileName}: ${msg}`);
   const result = { blocks: 0, flashcards: 0, subjectCreated: false };
 
-  const isLocal = material.sourceType === "LOCAL_INBOX";
-  
-  if (isLocal) {
-    throw new Error("Arquivos locais não são suportados na Web.");
-  }
+  const isLocal = material.sourceType === "LOCAL_INBOX" || material.sourceType === "LOCAL_UPLOAD";
 
   // ── Etapa 1: Extraindo texto por página ──────────────────────────────────
   log(`[Organize] PDF iniciado: ${material.fileName}`);
@@ -229,17 +233,32 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     .join("\n");
 
   log("Detectando estrutura de blocos com IA...");
-  let detectedBlocks: DetectedBlock[];
+  let detectedBlocks: DetectedBlock[] = [];
+  let materialRole = "UNKNOWN";
+
   try {
-    detectedBlocks = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
+    const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
+    detectedBlocks = structResult.blocks || [];
+    materialRole = structResult.materialRole || "UNKNOWN";
   } catch (err: any) {
     console.warn(`[ORGANIZE] IA falhou ao detectar blocos para ${material.fileName}. Criando bloco único.`);
     detectedBlocks = [];
+    materialRole = "UNKNOWN";
   }
 
-  // FALLBACK: Se não detectar blocos, criar um bloco único cobrindo todo o material
-  if (!detectedBlocks || detectedBlocks.length === 0) {
+  // Atualizar o material com o role detectado (e limpar erro)
+  await prisma.studyMaterial.update({
+    where: { id: material.id },
+    data: { 
+      organizationStatus: "ORGANIZING",
+      materialRole: materialRole as any
+    }
+  });
+
+  // FALLBACK: Se não detectar blocos e for MAIN_MATERIAL ou UNKNOWN
+  if ((!detectedBlocks || detectedBlocks.length === 0) && materialRole !== "SUPPORT_MATERIAL") {
     detectedBlocks = [{
+      type: "MAIN_BLOCK",
       title: "Conteúdo Completo",
       description: "Estudo integral do material (bloco gerado automaticamente).",
       pageStart: 1,
@@ -249,61 +268,122 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     }];
   }
 
-  log(`[Organize] Blocos criados: ${detectedBlocks.length}`);
+  log(`[Organize] Blocos processados/detectados: ${detectedBlocks.length}. Material Role: ${materialRole}`);
 
-  // ── Etapa 5: Criar StudyBlocks ──────────────────────────────────────────
+  if (materialRole === "SUPPORT_MATERIAL") {
+    // Para material de apoio, não criamos StudyBlock. 
+    // Identificamos os tópicos suportados e criamos StudyBlockSupport se o bloco já existir.
+    for (const blockDef of detectedBlocks) {
+      if (!blockDef.officialTopicId) continue;
 
-  await prisma.studyMaterial.update({
-    where: { id: material.id },
-    data: { organizationStatus: "ORGANIZING" }
-  });
+      const existingBlock = await prisma.studyBlock.findFirst({
+        where: { userId, subjectId: subjectId as string, officialTopicId: blockDef.officialTopicId }
+      });
 
-  for (let i = 0; i < detectedBlocks.length; i++) {
-    const blockDef = detectedBlocks[i];
-    const pageStart = blockDef.pageStart || 1;
-    const pageEnd = blockDef.pageEnd || pageStart;
-
-    // Criar o bloco
-    const studyBlock = await prisma.studyBlock.create({
-      data: {
-        userId,
-        subjectId: subjectId as string,
-        materialId: material.id,
-        title: blockDef.title || `Parte ${i + 1}`,
-        description: blockDef.description || "",
-        pageStart,
-        pageEnd,
-        orderIndex: i,
-        estimatedStudyMinutes: blockDef.estimatedStudyMinutes || 60,
-        createdBy: blockDef.createdBy || "AI",
-        confidence: blockDef.confidence ?? 1.0,
-        sourceHeading: blockDef.sourceHeading,
-        officialTopicId: blockDef.officialTopicId,
-        officialTopicName: blockDef.officialTopicName,
-        topicCode: blockDef.topicCode,
-        status: "NOT_STARTED",
-        nextActionType: "THEORY",
+      if (existingBlock) {
+        log(`Vinculando apoio ao bloco principal encontrado: ${existingBlock.title}`);
+        await prisma.studyBlockSupport.create({
+          data: {
+            studyBlockId: existingBlock.id,
+            materialId: material.id,
+            pageStart: blockDef.pageStart,
+            pageEnd: blockDef.pageEnd,
+            supportType: blockDef.supportType || "MATERIAL_DE_APOIO",
+            confidence: blockDef.confidence || 0.8
+          }
+        });
+      } else {
+        // Bloco ainda não existe, marca o material para vincular no futuro
+        log(`Bloco principal não encontrado para o tópico ${blockDef.officialTopicId}. Deixando pendente.`);
+        await prisma.studyMaterial.update({
+          where: { id: material.id },
+          data: { supportForTopicId: blockDef.officialTopicId }
+        });
+        // Se houver múltiplos tópicos em um só material de apoio, precisaremos lidar com array. 
+        // Por ora, salva o primeiro que encontrar.
+        break; 
       }
-    });
+    }
+  } else {
+    // MAIN_MATERIAL ou MIXED_MATERIAL
+    for (let i = 0; i < detectedBlocks.length; i++) {
+      const blockDef = detectedBlocks[i];
+      if (blockDef.type === "SUPPORT_BLOCK") continue; // Pula blocos de apoio dentro do material misto (por enquanto não vincula partes mistas retroativas no próprio material para evitar loops infinitos de IA)
 
-    result.blocks++;
+      const pageStart = blockDef.pageStart || 1;
+      const pageEnd = blockDef.pageEnd || pageStart;
 
-    // ── REORGANIZAÇÃO: Re-vincular cards órfãos ──────────────────────────
-    if (isReorganizing) {
-      log(`[Relink] Buscando cards para o novo bloco: ${studyBlock.title} (p.${pageStart}-${pageEnd})`);
-      const relinkResult = await prisma.flashcard.updateMany({
-        where: {
-          materialId: material.id,
-          studyBlockId: null,
-          sourcePageStart: { gte: pageStart, lte: pageEnd }
-        },
+      // Criar o bloco
+      const studyBlock = await prisma.studyBlock.create({
         data: {
-          studyBlockId: studyBlock.id
+          userId,
+          subjectId: subjectId as string,
+          materialId: material.id,
+          title: blockDef.title || `Parte ${i + 1}`,
+          description: blockDef.description || "",
+          pageStart,
+          pageEnd,
+          orderIndex: i,
+          estimatedStudyMinutes: blockDef.estimatedStudyMinutes || 60,
+          createdBy: blockDef.createdBy || "AI",
+          confidence: blockDef.confidence ?? 1.0,
+          sourceHeading: blockDef.sourceHeading,
+          officialTopicId: blockDef.officialTopicId,
+          officialTopicName: blockDef.officialTopicName,
+          topicCode: blockDef.topicCode,
+          status: "NOT_STARTED",
+          nextActionType: "THEORY",
         }
       });
-      if (relinkResult.count > 0) {
-        log(`[Relink] ${relinkResult.count} cards re-vinculados a este bloco.`);
-        result.flashcards += relinkResult.count;
+
+      result.blocks++;
+
+      // Vínculo retroativo: busca StudyMaterials (SUPPORT) pendentes para este tópico
+      if (blockDef.officialTopicId) {
+        const pendingSupports = await prisma.studyMaterial.findMany({
+          where: {
+            userId,
+            subjectId: subjectId as string,
+            materialRole: "SUPPORT_MATERIAL",
+            supportForTopicId: blockDef.officialTopicId
+          }
+        });
+
+        for (const ps of pendingSupports) {
+          log(`[Relink Support] Vinculando material de apoio pendente (${ps.fileName}) ao novo bloco ${studyBlock.title}`);
+          await prisma.studyBlockSupport.create({
+            data: {
+              studyBlockId: studyBlock.id,
+              materialId: ps.id,
+              supportType: "MATERIAL_DE_APOIO",
+              confidence: 1.0
+            }
+          });
+          // Limpar a pendência para evitar links futuros desnecessários
+          await prisma.studyMaterial.update({
+            where: { id: ps.id },
+            data: { supportForTopicId: null }
+          });
+        }
+      }
+
+      // ── REORGANIZAÇÃO: Re-vincular cards órfãos ──────────────────────────
+      if (isReorganizing) {
+        log(`[Relink] Buscando cards para o novo bloco: ${studyBlock.title} (p.${pageStart}-${pageEnd})`);
+        const relinkResult = await prisma.flashcard.updateMany({
+          where: {
+            materialId: material.id,
+            studyBlockId: null,
+            sourcePageStart: { gte: pageStart, lte: pageEnd }
+          },
+          data: {
+            studyBlockId: studyBlock.id
+          }
+        });
+        if (relinkResult.count > 0) {
+          log(`[Relink] ${relinkResult.count} cards re-vinculados a este bloco.`);
+          result.flashcards += relinkResult.count;
+        }
       }
     }
   }
@@ -393,7 +473,7 @@ export async function POST(req: NextRequest) {
       const materials = await prisma.studyMaterial.findMany({
         where: {
           userId,
-          sourceType: { in: ["CLOUD_UPLOAD"] }
+          sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] }
         },
         select: { id: true }
       });
@@ -420,7 +500,7 @@ export async function POST(req: NextRequest) {
       where: {
         userId,
         ...(materialId ? { id: materialId } : { organizationStatus: { in: statusFilter } }),
-        sourceType: { in: ["CLOUD_UPLOAD"] } // Apenas Nuvem na Web
+        sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] }
       },
       take: 1
     });

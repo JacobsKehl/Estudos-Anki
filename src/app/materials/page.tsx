@@ -14,6 +14,8 @@ type MaterialItem = {
   subjectName: string;
   status: "PENDING" | "PROCESSING" | "PROCESSED" | "ERROR";
   organizationStatus: string;
+  materialRole: string;
+  supportForTopicId: string | null;
   processingError: string | null;
   pageCount: number;
   extractedWords: number;
@@ -47,6 +49,8 @@ export default async function MaterialsPage() {
       subjectName: m.subject?.name || "Sem Matéria",
       status: m.processingStatus as any,
       organizationStatus: m.organizationStatus,
+      materialRole: m.materialRole,
+      supportForTopicId: m.supportForTopicId,
       processingError: m.processingError,
       pageCount: m.totalPages || 0,
       extractedWords: 0,

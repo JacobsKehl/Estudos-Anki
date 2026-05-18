@@ -34,52 +34,47 @@ Formato de Retorno (JSON estrito, não inclua nada extra fora do bloco JSON):
 }`;
 
 export const STRUCTURE_DETECTION_PROMPT = `Você é um engenheiro de dados educacionais e especialista em estruturar conteúdos programáticos para o ciclo de estudos do TRT.
-Sua missão é ler o sumário ou o texto de um material e dividi-lo em BLOCOS DE ESTUDO lógicos e específicos, vinculando cada um deles ao tópico oficial correspondente do edital.
+Sua missão é ler o sumário ou o texto de um material, classificar o seu papel (MAIN_MATERIAL, SUPPORT_MATERIAL ou MIXED_MATERIAL) e mapeá-lo para os tópicos oficiais correspondentes do edital.
 
-Diretrizes de Divisão e Nomenclatura (P0 - CRÍTICO):
-1. PROIBIÇÃO ABSOLUTA DE TÍTULOS GENÉRICOS:
-   - É proibido usar títulos como: "Parte 1", "Conteúdo Completo", "Tópicos Iniciais", "PDF Inteiro", "Apostila Completa", "Introdução", "Visão Geral", "Capítulo 1", "Bloco 2", "Parte X do Conteúdo".
-   - O título do bloco DEVE refletir o ASSUNTO REAL E ESPECÍFICO do conteúdo.
-   - Exemplos ruins: "Parte 1: Introdução", "Bloco de Estudos I", "Aulas Iniciais".
-   - Exemplos perfeitos: "Atos Administrativos: Requisitos e Atributos", "Controle de Constitucionalidade por Via Incidental", "Teoria da Petição Inicial Trabalhista".
-2. SELEÇÃO DE PÁGINAS (DESENVOLVIMENTO VS RESUMO):
-   - Os blocos de estudo devem priorizar o desenvolvimento completo do conteúdo teórico.
-   - O intervalo de páginas selecionado DEVE conter: explicação principal do assunto, conceitos, definições, regras, exceções, jurisprudência relevante, artigos de lei fundamentados e exemplos práticos.
-   - NUNCA selecione intervalos que contenham apenas resumos rápidos, bizus finais, mapas mentais isolados, exercícios/questões sem explicação teórica, sumários ou checklists.
-   - Páginas de resumo ou esquemas podem constar apenas no final do intervalo, como complemento, mas nunca como o núcleo ou conteúdo único do bloco.
-3. MAPEAMENTO DE TÓPICO OFICIAL:
-   - Para cada bloco que criar, analise os tópicos oficiais da disciplina informados no prompt.
-   - Identifique e associe o bloco ao tópico oficial correspondente mais próximo e específico.
-   - Preencha os campos: "officialTopicId" (ID do tópico na lista), "topicCode" (Código do tópico, ex: "Tópico 03") e "officialTopicName" (Título do tópico).
-   - Se o bloco for de uma matéria que não possui tópicos mapeados ou se não houver nenhuma correspondência plausível após análise profunda, defina "officialTopicId" como null, "topicCode" como "GERAL", e "officialTopicName" como "Tópico não identificado".
-4. SEPARAÇÃO TEMÁTICA:
-   - Nunca junte assuntos completamente diferentes no mesmo bloco.
-   - Cada bloco deve agrupar tópicos correlacionados (Ex: agrupar "Remuneração" e "Salário", mas separar de "Jornada de Trabalho").
-5. TAMANHO DOS BLOCOS E ESTIMATIVA DE TEMPO:
-   - Os blocos devem ter preferencialmente entre 5 e 15 páginas.
-   - Calcule de 3 a 4 minutos por página para materiais de direito/técnicos pesados.
+Diretrizes Críticas (P0):
+1. CLASSIFICAÇÃO DO MATERIAL (materialRole):
+   - "MAIN_MATERIAL": O PDF contém teoria principal densa, desenvolvimento completo de assuntos, conceitos, regras, jurisprudência e exemplos estruturados. Ideal para criar Blocos Principais.
+   - "SUPPORT_MATERIAL": O PDF é predominantemente ou inteiramente constituído de resumos, bizus, revisões rápidas, mapas mentais, simulados, checklists ou apenas questões/gabaritos.
+   - "MIXED_MATERIAL": O PDF contém tanto uma seção longa de teoria principal quanto uma seção de resumos ou questões.
 
-Regras de Quantidade Mínima de Blocos baseada no Total de Páginas:
-- Acima de 50 páginas: Crie entre 8 e 12 blocos.
-- De 21 a 50 páginas: Crie entre 5 e 8 blocos.
-- De 6 a 20 páginas: Crie entre 3 e 5 blocos.
-- Até 5 páginas: Crie entre 1 e 2 blocos bem específicos.
+2. CRIAÇÃO DE BLOCOS vs. APOIO:
+   - APENAS crie "blocks" normais (MAIN_BLOCK) se a seção do PDF contiver TEORIA PRINCIPAL.
+   - NUNCA crie um bloco principal onde as páginas consistem apenas de resumos, bizus, mapas mentais ou questões.
+   - Se um conjunto de páginas for de "apoio" (resumo, bizu, mapa mental), identifique o tópico oficial que ele cobre, mas não o liste como um bloco principal capaz de gerar um longo ciclo de estudo. A aplicação o usará como "apoio" a blocos principais.
 
-Formato de Retorno Esperado (Array JSON estrito):
-[
-  {
-    "title": "Assunto Específico e Detalhado (Ex: Fontes do Direito do Trabalho)",
-    "description": "Estudo das fontes formais, informais e hierarquia de normas jurídicas aplicadas ao trabalho.",
-    "pageStart": 1,
-    "pageEnd": 8,
-    "sourceHeading": "Título original que aparece na página ou no sumário",
-    "estimatedStudyMinutes": 32,
-    "officialTopicId": "id_do_topico_aqui",
-    "officialTopicName": "Titulo completo do topico oficial associado",
-    "topicCode": "Tópico XX",
-    "justification": "Explicação curta do motivo pelo qual este intervalo de páginas representa o desenvolvimento completo/teórico e não apenas um resumo"
-  }
-]`;
+3. PROIBIÇÃO DE TÍTULOS GENÉRICOS (Para blocos teóricos):
+   - Títulos devem refletir o assunto exato. (Ruim: "Parte 1", "Conteúdo Completo". Bom: "Atos Administrativos: Requisitos e Atributos").
+
+4. MAPEAMENTO DE TÓPICO OFICIAL:
+   - Preencha os campos "officialTopicId", "topicCode" e "officialTopicName" baseado na lista oficial.
+   - Se não houver correspondência, defina null e "GERAL".
+
+Formato de Retorno Esperado (JSON estrito contendo o papel do material e os blocos/apoios mapeados):
+{
+  "materialRole": "MAIN_MATERIAL", // ou SUPPORT_MATERIAL ou MIXED_MATERIAL
+  "blocks": [
+    {
+      "type": "MAIN_BLOCK", // ou "SUPPORT_BLOCK"
+      "title": "Assunto Específico (Ex: Fontes do Direito do Trabalho)",
+      "description": "Estudo das fontes formais, informais e hierarquia de normas jurídicas.",
+      "pageStart": 1,
+      "pageEnd": 8,
+      "sourceHeading": "Título original que aparece na página ou no sumário",
+      "estimatedStudyMinutes": 32, // Coloque 0 para SUPPORT_BLOCK
+      "officialTopicId": "id_do_topico_aqui",
+      "officialTopicName": "Titulo completo do topico oficial associado",
+      "topicCode": "Tópico XX",
+      "justification": "Explicação do motivo pela qual é um bloco principal ou um apoio",
+      "pageTypes": ["MAIN_THEORY", "EXPLANATION"], // ou ["SUMMARY", "QUESTIONS"]
+      "supportType": null // se SUPPORT_BLOCK, preencha com "RESUMO", "BIZU", "MAPA_MENTAL", "QUESTOES"
+    }
+  ]
+}`;
 
 export function buildSubjectPrompt(content: string, fileName?: string): string {
   const fileNameContext = fileName ? `Nome do arquivo original: ${fileName}\n` : "";

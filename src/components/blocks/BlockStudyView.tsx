@@ -13,7 +13,8 @@ import {
   BrainCircuit,
   Loader2,
   Info,
-  Play
+  Play,
+  Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,8 @@ interface BlockStudyViewProps {
 export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
   const router = useRouter();
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<"pdf" | "text">("pdf");
+  const [activeTab, setActiveTab] = React.useState<"pdf" | "text" | "apoios">("pdf");
+  const hasApoios = block.supportMaterials && block.supportMaterials.length > 0;
 
   const updateStatus = async (newStatus: string) => {
     setIsUpdatingStatus(true);
@@ -166,9 +168,53 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
               <FileText className="w-3.5 h-3.5 mr-2" />
               Texto Extraído
             </Button>
+            {hasApoios && (
+              <Button 
+                variant={activeTab === "apoios" ? "secondary" : "ghost"} 
+                size="sm" 
+                className={`rounded-xl h-9 px-6 text-xs font-bold uppercase tracking-wider ${activeTab === "apoios" ? "bg-white shadow-sm" : ""}`}
+                onClick={() => setActiveTab("apoios")}
+              >
+                <Layers className="w-3.5 h-3.5 mr-2" />
+                Apoios ({block.supportMaterials.length})
+              </Button>
+            )}
           </div>
 
-          {activeTab === "pdf" ? (
+          {activeTab === "apoios" ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-card p-8 rounded-[2.5rem] border border-border/40 shadow-sm">
+                <h3 className="text-xl font-bold mb-6">Materiais de Apoio</h3>
+                <div className="grid gap-4">
+                  {block.supportMaterials.map((support: any) => (
+                    <div key={support.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-accent" />
+                          <span className="font-semibold text-foreground">{support.material?.fileName || "Material"}</span>
+                        </div>
+                        {support.pageStart && (
+                          <p className="text-xs text-muted-foreground ml-6">
+                            Páginas {support.pageStart} a {support.pageEnd || support.pageStart}
+                          </p>
+                        )}
+                        {support.supportType && (
+                          <Badge variant="outline" className="ml-6 mt-2 text-[10px] uppercase">
+                            {support.supportType}
+                          </Badge>
+                        )}
+                      </div>
+                      <Button variant="outline" size="sm" className="rounded-xl shrink-0" asChild>
+                        <Link href={`/materials/${support.materialId}`}>
+                          Abrir Material
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : activeTab === "pdf" ? (
             <PdfBlockViewer 
               materialId={block.materialId} 
               pageStart={block.pageStart} 

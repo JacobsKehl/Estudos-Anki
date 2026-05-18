@@ -15,6 +15,7 @@ export default async function BlockPage({ params }: { params: { id: string } }) 
     include: {
       subject: true,
       material: true,
+      supportMaterials: { include: { material: true } },
       _count: {
         select: {
           flashcards: true

@@ -12,6 +12,13 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum MaterialRole {
+  MAIN_MATERIAL
+  SUPPORT_MATERIAL
+  MIXED_MATERIAL
+  UNKNOWN
+}
+
 model User {
   id                     String              @id @default(cuid())
   name                   String?
@@ -76,6 +83,9 @@ model StudyMaterial {
   processingError    String?
   subjectId          String?
   subject            StudySubject?       @relation(fields: [subjectId], references: [id])
+  materialRole       MaterialRole        @default(UNKNOWN)
+  supportForTopicId  String?
+  supportedBlocks    StudyBlockSupport[]
   extractedContent   ExtractedContent[]
   studyBlocks        StudyBlock[]
   flashcards         Flashcard[]
@@ -251,6 +261,20 @@ model StudyBlock {
   updatedAt     DateTime            @updatedAt
   flashcards    Flashcard[]
   scheduleItems StudyScheduleItem[]
+  supportMaterials StudyBlockSupport[]
+}
+
+model StudyBlockSupport {
+  id           String        @id @default(cuid())
+  studyBlockId String
+  studyBlock   StudyBlock    @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  materialId   String
+  material     StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  pageStart    Int?
+  pageEnd      Int?
+  supportType  String?       // BIZU, MAPA_MENTAL, RESUMO, REVISAO, QUESTOES
+  confidence   Float?
+  createdAt    DateTime      @default(now())
 }
 
 model StudySchedule {

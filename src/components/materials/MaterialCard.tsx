@@ -24,6 +24,8 @@ interface MaterialCardProps {
     subjectName: string;
     status: "PENDING" | "PROCESSING" | "PROCESSED" | "ERROR";
     organizationStatus: string;
+    materialRole?: string;
+    supportForTopicId?: string | null;
     processingError?: string | null;
     pageCount: number;
     extractedWords: number;
@@ -137,6 +139,22 @@ export function MaterialCard({
   };
 
   const getStatusInfo = () => {
+    // Override if it's a SUPPORT_MATERIAL
+    if (material.materialRole === "SUPPORT_MATERIAL") {
+      if (material.supportForTopicId) {
+        return {
+          label: "Material de Apoio",
+          variant: "outline" as const,
+          subLabel: "Aguardando bloco principal"
+        };
+      }
+      return {
+        label: "Material de Apoio",
+        variant: "outline" as const,
+        subLabel: "Vinculado aos blocos"
+      };
+    }
+
     switch (material.organizationStatus) {
       case "ORGANIZED":
         const isGeneric = material.blocksCount === 1;

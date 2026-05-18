@@ -21,7 +21,13 @@ export default async function SchedulePage() {
         items: {
           include: {
             subject: true,
-            studyBlock: true,
+            studyBlock: {
+              include: {
+                supportMaterials: {
+                  include: { material: true }
+                }
+              }
+            },
             material: true
           },
           orderBy: { dayNumber: "asc" }
@@ -135,6 +141,19 @@ export default async function SchedulePage() {
                         <Clock className="w-3 h-3" />
                         {item.estimatedMinutes} min
                       </span>
+                    </div>
+
+                    <div className="flex flex-col gap-2 pt-1 border-t border-border/40">
+                      {item.studyBlock?.supportMaterials && item.studyBlock.supportMaterials.length > 0 && (
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                          <span className="font-bold uppercase tracking-widest">
+                            Apoios: {item.studyBlock.supportMaterials.length} materiais
+                          </span>
+                          <Link href={`/blocks/${item.studyBlock.id}`} className="text-accent hover:underline font-bold">
+                            [Ver apoios]
+                          </Link>
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-2 flex gap-2">
