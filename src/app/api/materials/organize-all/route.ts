@@ -18,6 +18,9 @@ interface DetectedBlock {
   sourceHeading?: string;
   createdBy?: string;
   confidence?: number;
+  officialTopicId?: string | null;
+  officialTopicName?: string | null;
+  topicCode?: string | null;
 }
 
 interface PageContent {
@@ -228,7 +231,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   log("Detectando estrutura de blocos com IA...");
   let detectedBlocks: DetectedBlock[];
   try {
-    detectedBlocks = await detectStructure(fullTextForStructure, numPages);
+    detectedBlocks = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
   } catch (err: any) {
     console.warn(`[ORGANIZE] IA falhou ao detectar blocos para ${material.fileName}. Criando bloco único.`);
     detectedBlocks = [];
@@ -275,6 +278,9 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
         createdBy: blockDef.createdBy || "AI",
         confidence: blockDef.confidence ?? 1.0,
         sourceHeading: blockDef.sourceHeading,
+        officialTopicId: blockDef.officialTopicId,
+        officialTopicName: blockDef.officialTopicName,
+        topicCode: blockDef.topicCode,
         status: "NOT_STARTED",
         nextActionType: "THEORY",
       }

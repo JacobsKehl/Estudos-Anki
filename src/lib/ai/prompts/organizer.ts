@@ -34,23 +34,29 @@ Formato de Retorno (JSON estrito, não inclua nada extra fora do bloco JSON):
 }`;
 
 export const STRUCTURE_DETECTION_PROMPT = `Você é um engenheiro de dados educacionais e especialista em estruturar conteúdos programáticos para o ciclo de estudos do TRT.
-Sua missão é ler o sumário ou o texto inicial de um material e dividi-lo em BLOCOS DE ESTUDO lógicos e específicos.
+Sua missão é ler o sumário ou o texto de um material e dividi-lo em BLOCOS DE ESTUDO lógicos e específicos, vinculando cada um deles ao tópico oficial correspondente do edital.
 
 Diretrizes de Divisão e Nomenclatura (P0 - CRÍTICO):
 1. PROIBIÇÃO ABSOLUTA DE TÍTULOS GENÉRICOS:
-   - É proibido usar títulos como: "Parte 1", "Conteúdo Completo", "Tópicos Iniciais", "PDF Inteiro", "Apostila Completa", "Introdução", "Visão Geral", "Capítulo 1", "Bloco 2".
+   - É proibido usar títulos como: "Parte 1", "Conteúdo Completo", "Tópicos Iniciais", "PDF Inteiro", "Apostila Completa", "Introdução", "Visão Geral", "Capítulo 1", "Bloco 2", "Parte X do Conteúdo".
    - O título do bloco DEVE refletir o ASSUNTO REAL E ESPECÍFICO do conteúdo.
    - Exemplos ruins: "Parte 1: Introdução", "Bloco de Estudos I", "Aulas Iniciais".
    - Exemplos perfeitos: "Atos Administrativos: Requisitos e Atributos", "Controle de Constitucionalidade por Via Incidental", "Teoria da Petição Inicial Trabalhista".
-2. SEPARAÇÃO TEMÁTICA:
-   - Nunca junte assuntos completamente diferentes no mesmo bloco. 
+2. SELEÇÃO DE PÁGINAS (DESENVOLVIMENTO VS RESUMO):
+   - Os blocos de estudo devem priorizar o desenvolvimento completo do conteúdo teórico.
+   - O intervalo de páginas selecionado DEVE conter: explicação principal do assunto, conceitos, definições, regras, exceções, jurisprudência relevante, artigos de lei fundamentados e exemplos práticos.
+   - NUNCA selecione intervalos que contenham apenas resumos rápidos, bizus finais, mapas mentais isolados, exercícios/questões sem explicação teórica, sumários ou checklists.
+   - Páginas de resumo ou esquemas podem constar apenas no final do intervalo, como complemento, mas nunca como o núcleo ou conteúdo único do bloco.
+3. MAPEAMENTO DE TÓPICO OFICIAL:
+   - Para cada bloco que criar, analise os tópicos oficiais da disciplina informados no prompt.
+   - Identifique e associe o bloco ao tópico oficial correspondente mais próximo e específico.
+   - Preencha os campos: "officialTopicId" (ID do tópico na lista), "topicCode" (Código do tópico, ex: "Tópico 03") e "officialTopicName" (Título do tópico).
+   - Se o bloco for de uma matéria que não possui tópicos mapeados ou se não houver nenhuma correspondência plausível após análise profunda, defina "officialTopicId" como null, "topicCode" como "GERAL", e "officialTopicName" como "Tópico não identificado".
+4. SEPARAÇÃO TEMÁTICA:
+   - Nunca junte assuntos completamente diferentes no mesmo bloco.
    - Cada bloco deve agrupar tópicos correlacionados (Ex: agrupar "Remuneração" e "Salário", mas separar de "Jornada de Trabalho").
-3. TAMANHO DOS BLOCOS (Páginas):
-   - Os blocos devem ter preferencialmente entre 5 e 15 páginas. 
-   - Se o material for extenso (ex: 80 páginas), divida-o por subtópicos reais e crie a quantidade mínima de blocos exigida abaixo.
-4. DESCRIÇÃO PEDAGÓGICA:
-   - Descreva em uma frase clara e focada o que o estudante dominará ao estudar este bloco específico.
-5. ESTIMATIVA DE TEMPO:
+5. TAMANHO DOS BLOCOS E ESTIMATIVA DE TEMPO:
+   - Os blocos devem ter preferencialmente entre 5 e 15 páginas.
    - Calcule de 3 a 4 minutos por página para materiais de direito/técnicos pesados.
 
 Regras de Quantidade Mínima de Blocos baseada no Total de Páginas:
@@ -67,7 +73,11 @@ Formato de Retorno Esperado (Array JSON estrito):
     "pageStart": 1,
     "pageEnd": 8,
     "sourceHeading": "Título original que aparece na página ou no sumário",
-    "estimatedStudyMinutes": 32
+    "estimatedStudyMinutes": 32,
+    "officialTopicId": "id_do_topico_aqui",
+    "officialTopicName": "Titulo completo do topico oficial associado",
+    "topicCode": "Tópico XX",
+    "justification": "Explicação curta do motivo pelo qual este intervalo de páginas representa o desenvolvimento completo/teórico e não apenas um resumo"
   }
 ]`;
 
@@ -76,6 +86,15 @@ export function buildSubjectPrompt(content: string, fileName?: string): string {
   return `${SUBJECT_IDENTIFICATION_PROMPT}\n\n${fileNameContext}Texto extraído para análise:\n${content}`;
 }
 
-export function buildStructurePrompt(content: string): string {
-  return `${STRUCTURE_DETECTION_PROMPT}\n\nTexto sumariado para fatiamento:\n${content}`;
+export function buildStructurePrompt(content: string, subjectName: string, officialTopicsListText: string): string {
+  return `${STRUCTURE_DETECTION_PROMPT}
+
+=========================================
+DISCIPLINA: ${subjectName}
+TÓPICOS OFICIAIS DISPONÍVEIS:
+${officialTopicsListText}
+=========================================
+
+Texto extraído do PDF para análise estrutural de fatiamento:
+${content}`;
 }

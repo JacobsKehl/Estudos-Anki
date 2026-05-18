@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { getAdaptiveStudyQueue, StudyTask, ActionType } from "./recommendations/adaptive-scheduler";
+import { StudyTask } from "./recommendations/adaptive-scheduler";
 import { TRT4_STRATEGY } from "./strategies/trt4";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -12,6 +12,16 @@ interface SmartScheduleOptions {
   subjectsPerDay?: number;  // default: 2
   minutesPerSubject?: number; // default: 60
 }
+
+const MAIN_7_SUBJECTS = [
+  "Direito do Trabalho",
+  "Direito Processual do Trabalho",
+  "Direito Administrativo",
+  "Direito Constitucional",
+  "Direito Civil",
+  "Direito Processual Civil",
+  "Língua Portuguesa"
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,18 +91,14 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
   const scheduleItemsData: any[] = [];
   const now = new Date();
   
-  // Rastrear IDs de blocos já agendados (no banco ou nesta sessão) para evitar duplicidade
-  const alreadyScheduledItems = await (prisma as any).studyScheduleItem.findMany({
-    where: {
-      userId,
-      status: { notIn: ["CANCELLED", "ARCHIVED"] },
-      studyBlockId: { not: null }
-    },
-    select: { studyBlockId: true }
+  // Rastrear IDs de blocos já concluídos no banco de dados para evitar reagendar o que já foi estudado
+  const dbCompletedBlocks = await (prisma as any).studyBlock.findMany({
+    where: { userId, status: "COMPLETED" },
+    select: { id: true }
   });
   
   const scheduledBlockIds = new Set<string>(
-    alreadyScheduledItems.map((i: any) => i.studyBlockId)
+    dbCompletedBlocks.map((b: any) => b.id)
   );
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
@@ -119,10 +125,14 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
 
     // B. Adicionar 2 Blocos de Estudo (45 min cada)
     for (const subName of subjectsTodayNames) {
+      // Garantir foco estrito nas 7 matérias principais
+      const isMain = MAIN_7_SUBJECTS.some(m => m.toLowerCase() === subName.toLowerCase());
+      if (!isMain) continue;
+
       const subject = userSubjects.find(s => s.name.toLowerCase().includes(subName.toLowerCase()));
       
       if (subject) {
-        // Verificar regra dos 90 dias
+        // Verificar regra de início do edital
         const strategySub = TRT4_STRATEGY.subjects.find(s => s.name === subName);
         if (strategySub?.cycleStartAfterDays) {
           const daysSinceSubjectCreated = (now.getTime() - subject.createdAt.getTime()) / (1000 * 60 * 60 * 24);
@@ -132,21 +142,51 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
         }
 
         // Buscar o próximo bloco pendente desta matéria que NÃO esteja agendado
-        const nextBlock = await (prisma as any).studyBlock.findFirst({
+        let nextBlock = await (prisma as any).studyBlock.findFirst({
           where: {
             subjectId: subject.id,
             userId,
-            theoryStatus: "NOT_STARTED",
+            status: { not: "COMPLETED" },
             id: { notIn: Array.from(scheduledBlockIds) }
           },
           orderBy: { orderIndex: "asc" },
         });
 
+        // Fallback Inteligente: Se não achar bloco para essa matéria do ciclo, busca de outra das 7 matérias principais
+        if (!nextBlock) {
+          const otherMainSubjects = userSubjects.filter(s => {
+            const isOtherMain = MAIN_7_SUBJECTS.some(m => s.name.toLowerCase().includes(m.toLowerCase()));
+            return isOtherMain && s.id !== subject.id;
+          });
+
+          // Ordenar outras matérias para dar prioridade às Trabalhistas (Trabalho e Processual do Trabalho)
+          otherMainSubjects.sort((a, b) => {
+            const isATrab = a.name.toLowerCase().includes("trabalho");
+            const isBTrab = b.name.toLowerCase().includes("trabalho");
+            if (isATrab && !isBTrab) return -1;
+            if (!isATrab && isBTrab) return 1;
+            return 0;
+          });
+
+          for (const otherSub of otherMainSubjects) {
+            nextBlock = await (prisma as any).studyBlock.findFirst({
+              where: {
+                subjectId: otherSub.id,
+                userId,
+                status: { not: "COMPLETED" },
+                id: { notIn: Array.from(scheduledBlockIds) }
+              },
+              orderBy: { orderIndex: "asc" },
+            });
+            if (nextBlock) break;
+          }
+        }
+
         if (nextBlock) {
           scheduleItemsData.push({
             userId,
             scheduleId: schedule.id,
-            subjectId: subject.id,
+            subjectId: nextBlock.subjectId,
             studyBlockId: nextBlock.id,
             actionType: "THEORY",
             priorityScore: 90,
@@ -248,7 +288,7 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
 
   // Rastrear também blocos concluídos de fato no banco
   const dbCompletedBlocks = await (prisma as any).studyBlock.findMany({
-    where: { userId, theoryStatus: "COMPLETED" },
+    where: { userId, status: "COMPLETED" },
     select: { id: true }
   });
   dbCompletedBlocks.forEach((b: any) => completedBlockIds.add(b.id));
@@ -296,6 +336,10 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
 
     // B. Adicionar Blocos de Estudo (teoria apenas, sem flashcards repetidos)
     for (const subName of subjectsTodayNames) {
+      // Garantir foco estrito nas 7 matérias principais
+      const isMain = MAIN_7_SUBJECTS.some(m => m.toLowerCase() === subName.toLowerCase());
+      if (!isMain) continue;
+
       const subject = userSubjects.find(s => s.name.toLowerCase().includes(subName.toLowerCase()));
       
       if (subject) {
@@ -309,21 +353,51 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
         }
 
         // Buscar próximo bloco pendente desta matéria que NÃO esteja nas listas de concluídos
-        const nextBlock = await (prisma as any).studyBlock.findFirst({
+        let nextBlock = await (prisma as any).studyBlock.findFirst({
           where: {
             subjectId: subject.id,
             userId,
-            theoryStatus: "NOT_STARTED",
+            status: { not: "COMPLETED" },
             id: { notIn: Array.from(completedBlockIds) }
           },
           orderBy: { orderIndex: "asc" },
         });
 
+        // Fallback Inteligente: Se não achar bloco para essa matéria do ciclo, busca de outra das 7 matérias principais
+        if (!nextBlock) {
+          const otherMainSubjects = userSubjects.filter(s => {
+            const isOtherMain = MAIN_7_SUBJECTS.some(m => s.name.toLowerCase().includes(m.toLowerCase()));
+            return isOtherMain && s.id !== subject.id;
+          });
+
+          // Ordenar outras matérias para dar prioridade às Trabalhistas (Trabalho e Processual do Trabalho)
+          otherMainSubjects.sort((a, b) => {
+            const isATrab = a.name.toLowerCase().includes("trabalho");
+            const isBTrab = b.name.toLowerCase().includes("trabalho");
+            if (isATrab && !isBTrab) return -1;
+            if (!isATrab && isBTrab) return 1;
+            return 0;
+          });
+
+          for (const otherSub of otherMainSubjects) {
+            nextBlock = await (prisma as any).studyBlock.findFirst({
+              where: {
+                subjectId: otherSub.id,
+                userId,
+                status: { not: "COMPLETED" },
+                id: { notIn: Array.from(completedBlockIds) }
+              },
+              orderBy: { orderIndex: "asc" },
+            });
+            if (nextBlock) break;
+          }
+        }
+
         if (nextBlock) {
           scheduleItemsData.push({
             userId,
             scheduleId: activeSchedule.id,
-            subjectId: subject.id,
+            subjectId: nextBlock.subjectId,
             studyBlockId: nextBlock.id,
             actionType: "THEORY",
             priorityScore: 90,

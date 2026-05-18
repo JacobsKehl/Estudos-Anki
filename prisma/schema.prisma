@@ -218,6 +218,9 @@ model StudyBlock {
   createdBy             String  @default("MANUAL") // MANUAL, AI
   sourceHeading         String?
   sourceSection         String?
+  officialTopicId       String?
+  officialTopicName     String?
+  topicCode             String?
   confidence            Float?
 
   // Study cycle lifecycle

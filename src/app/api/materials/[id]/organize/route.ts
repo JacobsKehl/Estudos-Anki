@@ -409,7 +409,7 @@ export async function POST(
       .map(p => p.text)
       .join("\n");
 
-    const detectedBlocks = await detectStructure(fullTextForStructure, numPages);
+    const detectedBlocks = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
 
     if (!detectedBlocks || detectedBlocks.length === 0) {
       await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "IA não detectou estrutura" } });
@@ -441,6 +441,9 @@ export async function POST(
           createdBy: blockDef.createdBy || "AI",
           confidence: blockDef.confidence ?? 1.0,
           sourceHeading: blockDef.sourceHeading,
+          officialTopicId: blockDef.officialTopicId,
+          officialTopicName: blockDef.officialTopicName,
+          topicCode: blockDef.topicCode,
           status: "NOT_STARTED",
           theoryStatus: "NOT_STARTED",
           questionsStatus: "NOT_STARTED",
