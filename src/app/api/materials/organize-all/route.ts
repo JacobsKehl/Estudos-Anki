@@ -92,8 +92,6 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   const log = (msg: string) => console.log(`[ORGANIZE] ${material.fileName}: ${msg}`);
   const result = { blocks: 0, flashcards: 0, subjectCreated: false };
 
-  const isLocal = material.sourceType === "LOCAL_INBOX" || material.sourceType === "LOCAL_UPLOAD";
-
   // ── Etapa 1: Extraindo texto por página ──────────────────────────────────
   log(`[Organize] PDF iniciado: ${material.fileName}`);
 

@@ -42,10 +42,7 @@ export async function POST(
     const material = await prisma.studyMaterial.findUnique({ where: { id } });
     if (!material) return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
 
-    // Na Nuvem, ignoramos o processamento de arquivos locais do Windows
-    if (material.sourceType === "LOCAL_INBOX") {
-       throw new Error("O processamento de arquivos locais não é suportado na Web. Por favor, faça o upload do arquivo novamente via botão 'Nuvem'.");
-    }
+    // Sempre usar Supabase para o processamento
 
     // Download from Supabase Storage
     const { data, error } = await supabase.storage.from('materials').download(material.sourcePath!);
