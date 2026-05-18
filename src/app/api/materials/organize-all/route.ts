@@ -156,8 +156,13 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     .join("\n\n");
 
   let subjectId = material.subjectId;
-  let detectedSubject = "";
-  
+  let detectedSubject = material.detectedSubjectName || "";
+
+  if (subjectId && !detectedSubject) {
+    const existingSubject = await prisma.studySubject.findUnique({ where: { id: subjectId } });
+    if (existingSubject) detectedSubject = existingSubject.name;
+  }
+
   if (!subjectId || isReorganizing) {
     log("Identificando matéria com IA...");
     const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName);
