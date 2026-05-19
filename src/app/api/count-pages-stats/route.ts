@@ -5,12 +5,11 @@ export async function GET() {
   try {
     const extractedPagesCount = await prisma.extractedContent.count();
     const materialsProcessed = await prisma.studyMaterial.findMany({
-      where: {
-        processingStatus: "PROCESSED"
-      },
       select: {
         fileName: true,
-        totalPages: true
+        totalPages: true,
+        processingStatus: true,
+        organizationStatus: true
       }
     });
 
