@@ -158,8 +158,11 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
     }
   };
 
-  const runBulkAction = async (mode: "general" | "flashcards_only" | "clear_flashcards" | "unorganize") => {
-    const ids = Array.from(selectedIds);
+  const runBulkAction = async (
+    mode: "general" | "content_only" | "flashcards_only" | "clear_flashcards" | "unorganize",
+    targetIds?: string[]
+  ) => {
+    const ids = targetIds || Array.from(selectedIds);
     setBulkActionTotal(ids.length);
     setBulkActionCurrentIndex(0);
     setIsProcessingBulkAction(true);
@@ -185,6 +188,12 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
         setBulkActionStep("Identificando matéria correspondente...");
         await new Promise(r => setTimeout(r, 600));
         setBulkActionStep("Criando blocos de estudos temáticos com IA...");
+      } else if (mode === "content_only") {
+        setBulkActionStep("Lendo páginas e extraindo texto do PDF...");
+        await new Promise(r => setTimeout(r, 600));
+        setBulkActionStep("Identificando matéria correspondente...");
+        await new Promise(r => setTimeout(r, 600));
+        setBulkActionStep("Criando blocos de estudos temáticos (Apenas Teoria)...");
       } else if (mode === "flashcards_only") {
         setBulkActionStep("Carregando blocos de estudo...");
         await new Promise(r => setTimeout(r, 650));
@@ -457,6 +466,7 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
               isSelected={selectedIds.has(material.id)}
               onSelect={handleToggleSelect}
               isSelectionMode={isSelectionMode}
+              onOrganizeSingle={(mode) => runBulkAction(mode, [material.id])}
             />
           ))
         )}

@@ -36,13 +36,15 @@ interface MaterialCardProps {
   isSelected?: boolean;
   onSelect?: (id: string) => void;
   isSelectionMode?: boolean;
+  onOrganizeSingle?: (mode: "general" | "content_only" | "flashcards_only" | "clear_flashcards" | "unorganize") => Promise<void>;
 }
 
 export function MaterialCard({ 
   material, 
   isSelected = false, 
   onSelect, 
-  isSelectionMode = false 
+  isSelectionMode = false,
+  onOrganizeSingle
 }: MaterialCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -60,6 +62,17 @@ export function MaterialCard({
   const executeOrganizationAction = async (mode: string) => {
     setIsOrganizing(true);
     setShowActionsDialog(false);
+    
+    if (onOrganizeSingle) {
+      try {
+        await onOrganizeSingle(mode as any);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsOrganizing(false);
+      }
+      return;
+    }
     
     let loadingMsg = "Processando requisição...";
     if (mode === "general") loadingMsg = "Iniciando pipeline completo: PDF → Blocos → Flashcards...";
