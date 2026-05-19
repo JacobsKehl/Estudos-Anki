@@ -20,7 +20,13 @@ export async function GET(req: NextRequest) {
     console.log(`[DEBUG GEMINI] Masked Key: ${maskedKey}, Length: ${keyLength}`);
 
     const results: Record<string, { success: boolean; reply?: string; error?: string }> = {};
-    const modelsToTest = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+    const modelsToTest = [
+      "gemini-2.5-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash-002",
+      "gemini-1.5-pro-latest"
+    ];
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
