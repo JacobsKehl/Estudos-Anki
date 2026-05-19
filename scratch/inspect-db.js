@@ -3,23 +3,20 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
-  const materials = await prisma.studyMaterial.findMany({
-    where: {
-      fileName: { contains: "7" }
-    },
-    orderBy: { createdAt: "desc" }
+  const m = await prisma.studyMaterial.findUnique({
+    where: { id: "cmpah8enm0001jj04623eqhn4" },
+    include: { subject: true }
   });
 
-  console.log("=== MATERIAL LIST ===");
-  for (const m of materials) {
-    console.log(`- ID: ${m.id}`);
-    console.log(`  Title: ${m.title}`);
-    console.log(`  File Name: ${m.fileName}`);
-    console.log(`  Source Path: ${m.sourcePath}`);
-    console.log(`  Status: ${m.organizationStatus}`);
-    console.log(`  Error: ${m.processingError || "None"}`);
-    console.log(`  Detected structure: ${m.detectedStructure ? "Yes" : "No"}`);
-    console.log("------------------------");
+  if (m) {
+    console.log(`=== MATERIAL DETAILS ===`);
+    console.log(`- File Name: ${m.fileName}`);
+    console.log(`- Status: ${m.organizationStatus}`);
+    console.log(`- Error: ${m.processingError || "None"}`);
+    console.log(`- Subject: ${m.subject?.name || "None"}`);
+    console.log(`- Detected Subject: ${m.detectedSubjectName || "None"}`);
+    console.log(`- Updated At: ${m.updatedAt.toISOString()}`);
+    console.log(`- Detected Structure: ${m.detectedStructure ? m.detectedStructure.substring(0, 500) : "None"}`);
   }
 }
 

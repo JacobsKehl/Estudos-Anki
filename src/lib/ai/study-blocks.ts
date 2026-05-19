@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { STUDY_BLOCK_GENERATION_PROMPT } from "./prompts/study-block-generation";
+import { callGeminiWithRetry } from "./utils/retry";
 
 export interface SuggestedBlock {
   title: string;
@@ -30,7 +31,7 @@ export async function suggestStudyBlocks(materialId: string, pages: { pageNumber
   const prompt = STUDY_BLOCK_GENERATION_PROMPT.replace("{{pages}}", pagesText);
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await callGeminiWithRetry(() => model.generateContent(prompt));
     const response = await result.response;
     const text = response.text();
     

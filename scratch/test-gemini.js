@@ -1,6 +1,7 @@
-import { identifySubject } from "../src/lib/ai/organizer";
-import dotenv from "dotenv";
-dotenv.config();
+const { identifySubject } = require("../src/lib/ai/organizer");
+const { PrismaClient } = require("@prisma/client");
+
+const prisma = new PrismaClient();
 
 async function main() {
   const sampleText = "Aula 06  TRT-RS 4ª Região (Analista Judiciário -  Área Judiciária) Direito Processual do  Trabalho  Autor:  Bruno Klippel  27 de Janeiro de 2026";
@@ -15,4 +16,6 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

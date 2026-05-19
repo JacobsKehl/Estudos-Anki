@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from "fs";
 import { PDFDocument } from "pdf-lib";
+import { callGeminiWithRetry } from "../utils/retry";
 
 /**
  * Gemini-based PDF OCR with Chunking and Retry support
@@ -53,33 +54,22 @@ export async function extractTextWithGeminiOCR(source: string | Buffer): Promise
     `;
 
     let success = false;
-    let retries = 3;
+    try {
+      const result = await callGeminiWithRetry(() => model.generateContent([
+        { inlineData: { data: base64Data, mimeType: "application/pdf" } },
+        prompt
+      ]), 4, 3000); // 4 retries, starting delay 3s since OCR is heavy
 
-    while (!success && retries > 0) {
-      try {
-        const result = await model.generateContent([
-          { inlineData: { data: base64Data, mimeType: "application/pdf" } },
-          prompt
-        ]);
-
-        const text = result.response.text();
-        const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleanJson);
-        
-        if (Array.isArray(parsed)) {
-          allPages.push(...parsed);
-          success = true;
-        }
-      } catch (error: any) {
-        if (error.message.includes("503") || error.message.includes("429")) {
-          console.log(`  Retry needed (503/429). Retries left: ${retries - 1}`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          retries--;
-        } else {
-          console.error(`  Fatal error in chunk ${start + 1}-${end}:`, error.message);
-          break;
-        }
+      const text = result.response.text();
+      const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJson);
+      
+      if (Array.isArray(parsed)) {
+        allPages.push(...parsed);
+        success = true;
       }
+    } catch (error: any) {
+      console.error(`  Fatal error in chunk ${start + 1}-${end}:`, error.message);
     }
 
     if (!success) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { callGeminiWithRetry } from "../../lib/ai/utils/retry";
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,32 +20,12 @@ export async function GET(req: NextRequest) {
 
     console.log(`[DEBUG GEMINI] Masked Key: ${maskedKey}, Length: ${keyLength}`);
 
-    const results: Record<string, { success: boolean; reply?: string; error?: string }> = {};
-    const modelsToTest = [
-      "gemini-2.5-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-latest",
-      "gemini-1.5-flash-002",
-      "gemini-1.5-pro-latest"
-    ];
-
     const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    for (const mName of modelsToTest) {
-      try {
-        const model = genAI.getGenerativeModel({ model: mName });
-        const response = await model.generateContent("Respond with 'OK'");
-        results[mName] = {
-          success: true,
-          reply: response.response.text().trim()
-        };
-      } catch (err: any) {
-        results[mName] = {
-          success: false,
-          error: err.message
-        };
-      }
-    }
+    // Test resilient call
+    const result = await callGeminiWithRetry(() => model.generateContent("Respond with 'System Online'"));
+    const replyText = result.response.text().trim();
 
     return NextResponse.json({
       success: true,
@@ -52,7 +33,7 @@ export async function GET(req: NextRequest) {
       keyLength,
       hasQuotes,
       hasSpaces,
-      results
+      replyText
     });
   } catch (err: any) {
     return NextResponse.json({

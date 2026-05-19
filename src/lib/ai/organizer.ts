@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildSubjectPrompt, buildStructurePrompt } from "./prompts/organizer";
 import { OFFICIAL_TOPICS } from "../constants/official-topics";
+import { callGeminiWithRetry } from "./utils/retry";
 
 export interface SubjectIdentification {
   subjectName: string;
@@ -41,7 +42,7 @@ export async function identifySubject(firstPagesContent: string, fileName?: stri
   const prompt = buildSubjectPrompt(firstPagesContent, fileName);
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await callGeminiWithRetry(() => model.generateContent(prompt));
     const responseText = result.response.text();
     const startIndex = responseText.indexOf("{");
     const endIndex = responseText.lastIndexOf("}");
@@ -155,7 +156,7 @@ export async function detectStructure(
 
   while (attempts < 2) {
     try {
-      const result = await model.generateContent(currentPrompt);
+      const result = await callGeminiWithRetry(() => model.generateContent(currentPrompt));
       const response = await result.response;
       lastResponse = response.text();
       

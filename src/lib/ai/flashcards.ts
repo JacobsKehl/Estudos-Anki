@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildFlashcardPrompt } from "./prompts/flashcard-generation";
+import { callGeminiWithRetry } from "./utils/retry";
 
 export interface GeneratedFlashcard {
   question: string;
@@ -23,7 +24,7 @@ export async function generateFlashcards(text: string): Promise<GeneratedFlashca
   const prompt = buildFlashcardPrompt(text);
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await callGeminiWithRetry(() => model.generateContent(prompt));
     const response = await result.response;
     const responseText = response.text();
     // Limpa a resposta para garantir que seja um JSON válido
