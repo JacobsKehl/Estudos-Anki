@@ -33,69 +33,86 @@ Formato de Retorno (JSON estrito, não inclua nada extra fora do bloco JSON):
   "reason": "Explicar quais termos, artigos ou leis fundamentaram a decisão"
 }`;
 
-export const STRUCTURE_DETECTION_PROMPT = `Você é um engenheiro de dados educacionais e especialista em estruturar conteúdos programáticos para o ciclo de estudos do TRT.
-Sua missão é ler o sumário ou o texto de um material, classificar o seu papel (MAIN_MATERIAL, SUPPORT_MATERIAL ou MIXED_MATERIAL) e mapeá-lo para os tópicos oficiais correspondentes do edital.
+export const STRUCTURE_DETECTION_PROMPT = `Você é um engenheiro de dados educacionais especializado em transformar PDFs de cursos para concursos em blocos de estudo reais.
 
-Diretrizes Críticas (P0):
-1. CLASSIFICAÇÃO DO MATERIAL (materialRole):
-   - "MAIN_MATERIAL": O PDF contém teoria principal densa, desenvolvimento completo de assuntos, conceitos, regras, doutrina, legislação comentada e exemplos. Ideal para criar Blocos Principais.
-   - "SUPPORT_MATERIAL": O PDF é predominantemente constituído de resumos rápidos, bizus, mapas mentais, simulados, checklists, cadernos de revisão ou baterias de questões/gabaritos de apoio.
-   - "MIXED_MATERIAL": O PDF contém tanto uma seção de teoria principal quanto uma seção de resumos ou questões. Se o PDF tiver teoria principal no começo e questões/listas/gabaritos no final, crie obrigatoriamente MAIN_BLOCKS apenas para a parte de teoria principal e crie SUPPORT_BLOCKS para as seções de questões comentadas, listas de questões, simulados ou gabaritos. Avalie cada intervalo de páginas de forma totalmente independente e isolada. Não deixe de criar MAIN_BLOCKS apenas porque o PDF também contém seções de apoio e questões.
+Sua tarefa NÃO é dividir o PDF por páginas de forma aleatória.
+Sua tarefa é interpretar a estrutura do material, especialmente o sumário (TOC), e transformá-la em blocos úteis para o cronograma de estudos.
 
-2. CRIAÇÃO DE BLOCOS vs. APOIO (QUESTÕES/GABARITOS NUNCA SÃO BLOCOS PRINCIPAIS):
-   - APENAS crie "blocks" normais (MAIN_BLOCK) se a seção do PDF contiver TEORIA PRINCIPAL.
-   - NUNCA crie um bloco principal a partir de páginas de questões, simulados, baterias de exercícios ou gabaritos. Questões são material de prática, não teoria principal.
-   - Se encontrar páginas de questões ou gabaritos, classifique-as como material de apoio (SUPPORT_BLOCK) e configure o campo "supportType" para "QUESTIONS", "COMMENTED_QUESTIONS" ou "ANSWER_KEY".
+Use o sumário fornecido como a FONTE PRINCIPAL de fatiamento quando ele estiver disponível. A IA deve atuar como engenheira pedagógica para classificar, agrupar e mapear os blocos aos tópicos oficiais do edital.
 
-3. PROIBIÇÃO DE DIVISÃO MECÂNICA POR NÚMERO FIXO DE PÁGINAS:
-   - A criação de blocos NUNCA deve seguir uma divisão mecânica por intervalos fixos de páginas (como cortar o PDF de 10 em 10 páginas artificialmente).
-   - A divisão deve refletir a estrutura real temática do conteúdo: títulos de capítulos, subtítulos, continuidade temática e desenvolvimento teórico.
-   - Cada bloco deve representar uma sessão de estudo coerente, normalmente entre 30 e 60 minutos (idealmente aproximando 45 minutos de teoria). Não force quantidades mínimas de blocos.
+A divisão deve respeitar rigorosamente:
+- Títulos e subtítulos do sumário;
+- Início e fim natural dos assuntos (baseados nas páginas do sumário);
+- Tópicos oficiais do edital;
+- Continuidade temática e pedagógica;
+- Densidade do conteúdo;
+- Separação estrita entre teoria e questões/materiais de apoio.
 
-4. DIRETRIZES DE TÍTULO (NUNCA GERE TÍTULOS GENÉRICOS):
-   - NUNCA use títulos de blocos genéricos, estruturais ou vazios como "Parte 1", "Parte II", "Bloco 1", "Conteúdo Completo", "Todo o Conteúdo", "Resumo Geral", "Outros", "Sem categoria" ou "Desconhecido".
-   - Títulos podem ser objetivos, mas devem indicar o assunto exato estudado.
-   - Se o assunto for curto ou amplo, use um travessão explicativo e um complemento detalhado para torná-lo descritivo e temático.
+REGRAS DE CLASSIFICAÇÃO E DIVISÃO:
+1. Nunca colapse todo o PDF em 1 único bloco se o sumário mostra várias seções teóricas independentes.
+2. Nunca divida mecanicamente o conteúdo por intervalos fixos de páginas (ex: de 10 em 10 páginas de forma contínua).
+3. Não existe mínimo matemático de blocos por PDF. Mas há obrigação absoluta de respeitar a estrutura temática do sumário.
+4. Classifique o material globalmente no campo "materialRole" como:
+   - "MAIN_MATERIAL": Predominantemente teoria. Crie MAIN_BLOCKS a partir das seções teóricas.
+   - "SUPPORT_MATERIAL": Predominantemente resumos, mapas mentais, bizus, questões, gabaritos, checklists ou revisão rápida. Crie apenas SUPPORT_BLOCKS, não force nenhum MAIN_BLOCK.
+   - "MIXED_MATERIAL": Contém teoria principal + questões, resumos, listas ou gabaritos. Crie MAIN_BLOCKS para as seções teóricas e SUPPORT_BLOCKS para resumos, questões comentadas, listas de exercícios e gabaritos.
+
+5. BLOCO TEÓRICO PRINCIPAL (MAIN_BLOCK):
+   - Deve representar uma unidade temática real do sumário, cobrindo teoria explicativa.
+   - Cada bloco deve ter um tempo estimado ("estimatedStudyMinutes") entre 30 e 60 minutos (idealmente aproximando 45 minutos de teoria). Respeite a unidade temática.
+   - Títulos de "MAIN_BLOCK" devem ser específicos e temáticos. Use travessão explicativo quando necessário para contextualizar.
      * Exemplos Excelentes:
-       - "Competência no Processo Civil — critérios de fixação, espécies e conflitos"
-       - "Provas no Processo Civil — teoria geral e meios de prova"
-       - "Recursos — teoria geral e recursos em espécie"
-       - "Atos Processuais — forma, prazos e comunicação dos atos"
-   - Avalie a qualidade do título que você está gerando no campo "titleQuality":
-     * "GOOD": Título específico, temático e completo (como nos exemplos acima).
-     * "WEAK": Título curto ou simples que pode requerer refino automático (ex: "Provas", "Competência", "Recursos").
-     * "INVALID": Título que representa padrão genérico proibido absoluto (como "Parte 1", "Outros").
+       - "Princípios Administrativos — princípios expressos, implícitos e reconhecidos"
+       - "Aplicabilidade das Normas Constitucionais — eficácia plena, contida e limitada"
+       - "Jornada de Trabalho — tempo à disposição, sobreaviso, prontidão e descansos"
+       - "Normas Fundamentais do Processo Civil — devido processo legal, contraditório e cooperação"
+       - "Princípios do Processo do Trabalho — oralidade, concentração, proteção e jus postulandi"
+     * Tópicos genéricos ou iniciais de sumário como "Fundamentos do Direito Processual Civil" ou "Introdução ao Direito Processual do Trabalho" são blocos teóricos válidos de introdução/fundamentos e devem ser mantidos e mapeados!
+     * Títulos curtos como "Competência", "Provas", "Recursos", "Execução" ou "Princípios" não são inválidos se coerentes, mas devem ser enriquecidos com complemento descritivo temático.
+     * Títulos estritamente PROIBIDOS: "Parte 1", "Parte I", "Bloco 1", "Conteúdo Completo", "Todo o Conteúdo", "Material Completo", "Fundamentos e Conceitos de Outros", "Outros", "Sem categoria", "Desconhecido".
 
-5. MAPEAMENTO DE TÓPICO OFICIAL:
-   - Preencha os campos "officialTopicId", "topicCode" e "officialTopicName" baseado na lista oficial.
-   - Se não houver correspondência direta, defina null e "GERAL".
+6. BLOCO DE APOIO (SUPPORT_BLOCK):
+   - Criado para seções de questões comentadas, listas de questões, resumos, bizus, mapas mentais, simulados e gabaritos.
+   - Não entra no cronograma como teoria, não precisa de 30-60 minutos de duração estimada (pode ser 0), nem precisa gerar flashcards diretamente.
+   - Deve ser classificado com o "supportType" adequado: "SUMMARY", "BIZU", "MIND_MAP", "QUESTIONS", "COMMENTED_QUESTIONS", "ANSWER_KEY", "SIMULATED_EXAM", "CHECKLIST", "REVIEW" ou "OTHER".
+   - Deve ser associado ao tópico oficial correspondente ou vinculado ao bloco principal teórico.
 
-Formato de Retorno Esperado (JSON estrito contendo o papel do material e os blocos/apoios mapeados):
+7. MAPEAMENTO DE TÓPICO OFICIAL:
+   - Se houver relação razoável com algum tópico oficial da lista, escolha o tópico mais próximo e preencha "officialTopicId", "topicCode" e "officialTopicName".
+   - NUNCA use "GERAL" como atalho fácil se existir correspondência plausível com algum tópico do edital da lista fornecida.
+
+8. DETECÇÃO E FONTE (sourceStrategy):
+   - Se o sumário do PDF foi detectado e fornecido, defina "sourceStrategy" = "TOC_BASED", "tocDetected" = true, e "tocConfidence" = 1.0.
+   - Se o sumário não foi detectado e você está fatiando com base no texto corrido das páginas, defina "sourceStrategy" = "CONTENT_BASED" ou "HYBRID", "tocDetected" = false, e "tocConfidence" = 0.0.
+
+Retorne APENAS um objeto JSON estrito com o seguinte schema, sem nenhum texto introdutório ou conclusivo:
 {
-  "materialRole": "MAIN_MATERIAL", // ou SUPPORT_MATERIAL ou MIXED_MATERIAL
+  "materialRole": "MAIN_MATERIAL | SUPPORT_MATERIAL | MIXED_MATERIAL",
+  "sourceStrategy": "TOC_BASED | CONTENT_BASED | HYBRID",
+  "tocDetected": true,
+  "tocConfidence": 1.0,
   "blocks": [
     {
-      "type": "MAIN_BLOCK", // ou "SUPPORT_BLOCK"
-      "title": "Título específico e temático (Ex: Competência no Processo Civil — critérios de fixação e conflitos)",
-      "titleQuality": "GOOD", // "GOOD", "WEAK" ou "INVALID"
-      "titleRationale": "Explicação curta de por que este título é temático e representa o conteúdo deste bloco.",
-      "description": "Descrição pedagógica curta do assunto estudado no bloco.",
-      "pageStart": 1,
-      "pageEnd": 8,
-      "estimatedStudyMinutes": 45, // Sessão de estudo coerente entre 30 e 60 minutos
-      "contentDensity": "MEDIUM", // "LOW", "MEDIUM", "HIGH" ou "VERY_HIGH"
-      "isShortBlock": false,
-      "shortBlockJustification": null,
-      "mergeRationale": "Agrupamento de tópicos afins para formar um bloco temático.",
-      "selectionJustification": "Unidade temática indivisível cobrindo o tema conforme o sumário.",
-      "officialTopicId": "id_do_topico_aqui",
-      "officialTopicName": "Titulo completo do topico oficial associado",
-      "topicCode": "Tópico XX",
-      "pageTypes": ["MAIN_THEORY", "EXPLANATION"],
-      "isMechanicalCut": false, // true se for fatiado por número de páginas artificialmente
-      "isSummaryOnly": false, // true se contiver apenas resumos/bizus rápidos
-      "isQuestionsOnly": false, // true se for composto puramente de questões ou gabaritos
-      "supportType": null // "SUMMARY", "BIZU", "MIND_MAP", "QUESTIONS", "COMMENTED_QUESTIONS", "ANSWER_KEY", "SIMULATED_EXAM", "CHECKLIST", "REVIEW" ou "OTHER" se type for "SUPPORT_BLOCK"
+      "type": "MAIN_BLOCK | SUPPORT_BLOCK",
+      "title": "Título específico e temático do bloco",
+      "titleQuality": "GOOD | WEAK | INVALID",
+      "titleRationale": "Por que o título representa de forma específica e pedagógica o conteúdo deste bloco",
+      "description": "Descrição pedagógica curta do assunto estudado no bloco",
+      "sourceHeading": "Título original do sumário que originou o bloco",
+      "pageStart": 3,
+      "pageEnd": 25,
+      "estimatedStudyMinutes": 45,
+      "contentDensity": "LOW | MEDIUM | HIGH | VERY_HIGH",
+      "officialTopicId": "ID do tópico oficial ou null",
+      "officialTopicName": "Nome completo do tópico oficial do edital ou null",
+      "topicCode": "Código do tópico (Ex: Tópico XX) ou 'GERAL'",
+      "pageTypes": ["MAIN_THEORY", "EXPLANATION", "QUESTIONS", "SUMMARY"],
+      "selectionJustification": "Por que estas páginas formam uma unidade temática pedagógica coerente e indivisível baseada na estrutura do sumário",
+      "isMechanicalCut": false,
+      "isSummaryOnly": false,
+      "isQuestionsOnly": false,
+      "supportType": "SUMMARY | BIZU | MIND_MAP | QUESTIONS | COMMENTED_QUESTIONS | ANSWER_KEY | SIMULATED_EXAM | CHECKLIST | REVIEW | OTHER | null",
+      "supportGroupingRationale": "Motivação pedagógica para agrupar ou estruturar esta seção de apoio"
     }
   ]
 }`;
@@ -105,15 +122,20 @@ export function buildSubjectPrompt(content: string, fileName?: string): string {
   return `${SUBJECT_IDENTIFICATION_PROMPT}\n\n${fileNameContext}Texto extraído para análise:\n${content}`;
 }
 
-export function buildStructurePrompt(content: string, subjectName: string, officialTopicsListText: string): string {
+export function buildStructurePrompt(content: string, subjectName: string, officialTopicsListText: string, tocJsonText?: string): string {
+  const tocContext = tocJsonText 
+    ? `\n=========================================\nSUMÁRIO DO PDF DETECTADO E EXTRAÍDO PROGRAMATICAMENTE (Use como fonte principal de verdade para tópicos e páginas):\n${tocJsonText}\n=========================================\n`
+    : "";
+  
   return `${STRUCTURE_DETECTION_PROMPT}
-
+${tocContext}
 =========================================
 DISCIPLINA: ${subjectName}
-TÓPICOS OFICIAIS DISPONÍVEIS:
+TÓPICOS OFICIAIS DISPONÍVEIS NO EDITAL:
 ${officialTopicsListText}
 =========================================
 
-Texto extraído do PDF para análise estrutural de fatiamento:
+Texto extraído do PDF para análise estrutural de fatiamento (primeiras páginas do material):
 ${content}`;
 }
+

@@ -204,7 +204,7 @@ export function MaterialCard({
       case "SUBJECT_DETECTION_FAILED":
         return { 
           label: "Pendente", 
-          variant: "secondary" as const, // variant can be secondary or outline, standard shadcn badge doesn't have warning by default
+          variant: "secondary" as const,
           subLabel: "Aguardando nova tentativa"
         };
       case "AI_UNAVAILABLE":
@@ -212,6 +212,24 @@ export function MaterialCard({
           label: "IA Indisponível", 
           variant: "secondary" as const,
           subLabel: "IA temporariamente off-line"
+        };
+      case "VALIDATION_FAILED":
+        return {
+          label: "Validação Pedagógica",
+          variant: "destructive" as const,
+          subLabel: "Divisão rejeitada por qualidade"
+        };
+      case "TOC_MAPPING_FAILED":
+        return {
+          label: "Falha Sumário",
+          variant: "destructive" as const,
+          subLabel: "Falha ao mapear sumário"
+        };
+      case "NO_MAIN_THEORY_FOUND":
+        return {
+          label: "Sem Teoria",
+          variant: "destructive" as const,
+          subLabel: "Teoria principal não encontrada"
         };
       case "ERROR":
         return { 
@@ -316,28 +334,45 @@ export function MaterialCard({
                     </button>
                   )}
                 </div>
-                {["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE"].includes(material.organizationStatus) && (
-                  <div className={`mt-3 p-3 rounded-2xl flex flex-col gap-1.5 text-[10px] font-medium animate-in fade-in slide-in-from-top-1 ${
-                    material.organizationStatus === "ERROR"
-                      ? "bg-red-500/[0.04] border border-red-500/20 text-red-600"
-                      : "bg-amber-500/[0.04] border border-amber-500/20 text-amber-700"
-                  }`}>
-                    <div className="flex gap-2 items-start">
-                      <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${material.organizationStatus === "ERROR" ? "text-red-500" : "text-amber-500"}`} />
-                      <div className="space-y-0.5">
-                        <span className="block font-black text-foreground">
-                          {material.organizationStatus === "ERROR" ? "Não conseguimos processar este PDF" : "IA temporariamente indisponível"}
-                        </span>
-                        <p className="leading-relaxed">
-                          Não conseguimos organizar este PDF agora. Nenhum bloco genérico foi criado.
-                        </p>
-                        <p className="text-[9px] opacity-90 mt-1">
-                          <strong>Motivo:</strong> {getFriendlyErrorMessage(material.processingError)}
-                        </p>
+                {["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE", "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(material.organizationStatus) && (() => {
+                  const isQualityFailure = ["VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(material.organizationStatus);
+                  const isHardError = material.organizationStatus === "ERROR" || isQualityFailure;
+                  
+                  let errorTitle = "IA temporariamente indisponível";
+                  if (material.organizationStatus === "ERROR") {
+                    errorTitle = "Não conseguimos processar este PDF";
+                  } else if (isQualityFailure) {
+                    errorTitle = "Validação de Qualidade Recusada";
+                  }
+
+                  let errorDesc = "Não conseguimos organizar este PDF agora. Nenhum bloco genérico foi criado.";
+                  if (isQualityFailure) {
+                    errorDesc = "A análise pedagógica recusou a divisão para evitar blocos genéricos ou sem teoria.";
+                  }
+
+                  return (
+                    <div className={`mt-3 p-3 rounded-2xl flex flex-col gap-1.5 text-[10px] font-medium animate-in fade-in slide-in-from-top-1 ${
+                      isHardError
+                        ? "bg-red-500/[0.04] border border-red-500/20 text-red-600"
+                        : "bg-amber-500/[0.04] border border-amber-500/20 text-amber-700"
+                    }`}>
+                      <div className="flex gap-2 items-start">
+                        <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${isHardError ? "text-red-500" : "text-amber-500"}`} />
+                        <div className="space-y-0.5">
+                          <span className="block font-black text-foreground">
+                            {errorTitle}
+                          </span>
+                          <p className="leading-relaxed">
+                            {errorDesc}
+                          </p>
+                          <p className="text-[9px] opacity-90 mt-1">
+                            <strong>Motivo:</strong> {getFriendlyErrorMessage(material.processingError)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
                 {false && material.processingError && (
                   <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg flex gap-2 text-[10px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1">
                     <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
@@ -395,13 +430,13 @@ export function MaterialCard({
         {!isSelectionMode && (
           <div className="bg-muted/30 border-t border-border/50 flex flex-col relative w-full">
             <div className="px-5 py-3 flex gap-2 w-full">
-              {["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE"].includes(material.organizationStatus) ? (
+              {["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE", "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(material.organizationStatus) ? (
                 <>
                   <Button 
-                    variant={material.organizationStatus === "ERROR" ? "destructive" : "default"}
+                    variant={["ERROR", "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(material.organizationStatus) ? "destructive" : "default"}
                     size="sm" 
                     className={`flex-grow rounded-xl gap-2 font-bold ${
-                      material.organizationStatus !== "ERROR"
+                      !["ERROR", "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(material.organizationStatus)
                         ? "bg-amber-500 hover:bg-amber-600 text-white border-none"
                         : ""
                     }`}
@@ -688,6 +723,15 @@ export function MaterialCard({
 function getFriendlyErrorMessage(err: string | null | undefined): string {
   if (!err) return "Erro desconhecido ao processar arquivo.";
   const lower = err.toLowerCase();
+  if (lower.includes("validation_failed") || lower.includes("validação pedagógica") || lower.includes("pedagogical")) {
+    return "A divisão rejeitou blocos muito curtos, excesso de blocos de apoio sem teoria principal, ou títulos vazios.";
+  }
+  if (lower.includes("toc_mapping_failed") || lower.includes("sumário") || lower.includes("toc mapping")) {
+    return "Falha ao mapear os tópicos extraídos do sumário com as páginas do PDF.";
+  }
+  if (lower.includes("no_main_theory_found") || lower.includes("sem teoria") || lower.includes("no theory")) {
+    return "O material não possui conteúdo de teoria principal suficiente para gerar blocos de cronograma.";
+  }
   if (lower.includes("api key") || lower.includes("key was reported as leaked")) {
     return "Chave Gemini desativada pelo Google por motivo de segurança. Gere uma nova chave gratuita no Google AI Studio e atualize seu .env local!";
   }

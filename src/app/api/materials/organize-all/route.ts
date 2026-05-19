@@ -276,15 +276,15 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     const isForbiddenTitle = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt)) ||
                               FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(block.title));
     if (isForbiddenTitle) {
-      throw new Error(`O bloco "${block.title}" possui um título genérico proibido. A organização foi abortada.`);
+      throw new Error(`VALIDATION_FAILED: O bloco "${block.title}" possui um título genérico proibido. A organização foi abortada.`);
     }
 
     if (isMainSubject && block.type !== "SUPPORT_BLOCK" && !block.officialTopicId) {
-      throw new Error(`O bloco "${block.title}" na disciplina "${detectedSubject}" não foi mapeado para um tópico oficial do edital. A organização foi abortada.`);
+      throw new Error(`VALIDATION_FAILED: O bloco "${block.title}" na disciplina "${detectedSubject}" não foi mapeado para um tópico oficial do edital. A organização foi abortada.`);
     }
 
     if (block.pageStart < 1 || block.pageEnd < block.pageStart || block.pageEnd > numPages) {
-      throw new Error(`O bloco "${block.title}" possui intervalo de páginas inválido (${block.pageStart}-${block.pageEnd}). A organização foi abortada.`);
+      throw new Error(`VALIDATION_FAILED: O bloco "${block.title}" possui intervalo de páginas inválido (${block.pageStart}-${block.pageEnd}). A organização foi abortada.`);
     }
   }
 
@@ -598,7 +598,8 @@ export async function POST(req: NextRequest) {
     // 2. Materiais a organizar (inclui tentativas recuperáveis na fila de processamento automático)
     const statusFilter = [
       "IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", 
-      "GENERATING_FLASHCARDS", "ERROR", "NEEDS_RETRY", "AI_UNAVAILABLE", "SUBJECT_DETECTION_FAILED"
+      "GENERATING_FLASHCARDS", "ERROR", "NEEDS_RETRY", "AI_UNAVAILABLE", "SUBJECT_DETECTION_FAILED",
+      "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"
     ];
 
     const materialsToProcess = await prisma.studyMaterial.findMany({
@@ -654,6 +655,20 @@ export async function POST(req: NextRequest) {
         let targetStatus = "NEEDS_RETRY";
         if (error.message.includes("SUBJECT_DETECTION_FAILED")) {
           targetStatus = "SUBJECT_DETECTION_FAILED";
+        } else if (error.message.includes("VALIDATION_FAILED")) {
+          targetStatus = "VALIDATION_FAILED";
+        } else if (error.message.includes("TOC_MAPPING_FAILED")) {
+          targetStatus = "TOC_MAPPING_FAILED";
+        } else if (error.message.includes("NO_MAIN_THEORY_FOUND")) {
+          targetStatus = "NO_MAIN_THEORY_FOUND";
+        } else if (
+          error.message.includes("AI_UNAVAILABLE") || 
+          error.message.includes("AI_TIMEOUT") || 
+          error.message.includes("503") || 
+          error.message.includes("429") ||
+          error.message.includes("indisponível")
+        ) {
+          targetStatus = "AI_UNAVAILABLE";
         } else if (
           error.message.includes("VALIDATION_REJECTED_ALL_BLOCKS") ||
           error.message.includes("A organização foi abortada") ||
@@ -664,25 +679,25 @@ export async function POST(req: NextRequest) {
           error.message.includes("tópico oficial") ||
           error.message.includes("intervalo de páginas")
         ) {
-          targetStatus = "ERROR";
-        } else if (
-          error.message.includes("AI_UNAVAILABLE") || 
-          error.message.includes("AI_TIMEOUT") || 
-          error.message.includes("503") || 
-          error.message.includes("429") ||
-          error.message.includes("indisponível")
-        ) {
-          targetStatus = "AI_UNAVAILABLE";
+          targetStatus = "VALIDATION_FAILED";
         } else if (
           error.message.includes("texto selecionável") || 
           error.message.includes("Texto insuficiente") ||
           error.message.includes("PDF_TEXT_EXTRACTION_FAILED")
         ) {
-          targetStatus = "ERROR"; // Erro crítico não recuperável
+          targetStatus = "ERROR";
         }
 
         let savedErrorMsg = error.message || "Erro desconhecido na organização";
-        if (savedErrorMsg.includes("VALIDATION_REJECTED_ALL_BLOCKS:")) {
+        if (savedErrorMsg.includes("VALIDATION_FAILED:")) {
+          savedErrorMsg = savedErrorMsg.replace("VALIDATION_FAILED:", "").trim();
+        } else if (savedErrorMsg.includes("TOC_MAPPING_FAILED:")) {
+          savedErrorMsg = savedErrorMsg.replace("TOC_MAPPING_FAILED:", "").trim();
+        } else if (savedErrorMsg.includes("NO_MAIN_THEORY_FOUND:")) {
+          savedErrorMsg = savedErrorMsg.replace("NO_MAIN_THEORY_FOUND:", "").trim();
+        } else if (savedErrorMsg.includes("AI_UNAVAILABLE:")) {
+          savedErrorMsg = savedErrorMsg.replace("AI_UNAVAILABLE:", "").trim();
+        } else if (savedErrorMsg.includes("VALIDATION_REJECTED_ALL_BLOCKS:")) {
           savedErrorMsg = savedErrorMsg.replace("VALIDATION_REJECTED_ALL_BLOCKS:", "Todos os blocos foram rejeitados pela validação de qualidade:").trim();
         } else if (savedErrorMsg.includes("AI_INVALID_JSON:")) {
           savedErrorMsg = savedErrorMsg.replace("AI_INVALID_JSON:", "A IA retornou um JSON estruturado inválido:").trim();

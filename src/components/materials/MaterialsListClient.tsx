@@ -92,8 +92,13 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
 
       // Category filter
       if (activeFilter === "PROCESSED") return m.organizationStatus === "ORGANIZED";
-      if (activeFilter === "PENDING") return m.organizationStatus !== "ORGANIZED" && m.organizationStatus !== "ERROR";
-      if (activeFilter === "ERROR") return ["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE"].includes(m.organizationStatus);
+      if (activeFilter === "PENDING") {
+        return m.organizationStatus !== "ORGANIZED" && 
+               !["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE", "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(m.organizationStatus);
+      }
+      if (activeFilter === "ERROR") {
+        return ["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE", "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(m.organizationStatus);
+      }
       
       return true;
     });
@@ -630,6 +635,15 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
 function getFriendlyErrorMessage(err: string | null | undefined): string {
   if (!err) return "Erro desconhecido ao processar arquivo.";
   const lower = err.toLowerCase();
+  if (lower.includes("validation_failed") || lower.includes("validação pedagógica") || lower.includes("pedagogical")) {
+    return "A divisão rejeitou blocos muito curtos, excesso de blocos de apoio sem teoria principal, ou títulos vazios.";
+  }
+  if (lower.includes("toc_mapping_failed") || lower.includes("sumário") || lower.includes("toc mapping")) {
+    return "Falha ao mapear os tópicos extraídos do sumário com as páginas do PDF.";
+  }
+  if (lower.includes("no_main_theory_found") || lower.includes("sem teoria") || lower.includes("no theory")) {
+    return "O material não possui conteúdo de teoria principal suficiente para gerar blocos de cronograma.";
+  }
   if (lower.includes("api key") || lower.includes("key was reported as leaked")) {
     return "Chave Gemini desativada pelo Google por motivo de segurança. Gere uma nova chave gratuita no Google AI Studio e atualize seu .env local!";
   }

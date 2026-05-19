@@ -291,11 +291,131 @@ export function calculateBlockQualityScore(b: DetectedBlock, subjectName: string
   }
 
   if (subjectName.toLowerCase().trim() === "outros") {
-    score -= 2;
-    reasons.push("Matéria Outros");
+    score -= 3;
+    reasons.push("Matéria genérica");
   }
 
   return { score, reasons };
+}
+
+export interface TOCEntry {
+  heading: string;
+  pageStart: number;
+  pageEnd: number;
+}
+
+export function parseTOCLine(line: string, totalPages: number): { heading: string; pageStart: number } | null {
+  // Pattern 1: dots, hyphens, underscores, or 2+ spaces followed by a page number
+  const pattern1 = line.match(/^\s*(.+?)(?:\.{2,}|-{2,}|_{2,}|\s{2,})\s*(\d+)\s*$/);
+  if (pattern1) {
+    const heading = pattern1[1].trim();
+    const pageStart = parseInt(pattern1[2], 10);
+    if (pageStart >= 1 && pageStart <= totalPages) {
+      return { heading, pageStart };
+    }
+  }
+
+  // Pattern 2: starts with a section index (e.g. "4.1.", "1)", "Aula 01 -") and ends with a number
+  // E.g. "4.1. Título da seção 15" or "Aula 01 - Introdução 3"
+  const pattern2 = line.match(/^\s*((\d+(\.\d+)*|Aula\s+\d+|Capítulo\s+\d+|Seção\s+\d+|[a-zA-Z\u00C0-\u00FF\d\)\-\s]+?)\s+([a-zA-Z\u00C0-\u00FF\d\)\-\s,\/]+?))\s+(\d+)\s*$/);
+  if (pattern2) {
+    const heading = pattern2[1].trim();
+    const pageStart = parseInt(pattern2[5], 10);
+    if (pageStart >= 1 && pageStart <= totalPages && heading.length >= 3) {
+      return { heading, pageStart };
+    }
+  }
+
+  return null;
+}
+
+export function extractTOCFromText(text: string, totalPages: number): TOCEntry[] {
+  if (!text) return [];
+
+  const lines = text.split(/\r?\n/);
+  const candidates: { heading: string; pageStart: number; lineIndex: number }[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (line.toLowerCase().startsWith("página") || line.toLowerCase().startsWith("pagina")) continue;
+
+    const parsed = parseTOCLine(line, totalPages);
+    if (parsed) {
+      const heading = parsed.heading
+        .replace(/^[\s\.\-\*_]+/, "")
+        .replace(/[\s\.\-\*_]+$/, "")
+        .trim();
+
+      if (/[a-zA-Z\u00C0-\u00FF]/.test(heading) && heading.length >= 3) {
+        candidates.push({
+          heading,
+          pageStart: parsed.pageStart,
+          lineIndex: i
+        });
+      }
+    }
+  }
+
+  if (candidates.length === 0) return [];
+
+  const n = candidates.length;
+  const dp = new Array(n).fill(1);
+  const parent = new Array(n).fill(-1);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      if (candidates[i].pageStart >= candidates[j].pageStart) {
+        if (dp[j] + 1 > dp[i]) {
+          dp[i] = dp[j] + 1;
+          parent[i] = j;
+        }
+      }
+    }
+  }
+
+  let maxLength = 0;
+  let maxIdx = -1;
+  for (let i = 0; i < n; i++) {
+    if (dp[i] > maxLength) {
+      maxLength = dp[i];
+      maxIdx = i;
+    }
+  }
+
+  if (maxIdx === -1) return [];
+
+  const lndsSubsequence: typeof candidates = [];
+  let curr = maxIdx;
+  while (curr !== -1) {
+    lndsSubsequence.push(candidates[curr]);
+    curr = parent[curr];
+  }
+  lndsSubsequence.reverse();
+
+  const tocEntries: TOCEntry[] = [];
+  for (let i = 0; i < lndsSubsequence.length; i++) {
+    const entry = lndsSubsequence[i];
+    let pageEnd = totalPages;
+
+    if (i < lndsSubsequence.length - 1) {
+      const nextEntry = lndsSubsequence[i + 1];
+      if (nextEntry.pageStart > entry.pageStart) {
+        pageEnd = nextEntry.pageStart - 1;
+      } else {
+        pageEnd = entry.pageStart;
+      }
+    }
+
+    tocEntries.push({
+      heading: entry.heading,
+      pageStart: entry.pageStart,
+      pageEnd: pageEnd
+    });
+  }
+
+  return tocEntries;
 }
 
 export async function detectStructure(
@@ -309,6 +429,12 @@ export async function detectStructure(
 
   const genAI = new GoogleGenerativeAI(apiKey);
 
+  // Extrair sumário programaticamente se disponível
+  const tocEntries = extractTOCFromText(summaryContent, totalPages);
+  const tocDetected = tocEntries.length > 0;
+  const tocConfidence = tocDetected ? 1.0 : 0.0;
+  const sourceStrategy = tocDetected ? "TOC_BASED" : "CONTENT_BASED";
+
   const relevantTopics = OFFICIAL_TOPICS.filter(
     t => t.subjectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
          subjectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -318,7 +444,8 @@ export async function detectStructure(
     ? relevantTopics.map(t => `- ID: '${t.id}' | Código: '${t.topicCode}' | Título: '${t.title}'`).join('\n')
     : "Esta matéria não possui matriz de tópicos cadastrada. Use officialTopicId = null, topicCode = 'GERAL', officialTopicName = 'Tópico não identificado'.";
 
-  const initialPrompt = buildStructurePrompt(summaryContent, subjectName, officialTopicsListText) +
+  const tocJsonText = tocDetected ? JSON.stringify(tocEntries, null, 2) : undefined;
+  const initialPrompt = buildStructurePrompt(summaryContent, subjectName, officialTopicsListText, tocJsonText) +
     `\n\nTotal de páginas do PDF: ${totalPages}`;
   
   let lastError: any = null;
@@ -370,6 +497,38 @@ export async function detectStructure(
           const validatedBlocks: DetectedBlock[] = [];
           const isSupportOnlyMaterial = role === "SUPPORT_MATERIAL";
 
+          // Validação: TOC_MAPPING_FAILED se os blocos teóricos gerados não correspondem ao sumário
+          if (tocDetected && role !== "SUPPORT_MATERIAL" && blocks.length > 0) {
+            let tocMatchCount = 0;
+            for (const b of blocks) {
+              if (b.type !== "SUPPORT_BLOCK") {
+                const matchesTOCPage = tocEntries.some(t => Math.abs(t.pageStart - b.pageStart) <= 1);
+                if (matchesTOCPage) tocMatchCount++;
+              }
+            }
+            if (tocMatchCount === 0 && blocks.some(b => b.type !== "SUPPORT_BLOCK")) {
+              errors.push("TOC_MAPPING_FAILED: Os blocos teóricos gerados não correspondem às páginas e divisões do sumário extraído.");
+            }
+          }
+
+          // Se o sumário tem vários capítulos e a IA retornou apenas 1 bloco teórico, pode ser um colapso incorreto
+          const tocTheoryEntriesCount = tocEntries.filter(t => 
+            !t.heading.toLowerCase().includes("questoes") && 
+            !t.heading.toLowerCase().includes("exercicio") &&
+            !t.heading.toLowerCase().includes("gabarito") &&
+            !t.heading.toLowerCase().includes("resumo")
+          ).length;
+
+          const mainBlocksInResult = blocks.filter(b => !b.type || b.type === "MAIN_BLOCK");
+
+          if (tocDetected && tocTheoryEntriesCount >= 3 && mainBlocksInResult.length === 1) {
+            const singleBlock = mainBlocksInResult[0];
+            const hasGoodRationale = singleBlock && (singleBlock.selectionJustification?.length || 0) > 10;
+            if (!hasGoodRationale) {
+              errors.push("VALIDATION_FAILED: O sumário possui várias seções teóricas independentes, mas todo o conteúdo foi colapsado em um único bloco sem justificativa pedagógica coerente.");
+            }
+          }
+
           for (const b of blocks) {
             const originalTitle = b.title || "Sem Título";
             const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -382,7 +541,7 @@ export async function detectStructure(
               titleCategory = "PROIBIDO";
             } else if (
               WEAK_CORRIGIBLE_TITLES.some(wt => titleNorm === wt || titleNorm.includes(wt)) || 
-              originalTitle.length < 15 || 
+              originalTitle.length < 12 || 
               originalTitle.split(/\s+/).length <= 2
             ) {
               titleCategory = "FRACO";
@@ -459,7 +618,7 @@ export async function detectStructure(
             let decision: "ACCEPTED" | "ENHANCED" | "REJECTED" = "ACCEPTED";
             if (titleCategory === "PROIBIDO") {
               decision = "REJECTED";
-            } else if (score < 5) {
+            } else if (score < 4) {
               decision = "REJECTED";
             } else if (titleCategory === "FRACO" && enhancedTitle !== originalTitle) {
               decision = "ENHANCED";
@@ -480,7 +639,7 @@ export async function detectStructure(
             if (decision === "REJECTED") {
               const isMain = !b.type || b.type === "MAIN_BLOCK";
               if (isMain && !isSupportOnlyMaterial) {
-                errors.push(`A seleção de páginas ${b.pageStart}-${b.pageEnd} para o bloco principal "${originalTitle}" foi rejeitada. Razões: ${reasons.join("; ")}`);
+                errors.push(`VALIDATION_FAILED: A seleção de páginas ${b.pageStart}-${b.pageEnd} para o bloco principal "${originalTitle}" foi rejeitada. Razões: ${reasons.join("; ")}`);
               }
             } else {
               validatedBlocks.push(b);
@@ -498,7 +657,7 @@ export async function detectStructure(
             const hasMechanicalCutting = detectMechanicalCuttingHeuristic(validatedBlocks);
             if (hasMechanicalCutting) {
               console.warn("[AI Validation] Rejeitando divisão por fatiamento mecânico de páginas detectado pelo backend.");
-              errors.push("A divisão anterior parece ter sido feita por cortes fixos de páginas (ex: de 10 em 10 páginas), e não por unidade temática. Refaça a divisão respeitando a estrutura real do conteúdo (títulos, subtítulos), os tópicos oficiais, a continuidade do assunto e o desenvolvimento teórico principal. Não divida o PDF de forma regular/mecânica.");
+              errors.push("VALIDATION_FAILED: A divisão anterior parece ter sido feita por cortes fixos de páginas (ex: de 10 em 10 páginas), e não por unidade temática.");
             }
           }
 
@@ -506,16 +665,14 @@ export async function detectStructure(
           if (errors.length === 0) {
             const mainBlocksCount = mainBlocksList.length;
             if (role === "MAIN_MATERIAL" && mainBlocksCount === 0) {
-              errors.push(`O material foi classificado como ${role}, mas nenhum bloco principal de teoria (MAIN_BLOCK) válido foi gerado. Certifique-se de que o material contenha as explicações teóricas do assunto.`);
+              errors.push(`NO_MAIN_THEORY_FOUND: O material foi classificado como ${role}, mas nenhum bloco principal de teoria (MAIN_BLOCK) válido foi gerado.`);
             } else if (role === "MIXED_MATERIAL" && mainBlocksCount === 0) {
-              // Só exige se de fato houver algum bloco original na resposta da IA que tenha sido mapeado como de teoria principal
-              // ou se houver página do bloco marcada com MAIN_THEORY ou EXPLANATION
               const hasTheoryBlocks = blocks.some(b => 
                 (!b.type || b.type === "MAIN_BLOCK") && 
                 (b.pageTypes?.includes("MAIN_THEORY") || b.pageTypes?.includes("EXPLANATION"))
               );
               if (hasTheoryBlocks) {
-                errors.push("O material foi classificado como MIXED_MATERIAL com teoria evidente, mas nenhum bloco principal de teoria (MAIN_BLOCK) válido foi gerado.");
+                errors.push("NO_MAIN_THEORY_FOUND: O material foi classificado como MIXED_MATERIAL com teoria evidente, mas nenhum bloco principal de teoria (MAIN_BLOCK) válido foi gerado.");
               } else {
                 console.log("[MixedMaterial] Permitindo MIXED_MATERIAL sem MAIN_BLOCK pois não há teoria principal densa.");
               }
@@ -523,7 +680,7 @@ export async function detectStructure(
           }
 
           if (errors.length === 0) {
-            // Mapear tópicos oficiais com segurança (limpar correspondências vazias ou inválidas se houver)
+            // Mapear tópicos oficiais com segurança
             const mappedBlocks = validatedBlocks.map(b => {
               let topicId = b.officialTopicId || null;
               let code = b.topicCode || "GERAL";
@@ -558,15 +715,18 @@ export async function detectStructure(
 
             return {
               materialRole: role,
+              sourceStrategy: parsedResult.sourceStrategy || sourceStrategy,
+              tocDetected: parsedResult.tocDetected !== undefined ? parsedResult.tocDetected : tocDetected,
+              tocConfidence: parsedResult.tocConfidence !== undefined ? parsedResult.tocConfidence : tocConfidence,
               blocks: finalBlocks,
-              aiModelUsed: modelName // Salva qual modelo foi usado nos metadados!
+              aiModelUsed: modelName
             };
           }
 
           accumulatedErrors = errors;
           attempts++;
           console.warn(`[AI] Tentativa ${attempts} falhou nos critérios de qualidade: ${errors.join(" ")}`);
-          currentPrompt = initialPrompt + `\\n\\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros de qualidade: ${errors.join(" ")}\\nPOR FAVOR, refaça o mapeamento de blocos respeitando rigorosamente a explicação teórica principal. Evite títulos genéricos como 'Parte X'.`;
+          currentPrompt = initialPrompt + `\n\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros de qualidade: ${errors.join(" ")}\nPOR FAVOR, refaça o mapeamento de blocos respeitando rigorosamente a explicação teórica principal. Evite títulos genéricos como 'Parte X'.`;
           
         } catch (error: any) {
           console.error("Erro ao detectar estrutura:", error);
@@ -582,7 +742,15 @@ export async function detectStructure(
       }
 
       if (accumulatedErrors.length > 0) {
-        throw new Error(`VALIDATION_REJECTED_ALL_BLOCKS: ${accumulatedErrors.join(" | ")}`);
+        const isNoTheory = accumulatedErrors.some(e => e.includes("NO_MAIN_THEORY_FOUND") || e.includes("Nenhum bloco principal de teoria") || e.includes("não foi gerado"));
+        const isTocMapping = accumulatedErrors.some(e => e.includes("TOC_MAPPING_FAILED"));
+        if (isNoTheory) {
+          throw new Error(`NO_MAIN_THEORY_FOUND: ${accumulatedErrors.join(" | ")}`);
+        }
+        if (isTocMapping) {
+          throw new Error(`TOC_MAPPING_FAILED: ${accumulatedErrors.join(" | ")}`);
+        }
+        throw new Error(`VALIDATION_FAILED: ${accumulatedErrors.join(" | ")}`);
       }
       if (jsonParseError) {
         throw new Error(`AI_INVALID_JSON: ${jsonParseError}`);
@@ -622,12 +790,10 @@ function tryMergeShortBlocks(blocks: DetectedBlock[]): DetectedBlock[] {
     const isNextShort = nextPages < 4 && !next.shortBlockJustification;
     
     const sameTopic = current.officialTopicId === next.officialTopicId;
-    const contiguous = (next.pageStart <= current.pageEnd + 2); // Pode ter uma página vazia no meio
+    const contiguous = (next.pageStart <= current.pageEnd + 2);
     const sameType = (current.type || "MAIN_BLOCK") === (next.type || "MAIN_BLOCK");
     const isMainBlock = (current.type || "MAIN_BLOCK") === "MAIN_BLOCK";
 
-    // Tentamos mesclar se forem blocos principais, mesmo tópico, contíguos e o tamanho final <= 15
-    // Condição forte: se um dos dois for pequeno (< 4 páginas), forçamos o merge para evitar quebra excessiva
     if (isMainBlock && sameTopic && contiguous && sameType && combinedPages <= 15 && (isCurrentShort || isNextShort || currentPages < 5)) {
       current.pageEnd = Math.max(current.pageEnd, next.pageEnd);
       current.title = `${current.title} + ${next.title}`.substring(0, 100);
@@ -649,7 +815,7 @@ function calculateEstimatedMinutes(blocks: DetectedBlock[]): DetectedBlock[] {
     if (b.type === "SUPPORT_BLOCK") return { ...b, estimatedStudyMinutes: 0 };
     
     const pageCount = (b.pageEnd - b.pageStart) + 1;
-    let minutesPerPage = 5; // MEDIUM default
+    let minutesPerPage = 5;
 
     switch (b.contentDensity) {
       case "LOW": minutesPerPage = 3; break;
@@ -659,7 +825,6 @@ function calculateEstimatedMinutes(blocks: DetectedBlock[]): DetectedBlock[] {
     }
 
     let calcMinutes = pageCount * minutesPerPage;
-    // Tenta aproximar a sessão ao range 30-60 (idealmente 45)
     calcMinutes = Math.max(30, Math.min(60, calcMinutes));
 
     return {
@@ -671,32 +836,28 @@ function calculateEstimatedMinutes(blocks: DetectedBlock[]): DetectedBlock[] {
 
 export function detectQuestionsOrGabaritoHeuristic(text: string): { isQuestions: boolean; isAnswerKey: boolean; confidence: number } {
   const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
-  // Alternativas reais de múltipla escolha (a, b, c, d, e) - exige espaço após para evitar pegar palavras como "a", "e"
+
   const alternativeRegex = /\b[a-e]\s*[\).\-]\s/gi;
   const altMatches = textLower.match(alternativeRegex) || [];
 
-  // Padrão de enunciado de prova: e.g. FCC (2024), FGV, CESPE, TRT, VUNESP
-  const examKeywords = ["fcc", "fgv", "cespe", "cebraspe", "vunesp", "trt", "concurso"];
+  const examKeywords = ["fcc", "fgv", "cespe", "cebraspe", "vunesp", "trt", "concurso", "esaf", "fadesp", "consulplan"];
   let examKeywordCount = 0;
   examKeywords.forEach(ek => {
-    const regex = new RegExp(ek, "g");
+    const regex = new RegExp("\\b" + ek + "\\b", "g");
     const m = textLower.match(regex);
     if (m) examKeywordCount += m.length;
   });
 
-  // Padrão "Questão 01", "Questão 1"
-  const questionPrefixRegex = /questao\s*\d+/gi;
+  const questionPrefixRegex = /(questao\s*\d+|q\.\s*\d+)/gi;
   const questionPrefixMatches = textLower.match(questionPrefixRegex) || [];
 
-  // Termos explícitos e fortes de questões
   const strongQuestionKeywords = [
     "assinale a alternativa", "assinale a opcao", "julgue o item", 
     "julgue os itens", "certo ou errado", "alternativa correta", 
     "alternativa incorreta", "opcao correta", "questoes comentadas", 
     "questoes de provas", "questoes de concurso", "lista de questoes", 
     "caderno de questoes", "comentarios da questao", "comentario da questao",
-    "resolucao da questao"
+    "resolucao da questao", "comentada", "comentadas"
   ];
   let strongQuestionCount = 0;
   strongQuestionKeywords.forEach(kw => {
@@ -705,48 +866,33 @@ export function detectQuestionsOrGabaritoHeuristic(text: string): { isQuestions:
     if (m) strongQuestionCount += m.length;
   });
 
-  // Termos gerais de questões
-  const generalQuestionKeywords = ["questao", "questoes", "exercicio", "exercicios", "simulado", "prova", "gabarito", "comentario", "comentarios"];
-  let generalQuestionCount = 0;
-  generalQuestionKeywords.forEach(kw => {
-    const regex = new RegExp(kw, "g");
-    const m = textLower.match(regex);
-    if (m) generalQuestionCount += m.length;
-  });
-
-  // Gabaritos
-  const answerKeyKeywords = ["gabarito", "gabaritos", "resposta correta", "letra a", "letra b", "letra c", "letra d", "letra e", "alternativa correta"];
+  const answerKeyKeywords = ["gabarito", "gabaritos", "resposta correta", "gabarito oficial"];
   let answerKeyKeywordCount = 0;
   answerKeyKeywords.forEach(kw => {
-    const regex = new RegExp(kw, "g");
+    const regex = new RegExp("\\b" + kw + "\\b", "g");
     const m = textLower.match(regex);
     if (m) answerKeyKeywordCount += m.length;
   });
 
-  // Critérios de decisão ultra robustos
-  const hasStrongSignals = strongQuestionCount >= 1 || questionPrefixMatches.length >= 1 || (examKeywordCount >= 1 && generalQuestionCount >= 3);
-  const hasAlternatives = altMatches.length >= 4; // Mínimo de alternativas (normalmente A, B, C, D, E)
-  
-  // Uma lista de gabarito puro
-  const isAnswerKey = answerKeyKeywordCount >= 3 && (answerKeyKeywordCount > generalQuestionCount || altMatches.length < 3);
+  const hasStrongSignals = strongQuestionCount >= 1 || questionPrefixMatches.length >= 1 || (examKeywordCount >= 1 && altMatches.length >= 2);
+  const hasAlternatives = altMatches.length >= 4;
 
-  // Uma seção de questões só é válida se houver alternativas combinadas com sinais fortes,
-  // ou se houver múltiplos enunciados explícitos de questões, ou alta densidade de sinais fortes.
+  const isAnswerKey = answerKeyKeywordCount >= 2 && (answerKeyKeywordCount > strongQuestionCount || altMatches.length < 3);
+
   const isQuestions = !isAnswerKey && (
     (hasAlternatives && hasStrongSignals) ||
     (questionPrefixMatches.length >= 2) ||
-    (strongQuestionCount >= 2)
+    (strongQuestionCount >= 2 && altMatches.length >= 2)
   );
 
-  // Confiança da detecção
   const confidence = isQuestions || isAnswerKey
-    ? Math.min(1.0, ((altMatches.length * 0.1) + (questionPrefixMatches.length * 0.25) + (strongQuestionCount * 0.25) + (answerKeyKeywordCount * 0.15)) / 2)
+    ? Math.min(1.0, ((altMatches.length * 0.1) + (questionPrefixMatches.length * 0.3) + (strongQuestionCount * 0.3) + (answerKeyKeywordCount * 0.2)) / 2)
     : 0.0;
 
   return {
     isQuestions,
     isAnswerKey,
-    confidence: confidence > 0.25 ? confidence : 0.0
+    confidence: confidence > 0.2 ? confidence : 0.0
   };
 }
 
@@ -756,13 +902,11 @@ export function detectMechanicalCuttingHeuristic(blocks: DetectedBlock[]): boole
 
   const sizes = mainBlocks.map(b => (b.pageEnd - b.pageStart) + 1);
   
-  // Contar frequências dos tamanhos
   const frequencies: Record<number, number> = {};
   sizes.forEach(s => {
     frequencies[s] = (frequencies[s] || 0) + 1;
   });
 
-  // Encontrar a maior frequência
   let maxFreq = 0;
   let mostCommonSize = 0;
   for (const [sizeStr, freq] of Object.entries(frequencies)) {
@@ -772,10 +916,8 @@ export function detectMechanicalCuttingHeuristic(blocks: DetectedBlock[]): boole
     }
   }
 
-  // Se mais de 75% dos blocos têm exatamente o mesmo tamanho (ex: 10 em 10 páginas)
   const ratio = maxFreq / mainBlocks.length;
   if (ratio >= 0.75 && mostCommonSize >= 5) {
-    // Também checar se o primeiro bloco começa exatamente no 1 ou 2, e os outros são contíguos perfeitos (ex: 1-10, 11-20, 21-30)
     let isSuspiciouslySequential = true;
     for (let i = 0; i < mainBlocks.length - 1; i++) {
       if (mainBlocks[i + 1].pageStart !== mainBlocks[i].pageEnd + 1) {
