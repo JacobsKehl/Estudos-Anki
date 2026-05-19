@@ -19,11 +19,26 @@ export async function GET(req: NextRequest) {
 
     console.log(`[DEBUG GEMINI] Masked Key: ${maskedKey}, Length: ${keyLength}`);
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const results: Record<string, { success: boolean; reply?: string; error?: string }> = {};
+    const modelsToTest = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
 
-    const response = await model.generateContent("Hello, respond with 'Success' if you can read this.");
-    const replyText = response.response.text();
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    for (const mName of modelsToTest) {
+      try {
+        const model = genAI.getGenerativeModel({ model: mName });
+        const response = await model.generateContent("Respond with 'OK'");
+        results[mName] = {
+          success: true,
+          reply: response.response.text().trim()
+        };
+      } catch (err: any) {
+        results[mName] = {
+          success: false,
+          error: err.message
+        };
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -31,16 +46,13 @@ export async function GET(req: NextRequest) {
       keyLength,
       hasQuotes,
       hasSpaces,
-      replyText
+      results
     });
   } catch (err: any) {
     return NextResponse.json({
       success: false,
       error: err.message,
-      stack: err.stack,
-      maskedKey: process.env.GEMINI_API_KEY 
-        ? `${process.env.GEMINI_API_KEY.substring(0, 6)}...${process.env.GEMINI_API_KEY.substring(process.env.GEMINI_API_KEY.length - 4)}`
-        : "NONE"
+      stack: err.stack
     });
   }
 }
