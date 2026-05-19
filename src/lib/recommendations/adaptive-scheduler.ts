@@ -234,11 +234,23 @@ export async function getAdaptiveStudyQueue(
         userId,
         theoryStatus: "NOT_STARTED",
       },
-      orderBy: [{ subject: { priority: "desc" } }, { orderIndex: "asc" }],
-      take: 2,
+      include: {
+        material: true
+      }
     });
 
-    for (const block of notStartedBlocks) {
+    // Ordenação lógica/natural por nome do PDF (ex: "pdf 0" antes de "pdf 1") e depois pelo orderIndex
+    notStartedBlocks.sort((a: any, b: any) => {
+      const fileA = a.material?.fileName || "";
+      const fileB = b.material?.fileName || "";
+      const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
+      if (fileCompare !== 0) return fileCompare;
+      return a.orderIndex - b.orderIndex;
+    });
+
+    const topNotStartedBlocks = notStartedBlocks.slice(0, 2);
+
+    for (const block of topNotStartedBlocks) {
       tasks.push({
         type: "THEORY",
         subjectId: subject.id,

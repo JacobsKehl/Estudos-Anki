@@ -107,7 +107,18 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
       userId,
       status: { not: "COMPLETED" }
     },
-    orderBy: { orderIndex: "asc" }
+    include: {
+      material: true
+    }
+  });
+
+  // Ordenação lógica/natural por nome do PDF (ex: "pdf 0" antes de "pdf 1") e depois pelo orderIndex
+  allPendingBlocks.sort((a: any, b: any) => {
+    const fileA = a.material?.fileName || "";
+    const fileB = b.material?.fileName || "";
+    const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
+    if (fileCompare !== 0) return fileCompare;
+    return a.orderIndex - b.orderIndex;
   });
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
@@ -307,6 +318,29 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
   const scheduleItemsData: any[] = [];
   const startDate = activeSchedule.startDate ?? getNextStudyDay(new Date());
 
+  // Busca TODOS os blocos pendentes do usuário em uma única consulta rápida
+  const allPendingBlocks = await (prisma as any).studyBlock.findMany({
+    where: {
+      userId,
+      status: { not: "COMPLETED" },
+      id: { notIn: Array.from(completedBlockIds) }
+    },
+    include: {
+      material: true
+    }
+  });
+
+  // Ordenação lógica/natural por nome do PDF (ex: "pdf 0" antes de "pdf 1") e depois pelo orderIndex
+  allPendingBlocks.sort((a: any, b: any) => {
+    const fileA = a.material?.fileName || "";
+    const fileB = b.material?.fileName || "";
+    const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
+    if (fileCompare !== 0) return fileCompare;
+    return a.orderIndex - b.orderIndex;
+  });
+
+  const scheduledBlockIds = new Set<string>(completedBlockIds);
+
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const dayNumber = dayOffset + 1;
     
@@ -351,18 +385,13 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
           }
         }
 
-        // Buscar próximo bloco pendente desta matéria que NÃO esteja nas listas de concluídos
-        let nextBlock = await (prisma as any).studyBlock.findFirst({
-          where: {
-            subjectId: subject.id,
-            userId,
-            status: { not: "COMPLETED" },
-            id: { notIn: Array.from(completedBlockIds) }
-          },
-          orderBy: { orderIndex: "asc" },
-        });
+        // Buscar próximo bloco pendente desta matéria que NÃO esteja nas listas de concluídos (EM MEMÓRIA)
+        let nextBlock = allPendingBlocks.find((b: any) =>
+          b.subjectId === subject.id &&
+          !scheduledBlockIds.has(b.id)
+        );
 
-        // Fallback Inteligente: Se não achar bloco para essa matéria do ciclo, busca de outra das 7 matérias principais
+        // Fallback Inteligente: Se não achar bloco para essa matéria do ciclo, busca de outra das 7 matérias principais (EM MEMÓRIA)
         if (!nextBlock) {
           const otherMainSubjects = userSubjects.filter(s => {
             const isOtherMain = MAIN_7_SUBJECTS.some(m => s.name.toLowerCase().includes(m.toLowerCase()));
@@ -379,15 +408,10 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
           });
 
           for (const otherSub of otherMainSubjects) {
-            nextBlock = await (prisma as any).studyBlock.findFirst({
-              where: {
-                subjectId: otherSub.id,
-                userId,
-                status: { not: "COMPLETED" },
-                id: { notIn: Array.from(completedBlockIds) }
-              },
-              orderBy: { orderIndex: "asc" },
-            });
+            nextBlock = allPendingBlocks.find((b: any) =>
+              b.subjectId === otherSub.id &&
+              !scheduledBlockIds.has(b.id)
+            );
             if (nextBlock) break;
           }
         }
@@ -408,7 +432,7 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
           });
           
           // Marcar como agendado para evitar duplicidade na mesma sessão
-          completedBlockIds.add(nextBlock.id);
+          scheduledBlockIds.add(nextBlock.id);
         }
       }
     }

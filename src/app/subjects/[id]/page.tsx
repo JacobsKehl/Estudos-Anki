@@ -55,6 +55,16 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
 
     if (subject) {
       metrics = await getSubjectMetrics(id, userId);
+      
+      if (subject.studyBlocks) {
+        subject.studyBlocks.sort((a: any, b: any) => {
+          const fileA = a.material?.fileName || "";
+          const fileB = b.material?.fileName || "";
+          const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
+          if (fileCompare !== 0) return fileCompare;
+          return a.orderIndex - b.orderIndex;
+        });
+      }
     }
   } catch (error) {
     console.error("DB Error", error);
