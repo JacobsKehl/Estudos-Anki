@@ -25,6 +25,7 @@ const KNOWN_SUBJECTS_MAP: Record<string, string> = {
   "INFORMATICA": "Informática",
 };
 
+// Trigger automatic Vercel redeploy to activate new GEMINI_API_KEY environment variables
 export async function identifySubject(firstPagesContent: string, fileName?: string): Promise<SubjectIdentification> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
