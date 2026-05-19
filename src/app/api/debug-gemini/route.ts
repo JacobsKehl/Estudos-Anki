@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { callGeminiWithRetry } from "../../lib/ai/utils/retry";
+import { callGeminiWithRetry } from "@/lib/ai/utils/retry";
 
 export async function GET(req: NextRequest) {
   try {
