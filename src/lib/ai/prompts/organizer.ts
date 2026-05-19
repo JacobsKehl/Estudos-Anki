@@ -38,44 +38,35 @@ Sua missão é ler o sumário ou o texto de um material, classificar o seu papel
 
 Diretrizes Críticas (P0):
 1. CLASSIFICAÇÃO DO MATERIAL (materialRole):
-   - "MAIN_MATERIAL": O PDF contém teoria principal densa, desenvolvimento completo de assuntos, conceitos, regras, jurisprudência e exemplos estruturados. Ideal para criar Blocos Principais.
-   - "SUPPORT_MATERIAL": O PDF é predominantemente ou inteiramente constituído de resumos, bizus, revisões rápidas, mapas mentais, simulados, checklists ou apenas questões/gabaritos.
+   - "MAIN_MATERIAL": O PDF contém teoria principal densa, desenvolvimento completo de assuntos, conceitos, regras, doutrina, legislação comentada e exemplos. Ideal para criar Blocos Principais.
+   - "SUPPORT_MATERIAL": O PDF é predominantemente constituído de resumos rápidos, bizus, mapas mentais, simulados, checklists, cadernos de revisão ou baterias de questões/gabaritos de apoio.
    - "MIXED_MATERIAL": O PDF contém tanto uma seção longa de teoria principal quanto uma seção de resumos ou questões.
 
 2. CRIAÇÃO DE BLOCOS vs. APOIO (QUESTÕES/GABARITOS NUNCA SÃO BLOCOS PRINCIPAIS):
    - APENAS crie "blocks" normais (MAIN_BLOCK) se a seção do PDF contiver TEORIA PRINCIPAL.
-   - NUNCA crie um bloco principal a partir de páginas de questões, simulados, baterias de exercícios, questões comentadas ou gabaritos. Questões são material de prática, não teoria principal.
-   - Se encontrar páginas de questões, classifique-as como material de apoio (SUPPORT_BLOCK) e configure o campo "supportType" para "QUESTIONS" ou "COMMENTED_QUESTIONS".
-   - Se encontrar gabaritos ou resoluções de provas, classifique como "SUPPORT_BLOCK" com "supportType" como "ANSWER_KEY".
-   - Se encontrar simulados completos, use "SIMULATED_EXAM".
-   - Associar esses blocos de apoio ("SUPPORT_BLOCK") ao tópico oficial correto ("officialTopicId") e a mesma disciplina, pois eles serão acoplados ao bloco teórico correspondente pelo backend.
+   - NUNCA crie um bloco principal a partir de páginas de questões, simulados, baterias de exercícios ou gabaritos. Questões são material de prática, não teoria principal.
+   - Se encontrar páginas de questões ou gabaritos, classifique-as como material de apoio (SUPPORT_BLOCK) e configure o campo "supportType" para "QUESTIONS", "COMMENTED_QUESTIONS" ou "ANSWER_KEY".
 
-3. PROIBIÇÃO DE DIVISÃO MECÂNICA POR NÚMERO FIXO DE PÁGINAS (NOVO):
-   - A criação de blocos NUNCA deve seguir uma divisão mecânica por intervalos fixos de páginas (como cortar o PDF de 10 em 10 páginas, 8 em 8 páginas, ou qualquer padrão artificial similar).
-   - A divisão deve refletir exclusivamente a estrutura real do conteúdo: títulos de capítulos, subtítulos, tópicos oficiais do edital, continuidade temática e desenvolvimento teórico do assunto.
-   - O tamanho ideal de 5 a 12 páginas úteis para um bloco teórico principal (MAIN_BLOCK) é APENAS uma referência de qualidade para criar sessões de aproximadamente 45 minutos, e NUNCA uma régua de corte rígido.
-   - Se um tema contínuo e indivisível exigir 13 a 15 páginas, mantenha o assunto inteiro em um único bloco.
-   - Se um assunto for curto, denso e autônomo de 4 páginas, crie o bloco e justifique em "shortBlockJustification".
-   - NUNCA quebre um assunto no meio apenas para forçar uma quantidade fixa de páginas.
+3. PROIBIÇÃO DE DIVISÃO MECÂNICA POR NÚMERO FIXO DE PÁGINAS:
+   - A criação de blocos NUNCA deve seguir uma divisão mecânica por intervalos fixos de páginas (como cortar o PDF de 10 em 10 páginas artificialmente).
+   - A divisão deve refletir a estrutura real temática do conteúdo: títulos de capítulos, subtítulos, continuidade temática e desenvolvimento teórico.
+   - Cada bloco deve representar uma sessão de estudo coerente, normalmente entre 30 e 60 minutos (idealmente aproximando 45 minutos de teoria). Não force quantidades mínimas de blocos.
 
-4. NOVOS TIPOS DE APOIO (supportType):
-   - Se o bloco for um "SUPPORT_BLOCK", configure obrigatoriamente o campo "supportType" usando um dos valores a seguir:
-     * "SUMMARY": resumos tradicionais.
-     * "BIZU": dicas/bizus curtos e focados.
-     * "MIND_MAP": mapas mentais.
-     * "QUESTIONS": cadernos/listas de questões sem comentários.
-     * "COMMENTED_QUESTIONS": cadernos/baterias de questões comentadas.
-     * "ANSWER_KEY": gabaritos puros ou comentados de provas/simulados.
-     * "SIMULATED_EXAM": provas simuladas completas.
-     * "CHECKLIST": listas de verificação/checklists de estudos.
-     * "REVIEW": revisões rápidas ou materiais de véspera.
-     * "OTHER": outros materiais de apoio que não se encaixam nos anteriores.
-   - Para blocos principais (MAIN_BLOCK), o campo "supportType" deve ser null.
+4. DIRETRIZES DE TÍTULO (NUNCA GERE TÍTULOS GENÉRICOS):
+   - NUNCA use títulos de blocos genéricos, estruturais ou vazios como "Parte 1", "Parte II", "Bloco 1", "Conteúdo Completo", "Todo o Conteúdo", "Resumo Geral", "Outros", "Sem categoria" ou "Desconhecido".
+   - Títulos podem ser objetivos, mas devem indicar o assunto exato estudado.
+   - Se o assunto for curto ou amplo, use um travessão explicativo e um complemento detalhado para torná-lo descritivo e temático.
+     * Exemplos Excelentes:
+       - "Competência no Processo Civil — critérios de fixação, espécies e conflitos"
+       - "Provas no Processo Civil — teoria geral e meios de prova"
+       - "Recursos — teoria geral e recursos em espécie"
+       - "Atos Processuais — forma, prazos e comunicação dos atos"
+   - Avalie a qualidade do título que você está gerando no campo "titleQuality":
+     * "GOOD": Título específico, temático e completo (como nos exemplos acima).
+     * "WEAK": Título curto ou simples que pode requerer refino automático (ex: "Provas", "Competência", "Recursos").
+     * "INVALID": Título que representa padrão genérico proibido absoluto (como "Parte 1", "Outros").
 
-5. PROIBIÇÃO DE TÍTULOS GENÉRICOS (Para blocos teóricos):
-   - Títulos de blocos teóricos principais devem refletir o assunto exato. (Ruim: "Parte 1", "Conteúdo Completo", "Tópico de 1 a 10". Bom: "Atos Administrativos: Requisitos e Atributos").
-
-6. MAPEAMENTO DE TÓPICO OFICIAL:
+5. MAPEAMENTO DE TÓPICO OFICIAL:
    - Preencha os campos "officialTopicId", "topicCode" e "officialTopicName" baseado na lista oficial.
    - Se não houver correspondência direta, defina null e "GERAL".
 
@@ -85,23 +76,26 @@ Formato de Retorno Esperado (JSON estrito contendo o papel do material e os bloc
   "blocks": [
     {
       "type": "MAIN_BLOCK", // ou "SUPPORT_BLOCK"
-      "title": "Assunto Específico e Amplo (Ex: Competência da Justiça do Trabalho — conceitos e classificação)",
-      "description": "Estudo dos fundamentos da competência trabalhista e suas regras territoriais.",
+      "title": "Título específico e temático (Ex: Competência no Processo Civil — critérios de fixação e conflitos)",
+      "titleQuality": "GOOD", // "GOOD", "WEAK" ou "INVALID"
+      "titleRationale": "Explicação curta de por que este título é temático e representa o conteúdo deste bloco.",
+      "description": "Descrição pedagógica curta do assunto estudado no bloco.",
       "pageStart": 1,
       "pageEnd": 8,
-      "sourceHeading": "Título original aglomerado",
-      "estimatedStudyMinutes": 45, // Tente mirar próximo de 45 minutos para blocos teóricos
+      "estimatedStudyMinutes": 45, // Sessão de estudo coerente entre 30 e 60 minutos
       "contentDensity": "MEDIUM", // "LOW", "MEDIUM", "HIGH" ou "VERY_HIGH"
-      "isShortBlock": false, // true se tiver menos de 4 páginas
-      "shortBlockJustification": null, // obrigatório explicar se isShortBlock for true (ex: "Conteúdo extremamente denso e autônomo")
-      "mergeRationale": "Foram agrupados os subtópicos curtos de conceito e classificação para formar uma sessão completa.", // se você agrupou tópicos para chegar no volume ideal
-      "selectionJustification": "O intervalo contém a explicação principal e exemplos da matéria.",
+      "isShortBlock": false,
+      "shortBlockJustification": null,
+      "mergeRationale": "Agrupamento de tópicos afins para formar um bloco temático.",
+      "selectionJustification": "Unidade temática indivisível cobrindo o tema conforme o sumário.",
       "officialTopicId": "id_do_topico_aqui",
       "officialTopicName": "Titulo completo do topico oficial associado",
       "topicCode": "Tópico XX",
-      "justification": "Explicação do motivo pela qual é um bloco principal ou um apoio",
       "pageTypes": ["MAIN_THEORY", "EXPLANATION"],
-      "supportType": null // String válida apenas se type for "SUPPORT_BLOCK", caso contrário null
+      "isMechanicalCut": false, // true se for fatiado por número de páginas artificialmente
+      "isSummaryOnly": false, // true se contiver apenas resumos/bizus rápidos
+      "isQuestionsOnly": false, // true se for composto puramente de questões ou gabaritos
+      "supportType": null // "SUMMARY", "BIZU", "MIND_MAP", "QUESTIONS", "COMMENTED_QUESTIONS", "ANSWER_KEY", "SIMULATED_EXAM", "CHECKLIST", "REVIEW" ou "OTHER" se type for "SUPPORT_BLOCK"
     }
   ]
 }`;

@@ -129,6 +129,11 @@ export interface DetectedBlock {
   shortBlockJustification?: string | null;
   mergeRationale?: string | null;
   selectionJustification?: string | null;
+  titleQuality?: "GOOD" | "WEAK" | "INVALID";
+  titleRationale?: string;
+  isMechanicalCut?: boolean;
+  isSummaryOnly?: boolean;
+  isQuestionsOnly?: boolean;
 }
 
 export interface DetectedStructureResult {
@@ -139,21 +144,159 @@ export interface DetectedStructureResult {
 
 const FORBIDDEN_GENERIC_PATTERNS = [
   /^parte\s+\d+/i,
-  /^conteúdo\s+\d+/i,
-  /^conteudo\s+\d+/i,
-  /^bloco\s+\d+$/i
+  /^bloco\s+\d+$/i,
+  /^conte[uú]do\s+completo$/i,
+  /^todo\s+conte[uú]do$/i,
+  /outros/i
 ];
 
 const GENERIC_TITLES = [
-  "TODO CONTEUDO", "TODO O CONTEUDO", "CONTEUDO COMPLETO", "CONTEUDO COMPLETO", 
+  "TODO CONTEUDO", "TODO O CONTEUDO", "CONTEUDO COMPLETO",
   "MATERIAL COMPLETO", "MATERIAL GERAL", "RESUMO GERAL", "CONTEUDO GERAL",
-  "CONTEUDO GERAL", "CONTEUDO DA MATERIA", "CONTEUDO DA MATERIA",
-  "APOSTILA COMPLETA", "PDF COMPLETO", "PARTE 1 DO CONTEUDO",
-  "PARTE 2 DO CONTEUDO", "PARTE 3 DO CONTEUDO", "PARTE DO CONTEUDO",
+  "CONTEUDO DA MATERIA", "APOSTILA COMPLETA", "PDF COMPLETO",
+  "PARTE 1 DO CONTEUDO", "PARTE 2 DO CONTEUDO", "PARTE 3 DO CONTEUDO",
   "PARTE DO CONTEUDO", "MATERIAL INTEGRA", "TODO O PDF",
   "CONTEUDO INTEGRAL", "VISAO GERAL", "ESTUDO COMPLETO", "APOSTILA", "PDF", 
-  "CONTEUDO", "SUMARIO", "CAPITULO", "INTRODUCAO"
+  "CONTEUDO", "SUMARIO", "CAPITULO", "INTRODUCAO", "SEM CATEGORIA", "DESCONHECIDO",
+  "OUTROS", "FUNDAMENTOS E CONCEITOS DE OUTROS", "PARTE 1", "PARTE 2", "PARTE 3",
+  "BLOCO 1", "BLOCO 2", "BLOCO 3"
 ];
+
+const WEAK_CORRIGIBLE_TITLES = [
+  "INTRODUCAO", "CONCEITOS INICIAIS", "FUNDAMENTOS", "COMPETENCIA", 
+  "ATOS PROCESSUAIS", "RECURSOS", "EXECUCAO", "PROVAS", "SENTENCA",
+  "RECURSO", "PROVA"
+];
+
+export function enhanceBlockTitle(b: DetectedBlock, subjectName: string): string {
+  const originalTitle = b.title.trim();
+  const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  let coreConcept = originalTitle;
+
+  // Tópico oficial
+  let detailText = "";
+  if (b.officialTopicName && b.officialTopicName !== "Tópico não identificado") {
+    detailText = b.officialTopicName;
+  } else if (b.sourceHeading && b.sourceHeading !== "GERAL") {
+    detailText = b.sourceHeading;
+  } else if (b.description && b.description.length > 10) {
+    detailText = b.description.split(/[.\n]/)[0].trim();
+  }
+
+  if (detailText.toLowerCase().includes(coreConcept.toLowerCase())) {
+    coreConcept = detailText;
+    detailText = "";
+  }
+
+  const subjectClean = subjectName.replace(/Direito /i, "").trim();
+  let newTitle = coreConcept;
+
+  if (!newTitle.toLowerCase().includes(subjectClean.toLowerCase())) {
+    newTitle = `${coreConcept} no ${subjectClean}`;
+  }
+
+  if (detailText && detailText.length > 0) {
+    const cleanDetail = detailText.replace(/Tópico\s+\d+\s*-?\s*/i, "").trim();
+    if (cleanDetail.length > 5) {
+      newTitle = `${newTitle} — ${cleanDetail.substring(0, 70)}`;
+    }
+  }
+
+  newTitle = newTitle.charAt(0).toUpperCase() + newTitle.slice(1);
+  newTitle = newTitle.replace(/[.\s—-]+$/, "").trim();
+
+  // Mapeamentos específicos aprovados pelo usuário
+  if (titleNorm === "COMPETENCIA") {
+    return `Competência no ${subjectClean} — critérios de fixação, espécies e conflitos`;
+  }
+  if (titleNorm === "PROVAS") {
+    return `Provas no ${subjectClean} — teoria geral e meios de prova`;
+  }
+  if (titleNorm === "RECURSOS") {
+    return `Recursos no ${subjectClean} — teoria geral e recursos em espécie`;
+  }
+  if (titleNorm === "EXECUCAO") {
+    return `Processo de Execução no ${subjectClean} — fundamentos, espécies e atos executivos`;
+  }
+  if (titleNorm === "ATOS PROCESSUAIS") {
+    return `Atos Processuais no ${subjectClean} — forma, prazos e comunicação dos atos`;
+  }
+
+  return newTitle;
+}
+
+export function calculateBlockQualityScore(b: DetectedBlock, subjectName: string): { score: number; reasons: string[] } {
+  let score = 0;
+  const reasons = [];
+
+  const titleNorm = b.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
+  const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(b.title));
+
+  if (isForbiddenLiteral || isForbiddenPattern) {
+    score -= 3;
+    reasons.push("Título proibido absoluto");
+  } else if (b.title.length >= 15 && b.title.split(/\s+/).length > 2) {
+    score += 2;
+    reasons.push("Título bom");
+  } else {
+    reasons.push("Título simples/fraco corrigível");
+  }
+
+  if (b.officialTopicId && b.officialTopicId !== "GERAL") {
+    score += 2;
+    reasons.push("Tópico oficial coerente");
+  } else {
+    reasons.push("Tópico geral");
+  }
+
+  if (b.pageStart > 0 && b.pageEnd >= b.pageStart) {
+    score += 2;
+    reasons.push("Páginas coerentes");
+  } else {
+    reasons.push("Intervalo de páginas inválido");
+  }
+
+  const isMainBlock = !b.type || b.type === "MAIN_BLOCK";
+  if (isMainBlock) {
+    score += 2;
+    reasons.push("Bloco teórico principal");
+
+    if (b.isQuestionsOnly || b.supportType === "QUESTIONS" || b.supportType === "ANSWER_KEY") {
+      score -= 3;
+      reasons.push("Questão/gabarito como MAIN_BLOCK");
+    }
+    if (b.isSummaryOnly || b.supportType === "SUMMARY" || b.supportType === "BIZU") {
+      score -= 3;
+      reasons.push("Resumo/bizu como MAIN_BLOCK");
+    }
+  } else {
+    reasons.push("Bloco de apoio");
+  }
+
+  if (b.estimatedStudyMinutes >= 30 && b.estimatedStudyMinutes <= 60) {
+    score += 1;
+    reasons.push("Tempo de estudo coerente (30-60 min)");
+  }
+
+  if (b.description && b.description.length > 20) {
+    score += 1;
+    reasons.push("Descrição boa");
+  }
+
+  if (b.isMechanicalCut) {
+    score -= 2;
+    reasons.push("Fatiamento mecânico");
+  }
+
+  if (subjectName.toLowerCase().trim() === "outros") {
+    score -= 2;
+    reasons.push("Matéria Outros");
+  }
+
+  return { score, reasons };
+}
 
 export async function detectStructure(
   summaryContent: string,
@@ -166,15 +309,14 @@ export async function detectStructure(
 
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  // 1. Filtrar os tópicos oficiais relevantes para esta matéria
   const relevantTopics = OFFICIAL_TOPICS.filter(
     t => t.subjectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
          subjectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   );
 
   const officialTopicsListText = relevantTopics.length > 0
-    ? relevantTopics.map(t => `- ID: "${t.id}" | Código: "${t.topicCode}" | Título: "${t.title}"`).join("\n")
-    : "Esta matéria não possui matriz de tópicos cadastrada. Use officialTopicId = null, topicCode = \"GERAL\", officialTopicName = \"Tópico não identificado\".";
+    ? relevantTopics.map(t => `- ID: '${t.id}' | Código: '${t.topicCode}' | Título: '${t.title}'`).join('\n')
+    : "Esta matéria não possui matriz de tópicos cadastrada. Use officialTopicId = null, topicCode = 'GERAL', officialTopicName = 'Tópico não identificado'.";
 
   const initialPrompt = buildStructurePrompt(summaryContent, subjectName, officialTopicsListText) +
     `\n\nTotal de páginas do PDF: ${totalPages}`;
@@ -223,104 +365,136 @@ export async function detectStructure(
           const role = parsedResult.materialRole || "UNKNOWN";
           const blocks = parsedResult.blocks || [];
 
-          // --- Validação Técnica & Pedagógica ---
+          // --- Validação Inteligente Técnico & Pedagógica por Score ---
           const errors: string[] = [];
+          const validatedBlocks: DetectedBlock[] = [];
+          const isSupportOnlyMaterial = role === "SUPPORT_MATERIAL";
 
-          // 1. Títulos genéricos
-          const hasGenericTitle = blocks.some(b => {
-            const titleNorm = b.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+          for (const b of blocks) {
+            const originalTitle = b.title || "Sem Título";
+            const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
             const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
-            const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(b.title));
-            return isForbiddenLiteral || isForbiddenPattern;
-          });
-          if (hasGenericTitle) {
-            errors.push("Contém títulos genéricos proibidos (Parte X, Conteúdo Completo, Bloco 1, etc). Por favor, crie títulos altamente específicos e temáticos.");
-          }
+            const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(originalTitle));
 
+            let titleCategory: "PROIBIDO" | "FRACO" | "BOM" = "BOM";
+            if (isForbiddenLiteral || isForbiddenPattern) {
+              titleCategory = "PROIBIDO";
+            } else if (
+              WEAK_CORRIGIBLE_TITLES.some(wt => titleNorm === wt || titleNorm.includes(wt)) || 
+              originalTitle.length < 15 || 
+              originalTitle.split(/\s+/).length <= 2
+            ) {
+              titleCategory = "FRACO";
+            }
 
-          // 4. Validação de Páginas de Resumo/Bizus vs Explicação Principal & Detecção de Questões/Gabaritos
-          if (pageTexts && pageTexts.length > 0) {
-            for (const b of blocks) {
+            // Aprimoramento se for fraco
+            let enhancedTitle = originalTitle;
+            if (titleCategory === "FRACO") {
+              enhancedTitle = enhanceBlockTitle(b, subjectName);
+            }
+
+            b.title = enhancedTitle;
+
+            // Executar heurísticas adicionais baseadas no texto da página
+            if (pageTexts && pageTexts.length > 0) {
               const blockPages = pageTexts.filter(p => p.pageNumber >= b.pageStart && p.pageNumber <= b.pageEnd);
               const fullBlockText = blockPages.map(p => p.text).join("\n");
               const normalizedBlockText = fullBlockText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
               if (normalizedBlockText.trim().length > 0) {
-                // Executar heurística programática de Questões/Gabaritos
+                // Heurística programática de Questões/Gabaritos
                 const qgResult = detectQuestionsOrGabaritoHeuristic(fullBlockText);
                 if (qgResult.isQuestions || qgResult.isAnswerKey) {
-                  console.log(`[Heuristic Match] Bloco "${b.title}" (p.${b.pageStart}-${b.pageEnd}) detectado como Questões/Gabarito pelo backend. Convertendo para Apoio.`);
                   b.type = "SUPPORT_BLOCK";
                   b.supportType = qgResult.isQuestions ? "QUESTIONS" : "ANSWER_KEY";
+                  b.isQuestionsOnly = true;
                   b.estimatedStudyMinutes = 0;
                   b.description = b.description || `Banco de questões/gabarito de apoio para o assunto.`;
-                  continue;
-                }
+                } else {
+                  // Checar se é resumo ou bizu
+                  const negativeKeywords = [
+                    "resumo", "bizu", "mapa mental", "mapas mentais", "gabarito", "questoes", "questões",
+                    "simulado", "revisao de vespera", "revisão de véspera", "revisao rapida", "revisão rápida",
+                    "esquematico", "esquemático", "checklist"
+                  ];
+                  let negativeScore = 0;
+                  negativeKeywords.forEach(kw => {
+                    const regex = new RegExp(kw, "g");
+                    const matches = normalizedBlockText.match(regex);
+                    if (matches) negativeScore += matches.length;
+                  });
 
-                // Contagem de palavras-chave negativas (resumos/bizus/questões)
-                const negativeKeywords = [
-                  "resumo", "bizu", "mapa mental", "mapas mentais", "gabarito", "questoes", "questões",
-                  "simulado", "revisao de vespera", "revisão de véspera", "revisao rapida", "revisão rápida",
-                  "esquematico", "esquemático", "checklist"
-                ];
-                let negativeScore = 0;
-                negativeKeywords.forEach(kw => {
-                  const regex = new RegExp(kw, "g");
-                  const matches = normalizedBlockText.match(regex);
-                  if (matches) negativeScore += matches.length;
-                });
+                  const positiveKeywords = [
+                    "conceito", "definicao", "definicao", "exemplo", "classificacao", "classificacao",
+                    "regra", "excecao", "excecao", "jurisprudencia", "jurisprudencia", "artigo",
+                    "fundamento", "aplicacao", "aplicacao", "doutrina", "entendimento", "explicacao", "explicacao"
+                  ];
+                  let positiveScore = 0;
+                  positiveKeywords.forEach(kw => {
+                    const regex = new RegExp(kw, "g");
+                    const matches = normalizedBlockText.match(regex);
+                    if (matches) positiveScore += matches.length;
+                  });
 
-                // Contagem de palavras-chave positivas (desenvolvimento teórico completo)
-                const positiveKeywords = [
-                  "conceito", "definicao", "definicao", "exemplo", "classificacao", "classificacao",
-                  "regra", "excecao", "excecao", "jurisprudencia", "jurisprudencia", "artigo",
-                  "fundamento", "aplicacao", "aplicacao", "doutrina", "entendimento", "explicacao", "explicacao"
-                ];
-                let positiveScore = 0;
-                positiveKeywords.forEach(kw => {
-                  const regex = new RegExp(kw, "g");
-                  const matches = normalizedBlockText.match(regex);
-                  if (matches) positiveScore += matches.length;
-                });
-
-                console.log(`[AI Validation] Bloco "${b.title}" (Páginas ${b.pageStart}-${b.pageEnd}): negativeScore=${negativeScore}, positiveScore=${positiveScore}`);
-
-                // Critério de Rejeição: Mais de 80% do texto do bloco consiste em termos resumitivos E há baixíssima densidade teórica explicativa
-                // Apenas para MAIN_BLOCK (blocos teóricos)
-                const isResumoOnly = negativeScore > 6 && positiveScore <= 2;
-                if (isResumoOnly && (!b.type || b.type === "MAIN_BLOCK")) {
-                  console.warn(`[AI Validation] Bloco "${b.title}" (Páginas ${b.pageStart}-${b.pageEnd}) REJEITADO por parecer resumo/bizu/questões (negativo=${negativeScore}, positivo=${positiveScore})`);
-                  errors.push(`A seleção de páginas ${b.pageStart}-${b.pageEnd} para o bloco principal "${b.title}" foi rejeitada porque parece conter apenas resumo, bizu, simulado ou revisão rápida. É obrigatório incluir as páginas de desenvolvimento conceitual e explicação teórica em blocos MAIN_BLOCK.`);
-                  break;
+                  if (negativeScore > 6 && positiveScore <= 2) {
+                    b.isSummaryOnly = true;
+                  }
                 }
               }
             }
+
+            // Calcular score
+            const { score, reasons } = calculateBlockQualityScore(b, subjectName);
+
+            let decision: "ACCEPTED" | "ENHANCED" | "REJECTED" = "ACCEPTED";
+            if (titleCategory === "PROIBIDO") {
+              decision = "REJECTED";
+            } else if (score < 5) {
+              decision = "REJECTED";
+            } else if (titleCategory === "FRACO" && enhancedTitle !== originalTitle) {
+              decision = "ENHANCED";
+            }
+
+            // Exibir log formatado de diagnóstico pedagógico [BlockValidation]
+            console.log(`[BlockValidation] block: "${originalTitle}"`);
+            console.log(`[BlockValidation] type: "${b.type || "MAIN_BLOCK"}"`);
+            console.log(`[BlockValidation] titleCategory: ${titleCategory}`);
+            console.log(`[BlockValidation] enhancedTitle: "${enhancedTitle}"`);
+            console.log(`[BlockValidation] qualityScore: ${score}`);
+            console.log(`[BlockValidation] decision: ${decision}`);
+            console.log(`[BlockValidation] reasons: ${reasons.join(", ")}`);
+
+            if (decision === "REJECTED") {
+              const isMain = !b.type || b.type === "MAIN_BLOCK";
+              if (isMain && !isSupportOnlyMaterial) {
+                errors.push(`A seleção de páginas ${b.pageStart}-${b.pageEnd} para o bloco principal "${originalTitle}" foi rejeitada. Razões: ${reasons.join("; ")}`);
+              }
+            } else {
+              validatedBlocks.push(b);
+            }
           }
 
-          // 5. Validação de Fatiamento Mecânico por número fixo de páginas
-          if (errors.length === 0) {
-            const hasMechanicalCutting = detectMechanicalCuttingHeuristic(blocks);
+          // Validação de Fatiamento Mecânico por número fixo de páginas
+          if (errors.length === 0 && !isSupportOnlyMaterial) {
+            const hasMechanicalCutting = detectMechanicalCuttingHeuristic(validatedBlocks);
             if (hasMechanicalCutting) {
               console.warn("[AI Validation] Rejeitando divisão por fatiamento mecânico de páginas detectado pelo backend.");
               errors.push("A divisão anterior parece ter sido feita por cortes fixos de páginas (ex: de 10 em 10 páginas), e não por unidade temática. Refaça a divisão respeitando a estrutura real do conteúdo (títulos, subtítulos), os tópicos oficiais, a continuidade do assunto e o desenvolvimento teórico principal. Não divida o PDF de forma regular/mecânica.");
             }
           }
 
+          // Garantir pelo menos um bloco principal se for MAIN_MATERIAL ou MIXED_MATERIAL
           if (errors.length === 0) {
-            // Validação de blocos muito curtos sem justificativa
-            const hasUnjustifiedShortBlock = blocks.some(b => {
-              const pageCount = (b.pageEnd - b.pageStart) + 1;
-              return pageCount < 4 && !b.shortBlockJustification && (!b.type || b.type === "MAIN_BLOCK");
-            });
-            
-            if (hasUnjustifiedShortBlock) {
-              errors.push("Existem blocos muito curtos (1 a 3 páginas) sem justificativa ('shortBlockJustification'). Agrupe esses subtópicos menores em blocos maiores de 5 a 12 páginas, mantendo a coerência temática.");
+            const mainBlocksCount = validatedBlocks.filter(b => !b.type || b.type === "MAIN_BLOCK").length;
+            if ((role === "MAIN_MATERIAL" || role === "MIXED_MATERIAL") && mainBlocksCount === 0) {
+              errors.push(`O material foi classificado como ${role}, mas nenhum bloco principal de teoria (MAIN_BLOCK) válido foi gerado. Certifique-se de que o material contenha as explicações teóricas do assunto.`);
             }
           }
 
           if (errors.length === 0) {
             // Mapear tópicos oficiais com segurança (limpar correspondências vazias ou inválidas se houver)
-            const mappedBlocks = blocks.map(b => {
+            const mappedBlocks = validatedBlocks.map(b => {
               let topicId = b.officialTopicId || null;
               let code = b.topicCode || "GERAL";
               let name = b.officialTopicName || "Tópico não identificado";
@@ -348,9 +522,8 @@ export async function detectStructure(
             let finalBlocks = tryMergeShortBlocks(mappedBlocks);
             finalBlocks = calculateEstimatedMinutes(finalBlocks);
 
-            // Log de sucesso de fallback se não for o primeiro da lista
             if (modelName !== GEMINI_MODEL_CANDIDATES[0]) {
-              console.log(`🤖 [AI Fallback] Modelo principal falhou na mapeamento de estrutura. Fallback usado com sucesso: ${modelName}.`);
+              console.log(`🤖 [AI Fallback] Modelo principal falhou no mapeamento de estrutura. Fallback usado com sucesso: ${modelName}.`);
             }
 
             return {
@@ -363,7 +536,7 @@ export async function detectStructure(
           accumulatedErrors = errors;
           attempts++;
           console.warn(`[AI] Tentativa ${attempts} falhou nos critérios de qualidade: ${errors.join(" ")}`);
-          currentPrompt = initialPrompt + `\n\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros de qualidade: ${errors.join(" ")}\nPOR FAVOR, refaça o mapeamento de blocos respeitando rigorosamente a explicação teórica principal. Evite títulos genéricos como 'Parte X'.`;
+          currentPrompt = initialPrompt + `\\n\\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros de qualidade: ${errors.join(" ")}\\nPOR FAVOR, refaça o mapeamento de blocos respeitando rigorosamente a explicação teórica principal. Evite títulos genéricos como 'Parte X'.`;
           
         } catch (error: any) {
           console.error("Erro ao detectar estrutura:", error);
@@ -378,7 +551,6 @@ export async function detectStructure(
         }
       }
 
-      // Se falhou por qualidade dos blocos (VALIDATION_REJECTED_ALL_BLOCKS), não faz fallback automático
       if (accumulatedErrors.length > 0) {
         throw new Error(`VALIDATION_REJECTED_ALL_BLOCKS: ${accumulatedErrors.join(" | ")}`);
       }
@@ -395,10 +567,8 @@ export async function detectStructure(
       console.warn(`[AI Structure Fallback] Modelo ${modelName} falhou: ${error.message}`);
       lastError = error;
 
-      // Critério 14: Só fazer fallback de modelo para erros recuperáveis de infraestrutura (503, 429, timeout)
       const isRecoverable = isRecoverableGeminiError(error);
       if (!isRecoverable) {
-        // Erro permanente (como validação falhar ou JSON inválido recorrente) -> lança imediatamente
         throw error;
       }
     }
@@ -406,7 +576,6 @@ export async function detectStructure(
 
   throw new Error(`AI_UNAVAILABLE: Todos os modelos do Gemini falharam temporariamente com erros de indisponibilidade. Último erro: ${lastError?.message}`);
 }
-
 
 function tryMergeShortBlocks(blocks: DetectedBlock[]): DetectedBlock[] {
   if (blocks.length === 0) return blocks;
