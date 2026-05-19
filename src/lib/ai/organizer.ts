@@ -30,9 +30,6 @@ const KNOWN_SUBJECTS_MAP: Record<string, string> = {
 export const GEMINI_MODEL_CANDIDATES = [
   process.env.GEMINI_MODEL_PRIMARY || "gemini-2.5-flash",
   process.env.GEMINI_MODEL_FALLBACK_1 || "gemini-2.5-flash-lite",
-  process.env.GEMINI_MODEL_FALLBACK_2 || "gemini-2.0-flash",
-  process.env.GEMINI_MODEL_FALLBACK_3 || "gemini-2.0-flash-lite",
-  process.env.GEMINI_MODEL_FALLBACK_4 || "gemini-2.5-pro",
 ];
 
 // Helper para detectar erros temporários ou instabilidade na API do Gemini
@@ -240,20 +237,6 @@ export async function detectStructure(
             errors.push("Contém títulos genéricos proibidos (Parte X, Conteúdo Completo, Bloco 1, etc). Por favor, crie títulos altamente específicos e temáticos.");
           }
 
-          // 2. Bloco único para material longo
-          if (blocks.length === 1 && totalPages > 5) {
-            errors.push("Criou apenas um bloco único para um material longo. Divida-o por assuntos específicos.");
-          }
-
-          // 3. Quantidade mínima de blocos
-          let minBlocks = 1;
-          if (totalPages > 50) minBlocks = 4;
-          else if (totalPages > 20) minBlocks = 3;
-          else if (totalPages > 5) minBlocks = 2;
-
-          if (blocks.length < minBlocks && totalPages > 5) {
-            errors.push(`Quantidade insuficiente de blocos (encontrado ${blocks.length}, esperado no mínimo ${minBlocks}).`);
-          }
 
           // 4. Validação de Páginas de Resumo/Bizus vs Explicação Principal & Detecção de Questões/Gabaritos
           if (pageTexts && pageTexts.length > 0) {
