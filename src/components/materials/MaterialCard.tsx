@@ -187,6 +187,19 @@ export function MaterialCard({
           variant: "secondary" as const,
           subLabel: "Pronto para organizar"
         };
+      case "NEEDS_RETRY":
+      case "SUBJECT_DETECTION_FAILED":
+        return { 
+          label: "Pendente", 
+          variant: "secondary" as const, // variant can be secondary or outline, standard shadcn badge doesn't have warning by default
+          subLabel: "Aguardando nova tentativa"
+        };
+      case "AI_UNAVAILABLE":
+        return { 
+          label: "IA Indisponível", 
+          variant: "secondary" as const,
+          subLabel: "IA temporariamente off-line"
+        };
       case "ERROR":
         return { 
           label: "Erro", 
@@ -290,14 +303,23 @@ export function MaterialCard({
                     </button>
                   )}
                 </div>
-                {material.organizationStatus === "ERROR" && (
-                  <div className="mt-3 p-3 bg-red-500/[0.04] border border-red-500/20 rounded-2xl flex flex-col gap-1.5 text-[10px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1">
+                {["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE"].includes(material.organizationStatus) && (
+                  <div className={`mt-3 p-3 rounded-2xl flex flex-col gap-1.5 text-[10px] font-medium animate-in fade-in slide-in-from-top-1 ${
+                    material.organizationStatus === "ERROR"
+                      ? "bg-red-500/[0.04] border border-red-500/20 text-red-600"
+                      : "bg-amber-500/[0.04] border border-amber-500/20 text-amber-700"
+                  }`}>
                     <div className="flex gap-2 items-start">
-                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                      <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${material.organizationStatus === "ERROR" ? "text-red-500" : "text-amber-500"}`} />
                       <div className="space-y-0.5">
-                        <span className="block font-black text-foreground">Não conseguimos processar este PDF</span>
-                        <p className="leading-relaxed text-red-500">
-                          Motivo: {getFriendlyErrorMessage(material.processingError)}
+                        <span className="block font-black text-foreground">
+                          {material.organizationStatus === "ERROR" ? "Não conseguimos processar este PDF" : "IA temporariamente indisponível"}
+                        </span>
+                        <p className="leading-relaxed">
+                          Não conseguimos organizar este PDF agora. Nenhum bloco genérico foi criado.
+                        </p>
+                        <p className="text-[9px] opacity-90 mt-1">
+                          <strong>Motivo:</strong> {getFriendlyErrorMessage(material.processingError)}
                         </p>
                       </div>
                     </div>
@@ -360,12 +382,16 @@ export function MaterialCard({
         {!isSelectionMode && (
           <div className="bg-muted/30 border-t border-border/50 flex flex-col relative w-full">
             <div className="px-5 py-3 flex gap-2 w-full">
-              {material.organizationStatus === "ERROR" ? (
+              {["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE"].includes(material.organizationStatus) ? (
                 <>
                   <Button 
-                    variant="destructive"
+                    variant={material.organizationStatus === "ERROR" ? "destructive" : "default"}
                     size="sm" 
-                    className="flex-grow rounded-xl gap-2 font-bold"
+                    className={`flex-grow rounded-xl gap-2 font-bold ${
+                      material.organizationStatus !== "ERROR"
+                        ? "bg-amber-500 hover:bg-amber-600 text-white border-none"
+                        : ""
+                    }`}
                     onClick={() => executeOrganizationAction("general")}
                     disabled={isOrganizing}
                   >

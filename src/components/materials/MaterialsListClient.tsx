@@ -93,7 +93,7 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
       // Category filter
       if (activeFilter === "PROCESSED") return m.organizationStatus === "ORGANIZED";
       if (activeFilter === "PENDING") return m.organizationStatus !== "ORGANIZED" && m.organizationStatus !== "ERROR";
-      if (activeFilter === "ERROR") return m.organizationStatus === "ERROR";
+      if (activeFilter === "ERROR") return ["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE"].includes(m.organizationStatus);
       
       return true;
     });

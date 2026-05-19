@@ -405,11 +405,53 @@ export async function POST(
     const materialRole = structResult.materialRole || "UNKNOWN";
     const detectedBlocks = structResult.blocks || [];
 
-    if (!detectedBlocks || detectedBlocks.length === 0) {
-      await prisma.studyMaterial.update({ where: { id }, data: { organizationStatus: "ERROR", processingError: "IA não detectou estrutura" } });
-      return NextResponse.json({
-        error: "Não conseguimos organizar este PDF. Nenhum bloco foi criado."
-      }, { status: 400 });
+    if ((!detectedBlocks || detectedBlocks.length === 0) && materialRole !== "SUPPORT_MATERIAL") {
+      throw new Error("Não foi possível mapear a estrutura pedagógica de blocos temáticos reais.");
+    }
+
+    // Validação rígida antes de salvar os blocos no banco de dados
+    const mainSubjects = [
+      "Língua Portuguesa",
+      "Direito Administrativo",
+      "Direito Constitucional",
+      "Direito do Trabalho",
+      "Direito Processual do Trabalho",
+      "Direito Civil",
+      "Direito Processual Civil"
+    ];
+    const isMainSubject = mainSubjects.includes(detectedSubject);
+
+    const FORBIDDEN_GENERIC_PATTERNS = [
+      /^parte\s+\d+/i,
+      /^conteúdo\s+\d+/i,
+      /^conteudo\s+\d+/i,
+      /^bloco\s+\d+$/i
+    ];
+    const GENERIC_TITLES = [
+      "TODO CONTEUDO", "TODO O CONTEUDO", "CONTEUDO COMPLETO", 
+      "MATERIAL COMPLETO", "MATERIAL GERAL", "RESUMO GERAL", "CONTEUDO GERAL",
+      "CONTEUDO DA MATERIA", "APOSTILA COMPLETA", "PDF COMPLETO", "PARTE 1 DO CONTEUDO",
+      "PARTE 2 DO CONTEUDO", "PARTE 3 DO CONTEUDO", "PARTE DO CONTEUDO", "MATERIAL INTEGRA", "TODO O PDF",
+      "CONTEUDO INTEGRAL", "VISAO GERAL", "ESTUDO COMPLETO", "APOSTILA", "PDF", 
+      "CONTEUDO", "SUMARIO", "CAPITULO", "INTRODUCAO", "FUNDAMENTOS E CONCEITOS DE OUTROS",
+      "FUNDAMENTOS DE OUTROS", "CONCEITOS DE OUTROS", "OUTROS - BLOCO 1", "OUTROS", "BLOCO GENERICO"
+    ];
+
+    for (const block of detectedBlocks) {
+      const titleNorm = block.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const isForbiddenTitle = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt)) ||
+                                FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(block.title));
+      if (isForbiddenTitle) {
+        throw new Error(`O bloco "${block.title}" possui um título genérico proibido. A organização foi abortada.`);
+      }
+
+      if (isMainSubject && block.type !== "SUPPORT_BLOCK" && !block.officialTopicId) {
+        throw new Error(`O bloco "${block.title}" na disciplina "${detectedSubject}" não foi mapeado para um tópico oficial do edital. A organização foi abortada.`);
+      }
+
+      if (block.pageStart < 1 || block.pageEnd < block.pageStart || block.pageEnd > numPages) {
+        throw new Error(`O bloco "${block.title}" possui intervalo de páginas inválido (${block.pageStart}-${block.pageEnd}). A organização foi abortada.`);
+      }
     }
 
     let flashcardCount = 0;
@@ -665,9 +707,26 @@ export async function POST(
       userFriendlyError = "Sua chave de API do Gemini foi desativada pelo Google por motivo de vazamento em repositório público. Acesse o Google AI Studio (aistudio.google.com), gere uma nova chave de API gratuita e atualize seu arquivo .env local!";
     }
 
+    let targetStatus = "NEEDS_RETRY";
+    if (error.message.includes("SUBJECT_DETECTION_FAILED")) {
+      targetStatus = "SUBJECT_DETECTION_FAILED";
+    } else if (
+      error.message.includes("AI_UNAVAILABLE") || 
+      error.message.includes("503") || 
+      error.message.includes("429") ||
+      error.message.includes("indisponível")
+    ) {
+      targetStatus = "AI_UNAVAILABLE";
+    } else if (error.message.includes("texto selecionável") || error.message.includes("Texto insuficiente")) {
+      targetStatus = "ERROR";
+    }
+
     await prisma.studyMaterial.update({
       where: { id },
-      data: { organizationStatus: "ERROR", processingError: userFriendlyError.substring(0, 250) }
+      data: { 
+        organizationStatus: targetStatus, 
+        processingError: userFriendlyError.substring(0, 250) 
+      }
     }).catch(() => {});
 
     return NextResponse.json({ error: userFriendlyError }, { status: 500 });

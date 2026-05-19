@@ -226,18 +226,9 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     .join("\n");
 
   log("Detectando estrutura de blocos com IA...");
-  let detectedBlocks: DetectedBlock[] = [];
-  let materialRole = "UNKNOWN";
-
-  try {
-    const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
-    detectedBlocks = structResult.blocks || [];
-    materialRole = structResult.materialRole || "UNKNOWN";
-  } catch (err: any) {
-    console.warn(`[ORGANIZE] IA falhou ao detectar blocos para ${material.fileName}. Criando bloco único.`);
-    detectedBlocks = [];
-    materialRole = "UNKNOWN";
-  }
+  const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
+  const detectedBlocks = structResult.blocks || [];
+  const materialRole = structResult.materialRole || "UNKNOWN";
 
   // Atualizar o material com o role detectado (e limpar erro)
   await prisma.studyMaterial.update({
@@ -248,17 +239,53 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     }
   });
 
-  // FALLBACK: Se não detectar blocos e for MAIN_MATERIAL ou UNKNOWN
   if ((!detectedBlocks || detectedBlocks.length === 0) && materialRole !== "SUPPORT_MATERIAL") {
-    detectedBlocks = [{
-      type: "MAIN_BLOCK",
-      title: "Conteúdo Completo",
-      description: "Estudo integral do material (bloco gerado automaticamente).",
-      pageStart: 1,
-      pageEnd: numPages,
-      sourceHeading: "Material Completo",
-      estimatedStudyMinutes: numPages * 3
-    }];
+    throw new Error("Não foi possível mapear a estrutura pedagógica de blocos temáticos reais.");
+  }
+
+  // Validação rígida antes de salvar os blocos no banco de dados
+  const mainSubjects = [
+    "Língua Portuguesa",
+    "Direito Administrativo",
+    "Direito Constitucional",
+    "Direito do Trabalho",
+    "Direito Processual do Trabalho",
+    "Direito Civil",
+    "Direito Processual Civil"
+  ];
+  const isMainSubject = mainSubjects.includes(detectedSubject);
+
+  const FORBIDDEN_GENERIC_PATTERNS = [
+    /^parte\s+\d+/i,
+    /^conteúdo\s+\d+/i,
+    /^conteudo\s+\d+/i,
+    /^bloco\s+\d+$/i
+  ];
+  const GENERIC_TITLES = [
+    "TODO CONTEUDO", "TODO O CONTEUDO", "CONTEUDO COMPLETO", 
+    "MATERIAL COMPLETO", "MATERIAL GERAL", "RESUMO GERAL", "CONTEUDO GERAL",
+    "CONTEUDO DA MATERIA", "APOSTILA COMPLETA", "PDF COMPLETO", "PARTE 1 DO CONTEUDO",
+    "PARTE 2 DO CONTEUDO", "PARTE 3 DO CONTEUDO", "PARTE DO CONTEUDO", "MATERIAL INTEGRA", "TODO O PDF",
+    "CONTEUDO INTEGRAL", "VISAO GERAL", "ESTUDO COMPLETO", "APOSTILA", "PDF", 
+    "CONTEUDO", "SUMARIO", "CAPITULO", "INTRODUCAO", "FUNDAMENTOS E CONCEITOS DE OUTROS",
+    "FUNDAMENTOS DE OUTROS", "CONCEITOS DE OUTROS", "OUTROS - BLOCO 1", "OUTROS", "BLOCO GENERICO"
+  ];
+
+  for (const block of detectedBlocks) {
+    const titleNorm = block.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const isForbiddenTitle = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt)) ||
+                              FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(block.title));
+    if (isForbiddenTitle) {
+      throw new Error(`O bloco "${block.title}" possui um título genérico proibido. A organização foi abortada.`);
+    }
+
+    if (isMainSubject && block.type !== "SUPPORT_BLOCK" && !block.officialTopicId) {
+      throw new Error(`O bloco "${block.title}" na disciplina "${detectedSubject}" não foi mapeado para um tópico oficial do edital. A organização foi abortada.`);
+    }
+
+    if (block.pageStart < 1 || block.pageEnd < block.pageStart || block.pageEnd > numPages) {
+      throw new Error(`O bloco "${block.title}" possui intervalo de páginas inválido (${block.pageStart}-${block.pageEnd}). A organização foi abortada.`);
+    }
   }
 
   log(`[Organize] Blocos processados/detectados: ${detectedBlocks.length}. Material Role: ${materialRole}`);
@@ -568,10 +595,11 @@ export async function POST(req: NextRequest) {
 
     console.log(`[ORGANIZE ALL] Iniciando processamento para: ${userId} (force=${force}, materialId=${materialId || "todos"})`);
 
-    // 2. Materiais a organizar (exclui "ORGANIZED" da busca padrão de force para evitar loop infinito)
-    const statusFilter = force 
-      ? ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS", "ERROR"] as any[]
-      : ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS"] as any[];
+    // 2. Materiais a organizar (inclui tentativas recuperáveis na fila de processamento automático)
+    const statusFilter = [
+      "IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", 
+      "GENERATING_FLASHCARDS", "ERROR", "NEEDS_RETRY", "AI_UNAVAILABLE", "SUBJECT_DETECTION_FAILED"
+    ];
 
     const materialsToProcess = await prisma.studyMaterial.findMany({
       where: {
@@ -594,6 +622,7 @@ export async function POST(req: NextRequest) {
     const summary = {
       success: 0,
       errors: 0,
+      needsRetry: 0,
       totalBlocks: 0,
       totalFlashcards: 0,
       subjectsCreated: 0,
@@ -612,8 +641,6 @@ export async function POST(req: NextRequest) {
           });
 
           await prisma.studyBlock.deleteMany({ where: { materialId: material.id } });
-          // Preserva o ExtractedContent para evitar custos de extração/OCR desnecessários
-          // await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
         }
 
         const result = await processMaterial(material, userId, force);
@@ -623,16 +650,35 @@ export async function POST(req: NextRequest) {
         if (result.subjectCreated) summary.subjectsCreated++;
       } catch (error: any) {
         console.error(`[ORGANIZE MATERIAL ERROR] ${material.fileName}:`, error.message);
+        
+        let targetStatus = "NEEDS_RETRY";
+        if (error.message.includes("SUBJECT_DETECTION_FAILED")) {
+          targetStatus = "SUBJECT_DETECTION_FAILED";
+        } else if (
+          error.message.includes("AI_UNAVAILABLE") || 
+          error.message.includes("503") || 
+          error.message.includes("429") ||
+          error.message.includes("indisponível")
+        ) {
+          targetStatus = "AI_UNAVAILABLE";
+        } else if (error.message.includes("texto selecionável") || error.message.includes("Texto insuficiente")) {
+          targetStatus = "ERROR"; // Erro crítico não recuperável
+        }
+
         await prisma.studyMaterial.update({
           where: { id: material.id },
           data: { 
-            organizationStatus: "ERROR",
+            organizationStatus: targetStatus,
             processingError: error.message 
           }
         });
-        summary.errors++;
-        const isNoTextError = error.message.includes("texto selecionável");
-        if (isNoTextError) summary.noTextPdfs++;
+
+        if (targetStatus === "ERROR") {
+          summary.errors++;
+          summary.noTextPdfs++;
+        } else {
+          summary.needsRetry++;
+        }
       } finally {
         summary.materialsProcessed++;
       }
@@ -640,29 +686,29 @@ export async function POST(req: NextRequest) {
 
     // 4. Cronograma será atualizado de forma otimizada ao final do lote pelo frontend.
 
-
     // 5. Mensagem de resultado
     const messageParts: string[] = [];
     if (summary.success > 0) {
-      messageParts.push(`${summary.success} PDF(s) organizados`);
-      if (summary.subjectsCreated > 0) messageParts.push(`${summary.subjectsCreated} matéria(s) criadas`);
+      messageParts.push(`${summary.success} PDF(s) organizado(s) com sucesso`);
       messageParts.push(`${summary.totalBlocks} blocos criados`);
-      messageParts.push(`${summary.totalFlashcards} flashcards criados`);
+    }
+    if (summary.needsRetry > 0) {
+      messageParts.push(`${summary.needsRetry} PDF(s) aguardando nova tentativa (IA indisponível ou baixa confiança)`);
     }
     if (summary.errors > 0) {
-      const noText = summary.noTextPdfs > 0 ? ` (${summary.noTextPdfs} sem texto selecionável)` : "";
-      messageParts.push(`${summary.errors} PDF(s) com erro${noText}`);
+      messageParts.push(`${summary.errors} PDF(s) com erro crítico`);
     }
     
     const message = summary.success > 0
-      ? `Organização concluída! ${messageParts.join(" · ")}.`
-      : `Não conseguimos organizar os materiais. ${messageParts.filter(p => p.includes("erro")).join(" · ")}.`;
+      ? `Organização concluída! ${messageParts.join(" · ")}. Nenhum bloco genérico foi criado.`
+      : `Não conseguimos organizar o material. ${messageParts.join(" · ")}. Nenhum bloco genérico foi criado.`;
 
     return NextResponse.json({
       message,
       results: {
         success: summary.success,
         errors: summary.errors,
+        needsRetry: summary.needsRetry,
         totalBlocks: summary.totalBlocks,
         totalFlashcards: summary.totalFlashcards,
         subjectsCreated: summary.subjectsCreated,

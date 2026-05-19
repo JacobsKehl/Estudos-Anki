@@ -46,7 +46,7 @@ export async function identifySubject(firstPagesContent: string, fileName?: stri
     const responseText = result.response.text();
     const startIndex = responseText.indexOf("{");
     const endIndex = responseText.lastIndexOf("}");
-    if (startIndex === -1) throw new Error("JSON de matéria não encontrado");
+    if (startIndex === -1) throw new Error("JSON de matéria não encontrado na resposta da IA");
     const cleanJson = responseText.substring(startIndex, endIndex + 1);
     const parsed: SubjectIdentification = JSON.parse(cleanJson);
 
@@ -60,17 +60,20 @@ export async function identifySubject(firstPagesContent: string, fileName?: stri
       normalizedName = KNOWN_SUBJECTS_MAP[upperName];
     }
 
+    const forbiddenSubjects = ["outros", "outro", "geral", "sem categoria", "desconhecido"];
+    const isForbidden = forbiddenSubjects.includes(normalizedName.toLowerCase().trim());
+
+    if (parsed.confidence < 0.5 || isForbidden) {
+      throw new Error(`Baixa confiança ou matéria genérica inválida identificada ("${parsed.subjectName}" com confiança ${parsed.confidence}). Motivo: ${parsed.reason || "Não especificado"}`);
+    }
+
     return {
       ...parsed,
       subjectName: normalizedName
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro ao identificar matéria:", error);
-    return {
-      subjectName: "Outros",
-      confidence: 0,
-      reason: "Erro técnico na identificação"
-    };
+    throw new Error(`SUBJECT_DETECTION_FAILED: ${error.message || "Erro desconhecido na IA"}`);
   }
 }
 
@@ -326,50 +329,13 @@ export async function detectStructure(
     }
   }
 
-  // --- Fallback Seguro se falhou após retries ---
-  console.warn(`[AI] Usando fallback temático mapeado para ${totalPages} páginas.`);
-  const fallbackBlocks: DetectedBlock[] = [];
+  // --- Fallback Permitido Apenas para Logs/Debug ---
+  console.warn(`[AI Debug Fallback] Sugestão diagnóstica mapeada para ${totalPages} páginas.`);
   const pageSize = totalPages > 50 ? 10 : 6;
   const numBlocks = Math.ceil(totalPages / pageSize);
+  console.warn(`[AI Debug Fallback] Sugeridos ${numBlocks} blocos de tamanho ${pageSize} páginas para fins de diagnóstico.`);
 
-  for (let i = 0; i < numBlocks; i++) {
-    const start = i * pageSize + 1;
-    const end = Math.min((i + 1) * pageSize, totalPages);
-    
-    let fallbackTitle = `Fundamentos e Conceitos de ${subjectName} (Bloco ${i + 1})`;
-    let topicId: string | null = null;
-    let code = "GERAL";
-    let name = "Tópico não identificado";
-
-    // Associa inteligentemente a um tópico oficial se houver na lista
-    if (relevantTopics.length > 0) {
-      const targetTopic = relevantTopics[Math.min(i, relevantTopics.length - 1)];
-      fallbackTitle = `${targetTopic.title} — Visão Teórica`;
-      topicId = targetTopic.id;
-      code = targetTopic.topicCode;
-      name = targetTopic.title;
-    }
-
-    fallbackBlocks.push({
-      type: "MAIN_BLOCK",
-      title: fallbackTitle,
-      description: `Estudo focado de tópicos centrais da disciplina ${subjectName}.`,
-      pageStart: start,
-      pageEnd: end,
-      sourceHeading: "Divisão Estruturada",
-      estimatedStudyMinutes: (end - start + 1) * 3,
-      confidence: 0.5,
-      createdBy: "AI_FALLBACK",
-      officialTopicId: topicId,
-      topicCode: code,
-      officialTopicName: name
-    });
-  }
-
-  return {
-    materialRole: "UNKNOWN",
-    blocks: fallbackBlocks
-  };
+  throw new Error("Não foi possível mapear a estrutura pedagógica de blocos temáticos reais de forma segura. Verifique a qualidade do PDF ou tente novamente.");
 }
 
 function tryMergeShortBlocks(blocks: DetectedBlock[]): DetectedBlock[] {
