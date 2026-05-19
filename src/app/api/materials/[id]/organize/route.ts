@@ -320,6 +320,9 @@ export async function POST(
         text: p.text
       }));
       console.log(`[Reorganize] Usando ${nonEmptyPages.length} páginas já extraídas em cache do banco de dados.`);
+      if (numPages <= 0) {
+        numPages = Math.max(...existingExtracted.map(p => p.pageNumber), 0);
+      }
     } else {
       console.log(`[Reorganize] Extraindo páginas do zero do Supabase Storage...`);
       const { pages, numPages: parsedNumPages } = await extractAllPages(material.sourcePath!);
@@ -439,7 +442,7 @@ export async function POST(
 
     for (const block of detectedBlocks) {
       const titleNorm = block.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-      const isForbiddenTitle = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt)) ||
+      const isForbiddenTitle = GENERIC_TITLES.some(gt => titleNorm === gt) ||
                                 FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(block.title));
       if (isForbiddenTitle) {
         throw new Error(`VALIDATION_FAILED: O bloco "${block.title}" possui um título genérico proibido. A organização foi abortada.`);

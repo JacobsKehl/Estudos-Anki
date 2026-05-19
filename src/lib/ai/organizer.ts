@@ -150,7 +150,7 @@ const FORBIDDEN_GENERIC_PATTERNS = [
   /^bloco\s+\d+$/i,
   /^conte[uú]do\s+completo$/i,
   /^todo\s+conte[uú]do$/i,
-  /outros/i
+  /^outros$/i
 ];
 
 const GENERIC_TITLES = [
@@ -234,7 +234,7 @@ export function calculateBlockQualityScore(b: DetectedBlock, subjectName: string
   const reasons = [];
 
   const titleNorm = b.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
+  const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt);
   const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(b.title));
 
   if (isForbiddenLiteral || isForbiddenPattern) {
@@ -1142,16 +1142,16 @@ export function repairDetectedBlocks(
     const originalTitle = b.title || "Sem Título";
     const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-    const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
+    const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt);
     const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(originalTitle));
-    const isWeak = WEAK_CORRIGIBLE_TITLES.some(wt => titleNorm === wt || titleNorm.includes(wt)) || 
+    const isWeak = WEAK_CORRIGIBLE_TITLES.some(wt => titleNorm === wt) || 
                    originalTitle.length < 12 || 
                    originalTitle.split(/\s+/).length <= 2;
 
     if (isForbiddenLiteral || isForbiddenPattern || isWeak) {
       const enhanced = enhanceBlockTitle(b, subjectName);
       const titleNormEnhanced = enhanced.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-      const stillForbidden = GENERIC_TITLES.some(gt => titleNormEnhanced === gt || titleNormEnhanced.includes(gt)) ||
+      const stillForbidden = GENERIC_TITLES.some(gt => titleNormEnhanced === gt) ||
                              FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(enhanced));
       
       if (stillForbidden) {
@@ -1336,14 +1336,14 @@ export async function detectStructure(
             const originalTitle = b.title || "Sem Título";
             const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-            const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
+            const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt);
             const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(originalTitle));
 
             let titleCategory: "PROIBIDO" | "FRACO" | "BOM" = "BOM";
             if (isForbiddenLiteral || isForbiddenPattern) {
               titleCategory = "PROIBIDO";
             } else if (
-              WEAK_CORRIGIBLE_TITLES.some(wt => titleNorm === wt || titleNorm.includes(wt)) || 
+              WEAK_CORRIGIBLE_TITLES.some(wt => titleNorm === wt) || 
               originalTitle.length < 12 || 
               originalTitle.split(/\s+/).length <= 2
             ) {

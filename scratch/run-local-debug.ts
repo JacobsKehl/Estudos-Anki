@@ -148,7 +148,7 @@ async function main() {
   // 1. Títulos genéricos
   const hasGenericTitle = blocks.some((b: any) => {
     const titleNorm = b.title.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
+    const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt);
     const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(b.title));
     if (isForbiddenLiteral || isForbiddenPattern) {
       console.log(`[Rejeição] Bloco "${b.title}" possui título genérico/proibido.`);
