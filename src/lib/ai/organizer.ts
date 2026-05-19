@@ -421,10 +421,24 @@ export function extractTOCFromText(text: string, totalPages: number): TOCEntry[]
   return tocEntries;
 }
 
-export function classifyTOCHeading(heading: string): "MAIN_THEORY" | "QUESTIONS" | "ANSWER_KEY" | "SUMMARY" | "SUPPORT" {
+export interface DocumentSection {
+  heading: string;
+  pageStart: number;
+  pageEnd: number;
+  sectionType: "MAIN_THEORY" | "INTRO_PRESENTATION" | "SUMMARY_REVIEW" | "COMMENTED_QUESTIONS" | "QUESTIONS" | "ANSWER_KEY" | "SIMULATED_EXAM" | "APPENDIX" | "IGNORE";
+}
+
+export interface DocumentStructureMap {
+  documentType: "THEORY_ONLY" | "THEORY_WITH_QUESTIONS" | "QUESTIONS_ONLY" | "ANSWER_KEY_ONLY" | "UNKNOWN";
+  tocDetected: boolean;
+  tocConfidence: number;
+  sections: DocumentSection[];
+}
+
+export function classifyTOCHeadingForMap(heading: string): DocumentSection["sectionType"] {
   const norm = heading.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-  // Answer Keys
+  // Answer Key (Gabarito)
   if (
     norm.includes("gabarito") ||
     norm.includes("resposta correta") ||
@@ -434,11 +448,19 @@ export function classifyTOCHeading(heading: string): "MAIN_THEORY" | "QUESTIONS"
     return "ANSWER_KEY";
   }
 
+  // Commented Questions
+  if (
+    (norm.includes("questoes") && (norm.includes("comentadas") || norm.includes("comentarios"))) ||
+    norm.includes("comentadas") ||
+    norm.includes("comentarios")
+  ) {
+    return "COMMENTED_QUESTIONS";
+  }
+
   // Questions
   if (
     norm.includes("questoes") ||
     norm.includes("exercicio") ||
-    norm.includes("simulado") ||
     norm.includes("provas") ||
     norm.includes("caderno de questoes") ||
     norm.includes("lista de questoes") ||
@@ -448,7 +470,12 @@ export function classifyTOCHeading(heading: string): "MAIN_THEORY" | "QUESTIONS"
     return "QUESTIONS";
   }
 
-  // Summary / Review
+  // Simulated Exam
+  if (norm.includes("simulado") || norm.includes("simulados")) {
+    return "SIMULATED_EXAM";
+  }
+
+  // Summary / Review (Resumo / Revisão)
   if (
     norm.includes("resumo") ||
     norm.includes("bizu") ||
@@ -460,22 +487,228 @@ export function classifyTOCHeading(heading: string): "MAIN_THEORY" | "QUESTIONS"
     norm.includes("roteiro") ||
     norm.includes("esquema")
   ) {
-    return "SUMMARY";
+    return "SUMMARY_REVIEW";
   }
 
-  // General Intro/TOC pages
+  // Intro / Presentation
   if (
     norm.includes("sumario") ||
     norm.includes("apresentacao") ||
+    norm.includes("introducao ao curso") ||
+    norm.includes("cronograma") ||
+    norm.includes("prefacio")
+  ) {
+    return "INTRO_PRESENTATION";
+  }
+
+  // Appendix / References / Ignore
+  if (
     norm.includes("bibliografia") ||
     norm.includes("referencias") ||
-    norm.includes("introducao ao curso") ||
-    norm.includes("cronograma")
+    norm.includes("anexo") ||
+    norm.includes("apendice")
   ) {
-    return "SUPPORT";
+    return "APPENDIX";
   }
 
   // Default is theory
+  return "MAIN_THEORY";
+}
+
+export function buildDocumentStructureMap(
+  pageTexts: { pageNumber: number; text: string }[],
+  totalPages: number,
+  subjectName: string,
+  summaryContent: string
+): DocumentStructureMap {
+  console.log(`[buildDocumentStructureMap] Iniciando análise documental para ${totalPages} páginas.`);
+
+  // Passo 1: Extrair sumário programático
+  const tocEntries = extractTOCFromText(summaryContent, totalPages);
+  const tocDetected = tocEntries.length > 0;
+  const tocConfidence = tocDetected ? 0.95 : 0.0;
+
+  const initialSections: DocumentSection[] = [];
+  let firstContentPage = 1;
+
+  // Passo 2: Criar mapa inicial de seções
+  if (tocDetected) {
+    // Identificar a primeira página de conteúdo real (teoria/questões)
+    const mainEntries = tocEntries.filter(e => {
+      const type = classifyTOCHeadingForMap(e.heading);
+      return type === "MAIN_THEORY" || type === "COMMENTED_QUESTIONS" || type === "QUESTIONS";
+    });
+
+    firstContentPage = mainEntries.length > 0 ? Math.min(...mainEntries.map(e => e.pageStart)) : 1;
+
+    // Se o sumário ou páginas iniciais forem puramente estruturais, agrupa no IGNORE/INTRO_PRESENTATION
+    if (firstContentPage > 1) {
+      initialSections.push({
+        heading: "Sumário e Apresentação do Curso",
+        pageStart: 1,
+        pageEnd: firstContentPage - 1,
+        sectionType: "IGNORE"
+      });
+    }
+
+    for (const entry of tocEntries) {
+      if (entry.pageStart < firstContentPage) {
+        continue; // Já coberto pelo bloco estrutural inicial
+      }
+      initialSections.push({
+        heading: entry.heading,
+        pageStart: entry.pageStart,
+        pageEnd: entry.pageEnd,
+        sectionType: classifyTOCHeadingForMap(entry.heading)
+      });
+    }
+  } else {
+    // Se não há TOC detectado, tratar o documento inteiro como MAIN_THEORY inicialmente
+    initialSections.push({
+      heading: `Conteúdo Teórico Principal de ${subjectName}`,
+      pageStart: 1,
+      pageEnd: totalPages,
+      sectionType: "MAIN_THEORY"
+    });
+  }
+
+  console.log(`[buildDocumentStructureMap] ${initialSections.length} seções iniciais mapeadas.`);
+
+  const processedSections: DocumentSection[] = [];
+
+  // Passos 3, 4 e 5: Amostrar, classificar e corrigir intervalos de cada seção
+  for (const section of initialSections) {
+    if (section.sectionType === "IGNORE" || section.sectionType === "INTRO_PRESENTATION" || section.sectionType === "APPENDIX") {
+      processedSections.push(section);
+      continue;
+    }
+
+    // Pegar todas as páginas pertencentes a esta seção
+    const sectionPages = pageTexts.filter(p => p.pageNumber >= section.pageStart && p.pageNumber <= section.pageEnd);
+    if (sectionPages.length === 0) {
+      processedSections.push(section);
+      continue;
+    }
+
+    // Passo 3: Amostrar páginas de início/fim e meio
+    const sampledPages: { pageNumber: number; text: string }[] = [];
+    sampledPages.push(sectionPages[0]); // Primeira página da seção
+    if (sectionPages.length > 1) {
+      sampledPages.push(sectionPages[sectionPages.length - 1]); // Última página
+    }
+    if (sectionPages.length > 2) {
+      const midIndex = Math.floor(sectionPages.length / 2);
+      sampledPages.push(sectionPages[midIndex]); // Página do meio
+    }
+
+    // Passo 4: Classificar com base em amostragem real e heurística de score forte
+    let questionPagesCount = 0;
+    let answerKeyPagesCount = 0;
+    let tocPagesCount = 0;
+
+    for (const page of sampledPages) {
+      if (isTOCPage(page.text) || page.pageNumber < firstContentPage) {
+        tocPagesCount++;
+      } else {
+        const qgResult = detectQuestionsOrGabaritoHeuristic(page.text, { heading: section.heading, isTOCContext: page.pageNumber < firstContentPage });
+        if (qgResult.isQuestions) questionPagesCount++;
+        else if (qgResult.isAnswerKey) answerKeyPagesCount++;
+      }
+    }
+
+    let finalType: DocumentSection["sectionType"] = section.sectionType;
+
+    // Se a amostragem indicar que a seção inteira é na verdade questões/gabarito, reclassificamos!
+    if (sampledPages.length > 0) {
+      const majorityQuestions = (questionPagesCount / sampledPages.length) >= 0.6;
+      const majorityGabarito = (answerKeyPagesCount / sampledPages.length) >= 0.6;
+      const majorityTOC = (tocPagesCount / sampledPages.length) >= 0.6;
+
+      if (majorityTOC) {
+        finalType = "IGNORE";
+      } else if (majorityGabarito) {
+        finalType = "ANSWER_KEY";
+      } else if (majorityQuestions) {
+        finalType = (section.sectionType === "MAIN_THEORY") ? "COMMENTED_QUESTIONS" : "QUESTIONS";
+      }
+    }
+
+    // Passo 5: Corrigir intervalos e detectar transições internas (Teoria -> Questões)
+    // Se a seção é classificada como MAIN_THEORY e tem mais de 5 páginas, verificamos se no final dela começam questões
+    if (finalType === "MAIN_THEORY" && sectionPages.length > 4) {
+      let splitPageNumber = -1;
+
+      // Percorre as páginas de trás para frente para detectar onde as questões começam
+      for (let idx = sectionPages.length - 1; idx >= 1; idx--) {
+        const page = sectionPages[idx];
+        const qg = detectQuestionsOrGabaritoHeuristic(page.text, { heading: section.heading });
+        if (qg.isQuestions || qg.isAnswerKey) {
+          splitPageNumber = page.pageNumber;
+        } else {
+          // Paramos no primeiro bloco teórico real de trás para frente
+          break;
+        }
+      }
+
+      if (splitPageNumber !== -1 && splitPageNumber > section.pageStart + 1) {
+        console.log(`[buildDocumentStructureMap] Transição teórica para apoio detectada na página ${splitPageNumber} da seção "${section.heading}". Fatiando seção...`);
+        
+        // Adiciona a parte teórica ajustada
+        processedSections.push({
+          ...section,
+          pageEnd: splitPageNumber - 1,
+          sectionType: "MAIN_THEORY"
+        });
+
+        // Adiciona a parte de questões detectada
+        const isAnswer = detectQuestionsOrGabaritoHeuristic(pageTexts.find(p => p.pageNumber === splitPageNumber)?.text || "").isAnswerKey;
+        processedSections.push({
+          heading: `${section.heading} — Exercícios e Resolução`,
+          pageStart: splitPageNumber,
+          pageEnd: section.pageEnd,
+          sectionType: isAnswer ? "ANSWER_KEY" : "QUESTIONS"
+        });
+
+        continue;
+      }
+    }
+
+    processedSections.push({
+      ...section,
+      sectionType: finalType
+    });
+  }
+
+  // Passo 6: Retornar o DocumentStructureMap
+  const hasTheory = processedSections.some(s => s.sectionType === "MAIN_THEORY");
+  const hasQuestions = processedSections.some(s => s.sectionType === "QUESTIONS" || s.sectionType === "COMMENTED_QUESTIONS" || s.sectionType === "SIMULATED_EXAM");
+  let documentType: DocumentStructureMap["documentType"] = "UNKNOWN";
+
+  if (hasTheory && hasQuestions) {
+    documentType = "THEORY_WITH_QUESTIONS";
+  } else if (hasTheory) {
+    documentType = "THEORY_ONLY";
+  } else if (hasQuestions) {
+    documentType = "QUESTIONS_ONLY";
+  }
+
+  const mapResult: DocumentStructureMap = {
+    documentType,
+    tocDetected,
+    tocConfidence,
+    sections: processedSections
+  };
+
+  console.log(`[buildDocumentStructureMap] Mapa estrutural final concluído. Tipo de documento: ${documentType}. TOC Detectado: ${tocDetected}`);
+  return mapResult;
+}
+
+export function classifyTOCHeading(heading: string): "MAIN_THEORY" | "QUESTIONS" | "ANSWER_KEY" | "SUMMARY" | "SUPPORT" {
+  const mapType = classifyTOCHeadingForMap(heading);
+  if (mapType === "ANSWER_KEY") return "ANSWER_KEY";
+  if (mapType === "QUESTIONS" || mapType === "COMMENTED_QUESTIONS" || mapType === "SIMULATED_EXAM") return "QUESTIONS";
+  if (mapType === "SUMMARY_REVIEW") return "SUMMARY";
+  if (mapType === "INTRO_PRESENTATION" || mapType === "IGNORE" || mapType === "APPENDIX") return "SUPPORT";
   return "MAIN_THEORY";
 }
 
@@ -514,8 +747,9 @@ export function buildBlocksFromTOC(
   tocEntries: TOCEntry[],
   subjectName: string,
   officialTopics: { id: string; topicCode: string; title: string }[],
-  totalPages: number
+  _totalPages: number
 ): DetectedBlock[] {
+  void _totalPages;
   const blocks: DetectedBlock[] = [];
   let currentGroup: TOCEntry[] = [];
   let currentPages = 0;
@@ -562,12 +796,29 @@ export function buildBlocksFromTOC(
     const type = classifyTOCHeading(entry.heading);
     const pageCount = (entry.pageEnd - entry.pageStart) + 1;
 
+    if (type === "SUPPORT") {
+      // Exclui sumário físico e apresentações estruturais de virarem qualquer tipo de bloco
+      continue;
+    }
+
     if (type === "MAIN_THEORY") {
-      if (currentGroup.length > 0 && currentPages + pageCount > 18) {
-        saveCurrentGroup();
+      if (currentGroup.length === 0) {
+        currentGroup.push(entry);
+        currentPages = pageCount;
+      } else {
+        const entryIsMajor = /^\s*(aula\s+\d+|capitulo\s+\d+|\d+\s*[\).\-]\s+[a-zA-Z\u00C0-\u00FF])/i.test(entry.heading);
+        const currentIsLarge = currentPages >= 4;
+        const entryIsLarge = pageCount >= 4;
+
+        const shouldStartNew = (currentPages + pageCount > 18) || (currentIsLarge && (entryIsMajor || entryIsLarge));
+
+        if (shouldStartNew) {
+          saveCurrentGroup();
+        }
+
+        currentGroup.push(entry);
+        currentPages += pageCount;
       }
-      currentGroup.push(entry);
-      currentPages += pageCount;
     } else {
       saveCurrentGroup();
 
@@ -600,7 +851,131 @@ export function buildBlocksFromTOC(
   return blocks;
 }
 
-export function repairMicroTheoryBlocks(blocks: DetectedBlock[], totalPages: number): DetectedBlock[] {
+export function splitByTOCMainSections(
+  block: DetectedBlock,
+  tocEntries: TOCEntry[],
+  subjectName: string,
+  officialTopics: { id: string; topicCode: string; title: string }[]
+): DetectedBlock[] {
+  console.log(`[splitByTOCMainSections] Iniciando desmembramento de bloco "${block.title}" (páginas ${block.pageStart}-${block.pageEnd}) usando sumário.`);
+
+  // Encontra todas as entradas do sumário que caem dentro deste bloco
+  const blockEntries = tocEntries.filter(t => 
+    t.pageStart >= block.pageStart && 
+    t.pageStart <= block.pageEnd
+  );
+
+  // Filtra apenas entradas de teoria principal
+  const theoryEntries = blockEntries.filter(t => classifyTOCHeading(t.heading) === "MAIN_THEORY");
+
+  if (theoryEntries.length <= 1) {
+    console.log(`[splitByTOCMainSections] Apenas ${theoryEntries.length} seções teóricas encontradas no intervalo. Mantendo bloco unificado.`);
+    return [block];
+  }
+
+  // Ajustar o pageEnd da última entrada para coincidir com o pageEnd do bloco original
+  theoryEntries[theoryEntries.length - 1].pageEnd = block.pageEnd;
+
+  const splitBlocks: DetectedBlock[] = [];
+  let currentGroup: TOCEntry[] = [];
+  let currentPages = 0;
+
+  const saveCurrentGroup = () => {
+    if (currentGroup.length === 0) return;
+
+    const firstEntry = currentGroup[0];
+    const lastEntry = currentGroup[currentGroup.length - 1];
+
+    let groupTitle = currentGroup.map(e => e.heading).join(" e ");
+    if (groupTitle.length > 80) {
+      groupTitle = `${firstEntry.heading} e outros subtemas`;
+    }
+
+    const description = `Estudo detalhado de: ${currentGroup.map(e => e.heading).join(", ")}.`;
+    const pageStart = firstEntry.pageStart;
+    const pageEnd = lastEntry.pageEnd;
+
+    const bestTopic = findBestOfficialTopic(groupTitle + " " + description, officialTopics);
+
+    const newBlock: DetectedBlock = {
+      type: "MAIN_BLOCK",
+      title: groupTitle,
+      description,
+      pageStart,
+      pageEnd,
+      sourceHeading: firstEntry.heading,
+      estimatedStudyMinutes: 60,
+      officialTopicId: bestTopic?.id || null,
+      topicCode: bestTopic?.topicCode || "GERAL",
+      officialTopicName: bestTopic?.title || "Tópico não identificado",
+      justification: "Desmembrado do bloco único gigante com base nas seções teóricas do sumário."
+    };
+
+    newBlock.title = enhanceBlockTitle(newBlock, subjectName);
+    splitBlocks.push(newBlock);
+
+    currentGroup = [];
+    currentPages = 0;
+  };
+
+  for (const entry of theoryEntries) {
+    const pageCount = (entry.pageEnd - entry.pageStart) + 1;
+
+    if (currentGroup.length === 0) {
+      currentGroup.push(entry);
+      currentPages = pageCount;
+    } else {
+      const entryIsMajor = /^\s*(aula\s+\d+|capitulo\s+\d+|\d+\s*[\).\-]\s+[a-zA-Z\u00C0-\u00FF])/i.test(entry.heading);
+      const currentIsLarge = currentPages >= 4;
+      const entryIsLarge = pageCount >= 4;
+
+      const shouldStartNew = (currentPages + pageCount > 18) || (currentIsLarge && (entryIsMajor || entryIsLarge));
+
+      if (shouldStartNew) {
+        saveCurrentGroup();
+      }
+
+      currentGroup.push(entry);
+      currentPages += pageCount;
+    }
+  }
+
+  saveCurrentGroup();
+
+  console.log(`[splitByTOCMainSections] Bloco desmembrado com sucesso em ${splitBlocks.length} blocos.`);
+  return splitBlocks;
+}
+
+export function handleLargePDFSingleBlockSplitting(
+  blocks: DetectedBlock[],
+  tocEntries: TOCEntry[],
+  totalPages: number,
+  subjectName: string,
+  officialTopics: { id: string; topicCode: string; title: string }[]
+): DetectedBlock[] {
+  // Executa o fatiamento apenas para PDFs grandes com sumário confiável
+  if (totalPages <= 30 || tocEntries.length === 0) {
+    return blocks;
+  }
+
+  const mainBlocks = blocks.filter(b => !b.type || b.type === "MAIN_BLOCK");
+  const supportBlocks = blocks.filter(b => b.type === "SUPPORT_BLOCK");
+
+  const tocTheoryEntries = tocEntries.filter(t => classifyTOCHeading(t.heading) === "MAIN_THEORY");
+
+  if (mainBlocks.length === 1 && tocTheoryEntries.length >= 2) {
+    console.log(`[handleLargePDFSingleBlockSplitting] PDF grande (>30 pág) com colapso detectado de apenas 1 bloco teórico principal. Desmembrando via splitByTOCMainSections...`);
+    const singleBlock = mainBlocks[0];
+    const splitBlocks = splitByTOCMainSections(singleBlock, tocEntries, subjectName, officialTopics);
+    return [...splitBlocks, ...supportBlocks];
+  }
+
+  return blocks;
+}
+
+
+export function repairMicroTheoryBlocks(blocks: DetectedBlock[], _totalPages: number): DetectedBlock[] {
+  void _totalPages;
   if (blocks.length <= 1) {
     if (blocks.length === 1 && (blocks[0].type || "MAIN_BLOCK") === "MAIN_BLOCK") {
       const pageCount = (blocks[0].pageEnd - blocks[0].pageStart) + 1;
@@ -741,7 +1116,29 @@ export function repairDetectedBlocks(
 ): DetectedBlock[] {
   const repairedBlocks: DetectedBlock[] = [];
 
-  for (const b of aiBlocks) {
+  // Encontrar primeira página de conteúdo real a partir do sumário para excluir sumário físico de qualquer bloco
+  const mainEntries = tocEntries.filter(e => {
+    const type = classifyTOCHeadingForMap(e.heading);
+    return type === "MAIN_THEORY" || type === "COMMENTED_QUESTIONS" || type === "QUESTIONS";
+  });
+  const firstContentPage = mainEntries.length > 0 ? Math.min(...mainEntries.map(e => e.pageStart)) : 1;
+
+  for (const originalBlock of aiBlocks) {
+    const b = { ...originalBlock };
+
+    // Excluir sumário físico e ajustar limites de páginas
+    if (b.pageEnd < firstContentPage) {
+      console.log(`[Auto-Repair] Descartando bloco "${b.title}" (páginas ${b.pageStart}-${b.pageEnd}) pois está totalmente contido na região do sumário físico (antes da página ${firstContentPage}).`);
+      continue;
+    }
+    if (b.pageStart < firstContentPage) {
+      console.log(`[Auto-Repair] Ajustando pageStart de ${b.pageStart} para ${firstContentPage} para o bloco "${b.title}" para excluir páginas do sumário físico.`);
+      b.pageStart = firstContentPage;
+    }
+    if (b.pageStart > b.pageEnd) {
+      continue;
+    }
+
     const originalTitle = b.title || "Sem Título";
     const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
@@ -823,13 +1220,14 @@ export async function detectStructure(
 
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  // Extrair sumário programaticamente se disponível
+  // 1. Construir o mapa estrutural determinístico completo do documento antes da geração de blocos
+  const docStructureMap = buildDocumentStructureMap(pageTexts || [], totalPages, subjectName, summaryContent);
   const tocEntries = extractTOCFromText(summaryContent, totalPages);
-  const tocDetected = tocEntries.length > 0;
-  const tocConfidence = tocDetected ? 1.0 : 0.0;
+  const tocDetected = docStructureMap.tocDetected;
+  const tocConfidence = docStructureMap.tocConfidence;
   const sourceStrategy = tocDetected ? "TOC_BASED" : "CONTENT_BASED";
 
-  const mainTheorySections = tocEntries.filter(t => classifyTOCHeading(t.heading) === "MAIN_THEORY");
+  const mainTheorySections = docStructureMap.sections.filter(s => s.sectionType === "MAIN_THEORY");
   const hasMainTheory = mainTheorySections.length >= 1;
 
   const relevantTopics = OFFICIAL_TOPICS.filter(
@@ -841,7 +1239,8 @@ export async function detectStructure(
     ? relevantTopics.map(t => `- ID: '${t.id}' | Código: '${t.topicCode}' | Título: '${t.title}'`).join('\n')
     : "Esta matéria não possui matriz de tópicos cadastrada. Use officialTopicId = null, topicCode = 'GERAL', officialTopicName = 'Tópico não identificado'.";
 
-  const tocJsonText = tocDetected ? JSON.stringify(tocEntries, null, 2) : undefined;
+  // Serializar o mapa estrutural completo do documento para guiar a IA de forma precisa
+  const tocJsonText = JSON.stringify(docStructureMap, null, 2);
   const initialPrompt = buildStructurePrompt(summaryContent, subjectName, officialTopicsListText, tocJsonText) +
     `\n\nTotal de páginas do PDF: ${totalPages}`;
   
@@ -892,6 +1291,7 @@ export async function detectStructure(
           // --- PIPELINE DE AUTO-REPARO DE BLOCOS ---
           console.log(`[Auto-Repair] Iniciando pipeline de auto-reparo para ${blocks.length} blocos...`);
           blocks = repairDetectedBlocks(blocks, tocEntries, subjectName, relevantTopics);
+          blocks = handleLargePDFSingleBlockSplitting(blocks, tocEntries, totalPages, subjectName, relevantTopics);
           blocks = repairMicroTheoryBlocks(blocks, totalPages);
           console.log(`[Auto-Repair] Concluído. Blocos ativos após reparo: ${blocks.length}`);
 
@@ -1089,7 +1489,7 @@ export async function detectStructure(
             rescueBlocks = repairMicroTheoryBlocks(rescueBlocks, totalPages);
             
             rescueBlocks = rescueBlocks.map(b => {
-              let topicId = b.officialTopicId || null;
+              const topicId = b.officialTopicId || null;
               let code = b.topicCode || "GERAL";
               let name = b.officialTopicName || "Tópico não identificado";
 
@@ -1180,7 +1580,7 @@ export async function detectStructure(
             rescueBlocks = repairMicroTheoryBlocks(rescueBlocks, totalPages);
             
             rescueBlocks = rescueBlocks.map(b => {
-              let topicId = b.officialTopicId || null;
+              const topicId = b.officialTopicId || null;
               let code = b.topicCode || "GERAL";
               let name = b.officialTopicName || "Tópico não identificado";
 
@@ -1276,7 +1676,7 @@ function tryMergeShortBlocks(blocks: DetectedBlock[]): DetectedBlock[] {
     const sameType = (current.type || "MAIN_BLOCK") === (next.type || "MAIN_BLOCK");
     const isMainBlock = (current.type || "MAIN_BLOCK") === "MAIN_BLOCK";
 
-    if (isMainBlock && sameTopic && contiguous && sameType && combinedPages <= 15 && (isCurrentShort || isNextShort || currentPages < 5)) {
+    if (isMainBlock && sameTopic && contiguous && sameType && combinedPages <= 18 && (isCurrentShort || isNextShort || currentPages < 5)) {
       current.pageEnd = Math.max(current.pageEnd, next.pageEnd);
       current.title = `${current.title} + ${next.title}`.substring(0, 100);
       current.description = `${current.description} | ${next.description}`.substring(0, 200);
@@ -1316,11 +1716,54 @@ function calculateEstimatedMinutes(blocks: DetectedBlock[]): DetectedBlock[] {
   });
 }
 
-export function detectQuestionsOrGabaritoHeuristic(text: string): { isQuestions: boolean; isAnswerKey: boolean; confidence: number } {
-  const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+export function isTOCPage(text: string): boolean {
+  const norm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // Se a página contém "sumário" ou "índice" e múltiplos padrões de pontos, é uma página de sumário
+  const hasKeywords = norm.includes("sumario") || norm.includes("indice") || norm.includes("conteudo");
+  const dotsMatch = norm.match(/\.{3,}/g) || [];
+  
+  // Contar linhas que parecem entradas de sumário com página
+  const lines = text.split('\n');
+  let matchCount = 0;
+  for (const line of lines) {
+    if (parseTOCLine(line, 1000) !== null) {
+      matchCount++;
+    }
+  }
 
-  const alternativeRegex = /\b[a-e]\s*[\).\-]\s/gi;
-  const altMatches = textLower.match(alternativeRegex) || [];
+  return (hasKeywords && dotsMatch.length >= 3) || matchCount >= 4;
+}
+
+export function detectQuestionsOrGabaritoHeuristic(
+  text: string,
+  options?: { heading?: string; isTOCContext?: boolean }
+): { isQuestions: boolean; isAnswerKey: boolean; confidence: number } {
+  const isTOCContext = options?.isTOCContext || isTOCPage(text);
+  const heading = options?.heading || "";
+
+  if (isTOCContext) {
+    return { isQuestions: false, isAnswerKey: false, confidence: 0.0 };
+  }
+
+  const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const headingLower = heading.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const headingStrongQuestions =
+    /quest(oes|oes)|lista de quest|exerc[ií]cio|simulado|exercicios/i.test(headingLower);
+
+  const headingStrongGabarito =
+    /gabarito|respostas|resposta correta/i.test(headingLower);
+
+  const examCommand =
+    /assinale\s+(a\s+)?(alternativa|opcao)|julgue\s+(o\s+)?(item|itens)|certo\s+ou\s+errado|e\s+correto\s+afirmar|esta\s+correto\s+o\s+que\s+se\s+afirma|considerando|com\s+base|tendo\s+em\s+vista/i.test(textLower);
+
+  // Alternatives A-E structure: count lines that match A), B), C)... or a), b), c)... or A -, B -...
+  const alternativeRegex = /^\s*([a-eA-E]|\d+\.[a-eA-E])\s*[\).\-]\s/gm;
+  const altMatches = text.match(alternativeRegex) || [];
+  const hasAlternatives = altMatches.length >= 3;
+
+  const questionPrefixRegex = /\b(questao\s*\d+|q\.\s*\d+)\b/gi;
+  const questionPrefixMatches = textLower.match(questionPrefixRegex) || [];
 
   const examKeywords = ["fcc", "fgv", "cespe", "cebraspe", "vunesp", "trt", "concurso", "esaf", "fadesp", "consulplan"];
   let examKeywordCount = 0;
@@ -1330,51 +1773,67 @@ export function detectQuestionsOrGabaritoHeuristic(text: string): { isQuestions:
     if (m) examKeywordCount += m.length;
   });
 
-  const questionPrefixRegex = /(questao\s*\d+|q\.\s*\d+)/gi;
-  const questionPrefixMatches = textLower.match(questionPrefixRegex) || [];
-
-  const strongQuestionKeywords = [
-    "assinale a alternativa", "assinale a opcao", "julgue o item", 
-    "julgue os itens", "certo ou errado", "alternativa correta", 
-    "alternativa incorreta", "opcao correta", "questoes comentadas", 
-    "questoes de provas", "questoes de concurso", "lista de questoes", 
-    "caderno de questoes", "comentarios da questao", "comentario da questao",
-    "resolucao da questao", "comentada", "comentadas"
-  ];
-  let strongQuestionCount = 0;
-  strongQuestionKeywords.forEach(kw => {
-    const regex = new RegExp(kw, "g");
+  const commentsKeywords = ["comentarios:", "comentario:", "resolucao:", "comentario da questao", "comentarios da questao"];
+  let commentCount = 0;
+  commentsKeywords.forEach(kw => {
+    const regex = new RegExp("\\b" + kw + "\\b", "g");
     const m = textLower.match(regex);
-    if (m) strongQuestionCount += m.length;
+    if (m) commentCount += m.length;
   });
 
-  const answerKeyKeywords = ["gabarito", "gabaritos", "resposta correta", "gabarito oficial"];
-  let answerKeyKeywordCount = 0;
+  const answerKeyKeywords = ["gabarito", "resposta correta", "alternativa correta", "gabarito oficial"];
+  let answerKeyCount = 0;
   answerKeyKeywords.forEach(kw => {
     const regex = new RegExp("\\b" + kw + "\\b", "g");
     const m = textLower.match(regex);
-    if (m) answerKeyKeywordCount += m.length;
+    if (m) answerKeyCount += m.length;
   });
 
-  const hasStrongSignals = strongQuestionCount >= 1 || questionPrefixMatches.length >= 1 || (examKeywordCount >= 1 && altMatches.length >= 2);
-  const hasAlternatives = altMatches.length >= 4;
+  // Ordinal lists detect: e.g. 1. 2. 3. 4.1 4.2
+  // If it only has sequential numbering but no alternative options or question commands, it's NOT a question
+  const hasOrdinalList = /^\s*\d+(\.\d+)*\s*[\).\-]\s/gm.test(text);
 
-  const isAnswerKey = answerKeyKeywordCount >= 2 && (answerKeyKeywordCount > strongQuestionCount || altMatches.length < 3);
+  const ordinalOnly =
+    hasOrdinalList && 
+    !headingStrongQuestions && 
+    !headingStrongGabarito && 
+    !examCommand && 
+    !hasAlternatives && 
+    questionPrefixMatches.length === 0 &&
+    commentCount === 0 &&
+    answerKeyCount === 0;
 
+  if (ordinalOnly) {
+    return { isQuestions: false, isAnswerKey: false, confidence: 0.0 };
+  }
+
+  // Determine if it's answer key
+  const isAnswerKey =
+    headingStrongGabarito ||
+    (answerKeyCount >= 2 && (answerKeyCount > commentCount || !hasAlternatives)) ||
+    (answerKeyCount >= 1 && /^\s*0?1\s*[-–.]\s*[a-e]\b/gmi.test(textLower)); // Patterns like "01 - A", "02 - B"
+
+  // Determine if it's questions (either commented or standard)
   const isQuestions = !isAnswerKey && (
-    (hasAlternatives && hasStrongSignals) ||
+    headingStrongQuestions ||
+    (examCommand && hasAlternatives) ||
     (questionPrefixMatches.length >= 2) ||
-    (strongQuestionCount >= 2 && altMatches.length >= 2)
+    (examKeywordCount >= 1 && hasAlternatives) ||
+    (commentCount >= 1 && questionPrefixMatches.length >= 1)
   );
 
-  const confidence = isQuestions || isAnswerKey
-    ? Math.min(1.0, ((altMatches.length * 0.1) + (questionPrefixMatches.length * 0.3) + (strongQuestionCount * 0.3) + (answerKeyKeywordCount * 0.2)) / 2)
-    : 0.0;
+  let confidence = 0.0;
+  if (isQuestions || isAnswerKey) {
+    confidence = Math.min(1.0, ((altMatches.length * 0.1) + (questionPrefixMatches.length * 0.3) + (commentCount * 0.3) + (answerKeyCount * 0.2)) / 2);
+    if (headingStrongQuestions || headingStrongGabarito) {
+      confidence = Math.max(confidence, 0.9);
+    }
+  }
 
   return {
     isQuestions,
     isAnswerKey,
-    confidence: confidence > 0.2 ? confidence : 0.0
+    confidence: confidence > 0.25 ? confidence : 0.0
   };
 }
 

@@ -7,7 +7,6 @@ import {
   CheckCircle2, 
   Clock, 
   FileText, 
-  Sparkles, 
   ExternalLink,
   ChevronRight,
   BrainCircuit,
@@ -23,6 +22,42 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { GenerateFlashcardsButton } from "../subjects/GenerateFlashcardsButton";
 import { PdfBlockViewer } from "./PdfBlockViewer";
+
+const SUPPORT_TYPE_LABELS: Record<string, string> = {
+  SUMMARY: "Resumo Teórico",
+  BIZU: "Bizu / Dica Rápida",
+  MIND_MAP: "Mapa Mental",
+  CHECKLIST: "Checklist",
+  REVIEW: "Revisão Rápida",
+  QUESTIONS: "Questões Práticas",
+  COMMENTED_QUESTIONS: "Questões Comentadas",
+  SIMULATED_EXAM: "Simulado de Prova",
+  ANSWER_KEY: "Gabarito de Conferência",
+  OTHER: "Material de Apoio",
+};
+
+const getSchemaSupportDescription = (supportType: string) => {
+  switch (supportType) {
+    case "SUMMARY":
+    case "BIZU":
+    case "REVIEW":
+      return "Resumo teórico sintetizado e bizus do conteúdo para revisão rápida dos pontos-chave antes das provas.";
+    case "MIND_MAP":
+      return "Mapa mental visual estruturado para facilitar a memorização rápida e associação de conceitos.";
+    case "CHECKLIST":
+      return "Checklist de controle de tópicos para garantir que nenhum assunto importante seja esquecido.";
+    case "QUESTIONS":
+      return "Caderno de exercícios práticos com questões selecionadas do material para fixação e teste de conhecimento.";
+    case "COMMENTED_QUESTIONS":
+      return "Questões comentadas passo a passo, auxiliando na compreensão detalhada de cada alternativa e gabarito.";
+    case "SIMULATED_EXAM":
+      return "Simulado de prova completo para testar seu desempenho sob condições reais de exame.";
+    case "ANSWER_KEY":
+      return "Gabarito de conferência oficial para rápida verificação e validação das respostas dos respostas.";
+    default:
+      return "Material complementar de apoio pedagógico focado em potencializar seu aprendizado e fixação.";
+  }
+};
 
 interface BlockStudyViewProps {
   block: any;
@@ -46,6 +81,8 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
     pageEnd: block.pageEnd,
     title: block.title,
     isSupport: false,
+    description: "",
+    supportType: "",
   });
 
   React.useEffect(() => {
@@ -55,6 +92,8 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
       pageEnd: block.pageEnd,
       title: block.title,
       isSupport: false,
+      description: "",
+      supportType: "",
     });
   }, [block.id, block.materialId, block.pageStart, block.pageEnd, block.title]);
 
@@ -89,7 +128,7 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
         toast.success("Status atualizado");
       }
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("Erro ao atualizar o status do bloco");
     } finally {
       setIsUpdatingStatus(false);
@@ -191,6 +230,8 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
                   pageEnd: block.pageEnd,
                   title: block.title,
                   isSupport: false,
+                  description: "",
+                  supportType: "",
                 });
                 setActiveTab("pdf");
               }}
@@ -237,42 +278,6 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
                   s.supportType === "ANSWER_KEY"
                 );
 
-                const SUPPORT_TYPE_LABELS: Record<string, string> = {
-                  SUMMARY: "Resumo Teórico",
-                  BIZU: "Bizu / Dica Rápida",
-                  MIND_MAP: "Mapa Mental",
-                  CHECKLIST: "Checklist",
-                  REVIEW: "Revisão Rápida",
-                  QUESTIONS: "Questões Práticas",
-                  COMMENTED_QUESTIONS: "Questões Comentadas",
-                  SIMULATED_EXAM: "Simulado de Prova",
-                  ANSWER_KEY: "Gabarito de Conferência",
-                  OTHER: "Material de Apoio",
-                };
-
-                const getSchemaSupportDescription = (supportType: string) => {
-                  switch (supportType) {
-                    case "SUMMARY":
-                    case "BIZU":
-                    case "REVIEW":
-                      return "Resumo teórico sintetizado e bizus do conteúdo para revisão rápida dos pontos-chave antes das provas.";
-                    case "MIND_MAP":
-                      return "Mapa mental visual estruturado para facilitar a memorização rápida e associação de conceitos.";
-                    case "CHECKLIST":
-                      return "Checklist de controle de tópicos para garantir que nenhum assunto importante seja esquecido.";
-                    case "QUESTIONS":
-                      return "Caderno de exercícios práticos com questões selecionadas do material para fixação e teste de conhecimento.";
-                    case "COMMENTED_QUESTIONS":
-                      return "Questões comentadas passo a passo, auxiliando na compreensão detalhada de cada alternativa e gabarito.";
-                    case "SIMULATED_EXAM":
-                      return "Simulado de prova completo para testar seu desempenho sob condições reais de exame.";
-                    case "ANSWER_KEY":
-                      return "Gabarito de conferência oficial para rápida verificação e validação das respostas dos exercícios.";
-                    default:
-                      return "Material complementar de apoio pedagógico focado em potencializar seu aprendizado e fixação.";
-                  }
-                };
-
                 const renderSupportCard = (support: any) => (
                   <div key={support.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-5 rounded-2xl border border-border/40 bg-card hover:bg-muted/10 hover:border-accent/20 transition-all">
                     <div className="space-y-2 flex-1">
@@ -309,6 +314,8 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
                           pageEnd: support.pageEnd || support.pageStart || 1,
                           title: support.material?.fileName || "Material de Apoio",
                           isSupport: true,
+                          description: support.description || getSchemaSupportDescription(support.supportType),
+                          supportType: support.supportType || "",
                         });
                         setActiveTab("pdf");
                       }}
@@ -366,32 +373,46 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
           ) : activeTab === "pdf" ? (
             <div className="space-y-4 animate-in fade-in duration-500">
               {pdfViewerProps.isSupport && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border border-amber-100 bg-amber-50/70 text-amber-900 shadow-sm">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-amber-600 shrink-0" />
-                      <p className="text-sm font-bold">Visualizando Material de Apoio</p>
+                <div className="flex flex-col gap-4 p-5 rounded-2xl border border-amber-100 bg-amber-50/70 text-amber-900 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-amber-600 shrink-0" />
+                        <p className="text-sm font-bold text-amber-950">Visualizando Material de Apoio</p>
+                        {pdfViewerProps.supportType && (
+                          <Badge variant="secondary" className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800 border-amber-200/50">
+                            {SUPPORT_TYPE_LABELS[pdfViewerProps.supportType] || pdfViewerProps.supportType}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-amber-800 pl-6 leading-relaxed">
+                        <strong>{pdfViewerProps.title}</strong> {pdfViewerProps.pageStart ? `• Páginas ${pdfViewerProps.pageStart} a ${pdfViewerProps.pageEnd || pdfViewerProps.pageStart}` : ""}
+                      </p>
                     </div>
-                    <p className="text-xs text-amber-800 leading-relaxed pl-6">
-                      <strong>{pdfViewerProps.title}</strong> • Páginas {pdfViewerProps.pageStart} a {pdfViewerProps.pageEnd}
-                    </p>
+                    <Button 
+                      variant="soft" 
+                      size="sm" 
+                      className="rounded-xl font-bold bg-white text-amber-700 border border-amber-200 shrink-0 hover:bg-amber-100 hover:text-amber-850 transition-colors"
+                      onClick={() => {
+                        setPdfViewerProps({
+                          materialId: block.materialId,
+                          pageStart: block.pageStart,
+                          pageEnd: block.pageEnd,
+                          title: block.title,
+                          isSupport: false,
+                          description: "",
+                          supportType: "",
+                        });
+                      }}
+                    >
+                      Voltar para Teoria Principal
+                    </Button>
                   </div>
-                  <Button 
-                    variant="soft" 
-                    size="sm" 
-                    className="rounded-xl font-bold bg-white text-amber-700 border border-amber-200 shrink-0 hover:bg-amber-100 hover:text-amber-850 transition-colors"
-                    onClick={() => {
-                      setPdfViewerProps({
-                        materialId: block.materialId,
-                        pageStart: block.pageStart,
-                        pageEnd: block.pageEnd,
-                        title: block.title,
-                        isSupport: false,
-                      });
-                    }}
-                  >
-                    Voltar para Teoria Principal
-                  </Button>
+                  {pdfViewerProps.description && (
+                    <div className="pl-6 border-l-2 border-amber-200 text-xs text-amber-800 leading-relaxed font-medium">
+                      {pdfViewerProps.description}
+                    </div>
+                  )}
                 </div>
               )}
               <PdfBlockViewer 
