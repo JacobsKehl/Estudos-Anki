@@ -156,6 +156,9 @@ export async function detectStructure(
   let attempts = 0;
   let currentPrompt = initialPrompt;
   let lastResponse = "";
+  let accumulatedErrors: string[] = [];
+  let geminiApiError: string | null = null;
+  let jsonParseError: string | null = null;
 
   while (attempts < 2) {
     try {
@@ -165,10 +168,19 @@ export async function detectStructure(
       
       const startIndex = lastResponse.indexOf("{");
       const endIndex = lastResponse.lastIndexOf("}");
-      if (startIndex === -1) throw new Error("JSON não encontrado");
+      if (startIndex === -1) {
+        jsonParseError = "Estrutura JSON não encontrada na resposta da IA.";
+        throw new Error("JSON não encontrado");
+      }
       
       const cleanJson = lastResponse.substring(startIndex, endIndex + 1);
-      const parsedResult: DetectedStructureResult = JSON.parse(cleanJson);
+      let parsedResult: DetectedStructureResult;
+      try {
+        parsedResult = JSON.parse(cleanJson);
+      } catch (e: any) {
+        jsonParseError = `Falha no parse do JSON da IA: ${e.message}`;
+        throw e;
+      }
       
       const role = parsedResult.materialRole || "UNKNOWN";
       const blocks = parsedResult.blocks || [];
@@ -194,9 +206,9 @@ export async function detectStructure(
 
       // 3. Quantidade mínima de blocos
       let minBlocks = 1;
-      if (totalPages > 50) minBlocks = 8;
-      else if (totalPages > 20) minBlocks = 5;
-      else if (totalPages > 5) minBlocks = 3;
+      if (totalPages > 50) minBlocks = 4;
+      else if (totalPages > 20) minBlocks = 3;
+      else if (totalPages > 5) minBlocks = 2;
 
       if (blocks.length < minBlocks && totalPages > 5) {
         errors.push(`Quantidade insuficiente de blocos (encontrado ${blocks.length}, esperado no mínimo ${minBlocks}).`);
@@ -318,13 +330,20 @@ export async function detectStructure(
         };
       }
 
-      // Se falhou na validação, tenta de novo com prompt de correção
+      accumulatedErrors = errors;
       attempts++;
       console.warn(`[AI] Tentativa ${attempts} falhou nos critérios de qualidade: ${errors.join(" ")}`);
       currentPrompt = initialPrompt + `\n\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros de qualidade: ${errors.join(" ")}\nPOR FAVOR, refaça o mapeamento de blocos respeitando rigorosamente a explicação teórica principal. Evite títulos genéricos como 'Parte X'.`;
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao detectar estrutura:", error);
+      if (error.status === 503 || error.message?.includes("503") || error.status === 429 || error.message?.includes("429")) {
+        geminiApiError = `AI_RATE_LIMIT_OR_UNAVAILABLE: ${error.message}`;
+      } else if (error.message?.includes("fetch failed") || error.message?.includes("Service Unavailable")) {
+        geminiApiError = `AI_TIMEOUT_OR_NETWORK: ${error.message}`;
+      } else {
+        geminiApiError = error.message;
+      }
       attempts++;
     }
   }
@@ -335,7 +354,17 @@ export async function detectStructure(
   const numBlocks = Math.ceil(totalPages / pageSize);
   console.warn(`[AI Debug Fallback] Sugeridos ${numBlocks} blocos de tamanho ${pageSize} páginas para fins de diagnóstico.`);
 
-  throw new Error("Não foi possível mapear a estrutura pedagógica de blocos temáticos reais de forma segura. Verifique a qualidade do PDF ou tente novamente.");
+  if (accumulatedErrors.length > 0) {
+    throw new Error(`VALIDATION_REJECTED_ALL_BLOCKS: ${accumulatedErrors.join(" | ")}`);
+  }
+  if (jsonParseError) {
+    throw new Error(`AI_INVALID_JSON: ${jsonParseError}`);
+  }
+  if (geminiApiError) {
+    throw new Error(`AI_UNAVAILABLE: ${geminiApiError}`);
+  }
+
+  throw new Error("STRUCTURE_MAPPING_FAILED: Não foi possível mapear a estrutura pedagógica de blocos temáticos reais de forma segura. Verifique a qualidade do PDF.");
 }
 
 function tryMergeShortBlocks(blocks: DetectedBlock[]): DetectedBlock[] {

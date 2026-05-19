@@ -649,27 +649,41 @@ export async function POST(req: NextRequest) {
         summary.totalFlashcards += result.flashcards;
         if (result.subjectCreated) summary.subjectsCreated++;
       } catch (error: any) {
-        console.error(`[ORGANIZE MATERIAL ERROR] ${material.fileName}:`, error.message);
+        console.log(`[ORGANIZE MATERIAL ERROR] ${material.fileName}:`, error.message);
         
         let targetStatus = "NEEDS_RETRY";
         if (error.message.includes("SUBJECT_DETECTION_FAILED")) {
           targetStatus = "SUBJECT_DETECTION_FAILED";
         } else if (
           error.message.includes("AI_UNAVAILABLE") || 
+          error.message.includes("AI_TIMEOUT") || 
           error.message.includes("503") || 
           error.message.includes("429") ||
           error.message.includes("indisponível")
         ) {
           targetStatus = "AI_UNAVAILABLE";
-        } else if (error.message.includes("texto selecionável") || error.message.includes("Texto insuficiente")) {
+        } else if (
+          error.message.includes("texto selecionável") || 
+          error.message.includes("Texto insuficiente") ||
+          error.message.includes("PDF_TEXT_EXTRACTION_FAILED")
+        ) {
           targetStatus = "ERROR"; // Erro crítico não recuperável
+        }
+
+        let savedErrorMsg = error.message || "Erro desconhecido na organização";
+        if (savedErrorMsg.includes("VALIDATION_REJECTED_ALL_BLOCKS:")) {
+          savedErrorMsg = savedErrorMsg.replace("VALIDATION_REJECTED_ALL_BLOCKS:", "Todos os blocos foram rejeitados pela validação de qualidade:").trim();
+        } else if (savedErrorMsg.includes("AI_INVALID_JSON:")) {
+          savedErrorMsg = savedErrorMsg.replace("AI_INVALID_JSON:", "A IA retornou um JSON estruturado inválido:").trim();
+        } else if (savedErrorMsg.includes("STRUCTURE_MAPPING_FAILED:")) {
+          savedErrorMsg = savedErrorMsg.replace("STRUCTURE_MAPPING_FAILED:", "Não foi possível mapear a estrutura de forma pedagógica segura:").trim();
         }
 
         await prisma.studyMaterial.update({
           where: { id: material.id },
           data: { 
             organizationStatus: targetStatus,
-            processingError: error.message 
+            processingError: savedErrorMsg.substring(0, 250) 
           }
         });
 

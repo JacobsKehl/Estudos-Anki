@@ -712,23 +712,38 @@ export async function POST(
       targetStatus = "SUBJECT_DETECTION_FAILED";
     } else if (
       error.message.includes("AI_UNAVAILABLE") || 
+      error.message.includes("AI_TIMEOUT") || 
       error.message.includes("503") || 
       error.message.includes("429") ||
       error.message.includes("indisponível")
     ) {
       targetStatus = "AI_UNAVAILABLE";
-    } else if (error.message.includes("texto selecionável") || error.message.includes("Texto insuficiente")) {
+    } else if (
+      error.message.includes("texto selecionável") || 
+      error.message.includes("Texto insuficiente") || 
+      error.message.includes("PDF_TEXT_EXTRACTION_FAILED")
+    ) {
       targetStatus = "ERROR";
+    }
+
+    // Guardar a causa real de forma limpa na banco de dados
+    let savedErrorMsg = userFriendlyError;
+    if (userFriendlyError.includes("VALIDATION_REJECTED_ALL_BLOCKS:")) {
+      savedErrorMsg = userFriendlyError.replace("VALIDATION_REJECTED_ALL_BLOCKS:", "Todos os blocos foram rejeitados pela validação de qualidade:").trim();
+    } else if (userFriendlyError.includes("AI_INVALID_JSON:")) {
+      savedErrorMsg = userFriendlyError.replace("AI_INVALID_JSON:", "A IA retornou um JSON estruturado inválido:").trim();
+    } else if (userFriendlyError.includes("STRUCTURE_MAPPING_FAILED:")) {
+      savedErrorMsg = userFriendlyError.replace("STRUCTURE_MAPPING_FAILED:", "Não foi possível mapear a estrutura de forma pedagógica segura:").trim();
     }
 
     await prisma.studyMaterial.update({
       where: { id },
       data: { 
         organizationStatus: targetStatus, 
-        processingError: userFriendlyError.substring(0, 250) 
+        processingError: savedErrorMsg.substring(0, 250) 
       }
     }).catch(() => {});
 
-    return NextResponse.json({ error: userFriendlyError }, { status: 500 });
+    return NextResponse.json({ error: savedErrorMsg }, { status: 500 });
   }
 }
