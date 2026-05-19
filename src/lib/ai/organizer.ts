@@ -396,6 +396,9 @@ export async function detectStructure(
 
             b.title = enhancedTitle;
 
+            let intervalQuestionsScore = 0;
+            let intervalTheoryScore = 0;
+
             // Executar heurísticas adicionais baseadas no texto da página
             if (pageTexts && pageTexts.length > 0) {
               const blockPages = pageTexts.filter(p => p.pageNumber >= b.pageStart && p.pageNumber <= b.pageEnd);
@@ -405,6 +408,24 @@ export async function detectStructure(
               if (normalizedBlockText.trim().length > 0) {
                 // Heurística programática de Questões/Gabaritos
                 const qgResult = detectQuestionsOrGabaritoHeuristic(fullBlockText);
+                
+                // Calcular pontuação de questões e teoria por densidade
+                const qKeywords = ["questao", "questoes", "exercicio", "exercicios", "simulado", "prova", "assinale", "julgue", "alternativa"];
+                qKeywords.forEach(kw => {
+                  const matches = normalizedBlockText.match(new RegExp(kw, "g"));
+                  if (matches) intervalQuestionsScore += matches.length;
+                });
+                
+                const tKeywords = ["conceito", "definicao", "exemplo", "classificacao", "regra", "excecao", "jurisprudencia", "artigo", "doutrina", "explicacao"];
+                let positiveScore = 0;
+                tKeywords.forEach(kw => {
+                  const matches = normalizedBlockText.match(new RegExp(kw, "g"));
+                  if (matches) {
+                    intervalTheoryScore += matches.length;
+                    positiveScore += matches.length;
+                  }
+                });
+
                 if (qgResult.isQuestions || qgResult.isAnswerKey) {
                   b.type = "SUPPORT_BLOCK";
                   b.supportType = qgResult.isQuestions ? "QUESTIONS" : "ANSWER_KEY";
@@ -423,18 +444,6 @@ export async function detectStructure(
                     const regex = new RegExp(kw, "g");
                     const matches = normalizedBlockText.match(regex);
                     if (matches) negativeScore += matches.length;
-                  });
-
-                  const positiveKeywords = [
-                    "conceito", "definicao", "definicao", "exemplo", "classificacao", "classificacao",
-                    "regra", "excecao", "excecao", "jurisprudencia", "jurisprudencia", "artigo",
-                    "fundamento", "aplicacao", "aplicacao", "doutrina", "entendimento", "explicacao", "explicacao"
-                  ];
-                  let positiveScore = 0;
-                  positiveKeywords.forEach(kw => {
-                    const regex = new RegExp(kw, "g");
-                    const matches = normalizedBlockText.match(regex);
-                    if (matches) positiveScore += matches.length;
                   });
 
                   if (negativeScore > 6 && positiveScore <= 2) {
@@ -458,6 +467,9 @@ export async function detectStructure(
 
             // Exibir log formatado de diagnóstico pedagógico [BlockValidation]
             console.log(`[BlockValidation] block: "${originalTitle}"`);
+            console.log(`[BlockValidation] block page range: ${b.pageStart}-${b.pageEnd}`);
+            console.log(`[BlockValidation] interval has questions: ${intervalQuestionsScore}`);
+            console.log(`[BlockValidation] interval has theory: ${intervalTheoryScore}`);
             console.log(`[BlockValidation] type: "${b.type || "MAIN_BLOCK"}"`);
             console.log(`[BlockValidation] titleCategory: ${titleCategory}`);
             console.log(`[BlockValidation] enhancedTitle: "${enhancedTitle}"`);
@@ -475,6 +487,12 @@ export async function detectStructure(
             }
           }
 
+          // Logs de acompanhamento geral de materiais mistos/principais
+          const mainBlocksList = validatedBlocks.filter(b => !b.type || b.type === "MAIN_BLOCK");
+          const supportBlocksList = validatedBlocks.filter(b => b.type === "SUPPORT_BLOCK");
+          console.log(`[MixedMaterial] mainBlocks: ${mainBlocksList.length}`);
+          console.log(`[MixedMaterial] supportBlocks: ${supportBlocksList.length}`);
+
           // Validação de Fatiamento Mecânico por número fixo de páginas
           if (errors.length === 0 && !isSupportOnlyMaterial) {
             const hasMechanicalCutting = detectMechanicalCuttingHeuristic(validatedBlocks);
@@ -486,9 +504,21 @@ export async function detectStructure(
 
           // Garantir pelo menos um bloco principal se for MAIN_MATERIAL ou MIXED_MATERIAL
           if (errors.length === 0) {
-            const mainBlocksCount = validatedBlocks.filter(b => !b.type || b.type === "MAIN_BLOCK").length;
-            if ((role === "MAIN_MATERIAL" || role === "MIXED_MATERIAL") && mainBlocksCount === 0) {
+            const mainBlocksCount = mainBlocksList.length;
+            if (role === "MAIN_MATERIAL" && mainBlocksCount === 0) {
               errors.push(`O material foi classificado como ${role}, mas nenhum bloco principal de teoria (MAIN_BLOCK) válido foi gerado. Certifique-se de que o material contenha as explicações teóricas do assunto.`);
+            } else if (role === "MIXED_MATERIAL" && mainBlocksCount === 0) {
+              // Só exige se de fato houver algum bloco original na resposta da IA que tenha sido mapeado como de teoria principal
+              // ou se houver página do bloco marcada com MAIN_THEORY ou EXPLANATION
+              const hasTheoryBlocks = blocks.some(b => 
+                (!b.type || b.type === "MAIN_BLOCK") && 
+                (b.pageTypes?.includes("MAIN_THEORY") || b.pageTypes?.includes("EXPLANATION"))
+              );
+              if (hasTheoryBlocks) {
+                errors.push("O material foi classificado como MIXED_MATERIAL com teoria evidente, mas nenhum bloco principal de teoria (MAIN_BLOCK) válido foi gerado.");
+              } else {
+                console.log("[MixedMaterial] Permitindo MIXED_MATERIAL sem MAIN_BLOCK pois não há teoria principal densa.");
+              }
             }
           }
 
@@ -642,24 +672,49 @@ function calculateEstimatedMinutes(blocks: DetectedBlock[]): DetectedBlock[] {
 export function detectQuestionsOrGabaritoHeuristic(text: string): { isQuestions: boolean; isAnswerKey: boolean; confidence: number } {
   const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
-  // Contagem de alternativas (ex: A), B), C), D), E))
-  const alternativeRegex = /\b[a-e]\s*[\).\-]\s*/gi;
+  // Alternativas reais de múltipla escolha (a, b, c, d, e) - exige espaço após para evitar pegar palavras como "a", "e"
+  const alternativeRegex = /\b[a-e]\s*[\).\-]\s/gi;
   const altMatches = textLower.match(alternativeRegex) || [];
-  
-  // Contagem de questões numeradas (ex: 1., 2), 3 -)
-  const questionNumRegex = /\b\d+\s*[\).\-]\s+/gi;
-  const numMatches = textLower.match(questionNumRegex) || [];
 
-  // Contagem de palavras-chave de questões
-  const questionKeywords = ["questao", "questoes", "exercicio", "exercicios", "simulado", "prova", "assinale", "julgue", "certo ou errado", "alternativa"];
-  let questionKeywordCount = 0;
-  questionKeywords.forEach(kw => {
-    const regex = new RegExp(kw, "g");
+  // Padrão de enunciado de prova: e.g. FCC (2024), FGV, CESPE, TRT, VUNESP
+  const examKeywords = ["fcc", "fgv", "cespe", "cebraspe", "vunesp", "trt", "concurso"];
+  let examKeywordCount = 0;
+  examKeywords.forEach(ek => {
+    const regex = new RegExp(ek, "g");
     const m = textLower.match(regex);
-    if (m) questionKeywordCount += m.length;
+    if (m) examKeywordCount += m.length;
   });
 
-  // Contagem de palavras-chave de gabaritos
+  // Padrão "Questão 01", "Questão 1"
+  const questionPrefixRegex = /questao\s*\d+/gi;
+  const questionPrefixMatches = textLower.match(questionPrefixRegex) || [];
+
+  // Termos explícitos e fortes de questões
+  const strongQuestionKeywords = [
+    "assinale a alternativa", "assinale a opcao", "julgue o item", 
+    "julgue os itens", "certo ou errado", "alternativa correta", 
+    "alternativa incorreta", "opcao correta", "questoes comentadas", 
+    "questoes de provas", "questoes de concurso", "lista de questoes", 
+    "caderno de questoes", "comentarios da questao", "comentario da questao",
+    "resolucao da questao"
+  ];
+  let strongQuestionCount = 0;
+  strongQuestionKeywords.forEach(kw => {
+    const regex = new RegExp(kw, "g");
+    const m = textLower.match(regex);
+    if (m) strongQuestionCount += m.length;
+  });
+
+  // Termos gerais de questões
+  const generalQuestionKeywords = ["questao", "questoes", "exercicio", "exercicios", "simulado", "prova", "gabarito", "comentario", "comentarios"];
+  let generalQuestionCount = 0;
+  generalQuestionKeywords.forEach(kw => {
+    const regex = new RegExp(kw, "g");
+    const m = textLower.match(regex);
+    if (m) generalQuestionCount += m.length;
+  });
+
+  // Gabaritos
   const answerKeyKeywords = ["gabarito", "gabaritos", "resposta correta", "letra a", "letra b", "letra c", "letra d", "letra e", "alternativa correta"];
   let answerKeyKeywordCount = 0;
   answerKeyKeywords.forEach(kw => {
@@ -668,24 +723,30 @@ export function detectQuestionsOrGabaritoHeuristic(text: string): { isQuestions:
     if (m) answerKeyKeywordCount += m.length;
   });
 
-  // Heurística de decisão baseada em densidade relativa
-  const hasManyAlternatives = altMatches.length >= 5;
-  const hasManyQuestionNumbers = numMatches.length >= 3;
-  const hasManyQuestionKeywords = questionKeywordCount >= 4;
-  const hasManyAnswerKeyKeywords = answerKeyKeywordCount >= 3;
+  // Critérios de decisão ultra robustos
+  const hasStrongSignals = strongQuestionCount >= 1 || questionPrefixMatches.length >= 1 || (examKeywordCount >= 1 && generalQuestionCount >= 3);
+  const hasAlternatives = altMatches.length >= 4; // Mínimo de alternativas (normalmente A, B, C, D, E)
+  
+  // Uma lista de gabarito puro
+  const isAnswerKey = answerKeyKeywordCount >= 3 && (answerKeyKeywordCount > generalQuestionCount || altMatches.length < 3);
 
-  const isAnswerKey = hasManyAnswerKeyKeywords && (answerKeyKeywordCount > questionKeywordCount || altMatches.length < 3);
-  const isQuestions = (hasManyAlternatives || hasManyQuestionNumbers || hasManyQuestionKeywords) && !isAnswerKey;
-
-  const confidence = Math.min(
-    1.0,
-    ((altMatches.length * 0.1) + (numMatches.length * 0.15) + (questionKeywordCount * 0.1) + (answerKeyKeywordCount * 0.1)) / 2
+  // Uma seção de questões só é válida se houver alternativas combinadas com sinais fortes,
+  // ou se houver múltiplos enunciados explícitos de questões, ou alta densidade de sinais fortes.
+  const isQuestions = !isAnswerKey && (
+    (hasAlternatives && hasStrongSignals) ||
+    (questionPrefixMatches.length >= 2) ||
+    (strongQuestionCount >= 2)
   );
+
+  // Confiança da detecção
+  const confidence = isQuestions || isAnswerKey
+    ? Math.min(1.0, ((altMatches.length * 0.1) + (questionPrefixMatches.length * 0.25) + (strongQuestionCount * 0.25) + (answerKeyKeywordCount * 0.15)) / 2)
+    : 0.0;
 
   return {
     isQuestions,
     isAnswerKey,
-    confidence: confidence > 0.3 ? confidence : 0.0
+    confidence: confidence > 0.25 ? confidence : 0.0
   };
 }
 

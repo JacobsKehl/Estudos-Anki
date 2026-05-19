@@ -40,7 +40,7 @@ Diretrizes Críticas (P0):
 1. CLASSIFICAÇÃO DO MATERIAL (materialRole):
    - "MAIN_MATERIAL": O PDF contém teoria principal densa, desenvolvimento completo de assuntos, conceitos, regras, doutrina, legislação comentada e exemplos. Ideal para criar Blocos Principais.
    - "SUPPORT_MATERIAL": O PDF é predominantemente constituído de resumos rápidos, bizus, mapas mentais, simulados, checklists, cadernos de revisão ou baterias de questões/gabaritos de apoio.
-   - "MIXED_MATERIAL": O PDF contém tanto uma seção longa de teoria principal quanto uma seção de resumos ou questões.
+   - "MIXED_MATERIAL": O PDF contém tanto uma seção de teoria principal quanto uma seção de resumos ou questões. Se o PDF tiver teoria principal no começo e questões/listas/gabaritos no final, crie obrigatoriamente MAIN_BLOCKS apenas para a parte de teoria principal e crie SUPPORT_BLOCKS para as seções de questões comentadas, listas de questões, simulados ou gabaritos. Avalie cada intervalo de páginas de forma totalmente independente e isolada. Não deixe de criar MAIN_BLOCKS apenas porque o PDF também contém seções de apoio e questões.
 
 2. CRIAÇÃO DE BLOCOS vs. APOIO (QUESTÕES/GABARITOS NUNCA SÃO BLOCOS PRINCIPAIS):
    - APENAS crie "blocks" normais (MAIN_BLOCK) se a seção do PDF contiver TEORIA PRINCIPAL.

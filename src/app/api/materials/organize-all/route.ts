@@ -655,6 +655,17 @@ export async function POST(req: NextRequest) {
         if (error.message.includes("SUBJECT_DETECTION_FAILED")) {
           targetStatus = "SUBJECT_DETECTION_FAILED";
         } else if (
+          error.message.includes("VALIDATION_REJECTED_ALL_BLOCKS") ||
+          error.message.includes("A organização foi abortada") ||
+          error.message.includes("validação pedagógica") ||
+          error.message.includes("rejeitada") ||
+          error.message.includes("rejeitados") ||
+          error.message.includes("título genérico") ||
+          error.message.includes("tópico oficial") ||
+          error.message.includes("intervalo de páginas")
+        ) {
+          targetStatus = "ERROR";
+        } else if (
           error.message.includes("AI_UNAVAILABLE") || 
           error.message.includes("AI_TIMEOUT") || 
           error.message.includes("503") || 
