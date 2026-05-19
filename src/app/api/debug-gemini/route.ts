@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { callGeminiWithRetry } from "@/lib/ai/utils/retry";
+import { prisma } from "@/lib/prisma";
+import { identifySubject } from "@/lib/ai/organizer";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,32 +8,43 @@ export async function GET(req: NextRequest) {
     if (!apiKey) {
       return NextResponse.json({
         success: false,
-        error: "GEMINI_API_KEY is not defined in Vercel environment variables.",
-        present: false
+        error: "GEMINI_API_KEY is not defined in Vercel environment variables."
       });
     }
 
+    // Carregar o Direito Civil (1).pdf do banco
+    const material = await prisma.studyMaterial.findUnique({
+      where: { id: "cmpah8enm0001jj04623eqhn4" },
+      include: {
+        extractedContent: {
+          orderBy: { pageNumber: "asc" },
+          take: 3
+        }
+      }
+    });
+
+    if (!material) {
+      return NextResponse.json({
+        success: false,
+        error: "Material Direito Civil (1).pdf not found in database."
+      });
+    }
+
+    const sampleText = material.extractedContent.map(p => p.text).join("\n\n");
     const maskedKey = `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}`;
-    const keyLength = apiKey.length;
-    const hasQuotes = apiKey.startsWith('"') || apiKey.endsWith('"') || apiKey.startsWith("'") || apiKey.endsWith("'");
-    const hasSpaces = apiKey.trim() !== apiKey;
 
-    console.log(`[DEBUG GEMINI] Masked Key: ${maskedKey}, Length: ${keyLength}`);
+    console.log(`[DEBUG GEMINI] Simulating identifySubject in production...`);
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    // Test resilient call
-    const result = await callGeminiWithRetry(() => model.generateContent("Respond with 'System Online'"));
-    const replyText = result.response.text().trim();
+    const start = Date.now();
+    const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName);
+    const duration = Date.now() - start;
 
     return NextResponse.json({
       success: true,
       maskedKey,
-      keyLength,
-      hasQuotes,
-      hasSpaces,
-      replyText
+      materialName: material.fileName,
+      durationMs: duration,
+      idResult
     });
   } catch (err: any) {
     return NextResponse.json({
