@@ -20,6 +20,7 @@ import { TodayTaskCard } from "@/components/today/TodayTaskCard";
 import { getAdaptiveStudyQueue } from "@/lib/recommendations/adaptive-scheduler";
 import { PageHeader } from "@/components/ui/page-header";
 import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
+import { reorganizeActiveSchedule } from "@/lib/scheduler";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,21 @@ export default async function Dashboard() {
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(todayStart);
     todayEnd.setDate(todayEnd.getDate() + 1);
+
+    // Auto-reorganizar se houverem tarefas pendentes no passado
+    const hasPastPending = await (prisma as any).studyScheduleItem.findFirst({
+      where: {
+        userId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+        schedule: { status: "ACTIVE" },
+        scheduledDate: { lt: todayStart }
+      }
+    });
+
+    if (hasPastPending) {
+      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
+      await reorganizeActiveSchedule(userId, 30);
+    }
 
     todayItems = await (prisma as any).studyScheduleItem.findMany({
       where: {

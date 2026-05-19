@@ -341,13 +341,19 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
 
   const scheduledBlockIds = new Set<string>(completedBlockIds);
 
+  // A data de início para os novos blocos pendentes deve ser hoje
+  let nextAvailableDate = getNextStudyDay(new Date());
+
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const dayNumber = dayOffset + 1;
     
     // Se o dia já possui tarefas concluídas, mantemos intocado!
     if (completedDays.has(dayNumber)) continue;
 
-    const candidateDate = addDays(startDate, dayOffset);
+    const candidateDate = new Date(nextAvailableDate);
+    // Avança a data para a próxima iteração
+    nextAvailableDate = addDays(nextAvailableDate, 1);
+
     if (!isStudyDay(candidateDate)) continue;
 
     const cycleDay = dayOffset % 6;

@@ -10,11 +10,30 @@ import { cn } from "@/lib/utils";
 import { GenerateScheduleCTA } from "@/components/schedule/GenerateScheduleCTA";
 import { PageHeader } from "@/components/ui/page-header";
 import { ReorganizeScheduleButton } from "@/components/schedule/ReorganizeScheduleButton";
+import { reorganizeActiveSchedule } from "@/lib/scheduler";
 
 export default async function SchedulePage() {
   const mockUserId = await getMockUserId();
   let schedule: any = null;
   try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    // Auto-reorganizar se houverem tarefas pendentes no passado
+    const hasPastPending = await (prisma as any).studyScheduleItem.findFirst({
+      where: {
+        userId: mockUserId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+        schedule: { status: "ACTIVE" },
+        scheduledDate: { lt: todayStart }
+      }
+    });
+
+    if (hasPastPending) {
+      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
+      await reorganizeActiveSchedule(mockUserId, 30);
+    }
+
     schedule = await (prisma as any).studySchedule.findFirst({
       where: { userId: mockUserId, status: "ACTIVE" },
       include: {
