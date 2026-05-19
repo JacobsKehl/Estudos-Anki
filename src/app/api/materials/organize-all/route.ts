@@ -479,7 +479,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     where: { id: material.id },
     data: {
       organizationStatus: "ORGANIZED",
-      detectedStructure: JSON.stringify(detectedBlocks),
+      detectedStructure: JSON.stringify(structResult),
       totalPages: numPages
     }
   });
