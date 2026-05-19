@@ -2,15 +2,13 @@
 import { prisma } from "@/lib/prisma";
 import { getMockUserId } from "@/lib/auth-mock";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BookOpen, Blocks, Layers, FileText } from "lucide-react";
+import { ArrowLeft, BookOpen, Blocks, Layers, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { MaterialCard } from "@/components/materials/MaterialCard";
 import { GenerateAllFlashcardsButton } from "@/components/subjects/GenerateAllFlashcardsButton";
 import { StudyBlockItem } from "@/components/subjects/StudyBlockItem";
-import { GenerateFlashcardsButton } from "@/components/subjects/GenerateFlashcardsButton";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Sparkles, Plus } from "lucide-react";
+import { SupportBlockItem } from "@/components/subjects/SupportBlockItem";
 
 import { getSubjectMetrics } from "@/lib/services/subject-metrics";
 import { SubjectPerformancePanel } from "@/components/subjects/SubjectPerformancePanel";
@@ -40,6 +38,11 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
           orderBy: { orderIndex: "asc" },
           include: { 
             material: true,
+            supportMaterials: {
+              include: {
+                material: true
+              }
+            },
             _count: {
               select: {
                 flashcards: true
@@ -60,6 +63,14 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
   if (!subject || !metrics) {
     return notFound();
   }
+
+  // Extrair todos os blocos de apoio vinculados aos blocos teóricos da matéria
+  const supportBlocks = subject.studyBlocks.flatMap((block: any) => 
+    (block.supportMaterials || []).map((support: any) => ({
+      ...support,
+      studyBlock: block // referência de volta para o bloco teórico pai
+    }))
+  );
 
   return (
     <div className="space-y-8 max-w-6xl animate-in fade-in duration-700 slide-in-from-bottom-4 pb-20">
@@ -106,45 +117,63 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Blocks */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between border-b border-border pb-2">
-            <div className="flex items-center gap-2">
-              <Blocks className="w-5 h-5 text-accent" />
-              <h2 className="text-xl font-semibold">Blocos de Estudo</h2>
+        <div className="lg:col-span-2 space-y-8">
+          {/* Blocos de Estudo */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <div className="flex items-center gap-2">
+                <Blocks className="w-5 h-5 text-accent" />
+                <h2 className="text-xl font-semibold">Blocos de Estudo</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <GenerateAllFlashcardsButton subjectId={subject.id} />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <GenerateAllFlashcardsButton subjectId={subject.id} />
+
+            <div className="space-y-4">
+              {subject.studyBlocks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-card rounded-[2.5rem] border-2 border-dashed border-border/60 space-y-6">
+                  <div className="w-20 h-20 rounded-3xl bg-sage-light/30 text-accent flex items-center justify-center">
+                    <Blocks className="w-10 h-10" />
+                  </div>
+                  <div className="max-w-md space-y-2">
+                    <h3 className="text-xl font-bold">Ainda não há blocos de estudo</h3>
+                    <p className="text-muted-foreground">
+                      Seus materiais importados ainda não foram organizados. Vá até a Biblioteca para fatiar seus conteúdos automaticamente.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button asChild className="rounded-xl gap-2 font-medium bg-accent text-white hover:bg-accent/90 h-12 px-8">
+                      <Link href="/materials">
+                        <Sparkles className="w-4 h-4" />
+                        Organizar meus estudos
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                subject.studyBlocks.map((block: any) => (
+                  <StudyBlockItem key={block.id} block={block} />
+                ))
+              )}
             </div>
           </div>
 
-          <div className="space-y-4">
-            {subject.studyBlocks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-card rounded-[2.5rem] border-2 border-dashed border-border/60 space-y-6">
-                <div className="w-20 h-20 rounded-3xl bg-sage-light/30 text-accent flex items-center justify-center">
-                  <Blocks className="w-10 h-10" />
-                </div>
-                <div className="max-w-md space-y-2">
-                  <h3 className="text-xl font-bold">Ainda não há blocos de estudo</h3>
-                  <p className="text-muted-foreground">
-                    Seus materiais importados ainda não foram organizados. Vá até a Biblioteca para fatiar seus conteúdos automaticamente.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button asChild className="rounded-xl gap-2 font-medium bg-accent text-white hover:bg-accent/90 h-12 px-8">
-                    <Link href="/materials">
-                      <Sparkles className="w-4 h-4" />
-                      Organizar meus estudos
-                    </Link>
-                  </Button>
-                </div>
+          {/* Blocos de Apoio */}
+          {supportBlocks.length > 0 && (
+            <div className="space-y-6 pt-4 border-t border-border/40">
+              <div className="flex items-center gap-2 pb-2">
+                <Layers className="w-5 h-5 text-accent" />
+                <h2 className="text-xl font-semibold">Blocos de Apoio</h2>
               </div>
-            ) : (
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              subject.studyBlocks.map((block: any) => (
-                <StudyBlockItem key={block.id} block={block} />
-              ))
-            )}
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {supportBlocks.map((support: any) => (
+                  <SupportBlockItem key={support.id} support={support} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Materials */}

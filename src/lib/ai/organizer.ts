@@ -140,6 +140,9 @@ export interface DetectedStructureResult {
   materialRole: string; // MAIN_MATERIAL | SUPPORT_MATERIAL | MIXED_MATERIAL | UNKNOWN
   blocks: DetectedBlock[];
   aiModelUsed?: string; // Armazenar qual modelo final gerou com sucesso
+  sourceStrategy?: string;
+  tocDetected?: boolean;
+  tocConfidence?: number;
 }
 
 const FORBIDDEN_GENERIC_PATTERNS = [
@@ -418,6 +421,397 @@ export function extractTOCFromText(text: string, totalPages: number): TOCEntry[]
   return tocEntries;
 }
 
+export function classifyTOCHeading(heading: string): "MAIN_THEORY" | "QUESTIONS" | "ANSWER_KEY" | "SUMMARY" | "SUPPORT" {
+  const norm = heading.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  // Answer Keys
+  if (
+    norm.includes("gabarito") ||
+    norm.includes("resposta correta") ||
+    norm.includes("respostas corretas") ||
+    norm.includes("respostas")
+  ) {
+    return "ANSWER_KEY";
+  }
+
+  // Questions
+  if (
+    norm.includes("questoes") ||
+    norm.includes("exercicio") ||
+    norm.includes("simulado") ||
+    norm.includes("provas") ||
+    norm.includes("caderno de questoes") ||
+    norm.includes("lista de questoes") ||
+    norm.includes("questoes de fixacao") ||
+    norm.includes("treino")
+  ) {
+    return "QUESTIONS";
+  }
+
+  // Summary / Review
+  if (
+    norm.includes("resumo") ||
+    norm.includes("bizu") ||
+    norm.includes("mapa mental") ||
+    norm.includes("mapas mentais") ||
+    norm.includes("esquematico") ||
+    norm.includes("revisao") ||
+    norm.includes("checklist") ||
+    norm.includes("roteiro") ||
+    norm.includes("esquema")
+  ) {
+    return "SUMMARY";
+  }
+
+  // General Intro/TOC pages
+  if (
+    norm.includes("sumario") ||
+    norm.includes("apresentacao") ||
+    norm.includes("bibliografia") ||
+    norm.includes("referencias") ||
+    norm.includes("introducao ao curso") ||
+    norm.includes("cronograma")
+  ) {
+    return "SUPPORT";
+  }
+
+  // Default is theory
+  return "MAIN_THEORY";
+}
+
+export function findBestOfficialTopic(
+  text: string,
+  officialTopics: { id: string; topicCode: string; title: string }[]
+): { id: string; topicCode: string; title: string } | null {
+  if (officialTopics.length === 0) return null;
+
+  const cleanText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const words = cleanText.split(/[^\w]+/i).filter(w => w.length > 3);
+
+  let bestTopic = officialTopics[0];
+  let maxScore = -1;
+
+  for (const topic of officialTopics) {
+    const topicTitleClean = topic.title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    let score = 0;
+    for (const w of words) {
+      if (topicTitleClean.includes(w)) {
+        score += w.length;
+      }
+    }
+
+    if (score > maxScore) {
+      maxScore = score;
+      bestTopic = topic;
+    }
+  }
+
+  return bestTopic;
+}
+
+export function buildBlocksFromTOC(
+  tocEntries: TOCEntry[],
+  subjectName: string,
+  officialTopics: { id: string; topicCode: string; title: string }[],
+  totalPages: number
+): DetectedBlock[] {
+  const blocks: DetectedBlock[] = [];
+  let currentGroup: TOCEntry[] = [];
+  let currentPages = 0;
+
+  const saveCurrentGroup = () => {
+    if (currentGroup.length === 0) return;
+
+    const firstEntry = currentGroup[0];
+    const lastEntry = currentGroup[currentGroup.length - 1];
+    
+    let groupTitle = currentGroup.map(e => e.heading).join(" e ");
+    if (groupTitle.length > 80) {
+      groupTitle = `${firstEntry.heading} e outros subtemas`;
+    }
+
+    const description = `Estudo detalhado de: ${currentGroup.map(e => e.heading).join(", ")}.`;
+    const pageStart = firstEntry.pageStart;
+    const pageEnd = lastEntry.pageEnd;
+
+    const bestTopic = findBestOfficialTopic(groupTitle + " " + description, officialTopics);
+
+    const block: DetectedBlock = {
+      type: "MAIN_BLOCK",
+      title: groupTitle,
+      description,
+      pageStart,
+      pageEnd,
+      sourceHeading: firstEntry.heading,
+      estimatedStudyMinutes: 60,
+      officialTopicId: bestTopic?.id || null,
+      topicCode: bestTopic?.topicCode || "GERAL",
+      officialTopicName: bestTopic?.title || "Tópico não identificado",
+      justification: "Reconstrução determinística pelo sumário devido a falha na extração de blocos da IA."
+    };
+
+    block.title = enhanceBlockTitle(block, subjectName);
+    blocks.push(block);
+
+    currentGroup = [];
+    currentPages = 0;
+  };
+
+  for (const entry of tocEntries) {
+    const type = classifyTOCHeading(entry.heading);
+    const pageCount = (entry.pageEnd - entry.pageStart) + 1;
+
+    if (type === "MAIN_THEORY") {
+      if (currentGroup.length > 0 && currentPages + pageCount > 18) {
+        saveCurrentGroup();
+      }
+      currentGroup.push(entry);
+      currentPages += pageCount;
+    } else {
+      saveCurrentGroup();
+
+      let supportType: string = "OTHER";
+      if (type === "QUESTIONS") supportType = "QUESTIONS";
+      else if (type === "ANSWER_KEY") supportType = "ANSWER_KEY";
+      else if (type === "SUMMARY") supportType = "SUMMARY";
+
+      const bestTopic = findBestOfficialTopic(entry.heading, officialTopics);
+
+      blocks.push({
+        type: "SUPPORT_BLOCK",
+        title: entry.heading,
+        description: `Material de apoio: ${entry.heading}`,
+        pageStart: entry.pageStart,
+        pageEnd: entry.pageEnd,
+        sourceHeading: entry.heading,
+        estimatedStudyMinutes: 0,
+        officialTopicId: bestTopic?.id || null,
+        topicCode: bestTopic?.topicCode || "GERAL",
+        officialTopicName: bestTopic?.title || "Tópico não identificado",
+        supportType,
+        justification: "Fatiamento de apoio direto pelo sumário."
+      });
+    }
+  }
+
+  saveCurrentGroup();
+
+  return blocks;
+}
+
+export function repairMicroTheoryBlocks(blocks: DetectedBlock[], totalPages: number): DetectedBlock[] {
+  if (blocks.length <= 1) {
+    if (blocks.length === 1 && (blocks[0].type || "MAIN_BLOCK") === "MAIN_BLOCK") {
+      const pageCount = (blocks[0].pageEnd - blocks[0].pageStart) + 1;
+      if (pageCount <= 2) {
+        blocks[0].shortBlockJustification = "Densidade/Limite total do documento. Unidade isolada real de teoria.";
+        blocks[0].justification = "Permitido microbloco devido ao tamanho total reduzido do PDF.";
+      }
+    }
+    return blocks;
+  }
+
+  let repaired = [...blocks];
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    const newBlocks: DetectedBlock[] = [];
+
+    for (let i = 0; i < repaired.length; i++) {
+      const b = repaired[i];
+      const pageCount = (b.pageEnd - b.pageStart) + 1;
+      const isMainBlock = (!b.type || b.type === "MAIN_BLOCK");
+
+      if (isMainBlock && pageCount <= 2 && !b.shortBlockJustification) {
+        let merged = false;
+
+        // 1. Try to merge with previous block
+        if (newBlocks.length > 0) {
+          const prev = newBlocks[newBlocks.length - 1];
+          const isPrevMain = (!prev.type || prev.type === "MAIN_BLOCK");
+          if (isPrevMain && prev.pageEnd + 2 >= b.pageStart) {
+            prev.pageEnd = Math.max(prev.pageEnd, b.pageEnd);
+            prev.title = `${prev.title} e ${b.title}`.substring(0, 100);
+            prev.description = `${prev.description} | ${b.description}`.substring(0, 200);
+            prev.mergeRationale = `Mesclado microbloco teórico (${pageCount} pág) com o bloco anterior.`;
+            merged = true;
+            changed = true;
+            continue;
+          }
+        }
+
+        // 2. Try to merge with next block
+        if (!merged && i < repaired.length - 1) {
+          const next = repaired[i + 1];
+          const isNextMain = (!next.type || next.type === "MAIN_BLOCK");
+          if (isNextMain && b.pageEnd + 2 >= next.pageStart) {
+            next.pageStart = Math.min(b.pageStart, next.pageStart);
+            next.title = `${b.title} e ${next.title}`.substring(0, 100);
+            next.description = `${b.description} | ${next.description}`.substring(0, 200);
+            next.mergeRationale = `Mesclado microbloco teórico (${pageCount} pág) com o bloco seguinte.`;
+            merged = true;
+            changed = true;
+            continue;
+          }
+        }
+
+        // 3. Try to merge with any other block of the same officialTopicId
+        if (!merged) {
+          for (let j = 0; j < newBlocks.length; j++) {
+            const candidate = newBlocks[j];
+            const isCandMain = (!candidate.type || candidate.type === "MAIN_BLOCK");
+            if (isCandMain && candidate.officialTopicId === b.officialTopicId) {
+              candidate.pageStart = Math.min(candidate.pageStart, b.pageStart);
+              candidate.pageEnd = Math.max(candidate.pageEnd, b.pageEnd);
+              candidate.title = `${candidate.title} e ${b.title}`.substring(0, 100);
+              candidate.mergeRationale = `Agrupado microbloco do mesmo macrotema.`;
+              merged = true;
+              changed = true;
+              break;
+            }
+          }
+          if (merged) continue;
+
+          for (let j = i + 1; j < repaired.length; j++) {
+            const candidate = repaired[j];
+            const isCandMain = (!candidate.type || candidate.type === "MAIN_BLOCK");
+            if (isCandMain && candidate.officialTopicId === b.officialTopicId) {
+              candidate.pageStart = Math.min(b.pageStart, candidate.pageStart);
+              candidate.pageEnd = Math.max(b.pageEnd, candidate.pageEnd);
+              candidate.title = `${b.title} e ${candidate.title}`.substring(0, 100);
+              candidate.mergeRationale = `Agrupado microbloco do mesmo macrotema.`;
+              merged = true;
+              changed = true;
+              break;
+            }
+          }
+          if (merged) continue;
+        }
+
+        // 4. Fallback: merge with closest theoretical block anyway
+        if (!merged) {
+          if (newBlocks.length > 0) {
+            const prev = newBlocks[newBlocks.length - 1];
+            const isPrevMain = (!prev.type || prev.type === "MAIN_BLOCK");
+            if (isPrevMain) {
+              prev.pageEnd = Math.max(prev.pageEnd, b.pageEnd);
+              prev.title = `${prev.title} e ${b.title}`.substring(0, 100);
+              prev.mergeRationale = `Mesclado microbloco residual com o bloco anterior.`;
+              merged = true;
+              changed = true;
+              continue;
+            }
+          }
+          if (!merged && i < repaired.length - 1) {
+            const next = repaired[i + 1];
+            const isNextMain = (!next.type || next.type === "MAIN_BLOCK");
+            if (isNextMain) {
+              next.pageStart = Math.min(b.pageStart, next.pageStart);
+              next.title = `${b.title} e ${next.title}`.substring(0, 100);
+              next.mergeRationale = `Mesclado microbloco residual com o bloco seguinte.`;
+              merged = true;
+              changed = true;
+              continue;
+            }
+          }
+        }
+
+        if (!merged) {
+          b.shortBlockJustification = "Unidade isolada real e irredutível de teoria.";
+          b.justification = "Mantido microbloco de teoria por impossibilidade pedagógica de mesclagem.";
+        }
+      }
+
+      newBlocks.push(b);
+    }
+
+    repaired = newBlocks;
+  }
+
+  return repaired;
+}
+
+export function repairDetectedBlocks(
+  aiBlocks: DetectedBlock[],
+  tocEntries: TOCEntry[],
+  subjectName: string,
+  officialTopics: { id: string; topicCode: string; title: string }[]
+): DetectedBlock[] {
+  const repairedBlocks: DetectedBlock[] = [];
+
+  for (const b of aiBlocks) {
+    const originalTitle = b.title || "Sem Título";
+    const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    const isForbiddenLiteral = GENERIC_TITLES.some(gt => titleNorm === gt || titleNorm.includes(gt));
+    const isForbiddenPattern = FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(originalTitle));
+    const isWeak = WEAK_CORRIGIBLE_TITLES.some(wt => titleNorm === wt || titleNorm.includes(wt)) || 
+                   originalTitle.length < 12 || 
+                   originalTitle.split(/\s+/).length <= 2;
+
+    if (isForbiddenLiteral || isForbiddenPattern || isWeak) {
+      const enhanced = enhanceBlockTitle(b, subjectName);
+      const titleNormEnhanced = enhanced.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const stillForbidden = GENERIC_TITLES.some(gt => titleNormEnhanced === gt || titleNormEnhanced.includes(gt)) ||
+                             FORBIDDEN_GENERIC_PATTERNS.some(re => re.test(enhanced));
+      
+      if (stillForbidden) {
+        if (b.officialTopicName && b.officialTopicName !== "Tópico não identificado") {
+          b.title = `${b.officialTopicName} no ${subjectName.replace(/Direito /i, "")}`;
+        } else {
+          const matchingTOC = tocEntries.find(t => b.pageStart >= t.pageStart && b.pageStart <= t.pageEnd);
+          if (matchingTOC) {
+            b.title = `${matchingTOC.heading} no ${subjectName.replace(/Direito /i, "")}`;
+          } else {
+            b.title = `Estudo de ${subjectName.replace(/Direito /i, "")} — Páginas ${b.pageStart} a ${b.pageEnd}`;
+          }
+        }
+      } else {
+        b.title = enhanced;
+      }
+    }
+
+    if (b.type === "SUPPORT_BLOCK" || b.supportType === "QUESTIONS" || b.supportType === "SUMMARY") {
+      const matchingTOC = tocEntries.find(t => b.pageStart >= t.pageStart && b.pageStart <= t.pageEnd);
+      if (matchingTOC) {
+        const tocClass = classifyTOCHeading(matchingTOC.heading);
+        if (tocClass === "MAIN_THEORY") {
+          b.type = "MAIN_BLOCK";
+          b.supportType = null;
+          b.isQuestionsOnly = false;
+          b.isSummaryOnly = false;
+          b.justification = `Reclassificado de apoio para bloco principal teórico com base na seção "${matchingTOC.heading}" do sumário.`;
+          
+          if (!b.officialTopicId) {
+            const bestTopic = findBestOfficialTopic(matchingTOC.heading, officialTopics);
+            if (bestTopic) {
+              b.officialTopicId = bestTopic.id;
+              b.topicCode = bestTopic.topicCode;
+              b.officialTopicName = bestTopic.title;
+            }
+          }
+        }
+      }
+    }
+
+    if ((!b.type || b.type === "MAIN_BLOCK") && !b.officialTopicId && officialTopics.length > 0) {
+      const combinedText = `${b.title} ${b.description} ${b.sourceHeading || ""}`;
+      const bestTopic = findBestOfficialTopic(combinedText, officialTopics);
+      if (bestTopic) {
+        b.officialTopicId = bestTopic.id;
+        b.topicCode = bestTopic.topicCode;
+        b.officialTopicName = bestTopic.title;
+      }
+    }
+
+    repairedBlocks.push(b);
+  }
+
+  return tryMergeShortBlocks(repairedBlocks);
+}
+
 export async function detectStructure(
   summaryContent: string,
   totalPages: number,
@@ -434,6 +828,9 @@ export async function detectStructure(
   const tocDetected = tocEntries.length > 0;
   const tocConfidence = tocDetected ? 1.0 : 0.0;
   const sourceStrategy = tocDetected ? "TOC_BASED" : "CONTENT_BASED";
+
+  const mainTheorySections = tocEntries.filter(t => classifyTOCHeading(t.heading) === "MAIN_THEORY");
+  const hasMainTheory = mainTheorySections.length >= 1;
 
   const relevantTopics = OFFICIAL_TOPICS.filter(
     t => t.subjectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
@@ -490,7 +887,13 @@ export async function detectStructure(
           }
           
           const role = parsedResult.materialRole || "UNKNOWN";
-          const blocks = parsedResult.blocks || [];
+          let blocks = parsedResult.blocks || [];
+
+          // --- PIPELINE DE AUTO-REPARO DE BLOCOS ---
+          console.log(`[Auto-Repair] Iniciando pipeline de auto-reparo para ${blocks.length} blocos...`);
+          blocks = repairDetectedBlocks(blocks, tocEntries, subjectName, relevantTopics);
+          blocks = repairMicroTheoryBlocks(blocks, totalPages);
+          console.log(`[Auto-Repair] Concluído. Blocos ativos após reparo: ${blocks.length}`);
 
           // --- Validação Inteligente Técnico & Pedagógica por Score ---
           const errors: string[] = [];
@@ -679,6 +1082,45 @@ export async function detectStructure(
             }
           }
 
+          // Se houver algum erro de qualidade da IA, mas o sumário for confiável, resgatar!
+          if (errors.length > 0 && tocDetected && tocConfidence >= 0.65 && hasMainTheory) {
+            console.log(`[TOC Rescue] A IA falhou ou gerou blocos ruins, mas o sumário é confiável. Iniciando reconstrução determinística via sumário...`);
+            let rescueBlocks = buildBlocksFromTOC(tocEntries, subjectName, relevantTopics, totalPages);
+            rescueBlocks = repairMicroTheoryBlocks(rescueBlocks, totalPages);
+            
+            rescueBlocks = rescueBlocks.map(b => {
+              let topicId = b.officialTopicId || null;
+              let code = b.topicCode || "GERAL";
+              let name = b.officialTopicName || "Tópico não identificado";
+
+              if (topicId) {
+                const found = relevantTopics.find(t => t.id === topicId);
+                if (found) {
+                  code = found.topicCode;
+                  name = found.title;
+                }
+              }
+              return {
+                ...b,
+                officialTopicId: topicId,
+                topicCode: code,
+                officialTopicName: name
+              };
+            });
+            
+            let finalBlocks = tryMergeShortBlocks(rescueBlocks);
+            finalBlocks = calculateEstimatedMinutes(finalBlocks);
+
+            return {
+              materialRole: role === "SUPPORT_MATERIAL" ? "SUPPORT_MATERIAL" : "MIXED_MATERIAL",
+              sourceStrategy: "TOC_BASED",
+              tocDetected: true,
+              tocConfidence: 1.0,
+              blocks: finalBlocks,
+              aiModelUsed: `${modelName}-TOCRescue`
+            };
+          }
+
           if (errors.length === 0) {
             // Mapear tópicos oficiais com segurança
             const mappedBlocks = validatedBlocks.map(b => {
@@ -730,6 +1172,46 @@ export async function detectStructure(
           
         } catch (error: any) {
           console.error("Erro ao detectar estrutura:", error);
+          
+          // Se a API falhou/timeout ou deu erro de JSON, mas temos sumário confiável, resgatar deterministicamente!
+          if (tocDetected && tocConfidence >= 0.65 && hasMainTheory) {
+            console.log(`[TOC Rescue Catch] Erro na requisição da IA, mas sumário confiável detectado. Resgatando deterministicamente via sumário...`);
+            let rescueBlocks = buildBlocksFromTOC(tocEntries, subjectName, relevantTopics, totalPages);
+            rescueBlocks = repairMicroTheoryBlocks(rescueBlocks, totalPages);
+            
+            rescueBlocks = rescueBlocks.map(b => {
+              let topicId = b.officialTopicId || null;
+              let code = b.topicCode || "GERAL";
+              let name = b.officialTopicName || "Tópico não identificado";
+
+              if (topicId) {
+                const found = relevantTopics.find(t => t.id === topicId);
+                if (found) {
+                  code = found.topicCode;
+                  name = found.title;
+                }
+              }
+              return {
+                ...b,
+                officialTopicId: topicId,
+                topicCode: code,
+                officialTopicName: name
+              };
+            });
+            
+            let finalBlocks = tryMergeShortBlocks(rescueBlocks);
+            finalBlocks = calculateEstimatedMinutes(finalBlocks);
+
+            return {
+              materialRole: "MIXED_MATERIAL",
+              sourceStrategy: "TOC_BASED",
+              tocDetected: true,
+              tocConfidence: 1.0,
+              blocks: finalBlocks,
+              aiModelUsed: `${modelName}-TOCRescueCatch`
+            };
+          }
+
           if (error.status === 503 || error.message?.includes("503") || error.status === 429 || error.message?.includes("429")) {
             geminiApiError = `AI_RATE_LIMIT_OR_UNAVAILABLE: ${error.message}`;
           } else if (error.message?.includes("fetch failed") || error.message?.includes("Service Unavailable")) {

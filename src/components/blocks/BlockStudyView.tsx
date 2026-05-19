@@ -40,6 +40,15 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
   const [activeTab, setActiveTab] = React.useState<"pdf" | "text" | "apoios">("pdf");
   const hasApoios = block.supportMaterials && block.supportMaterials.length > 0;
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "apoios") {
+        setActiveTab("apoios");
+      }
+    }
+  }, []);
+
   const updateStatus = async (newStatus: string) => {
     setIsUpdatingStatus(true);
     try {
