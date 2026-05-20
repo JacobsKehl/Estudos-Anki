@@ -71,7 +71,7 @@ export function Topbar() {
           </button>
           
           <div className="h-8 w-8 rounded-xl bg-sage-light text-accent flex items-center justify-center font-bold text-xs shadow-sm border border-accent/10">
-            HK
+            GF
           </div>
         </div>
       </header>
