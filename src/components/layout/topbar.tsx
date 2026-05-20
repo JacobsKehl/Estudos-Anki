@@ -60,13 +60,13 @@ export function Topbar() {
         <div className="flex items-center gap-3">
           <button
             onClick={toggleTheme}
-            className="flex items-center justify-center w-8 h-8 rounded-xl border border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground hover:border-accent/35 hover:bg-muted/50 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 rounded-xl border border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground hover:border-accent/35 hover:bg-muted/50 hover:scale-105 active:scale-95 transition-all cursor-pointer group"
             title="Alternar tema escuro/claro"
           >
             {isDark ? (
-              <Sun className="w-4 h-4 text-amber-500 animate-spin-slow" />
+              <Sun className="w-4 h-4 text-amber-500 transition-transform duration-700 ease-out group-hover:rotate-[360deg]" />
             ) : (
-              <Moon className="w-4 h-4 text-slate-500" />
+              <Moon className="w-4 h-4 text-slate-500 transition-transform duration-500 group-hover:-rotate-12 group-hover:scale-110" />
             )}
           </button>
           
