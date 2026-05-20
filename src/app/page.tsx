@@ -177,10 +177,10 @@ export default async function Dashboard() {
       </PageHeader>
 
       {/* ── Hero: Próxima Ação ─────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-sage-light/50 to-sage-light/20 border border-sage-light/60 p-7 shadow-sm">
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-sage-light/50 to-sage-light/20 dark:from-accent/10 dark:to-accent/5 border border-sage-light/60 dark:border-accent/15 p-7 shadow-sm">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-2">
-            <span className="inline-block bg-white/70 text-accent px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-accent/10">
+            <span className="inline-block bg-white/70 dark:bg-accent/15 text-accent px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-accent/10 dark:border-accent/20">
               Próxima Ação
             </span>
             <h1 className="text-2xl font-extrabold tracking-tight text-foreground md:text-3xl max-w-xl">
@@ -258,7 +258,7 @@ export default async function Dashboard() {
             </p>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-white to-sage-light/5 border border-sage-light/60 rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="bg-gradient-to-br from-white to-sage-light/5 dark:from-slate-900 dark:to-slate-800/50 border border-sage-light/60 dark:border-accent/15 rounded-[2rem] p-8 shadow-sm dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-md transition-all duration-300">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
               <div className="space-y-5 flex-1">
                 <div className="space-y-1">
@@ -270,12 +270,12 @@ export default async function Dashboard() {
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-bold text-muted-foreground/70">
                   {todayStats.fromTodayBlocks > 0 && (
-                    <span className="flex items-center gap-1.5 bg-sage-light/20 text-accent px-2 py-0.5 rounded-md">
+                    <span className="flex items-center gap-1.5 bg-sage-light/20 dark:bg-accent/10 text-accent px-2 py-0.5 rounded-md">
                       {todayStats.fromTodayBlocks} dos conteúdos de hoje
                     </span>
                   )}
                   {todayStats.fromSpacedReview > 0 && (
-                    <span className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md">
+                    <span className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-md">
                       {todayStats.fromSpacedReview} de revisão espaçada
                     </span>
                   )}
@@ -305,7 +305,7 @@ export default async function Dashboard() {
                 {(todayStats.subjects as string[]).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {(todayStats.subjects as string[]).map((s: string) => (
-                      <Badge key={s} variant="outline" className="bg-white/80 text-[9px] font-bold uppercase tracking-wider px-2 py-0">
+                      <Badge key={s} variant="outline" className="bg-white/80 dark:bg-white/5 dark:border-border/40 dark:text-muted-foreground text-[9px] font-bold uppercase tracking-wider px-2 py-0">
                         {s}
                       </Badge>
                     ))}
@@ -317,7 +317,7 @@ export default async function Dashboard() {
                 <Button 
                   variant="primary"
                   size="lg" 
-                  className="rounded-2xl px-10 font-black shadow-xl shadow-accent/20 hover:scale-105 transition-all gap-3"
+                  className="rounded-2xl px-10 font-black shadow-xl shadow-accent/20 dark:shadow-accent/10 hover:scale-105 transition-all gap-3"
                   asChild
                 >
                   <Link href="/practice?source=today">

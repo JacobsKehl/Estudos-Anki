@@ -13,12 +13,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const variants = {
       default: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm",
       primary: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm",
-      secondary: "bg-sage-light text-accent hover:bg-sage-light/80 shadow-sm",
+      secondary: "bg-sage-light text-accent hover:bg-sage-light/80 dark:bg-accent/15 dark:text-accent dark:hover:bg-accent/25 shadow-sm",
       soft: "bg-accent/10 text-accent hover:bg-accent/20 border border-transparent",
-      outline: "border border-border bg-transparent hover:bg-muted/30 text-foreground",
-      ghost: "hover:bg-muted/30 text-foreground/80 hover:text-foreground border-transparent",
+      outline: "border border-border bg-transparent hover:bg-muted/30 dark:hover:bg-white/5 text-foreground",
+      ghost: "hover:bg-muted/30 dark:hover:bg-white/5 text-foreground/80 hover:text-foreground border-transparent",
       link: "text-accent underline-offset-4 hover:underline",
-      destructive: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100",
+      destructive: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 dark:border-red-500/20",
     };
 
     const sizes = {

@@ -155,12 +155,12 @@ export function CloudUploadButton() {
         <Button
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="w-full rounded-2xl h-14 bg-white text-accent hover:bg-white/90 shadow-xl shadow-black/5 transition-all hover:scale-[1.02] active:scale-95 group relative overflow-hidden border-none font-bold"
+          className="w-full rounded-2xl h-14 bg-accent text-white hover:bg-accent/90 shadow-lg shadow-accent/20 dark:shadow-accent/10 transition-all hover:scale-[1.02] active:scale-95 group relative overflow-hidden border-none font-bold"
         >
           {isUploading ? (
             <div className="flex items-center justify-center">
-              <Loader2 className="w-5 h-5 mr-3 animate-spin text-accent" />
-              <span className="text-sm font-bold text-accent">{currentFileIndex} / {totalFiles}</span>
+              <Loader2 className="w-5 h-5 mr-3 animate-spin text-white" />
+              <span className="text-sm font-bold text-white">{currentFileIndex} / {totalFiles}</span>
             </div>
           ) : (
             <div className="flex items-center justify-center">
@@ -171,8 +171,8 @@ export function CloudUploadButton() {
         </Button>
         
         <div className="flex items-center gap-1.5 opacity-40">
-           <FileText className="w-3 h-3 text-white" />
-           <p className="text-[9px] text-white uppercase tracking-widest font-bold">
+           <FileText className="w-3 h-3 text-muted-foreground" />
+           <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">
              PDF • MÁULTIPLOS ARQUIVOS
            </p>
         </div>

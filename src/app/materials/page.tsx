@@ -86,7 +86,7 @@ export default async function MaterialsPage() {
       <div className="grid lg:grid-cols-12 gap-8">
         
         {/* Main Action Card */}
-        <div className="lg:col-span-8 bg-card rounded-[2.5rem] p-8 md:p-10 border border-border/50 relative overflow-hidden flex flex-col justify-between shadow-sm">
+        <div className="lg:col-span-8 bg-card rounded-[2.5rem] p-8 md:p-10 border border-border/50 dark:border-accent/10 relative overflow-hidden flex flex-col justify-between shadow-sm dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-2">
               <Badge className="bg-accent/10 text-accent hover:bg-accent/10 border-accent/20 px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
@@ -114,13 +114,13 @@ export default async function MaterialsPage() {
         {/* Upload & Info Cards Container */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           {/* Upload Card */}
-          <div className="bg-accent rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center space-y-6 shadow-lg shadow-accent/20 text-white group cursor-default transition-all hover:scale-[1.02]">
-            <div className="bg-white/20 p-4 rounded-3xl backdrop-blur-sm group-hover:bg-white/30 transition-colors">
+          <div className="bg-sage-light/20 dark:bg-accent/5 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center space-y-6 border border-accent/25 dark:border-accent/15 shadow-sm dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] text-foreground group cursor-default transition-all hover:scale-[1.02]">
+            <div className="bg-accent/10 dark:bg-accent/15 text-accent p-4 rounded-3xl group-hover:bg-accent/20 transition-colors">
               <Plus className="w-8 h-8" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl font-bold">Novo Arquivo</h3>
-              <p className="text-xs text-white/70">Arraste ou clique para subir PDF</p>
+              <h3 className="text-xl font-bold text-foreground">Novo Arquivo</h3>
+              <p className="text-xs text-muted-foreground">Arraste ou clique para subir PDF</p>
             </div>
             <CloudUploadButton />
           </div>

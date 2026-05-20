@@ -326,7 +326,7 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
       <Button
         variant="outline"
         size="lg"
-        className="rounded-2xl border-emerald-200 text-emerald-700 bg-emerald-50/50 cursor-default"
+        className="rounded-2xl border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10 cursor-default"
         disabled
       >
         <CheckCircle2 className="w-5 h-5 mr-2" />
