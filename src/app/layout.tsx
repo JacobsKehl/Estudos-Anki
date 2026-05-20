@@ -19,8 +19,13 @@ export const metadata: Metadata = {
   title: "Kehl Study - Foco & Performance",
   description: "Plataforma de estudos minimalista com repetição espaçada",
   icons: {
-    icon: "/brand/icon.png",
-  }
+    icon: [
+      { url: "/brand/favicon.png", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/brand/apple-touch-icon.png",
+  },
+  manifest: "/manifest.json",
 };
 
 import { Toaster } from "sonner";

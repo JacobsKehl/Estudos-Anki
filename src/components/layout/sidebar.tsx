@@ -12,7 +12,7 @@ import {
   Trophy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/ui/logo";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 
 const navItems = [
   { label: "Hoje", href: "/", icon: Target },
@@ -28,12 +28,8 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-border bg-card/50 backdrop-blur-md md:flex">
       <div className="flex h-20 items-center px-6">
-        <Link href="/" className="flex items-center gap-3 group">
-          <Logo size={48} className="group-hover:scale-105 transition-transform duration-300 mix-blend-multiply dark:mix-blend-normal dark:rounded-2xl dark:shadow-sm" />
-          <div className="flex flex-col leading-none">
-            <span className="text-2xl font-extrabold tracking-tight text-foreground">Kehl</span>
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-accent/80 mt-1">Study</span>
-          </div>
+        <Link href="/" className="group outline-none">
+          <BrandLockup variant="sidebar" className="transition-opacity hover:opacity-90" />
         </Link>
       </div>
 

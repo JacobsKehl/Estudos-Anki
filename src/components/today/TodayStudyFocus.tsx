@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter } from "next/navigation";
-import { Logo } from "@/components/ui/logo";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 import { GenerateFlashcardsButton } from "@/components/subjects/GenerateFlashcardsButton";
 
 interface TodayStudyFocusProps {
@@ -203,7 +203,7 @@ export function TodayStudyFocus({ item, pendingReviews }: TodayStudyFocusProps) 
         {/* Motivation Card */}
         <div className="bg-gradient-to-br from-sage-light/30 to-white border border-sage-light/40 rounded-[2rem] p-6 text-center space-y-3">
           <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
-            <Logo size={24} className="opacity-60" />
+            <BrandLockup variant="mark" className="opacity-60 scale-75 origin-center" />
           </div>
           <h4 className="font-bold">Foco no Processo</h4>
           <p className="text-xs text-muted-foreground leading-relaxed">

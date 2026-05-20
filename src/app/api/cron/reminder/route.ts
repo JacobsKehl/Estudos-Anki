@@ -246,7 +246,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Localizar usuário destinatário
-    let user = await prisma.user.findFirst();
+    const user = await prisma.user.findFirst();
 
     if (!user) {
       return NextResponse.json({ error: "Nenhum usuário encontrado no banco de dados." }, { status: 404 });

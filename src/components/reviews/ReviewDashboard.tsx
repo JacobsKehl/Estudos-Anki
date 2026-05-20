@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FlashcardSession } from "@/components/flashcards/FlashcardSession";
 import { useRouter } from "next/navigation";
-import { Logo } from "@/components/ui/logo";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 import Link from "next/link";
 
 interface ReviewDashboardProps {
@@ -135,7 +135,7 @@ export function ReviewDashboard({ pendingCards, stats }: ReviewDashboardProps) {
         
         <div className="hidden lg:flex w-48 h-48 md:w-64 md:h-64 bg-accent/10 rounded-full items-center justify-center relative shadow-[inset_0_0_40px_rgba(var(--accent),0.05)]">
           <div className="absolute inset-0 border-2 border-dashed border-accent/20 rounded-full animate-[spin_30s_linear_infinite]" />
-          <Logo size={96} className="opacity-40" />
+          <BrandLockup variant="mark" className="opacity-40 scale-[3] origin-center" />
         </div>
       </div>
 

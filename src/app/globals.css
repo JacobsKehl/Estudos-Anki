@@ -40,6 +40,13 @@
 
 @layer base {
   :root {
+    /* Kehl Study Brand Tokens */
+    --brand-sage: #6f8a70;
+    --brand-sage-dark: #506b52;
+    --brand-beige: #c9ad7f;
+    --brand-beige-soft: #e2c79f;
+    --brand-cream: #fbf8f3;
+
     --background: #fcfcfc;
     --foreground: #334155;
     --accent: #789461;
