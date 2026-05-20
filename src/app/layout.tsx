@@ -36,6 +36,7 @@ export const metadata: Metadata = {
 
 import { Toaster } from "sonner";
 import { StudyPreferencesProvider } from "@/hooks/useStudyPreferences";
+import { StudyTimer } from "@/components/study/study-timer";
 
 export default function RootLayout({
   children,
@@ -83,6 +84,7 @@ export default function RootLayout({
               </main>
             </div>
             <MobileNav />
+            <StudyTimer />
           </div>
           <Toaster position="top-center" richColors />
         </StudyPreferencesProvider>
