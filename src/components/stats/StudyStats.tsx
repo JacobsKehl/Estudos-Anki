@@ -60,29 +60,29 @@ export function StudyStats({ data }: StudyStatsProps) {
           title="Matérias" 
           value={summary.totalSubjects} 
           icon={BookMarked} 
-          color="text-blue-500" 
-          bgColor="bg-blue-50" 
+          color="text-[#d48166]" 
+          bgColor="bg-peach" 
         />
         <StatsCard 
           title="Blocos Estudados" 
           value={`${summary.completedBlocks}/${summary.totalBlocks}`} 
           icon={CheckCircle2} 
-          color="text-emerald-500" 
-          bgColor="bg-emerald-50" 
+          color="text-[#789461]" 
+          bgColor="bg-sage-light" 
         />
         <StatsCard 
           title="Cards Ativos" 
           value={summary.approvedFlashcards} 
           icon={BrainCircuit} 
-          color="text-purple-500" 
-          bgColor="bg-purple-50" 
+          color="text-[#8e7cc3]" 
+          bgColor="bg-lavender" 
         />
         <StatsCard 
           title="Precisão Média" 
           value={`${summary.averageAccuracy}%`} 
           icon={Target} 
-          color="text-amber-500" 
-          bgColor="bg-amber-50" 
+          color="text-warning-text" 
+          bgColor="bg-warning-bg" 
         />
       </div>
 
@@ -126,22 +126,22 @@ export function StudyStats({ data }: StudyStatsProps) {
         <Card className="rounded-[2.5rem] border-border/40 shadow-sm overflow-hidden">
           <CardHeader className="p-8 pb-4">
             <CardTitle className="text-xl font-bold flex items-center gap-3">
-              <Zap className="w-5 h-5 text-amber-500" />
+              <Zap className="w-5 h-5 text-warning-text" />
               Domínio de Conhecimento (SRS)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-8 pt-0 space-y-6">
             <div className="h-4 w-full bg-muted rounded-full flex overflow-hidden">
-              <div className="bg-emerald-500 h-full" style={{ width: `${(mastery.REVIEW / summary.approvedFlashcards) * 100}%` }} title="Dominado" />
-              <div className="bg-blue-500 h-full" style={{ width: `${(mastery.LEARNING / summary.approvedFlashcards) * 100}%` }} title="Aprendendo" />
-              <div className="bg-amber-500 h-full" style={{ width: `${(mastery.RELEARNING / summary.approvedFlashcards) * 100}%` }} title="Reaprendendo" />
+              <div className="bg-[#789461] h-full" style={{ width: `${(mastery.REVIEW / summary.approvedFlashcards) * 100}%` }} title="Dominado" />
+              <div className="bg-[#8e7cc3] h-full" style={{ width: `${(mastery.LEARNING / summary.approvedFlashcards) * 100}%` }} title="Aprendendo" />
+              <div className="bg-[#d48166] h-full" style={{ width: `${(mastery.RELEARNING / summary.approvedFlashcards) * 100}%` }} title="Reaprendendo" />
               <div className="bg-slate-300 h-full" style={{ width: `${(mastery.NEW / summary.approvedFlashcards) * 100}%` }} title="Novo" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <MasteryItem label="Dominado (Review)" value={mastery.REVIEW} color="bg-emerald-500" />
-              <MasteryItem label="Aprendendo" value={mastery.LEARNING} color="bg-blue-500" />
-              <MasteryItem label="Reaprendendo" value={mastery.RELEARNING} color="bg-amber-500" />
+              <MasteryItem label="Dominado (Review)" value={mastery.REVIEW} color="bg-[#789461]" />
+              <MasteryItem label="Aprendendo" value={mastery.LEARNING} color="bg-[#8e7cc3]" />
+              <MasteryItem label="Reaprendendo" value={mastery.RELEARNING} color="bg-[#d48166]" />
               <MasteryItem label="Não Iniciado (New)" value={mastery.NEW} color="bg-slate-300" />
             </div>
           </CardContent>

@@ -142,7 +142,7 @@ export default async function SchedulePage() {
                       </div>
                       <div className={cn(
                         "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider",
-                        item.status === "COMPLETED" ? "bg-green-50 text-green-600" : "bg-muted text-muted-foreground"
+                        item.status === "COMPLETED" ? "bg-accent/10 text-accent" : "bg-muted text-muted-foreground"
                       )}>
                         {item.status === "COMPLETED" ? "Concluído" : "Pendente"}
                       </div>
@@ -198,7 +198,7 @@ export default async function SchedulePage() {
                                 </Badge>
                               )}
                               {questionsCount > 0 && (
-                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-blue-50 text-blue-600 border-blue-200 rounded-md">
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-muted/60 text-foreground border-border/50 rounded-md">
                                   {questionsCount} Lista{questionsCount > 1 ? "s" : ""} de Questões
                                 </Badge>
                               )}
@@ -220,7 +220,7 @@ export default async function SchedulePage() {
 
                     <div className="pt-2 flex gap-2">
                       {item.status === "COMPLETED" ? (
-                        <div className="flex items-center gap-2 text-green-600 text-xs font-medium">
+                        <div className="flex items-center gap-2 text-accent text-xs font-medium">
                           <CheckCircle2 className="w-4 h-4" />
                           Estudo finalizado
                         </div>

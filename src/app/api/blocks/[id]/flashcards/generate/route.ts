@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMockUserId } from "@/lib/auth-mock";
 import { generateFlashcards } from "@/lib/ai/flashcards";
+import type { FlashcardDifficulty } from "@/lib/ai/prompts/flashcard-generation";
 
 export async function POST(
   req: NextRequest,
@@ -21,7 +22,7 @@ export async function POST(
       }
     });
 
-    // Bloquear geração múltipla: Verificar se já existem flashcards vinculados a este bloco
+    // Bloquear geração múltipla: verificar se já existem flashcards vinculados a este bloco
     const existingCardsCount = await prisma.flashcard.count({
       where: { studyBlockId: id }
     });
@@ -57,8 +58,23 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 4. Generate flashcards with Gemini
-    const generatedCards = await generateFlashcards(fullText);
+    // 4. Read user's preferred difficulty from DB (defaults to NORMAL_PLUS)
+    let difficulty: FlashcardDifficulty = "NORMAL_PLUS";
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: mockUserId },
+        select: { flashcardDifficulty: true }
+      });
+      const dbDifficulty = user?.flashcardDifficulty;
+      if (dbDifficulty === "EASY" || dbDifficulty === "NORMAL_PLUS" || dbDifficulty === "HARD") {
+        difficulty = dbDifficulty;
+      }
+    } catch {
+      // If reading fails, proceed with default
+    }
+
+    // 5. Generate flashcards with Gemini using user's preferred difficulty
+    const generatedCards = await generateFlashcards(fullText, difficulty);
 
     if (!generatedCards || generatedCards.length === 0) {
       return NextResponse.json({ 
@@ -66,7 +82,7 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 5. Save to database as PENDING_APPROVAL with full traceability
+    // 6. Save to database with full traceability
     const limitedCards = generatedCards.slice(0, 15);
     const savedCards = await prisma.$transaction(
       limitedCards.map(card => 

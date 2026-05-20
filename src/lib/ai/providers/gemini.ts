@@ -1,13 +1,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GeneratedFlashcard } from "../flashcards";
-import { buildFlashcardPrompt } from "../prompts/flashcard-generation";
+import { buildFlashcardPrompt, FlashcardDifficulty } from "../prompts/flashcard-generation";
 import { callGeminiWithRetry } from "../utils/retry";
 
 /**
  * Gemini Flashcard Generator
  * Uses real Google Gemini API to generate cards from text.
  */
-export async function generateFlashcardsWithGemini(blockText: string): Promise<GeneratedFlashcard[]> {
+export async function generateFlashcardsWithGemini(
+  blockText: string,
+  difficulty: FlashcardDifficulty = "NORMAL_PLUS"
+): Promise<GeneratedFlashcard[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
@@ -26,7 +29,7 @@ export async function generateFlashcardsWithGemini(blockText: string): Promise<G
       }
     });
 
-    const prompt = buildFlashcardPrompt(blockText);
+    const prompt = buildFlashcardPrompt(blockText, difficulty);
     
     const result = await callGeminiWithRetry(() => model.generateContent(prompt));
     const response = await result.response;

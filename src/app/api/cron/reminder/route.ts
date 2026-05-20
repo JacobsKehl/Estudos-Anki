@@ -246,19 +246,22 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Localizar usuário destinatário
-    const targetEmail = process.env.DAILY_REMINDER_EMAIL || "gabriela.furtado.p@gmail.com";
-    let user = await prisma.user.findUnique({
-      where: { email: targetEmail },
-    });
+    let user = await prisma.user.findFirst();
 
     if (!user) {
-      // Se não encontrar o e-mail real, busca o primeiro usuário (Dev Fallback)
-      user = await prisma.user.findFirst();
+      return NextResponse.json({ error: "Nenhum usuário encontrado no banco de dados." }, { status: 404 });
     }
 
-    if (!user) {
-      return NextResponse.json({ error: "No user found in database." }, { status: 404 });
+    // Se o lembrete estiver desativado e NÃO for um disparo de teste manual, abortar o envio
+    if (!user.emailReminderEnabled && !isManualTrigger) {
+      return NextResponse.json({ 
+        success: false, 
+        skipped: true, 
+        reason: "Envio cancelado: lembrete diário por e-mail desativado nas configurações do usuário." 
+      });
     }
+
+    const targetEmail = user.dailyReminderEmail || "gabriela.furtado.p@gmail.com";
 
     // 3. Obter datas em America/Sao_Paulo (Ontem e Hoje)
     const now = new Date();

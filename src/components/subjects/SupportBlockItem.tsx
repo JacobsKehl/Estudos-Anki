@@ -13,9 +13,9 @@ const SUPPORT_TYPE_CONFIG: Record<
   SUMMARY: {
     label: "Resumo Teórico",
     icon: FileText,
-    bgClass: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400",
-    textClass: "text-emerald-700 dark:text-emerald-400",
-    borderClass: "border-emerald-200/50 dark:border-emerald-800/30"
+    bgClass: "bg-accent/10 text-accent",
+    textClass: "text-accent",
+    borderClass: "border-accent/20"
   },
   BIZU: {
     label: "Bizu / Dica Rápida",
@@ -27,16 +27,16 @@ const SUPPORT_TYPE_CONFIG: Record<
   MIND_MAP: {
     label: "Mapa Mental",
     icon: Layers,
-    bgClass: "bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-400",
-    textClass: "text-sky-700 dark:text-sky-400",
-    borderClass: "border-sky-200/50 dark:border-sky-800/30"
+    bgClass: "bg-accent/15 text-accent",
+    textClass: "text-accent",
+    borderClass: "border-accent/25"
   },
   CHECKLIST: {
     label: "Checklist",
     icon: FileText,
-    bgClass: "bg-teal-50 text-teal-700 dark:bg-teal-950/30 dark:text-teal-400",
-    textClass: "text-teal-700 dark:text-teal-400",
-    borderClass: "border-teal-200/50 dark:border-teal-800/30"
+    bgClass: "bg-sage-light/30 text-accent",
+    textClass: "text-accent",
+    borderClass: "border-accent/20"
   },
   REVIEW: {
     label: "Revisão Rápida",
@@ -48,30 +48,30 @@ const SUPPORT_TYPE_CONFIG: Record<
   QUESTIONS: {
     label: "Questões Práticas",
     icon: BookOpen,
-    bgClass: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400",
-    textClass: "text-blue-700 dark:text-blue-400",
-    borderClass: "border-blue-200/50 dark:border-blue-800/30"
+    bgClass: "bg-muted/60 text-foreground",
+    textClass: "text-foreground",
+    borderClass: "border-border/50"
   },
   COMMENTED_QUESTIONS: {
     label: "Questões Comentadas",
     icon: BookOpen,
-    bgClass: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-400",
-    textClass: "text-cyan-700 dark:text-cyan-400",
-    borderClass: "border-cyan-200/50 dark:border-cyan-800/30"
+    bgClass: "bg-muted/60 text-foreground",
+    textClass: "text-foreground",
+    borderClass: "border-border/50"
   },
   SIMULATED_EXAM: {
     label: "Simulado de Prova",
     icon: BookOpen,
-    bgClass: "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400",
-    textClass: "text-orange-700 dark:text-orange-400",
-    borderClass: "border-orange-200/50 dark:border-orange-800/30"
+    bgClass: "bg-amber-50/70 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
+    textClass: "text-amber-700 dark:text-amber-400",
+    borderClass: "border-amber-200/50 dark:border-amber-800/30"
   },
   ANSWER_KEY: {
     label: "Gabarito de Conferência",
     icon: CheckCircle2,
-    bgClass: "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400",
-    textClass: "text-green-700 dark:text-green-400",
-    borderClass: "border-green-200/50 dark:border-green-800/30"
+    bgClass: "bg-accent/10 text-accent",
+    textClass: "text-accent",
+    borderClass: "border-accent/20"
   },
   OTHER: {
     label: "Material de Apoio",
@@ -81,6 +81,7 @@ const SUPPORT_TYPE_CONFIG: Record<
     borderClass: "border-slate-200/50 dark:border-slate-800/30"
   }
 };
+
 
 interface SupportBlockItemProps {
   support: {

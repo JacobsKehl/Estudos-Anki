@@ -1,10 +1,9 @@
-import { Sparkles, Cloud, LayoutGrid, Library, Plus, Info, ShieldCheck } from "lucide-react";
+import { Sparkles, Cloud, LayoutGrid, Library, Plus, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
-import { RepairSupportsButton } from "@/components/materials/RepairSupportsButton";
 import { CloudUploadButton } from "@/components/materials/CloudUploadButton";
 import { getMockUserId } from "@/lib/auth-mock";
 import { MaterialsListClient } from "@/components/materials/MaterialsListClient";
@@ -91,11 +90,11 @@ export default async function MaterialsPage() {
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-2">
               <Badge className="bg-accent/10 text-accent hover:bg-accent/10 border-accent/20 px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                Intelligent Analysis
+                Análise Inteligente
               </Badge>
               <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                <ShieldCheck className="w-3 h-3 text-green-500" />
-                Cloud Protected
+                <ShieldCheck className="w-3 h-3 text-accent" />
+                Protegido na Nuvem
               </div>
             </div>
             
@@ -107,12 +106,6 @@ export default async function MaterialsPage() {
           
           <div className="relative z-10 flex flex-wrap items-center gap-4 mt-10">
             <OrganizeAllButton unorganizedCount={unorganizedCount} />
-            {materials.length > 0 && (
-              <div className="opacity-50 hover:opacity-100 transition-opacity">
-                <OrganizeAllButton unorganizedCount={0} force={true} />
-              </div>
-            )}
-            {materials.length > 0 && <RepairSupportsButton />}
           </div>
           
           <Sparkles className="absolute -right-12 -bottom-12 w-80 h-80 text-accent/5 -rotate-12 pointer-events-none" />

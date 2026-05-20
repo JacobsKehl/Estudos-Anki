@@ -67,4 +67,46 @@
   @apply bg-white/60 backdrop-blur-xl border border-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)];
 }
 
+/* Reduced Motion Utility */
+.motion-reduce *,
+.motion-reduce *::before,
+.motion-reduce *::after {
+  animation-delay: 0s !important;
+  animation-duration: 0.05s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.05s !important;
+  scroll-behavior: auto !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Compact Density Layout Tweaks */
+.density-compact .p-8,
+.density-compact .md\:p-8 {
+  padding: 1.25rem !important;
+}
+.density-compact .p-6 {
+  padding: 0.875rem !important;
+}
+.density-compact .p-4,
+.density-compact .md\:p-4 {
+  padding: 0.5rem !important;
+}
+.density-compact .gap-8 {
+  gap: 1.25rem !important;
+}
+.density-compact .gap-6 {
+  gap: 0.875rem !important;
+}
+.density-compact .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.25rem !important;
+}
+.density-compact .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.875rem !important;
+}
+.density-compact .h-11 {
+  height: 2.25rem !important;
+}
+
+
 

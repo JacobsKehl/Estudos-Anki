@@ -21,6 +21,7 @@ import { getAdaptiveStudyQueue } from "@/lib/recommendations/adaptive-scheduler"
 import { PageHeader } from "@/components/ui/page-header";
 import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
 import { reorganizeActiveSchedule } from "@/lib/scheduler";
+import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
 
 export const dynamic = "force-dynamic";
 
@@ -198,18 +199,21 @@ export default async function Dashboard() {
         </div>
       </section>
 
+      {/* Daily progress against minutes target */}
+      <DailyGoalAlert totalMinutes={totalMinutes} />
+
       {/* ══ SEÇÃO 1: ESTUDO DO DIA ═══ teoria, blocos, PDF ═══════════════════ */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b-2 border-blue-100">
+        <div className="flex items-center justify-between pb-3 border-b-2 border-sage-light/40">
           <div className="flex items-center gap-2.5">
-            <div className="w-1 h-5 bg-blue-400 rounded-full" />
-            <BookOpen className="w-4 h-4 text-blue-500" />
+            <div className="w-1 h-5 bg-accent rounded-full" />
+            <BookOpen className="w-4 h-4 text-accent" />
             <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Estudo do Dia</h2>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted-foreground/60 font-medium">Teoria · PDF · Blocos</span>
             {totalMinutes > 0 && (
-              <Badge variant="outline" className="rounded-lg bg-blue-50 text-blue-600 border-blue-100 font-bold px-2.5 py-0.5 text-[10px]">
+              <Badge variant="outline" className="rounded-lg bg-sage-light/20 text-accent border-sage-light/40 font-bold px-2.5 py-0.5 text-[10px]">
                 ~{totalMinutes}m
               </Badge>
             )}

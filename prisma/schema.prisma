@@ -29,6 +29,17 @@ model User {
   googleRefreshToken     String?
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
+  
+  // Real preference fields
+  dailyGoalMinutes       Int                 @default(120)
+  studyFocus             String              @default("Ciência da Computação & Inteligência Artificial")
+  flashcardDifficulty    String              @default("NORMAL_PLUS")
+  emailReminderEnabled   Boolean             @default(true)
+  emailReminderTime      String              @default("08:00")
+  dailyReminderEmail     String              @default("gabriela.furtado.p@gmail.com")
+  displayDensity         String              @default("comfortable")
+  animations             String              @default("normal")
+
   subjects               StudySubject[]
   studyPlans             StudyPlan[]
   flashcards             Flashcard[]

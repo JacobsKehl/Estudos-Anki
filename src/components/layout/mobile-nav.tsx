@@ -16,7 +16,7 @@ const mobileItems = [
   { label: "Cronograma", href: "/schedule", icon: Calendar },
   { label: "Biblioteca", href: "/materials", icon: BookOpen },
   { label: "Matérias", href: "/subjects", icon: BookMarked },
-  { label: "Stats", href: "/stats", icon: Trophy },
+  { label: "Desempenho", href: "/stats", icon: Trophy },
 ];
 
 export function MobileNav() {

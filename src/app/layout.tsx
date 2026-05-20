@@ -24,6 +24,7 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "sonner";
+import { StudyPreferencesProvider } from "@/hooks/useStudyPreferences";
 
 export default function RootLayout({
   children,
@@ -35,18 +36,38 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const prefsStr = localStorage.getItem('kehl_study_preferences');
+                  if (prefsStr) {
+                    const prefs = JSON.parse(prefsStr);
+                    if (prefs.displayDensity === 'compact') document.documentElement.classList.add('density-compact');
+                    if (prefs.animations === 'reduced') document.documentElement.classList.add('motion-reduce');
+                  }
+                } catch (e) {}
+              })();
+            `
+          }}
+        />
+      </head>
       <body className="min-h-full bg-background font-sans text-foreground">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <div className="flex flex-1 flex-col md:pl-64 pb-16 md:pb-0">
-            <Topbar />
-            <main className="flex-1 p-4 md:p-8">
-              {children}
-            </main>
+        <StudyPreferencesProvider>
+          <div className="flex min-h-screen">
+            <Sidebar />
+            <div className="flex flex-1 flex-col md:pl-64 pb-16 md:pb-0">
+              <Topbar />
+              <main className="flex-1 p-4 md:p-8">
+                {children}
+              </main>
+            </div>
+            <MobileNav />
           </div>
-          <MobileNav />
-        </div>
-        <Toaster position="top-center" richColors />
+          <Toaster position="top-center" richColors />
+        </StudyPreferencesProvider>
       </body>
     </html>
   );

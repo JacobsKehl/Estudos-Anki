@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { buildFlashcardPrompt } from "./prompts/flashcard-generation";
+import { buildFlashcardPrompt, FlashcardDifficulty } from "./prompts/flashcard-generation";
 import { callGeminiWithRetry } from "./utils/retry";
 
 export interface GeneratedFlashcard {
@@ -9,7 +9,10 @@ export interface GeneratedFlashcard {
   difficulty: "EASY" | "MEDIUM" | "HARD";
 }
 
-export async function generateFlashcards(text: string): Promise<GeneratedFlashcard[]> {
+export async function generateFlashcards(
+  text: string,
+  difficulty: FlashcardDifficulty = "NORMAL_PLUS"
+): Promise<GeneratedFlashcard[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
@@ -21,7 +24,7 @@ export async function generateFlashcards(text: string): Promise<GeneratedFlashca
     }
   });
 
-  const prompt = buildFlashcardPrompt(text);
+  const prompt = buildFlashcardPrompt(text, difficulty);
 
   try {
     const result = await callGeminiWithRetry(() => model.generateContent(prompt));
@@ -46,7 +49,7 @@ export async function generateFlashcards(text: string): Promise<GeneratedFlashca
       .map(card => ({
         ...card,
         type: (card.type.toUpperCase() === "CLOZE" ? "CLOZE" : "QUESTION_ANSWER") as any,
-        difficulty: (["EASY", "MEDIUM", "HARD"].includes(card.difficulty.toUpperCase()) 
+        difficulty: (["EASY", "MEDIUM", "HARD"].includes(card.difficulty?.toUpperCase?.() ?? "") 
           ? card.difficulty.toUpperCase() 
           : "MEDIUM") as any
       }));

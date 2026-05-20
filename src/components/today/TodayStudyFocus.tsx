@@ -104,7 +104,7 @@ export function TodayStudyFocus({ item, pendingReviews }: TodayStudyFocusProps) 
               </Button>
             ) : (
               <div className="flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-2">
-                <div className="flex items-center gap-2 text-green-600 font-bold">
+                <div className="flex items-center gap-2 text-accent font-bold">
                   <CheckCircle2 className="w-6 h-6" />
                   Estudo concluído!
                 </div>

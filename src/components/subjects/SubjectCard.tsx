@@ -29,10 +29,10 @@ interface SubjectCardProps {
 }
 
 const HEALTH_CONFIG = {
-  EXCELLENT: { label: "Excelente", class: "bg-green-100 text-green-700" },
-  GOOD: { label: "Boa", class: "bg-blue-100 text-blue-700" },
-  ATTENTION: { label: "Atenção", class: "bg-orange-100 text-orange-700" },
-  CRITICAL: { label: "Crítica", class: "bg-red-100 text-red-700" },
+  EXCELLENT: { label: "Excelente", class: "bg-accent/15 text-accent" },
+  GOOD: { label: "Boa", class: "bg-muted/60 text-muted-foreground" },
+  ATTENTION: { label: "Atenção", class: "bg-amber-50 text-amber-700 border border-amber-100" },
+  CRITICAL: { label: "Crítica", class: "bg-rose-50 text-rose-600 border border-rose-100" },
 };
 
 export function SubjectCard({ subject }: SubjectCardProps) {
@@ -115,8 +115,8 @@ export function SubjectCard({ subject }: SubjectCardProps) {
       </div>
       
       {subject.metrics && subject.metrics.dueReviews > 0 && (
-        <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 bg-orange-50/50 p-2 rounded-xl border border-orange-100">
-          <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+        <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50/50 p-2 rounded-xl border border-amber-100">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
           {subject.metrics.dueReviews} revisões pendentes
         </div>
       )}

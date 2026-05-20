@@ -33,9 +33,9 @@ const ACTION_CONFIG: Record<ActionType, {
   THEORY: {
     label: "Teoria",
     icon: BookOpen,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50/50 dark:bg-blue-950/10 border-blue-100 dark:border-blue-900/30",
-    badgeColor: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
+    color: "text-accent",
+    bgColor: "bg-sage-light/20 dark:bg-accent/5 border-sage-light/40 dark:border-accent/10",
+    badgeColor: "bg-sage-light/40 text-accent dark:bg-accent/20 dark:text-sage-light",
   },
   REVIEW_BLOCK: {
     label: "Revisão de conteúdo",

@@ -181,9 +181,9 @@ export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryPr
                       {card.type === 'CLOZE' ? 'Cloze' : 'Q&A'}
                     </Badge>
                     <Badge variant="outline" className={`border-none rounded-lg px-2 py-0.5 ${
-                      card.difficulty === 'HARD' ? 'bg-red-50 text-red-600' : 
-                      card.difficulty === 'MEDIUM' ? 'bg-orange-50 text-orange-600' : 
-                      'bg-green-50 text-green-600'
+                      card.difficulty === 'HARD' ? 'bg-rose-50 text-rose-600' : 
+                      card.difficulty === 'MEDIUM' ? 'bg-amber-50 text-amber-600' : 
+                      'bg-accent/10 text-accent'
                     }`}>
                       {card.difficulty}
                     </Badge>
@@ -208,10 +208,10 @@ export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryPr
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
-                  <Button 
+                    <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50"
+                    className="h-8 w-8 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-50"
                     onClick={() => handleDelete(card.id)}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -264,7 +264,7 @@ export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryPr
                     <Button
                       variant="outline"
                       size="sm"
-                      className="rounded-xl border-emerald-100 text-emerald-600 hover:bg-emerald-50 h-8 text-xs font-semibold"
+                      className="rounded-xl border-accent/20 text-accent hover:bg-accent/5 h-8 text-xs font-semibold"
                       onClick={() => handleStateChange(card.id, "NEW", "APPROVED")}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1" />

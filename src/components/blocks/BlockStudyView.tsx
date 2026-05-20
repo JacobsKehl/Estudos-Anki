@@ -139,7 +139,7 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
     switch (status) {
       case "NOT_STARTED": return { label: "Não Iniciado", color: "bg-muted text-muted-foreground" };
       case "IN_PROGRESS": return { label: "Estudando", color: "bg-amber-50 text-amber-600 border-amber-100" };
-      case "COMPLETED": return { label: "Concluído", color: "bg-green-50 text-green-600 border-green-100" };
+      case "COMPLETED": return { label: "Concluído", color: "bg-accent/10 text-accent border-accent/20" };
       case "SKIPPED": return { label: "Pulado", color: "bg-red-50 text-red-600 border-red-100" };
       default: return { label: status, color: "bg-muted text-muted-foreground" };
     }
@@ -344,7 +344,7 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
                     {/* Seção de Exercícios */}
                     {questions.length > 0 && (
                       <div className="bg-card p-6 rounded-[2rem] border border-border/40 shadow-sm space-y-4">
-                        <h3 className="text-lg font-bold text-blue-600 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                           <BrainCircuit className="w-5 h-5" />
                           Prática e Questões
                         </h3>
@@ -484,7 +484,7 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
 
               <div className="pt-2 flex flex-col gap-3">
                 {stats.approved > 0 && (
-                  <Button variant="primary" size="lg" className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-blue-200 transition-all hover:scale-[1.02]" asChild>
+                  <Button variant="primary" size="lg" className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-accent/20 transition-all hover:scale-[1.02]" asChild>
                     <Link href={`/practice?blockId=${block.id}`}>
                       <Play className="w-4 h-4 fill-current" />
                       Praticar cards

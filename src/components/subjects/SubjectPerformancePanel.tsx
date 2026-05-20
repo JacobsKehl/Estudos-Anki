@@ -20,25 +20,25 @@ interface SubjectPerformancePanelProps {
 const HEALTH_CONFIG = {
   EXCELLENT: { 
     label: "Excelente", 
-    class: "bg-green-100 text-green-700 border-green-200", 
+    class: "bg-accent/15 text-accent border-accent/20", 
     description: "Você está dominando esta matéria!",
     icon: Trophy
   },
   GOOD: { 
     label: "Boa", 
-    class: "bg-blue-100 text-blue-700 border-blue-200", 
+    class: "bg-muted/60 text-foreground border-border/40", 
     description: "Ritmo constante. Continue assim.",
     icon: TrendingUp
   },
   ATTENTION: { 
     label: "Atenção", 
-    class: "bg-orange-100 text-orange-700 border-orange-200", 
+    class: "bg-amber-50 text-amber-700 border-amber-100", 
     description: "Algumas revisões estão acumulando.",
     icon: AlertCircle
   },
   CRITICAL: { 
     label: "Crítica", 
-    class: "bg-red-100 text-red-700 border-red-200", 
+    class: "bg-rose-50 text-rose-700 border-rose-100", 
     description: "Muitas revisões pendentes ou taxa de acerto baixa.",
     icon: AlertCircle
   },
@@ -75,7 +75,7 @@ export function SubjectPerformancePanel({ metrics }: SubjectPerformancePanelProp
           label="Concluído"
           value={`${metrics.completedBlocks}/${metrics.totalBlocks}`}
           sublabel="Blocos de estudo"
-          color="bg-green-50 text-green-600"
+          color="bg-accent/10 text-accent"
         />
         <MetricCard 
           icon={Sparkles}
@@ -89,14 +89,14 @@ export function SubjectPerformancePanel({ metrics }: SubjectPerformancePanelProp
           label="Pendentes"
           value={metrics.dueReviews}
           sublabel="Revisões hoje"
-          color={metrics.dueReviews > 0 ? "bg-orange-50 text-orange-600" : "bg-muted text-muted-foreground"}
+          color={metrics.dueReviews > 0 ? "bg-amber-50 text-amber-600" : "bg-muted text-muted-foreground"}
         />
         <MetricCard 
           icon={Target}
           label="Aprovação"
           value={`${metrics.accuracyRate}%`}
           sublabel="Taxa de acerto"
-          color="bg-blue-50 text-blue-600"
+          color="bg-accent/10 text-accent"
         />
       </div>
     </div>
