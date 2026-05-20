@@ -29,12 +29,10 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-border bg-card/50 backdrop-blur-md md:flex">
       <div className="flex h-20 items-center px-6">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/50 backdrop-blur-sm shadow-sm border border-accent/5 group-hover:scale-105 transition-transform duration-300">
-            <Logo size={28} />
-          </div>
+          <Logo size={48} className="group-hover:scale-105 transition-transform duration-300 mix-blend-multiply dark:mix-blend-normal dark:rounded-2xl dark:shadow-sm" />
           <div className="flex flex-col leading-none">
-            <span className="text-lg font-extrabold tracking-tight text-foreground">Kehl</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80">Study</span>
+            <span className="text-2xl font-extrabold tracking-tight text-foreground">Kehl</span>
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-accent/80 mt-1">Study</span>
           </div>
         </Link>
       </div>
