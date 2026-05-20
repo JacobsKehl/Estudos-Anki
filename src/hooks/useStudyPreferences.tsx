@@ -189,7 +189,11 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
       return true;
     } catch (e) {
       console.error("Erro ao salvar preferências no banco:", e);
-      toast.error("Salvo localmente, mas não conseguimos sincronizar com o banco.");
+      // Only show error toast for non-theme changes (theme is already saved locally)
+      const isThemeOnlyChange = Object.keys(newPrefs).length === 1 && newPrefs.theme !== undefined;
+      if (!isThemeOnlyChange) {
+        toast.error("Salvo localmente, mas não conseguimos sincronizar com o banco.");
+      }
       return false;
     }
   };
