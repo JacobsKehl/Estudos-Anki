@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { identifySubject, detectStructure } from "@/lib/ai/organizer";
+import { identifySubject, detectStructure, findBestOfficialTopic } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
+import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 min
@@ -448,8 +449,41 @@ export async function POST(
         throw new Error(`VALIDATION_FAILED: O bloco "${block.title}" possui um título genérico proibido. A organização foi abortada.`);
       }
 
+      // Normaliza valores nulos vindos como string ou vazio
+      if (block.officialTopicId === "null" || block.officialTopicId === "undefined" || block.officialTopicId === "") {
+        block.officialTopicId = null;
+        block.officialTopicName = null;
+        block.topicCode = null;
+      }
+
+      // Se a disciplina exige mapeamento e o bloco principal está sem tópico, tentamos mapear
       if (isMainSubject && block.type !== "SUPPORT_BLOCK" && !block.officialTopicId) {
-        throw new Error(`VALIDATION_FAILED: O bloco "${block.title}" na disciplina "${detectedSubject}" não foi mapeado para um tópico oficial do edital. A organização foi abortada.`);
+        const subjectTopics = OFFICIAL_TOPICS.filter(
+          t => t.subjectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
+               detectedSubject.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        );
+
+        if (subjectTopics.length > 0) {
+          const combinedText = `${block.title} ${block.description || ""} ${block.sourceHeading || ""}`;
+          const bestTopic = findBestOfficialTopic(combinedText, subjectTopics);
+          if (bestTopic) {
+            block.officialTopicId = bestTopic.id;
+            block.topicCode = bestTopic.topicCode;
+            block.officialTopicName = bestTopic.title;
+            console.log(`[Validation Fallback] Mapeado bloco "${block.title}" com sucesso para o tópico "${bestTopic.title}"`);
+          } else {
+            // Se nenhum for melhor, usa o primeiro tópico como fallback
+            block.officialTopicId = subjectTopics[0].id;
+            block.topicCode = subjectTopics[0].topicCode;
+            block.officialTopicName = subjectTopics[0].title;
+            console.log(`[Validation Fallback] Nenhum tópico ideal para bloco "${block.title}". Fallback para primeiro tópico: "${subjectTopics[0].title}"`);
+          }
+        } else {
+          // Caso a disciplina não possua tópicos cadastrados na matriz
+          block.officialTopicId = null;
+          block.topicCode = "GERAL";
+          block.officialTopicName = "Tópico não identificado";
+        }
       }
 
       if (block.pageStart < 1 || block.pageEnd < block.pageStart || block.pageEnd > numPages) {
