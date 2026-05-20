@@ -224,17 +224,24 @@ function generateEmailHtml(
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Validação de Segurança (CRON_SECRET)
+    // 1. Validação de Segurança (CRON_SECRET ou manual trigger key)
     const authHeader = req.headers.get("authorization");
     const secret = process.env.CRON_SECRET;
+    const manualKey = process.env.MANUAL_TRIGGER_KEY;
+    const queryKey = req.nextUrl.searchParams.get("manual_key");
 
-    if (process.env.NODE_ENV !== "development") {
-      if (!secret || authHeader !== `Bearer ${secret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    } else {
-      if (secret && authHeader !== `Bearer ${secret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Permite bypass via query param seguro (para envio manual pontual)
+    const isManualTrigger = manualKey && queryKey === manualKey;
+
+    if (!isManualTrigger) {
+      if (process.env.NODE_ENV !== "development") {
+        if (!secret || authHeader !== `Bearer ${secret}`) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+      } else {
+        if (secret && authHeader !== `Bearer ${secret}`) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
       }
     }
 
