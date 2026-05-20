@@ -27,7 +27,7 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-border bg-card/50 backdrop-blur-md md:flex">
-      <div className="flex h-20 items-center px-6">
+      <div className="px-5 pt-5 pb-6">
         <Link href="/" className="group outline-none">
           <BrandLockup variant="sidebar" className="transition-opacity hover:opacity-90" />
         </Link>

@@ -22,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
-import { BrandLockup } from "@/components/brand/BrandLockup";
 import { EditFlashcardDialog } from "./EditFlashcardDialog";
 import { toast } from "sonner";
 import { ClozeUtils } from "@/lib/utils/cloze";

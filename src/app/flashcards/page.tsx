@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const dynamic = "force-dynamic";
-import { Logo } from "@/components/ui/logo";
 import { prisma } from "@/lib/prisma";
 import { getMockUserId } from "@/lib/auth-mock";
 import { FlashcardRepository } from "@/components/flashcards/FlashcardRepository";

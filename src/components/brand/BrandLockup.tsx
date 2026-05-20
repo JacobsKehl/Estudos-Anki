@@ -1,4 +1,3 @@
-import React from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
@@ -9,61 +8,61 @@ interface BrandLockupProps {
   className?: string;
 }
 
+/**
+ * Kehl Study — Brand Lockup
+ * Renders the brand mark (transparent PNG) with optional wordmark.
+ * No backgrounds, no borders, no shadows, no mix-blend hacks.
+ */
 export function BrandLockup({ variant = "sidebar", className }: BrandLockupProps) {
-  // TECHNICAL DEBT: Currently using mix-blend-multiply to hide the cream background 
-  // on the PNG asset. Replace with a native transparent PNG or SVG in the future
-  // for perfect cross-browser and dark mode support.
-  const imageClasses = cn(
-    "shrink-0 object-contain mix-blend-multiply dark:mix-blend-normal",
-    variant === "sidebar" ? "h-14 w-14" : variant === "compact" ? "h-10 w-10" : "h-14 w-14"
-  );
-
-  const containerClasses = cn(
-    "flex items-center gap-3",
-    variant === "sidebar" && "px-2 py-2",
-    className
-  );
-
   if (variant === "mark") {
     return (
-      <div className={className}>
+      <div className={cn("inline-flex", className)}>
         <Image
           src="/brand/kehl-mark.png"
           alt="Kehl Study"
-          width={56}
-          height={56}
+          width={72}
+          height={72}
           priority
-          className={imageClasses}
+          className="h-16 w-16 shrink-0 object-contain"
         />
       </div>
     );
   }
 
+  if (variant === "compact") {
+    return (
+      <div className={cn("flex items-center gap-2", className)}>
+        <Image
+          src="/brand/kehl-mark.png"
+          alt="Kehl Study"
+          width={44}
+          height={44}
+          className="h-11 w-11 shrink-0 object-contain"
+        />
+        <span className="text-lg font-medium tracking-[-0.03em] text-brand-sage">
+          Kehl
+        </span>
+      </div>
+    );
+  }
+
+  // variant === "sidebar" (default)
   return (
-    <div className={containerClasses}>
+    <div className={cn("flex items-center gap-3", className)}>
       <Image
         src="/brand/kehl-mark.png"
         alt="Kehl Study"
-        width={56}
-        height={56}
+        width={68}
+        height={68}
         priority
-        className={imageClasses}
+        className="h-[68px] w-[68px] shrink-0 object-contain"
       />
+
       <div className="leading-none flex flex-col justify-center">
-        <span 
-          className={cn(
-            "block font-serif font-medium text-[var(--brand-sage)] tracking-[-0.03em]",
-            variant === "sidebar" ? "text-2xl" : "text-xl"
-          )}
-        >
+        <span className="block text-[1.55rem] font-medium tracking-[-0.045em] text-brand-sage">
           Kehl
         </span>
-        <span 
-          className={cn(
-            "mt-1 block font-semibold uppercase text-[var(--brand-beige)] tracking-[0.35em]",
-            variant === "sidebar" ? "text-[0.66rem]" : "text-[0.55rem]"
-          )}
-        >
+        <span className="mt-1 block text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-brand-beige">
           Study
         </span>
       </div>

@@ -25,6 +25,13 @@
   --color-error-bg: var(--error-bg);
   --color-error-text: var(--error-text);
 
+  /* Brand Identity */
+  --color-brand-sage: var(--brand-sage);
+  --color-brand-sage-dark: var(--brand-sage-dark);
+  --color-brand-beige: var(--brand-beige);
+  --color-brand-beige-soft: var(--brand-beige-soft);
+  --color-brand-cream: var(--brand-cream);
+
   /* Soft Geometry */
   --radius-sm: 8px;
   --radius-md: 16px;
