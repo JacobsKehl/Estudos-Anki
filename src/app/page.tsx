@@ -258,7 +258,7 @@ export default async function Dashboard() {
             </p>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-white to-sage-light/5 dark:from-slate-900 dark:to-slate-800/50 border border-sage-light/60 dark:border-accent/15 rounded-[2rem] p-8 shadow-sm dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-md transition-all duration-300">
+          <div className="bg-white dark:bg-card border border-sage-light/60 dark:border-accent/15 rounded-[2rem] p-8 shadow-sm dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-md transition-shadow duration-300">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
               <div className="space-y-5 flex-1">
                 <div className="space-y-1">
