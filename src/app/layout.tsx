@@ -43,11 +43,18 @@ export default function RootLayout({
               (function() {
                 try {
                   const prefsStr = localStorage.getItem('kehl_study_preferences');
+                  let isDark = false;
                   if (prefsStr) {
                     const prefs = JSON.parse(prefsStr);
                     if (prefs.displayDensity === 'compact') document.documentElement.classList.add('density-compact');
                     if (prefs.animations === 'reduced') document.documentElement.classList.add('motion-reduce');
+                    if (prefs.theme === 'dark' || (prefs.theme === 'system' || !prefs.theme) && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                      isDark = true;
+                    }
+                  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    isDark = true;
                   }
+                  if (isDark) document.documentElement.classList.add('dark');
                 } catch (e) {}
               })();
             `

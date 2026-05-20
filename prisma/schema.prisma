@@ -39,6 +39,7 @@ model User {
   dailyReminderEmail     String              @default("gabriela.furtado.p@gmail.com")
   displayDensity         String              @default("comfortable")
   animations             String              @default("normal")
+  theme                  String              @default("light")
 
   subjects               StudySubject[]
   studyPlans             StudyPlan[]

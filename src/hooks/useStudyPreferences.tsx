@@ -13,6 +13,7 @@ export interface StudyPreferences {
   dailyReminderEmail: string;
   displayDensity: "comfortable" | "compact";
   animations: "normal" | "reduced";
+  theme: "light" | "dark" | "system";
 }
 
 const DEFAULT_PREFERENCES: StudyPreferences = {
@@ -25,6 +26,7 @@ const DEFAULT_PREFERENCES: StudyPreferences = {
   dailyReminderEmail: "gabriela.furtado.p@gmail.com",
   displayDensity: "comfortable",
   animations: "normal",
+  theme: "system",
 };
 
 interface StudyPreferencesContextType {
@@ -41,7 +43,11 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
   const [isLoading, setIsLoading] = useState(true);
 
   // Apply UI classes for CSS-first density and animation preferences
-  const applyVisualPreferences = (density: "comfortable" | "compact", animations: "normal" | "reduced") => {
+  const applyVisualPreferences = (
+    density: "comfortable" | "compact",
+    animations: "normal" | "reduced",
+    theme: "light" | "dark" | "system"
+  ) => {
     if (typeof window === "undefined") return;
     
     const root = document.documentElement;
@@ -63,6 +69,13 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
       root.classList.add("motion-normal");
       root.classList.remove("motion-reduce");
     }
+
+    // Theme classes
+    if (theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
   };
 
   // Load from localStorage immediately (Zero-FOUC)
@@ -75,10 +88,10 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
         const parsed = JSON.parse(stored);
         const merged = { ...DEFAULT_PREFERENCES, ...parsed };
         setPreferences(merged);
-        applyVisualPreferences(merged.displayDensity, merged.animations);
+        applyVisualPreferences(merged.displayDensity, merged.animations, merged.theme);
       } else {
         // Apply defaults immediately
-        applyVisualPreferences(DEFAULT_PREFERENCES.displayDensity, DEFAULT_PREFERENCES.animations);
+        applyVisualPreferences(DEFAULT_PREFERENCES.displayDensity, DEFAULT_PREFERENCES.animations, DEFAULT_PREFERENCES.theme);
       }
     } catch (e) {
       console.error("Erro ao carregar preferências locais:", e);
@@ -103,10 +116,11 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
           dailyReminderEmail: dbPrefs.dailyReminderEmail ?? preferences.dailyReminderEmail,
           displayDensity: (dbPrefs.displayDensity as any) ?? preferences.displayDensity,
           animations: (dbPrefs.animations as any) ?? preferences.animations,
+          theme: (dbPrefs.theme as any) ?? preferences.theme,
         };
         
         setPreferences(merged);
-        applyVisualPreferences(merged.displayDensity, merged.animations);
+        applyVisualPreferences(merged.displayDensity, merged.animations, merged.theme);
         localStorage.setItem("kehl_study_preferences", JSON.stringify(merged));
       }
     } catch (e) {
@@ -120,11 +134,42 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
     syncWithServer();
   }, []);
 
+  // Listen to system theme changes if set to 'system'
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (preferences.theme !== "system") return;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      const root = document.documentElement;
+      if (mediaQuery.matches) {
+        root.classList.add("dark");
+      } else {
+        root.classList.remove("dark");
+      }
+    };
+
+    // Use modern or fallback listener
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+    }
+    
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", handleChange);
+      } else {
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, [preferences.theme]);
+
   const updatePreferences = async (newPrefs: Partial<StudyPreferences>): Promise<boolean> => {
     // 1. Optimistic Update in UI & localStorage
     const updated = { ...preferences, ...newPrefs };
     setPreferences(updated);
-    applyVisualPreferences(updated.displayDensity, updated.animations);
+    applyVisualPreferences(updated.displayDensity, updated.animations, updated.theme);
     
     if (typeof window !== "undefined") {
       localStorage.setItem("kehl_study_preferences", JSON.stringify(updated));

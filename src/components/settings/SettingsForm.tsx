@@ -39,6 +39,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
   const [dailyReminderEmail, setDailyReminderEmail] = useState(preferences.dailyReminderEmail);
   const [displayDensity, setDisplayDensity] = useState(preferences.displayDensity);
   const [animations, setAnimations] = useState(preferences.animations);
+  const [theme, setTheme] = useState(preferences.theme);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -55,6 +56,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
     setDailyReminderEmail(preferences.dailyReminderEmail);
     setDisplayDensity(preferences.displayDensity);
     setAnimations(preferences.animations);
+    setTheme(preferences.theme);
   }, [preferences]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -72,6 +74,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
         dailyReminderEmail,
         displayDensity,
         animations,
+        theme,
       });
 
       if (success) {
@@ -288,7 +291,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Densidade de Tela
@@ -298,8 +301,23 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
                   onChange={(e) => setDisplayDensity(e.target.value as any)}
                   className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all cursor-pointer"
                 >
-                  <option value="comfortable">Confortável (Design com mais respiro e espaçamentos)</option>
-                  <option value="compact">Compacta (Maximiza área visível de estudo)</option>
+                  <option value="comfortable">Confortável (Design espaçado)</option>
+                  <option value="compact">Compacta (Maximiza área)</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Tema (Modo Noturno)
+                </label>
+                <select
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as any)}
+                  className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all cursor-pointer"
+                >
+                  <option value="light">☀️ Claro (Padrão)</option>
+                  <option value="dark">🌙 Escuro (Agradável aos olhos)</option>
+                  <option value="system">💻 Sistema (Automático)</option>
                 </select>
               </div>
 
@@ -312,8 +330,8 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
                   onChange={(e) => setAnimations(e.target.value as any)}
                   className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all cursor-pointer"
                 >
-                  <option value="normal">Normais (Transições premium suaves)</option>
-                  <option value="reduced">Reduzidas (Desliga animações para máxima performance)</option>
+                  <option value="normal">Normais (Premium suavizado)</option>
+                  <option value="reduced">Reduzidas (Foco em performance)</option>
                 </select>
               </div>
             </div>

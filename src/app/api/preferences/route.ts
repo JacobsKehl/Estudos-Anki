@@ -19,6 +19,7 @@ export async function GET() {
         dailyReminderEmail: true,
         displayDensity: true,
         animations: true,
+        theme: true,
       },
     });
 
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     if (body.dailyReminderEmail !== undefined) data.dailyReminderEmail = body.dailyReminderEmail;
     if (body.displayDensity !== undefined) data.displayDensity = body.displayDensity;
     if (body.animations !== undefined) data.animations = body.animations;
+    if (body.theme !== undefined) data.theme = body.theme;
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
         dailyReminderEmail: true,
         displayDensity: true,
         animations: true,
+        theme: true,
       },
     });
 
