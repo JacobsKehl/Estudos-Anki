@@ -16,6 +16,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+
+interface ConfettiParticle {
+  id: number;
+  cx: number;
+  cy: number;
+  cr: number;
+  color: string;
+}
 
 interface StudyBlockItemProps {
   block: any;
@@ -32,6 +41,15 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
   const [editDescription, setEditDescription] = React.useState(block.description || "");
   const [editPageStart, setEditPageStart] = React.useState(block.pageStart);
   const [editPageEnd, setEditPageEnd] = React.useState(block.pageEnd);
+
+  const [status, setStatus] = React.useState(block.status);
+  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+  const [showConfetti, setShowConfetti] = React.useState(false);
+  const [confettiParticles, setConfettiParticles] = React.useState<ConfettiParticle[]>([]);
+
+  React.useEffect(() => {
+    setStatus(block.status);
+  }, [block.status]);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -74,6 +92,57 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
     }
   };
 
+  const handleToggleStatus = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isUpdatingStatus) return;
+    setIsUpdatingStatus(true);
+    
+    const newStatus = status === "COMPLETED" ? "NOT_STARTED" : "COMPLETED";
+    
+    // Optimistic UI update
+    setStatus(newStatus);
+    if (newStatus === "COMPLETED") {
+      const newParticles = Array.from({ length: 12 }).map((_, i) => {
+        const angle = (i / 12) * 360 + (Math.random() - 0.5) * 20;
+        const distance = 30 + Math.random() * 40;
+        const cx = Math.cos((angle * Math.PI) / 180) * distance;
+        const cy = Math.sin((angle * Math.PI) / 180) * distance;
+        const cr = Math.random() * 360;
+        const colors = ["#789461", "#8fb973", "#34d399", "#059669", "#fbbf24", "#e2c79f"];
+        const color = colors[i % colors.length];
+        return { id: i, cx, cy, cr, color };
+      });
+      setConfettiParticles(newParticles);
+      setShowConfetti(true);
+      setTimeout(() => {
+        setShowConfetti(false);
+        setConfettiParticles([]);
+      }, 800);
+    }
+    
+    try {
+      const res = await fetch(`/api/blocks/${block.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      if (!res.ok) throw new Error("Erro ao atualizar status");
+      
+      toast.success(newStatus === "COMPLETED" ? "Bloco concluído! 🎉" : "Bloco reaberto");
+      router.refresh();
+    } catch (error) {
+      // Revert on failure
+      setStatus(status);
+      setConfettiParticles([]);
+      setShowConfetti(false);
+      toast.error("Erro ao atualizar status do bloco");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   return (
     <div 
       className="group bg-card p-5 rounded-[2rem] border border-border/40 flex flex-col gap-3 hover:border-accent/30 transition-all shadow-[0_4px_12px_-4px_rgba(0,0,0,0.02)] cursor-pointer relative"
@@ -87,10 +156,85 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
             {block.material?.fileName || "Material Desconhecido"}
           </p>
         </div>
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-          <div className="text-[10px] font-bold px-3 py-1 bg-sage-light/30 text-accent rounded-full uppercase tracking-wider mr-2">
-            {block.status === "NOT_STARTED" ? "Não Iniciado" : block.status === "IN_PROGRESS" ? "Estudando" : "Concluído"}
-          </div>
+        <div className="flex items-center gap-1 relative overflow-visible" onClick={e => e.stopPropagation()}>
+          <style>{`
+            @keyframes draw {
+              to {
+                stroke-dashoffset: 0;
+              }
+            }
+            .checkmark-path {
+              stroke-dasharray: 22;
+              stroke-dashoffset: 22;
+              animation: draw 0.35s cubic-bezier(0.4, 0, 0.2, 1) 0.05s forwards;
+            }
+            @keyframes confetti-shoot {
+              0% {
+                transform: translate(-50%, -50%) translate(0, 0) scale(1.2);
+                opacity: 1;
+              }
+              100% {
+                transform: translate(-50%, -50%) translate(var(--cx), var(--cy)) rotate(var(--cr)) scale(0);
+                opacity: 0;
+              }
+            }
+            .confetti-particle {
+              position: absolute;
+              width: 5px;
+              height: 5px;
+              border-radius: 50%;
+              background-color: var(--cbg);
+              animation: confetti-shoot 0.75s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+              pointer-events: none;
+            }
+          `}</style>
+
+          <button
+            onClick={handleToggleStatus}
+            disabled={isUpdatingStatus}
+            title={status === "COMPLETED" ? "Desmarcar conclusão" : "Concluir bloco"}
+            className={cn(
+              "text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider mr-2 transition-all duration-300 flex items-center gap-1 relative overflow-visible select-none active:scale-95",
+              status === "COMPLETED"
+                ? "bg-success-bg text-success-text hover:bg-success-bg/85 hover:scale-105 hover:shadow-[0_4px_12px_rgba(52,211,153,0.15)] cursor-pointer"
+                : status === "IN_PROGRESS"
+                ? "bg-warning-bg text-warning-text hover:bg-warning-bg/85 hover:scale-105 cursor-pointer"
+                : "bg-sage-light/30 text-accent hover:bg-sage-light/45 hover:scale-105 hover:shadow-[0_4px_12px_rgba(120,148,97,0.12)] cursor-pointer"
+            )}
+          >
+            {isUpdatingStatus ? (
+              <Loader2 className="w-3 h-3 animate-spin text-accent" />
+            ) : status === "COMPLETED" ? (
+              <svg
+                className="w-3 h-3 text-success-text shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" className="checkmark-path" />
+              </svg>
+            ) : null}
+            <span>{status === "COMPLETED" ? "Concluído" : status === "IN_PROGRESS" ? "Estudando" : "Não Iniciado"}</span>
+
+            {/* Confetti Explosion particles */}
+            {showConfetti && confettiParticles.map((p) => (
+              <div
+                key={p.id}
+                className="confetti-particle"
+                style={{
+                  "--cx": `${p.cx}px`,
+                  "--cy": `${p.cy}px`,
+                  "--cr": `${p.cr}deg`,
+                  "--cbg": p.color,
+                  left: "50%",
+                  top: "50%",
+                } as React.CSSProperties}
+              />
+            ))}
+          </button>
           
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {block.confidence && block.confidence < 0.5 && (
