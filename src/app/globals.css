@@ -92,8 +92,35 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased selection:bg-accent/20 selection:text-accent;
+    @apply bg-background text-foreground antialiased selection:bg-accent/20 selection:text-accent dark:selection:bg-accent/30 dark:selection:text-accent-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Transition for all themeable components to ensure smooth light/dark shifts */
+  body, header, aside, main, .card, button, input, select, textarea {
+    @apply transition-colors duration-300;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.18);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.35);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.08);
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.22);
   }
 }
 
@@ -102,7 +129,20 @@
 }
 
 .glass {
-  @apply bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-slate-800/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+  @apply bg-white/60 dark:bg-slate-950/40 backdrop-blur-xl border border-white/40 dark:border-slate-800/35 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.37)];
+}
+
+/* Premium micro-interactive animations */
+.card-interactive {
+  @apply cursor-pointer hover:border-accent/40 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.45)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all duration-300;
+}
+
+/* Accent Glow for important dashboard action cards */
+.accent-glow-hover {
+  @apply transition-all duration-300;
+}
+.accent-glow-hover:hover {
+  @apply shadow-[0_0_20px_rgba(143,185,115,0.08)] border-accent/40;
 }
 
 /* Reduced Motion Utility */

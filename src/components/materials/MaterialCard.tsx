@@ -297,11 +297,11 @@ export function MaterialCard({
   return (
     <Card 
       onClick={() => isSelectionMode && onSelect && onSelect(material.id)}
-      className={`group hover:border-accent/30 transition-all duration-300 overflow-hidden h-full flex flex-col ${
+      className={`group card-interactive overflow-hidden h-full flex flex-col ${
         isSelectionMode 
           ? isSelected 
             ? "border-accent ring-2 ring-accent/20 bg-accent/[0.02]" 
-            : "cursor-pointer hover:bg-muted/10" 
+            : "hover:bg-muted/10" 
           : ""
       }`}
     >
