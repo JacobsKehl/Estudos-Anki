@@ -10,8 +10,7 @@ interface BrandLockupProps {
 
 /**
  * Kehl Study — Brand Lockup
- * Renders the brand mark (transparent PNG) with optional wordmark.
- * No backgrounds, no borders, no shadows, no mix-blend hacks.
+ * Transparent PNG, no backgrounds, no blend hacks.
  */
 export function BrandLockup({ variant = "sidebar", className }: BrandLockupProps) {
   if (variant === "mark") {
@@ -46,23 +45,23 @@ export function BrandLockup({ variant = "sidebar", className }: BrandLockupProps
     );
   }
 
-  // variant === "sidebar" (default)
+  // variant === "sidebar" — fills the full sidebar width
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex items-center gap-4 w-full", className)}>
       <Image
         src="/brand/kehl-mark.png"
         alt="Kehl Study"
-        width={68}
-        height={68}
+        width={96}
+        height={96}
         priority
-        className="h-[68px] w-[68px] shrink-0 object-contain"
+        className="h-[88px] w-[88px] shrink-0 object-contain"
       />
 
-      <div className="leading-none flex flex-col justify-center">
-        <span className="block text-[1.55rem] font-medium tracking-[-0.045em] text-brand-sage">
+      <div className="leading-none flex flex-col justify-center min-w-0">
+        <span className="block text-[2rem] font-medium tracking-[-0.05em] text-brand-sage">
           Kehl
         </span>
-        <span className="mt-1 block text-[0.68rem] font-semibold uppercase tracking-[0.34em] text-brand-beige">
+        <span className="mt-1.5 block text-[0.72rem] font-semibold uppercase tracking-[0.38em] text-brand-beige">
           Study
         </span>
       </div>
