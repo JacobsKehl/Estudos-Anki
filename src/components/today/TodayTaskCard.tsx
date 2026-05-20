@@ -35,7 +35,7 @@ const ACTION_CONFIG: Record<ActionType, {
     icon: BookOpen,
     color: "text-accent",
     bgColor: "bg-sage-light/20 dark:bg-accent/5 border-sage-light/40 dark:border-accent/10",
-    badgeColor: "bg-accent/80 text-white dark:bg-accent/30 dark:text-emerald-300",
+    badgeColor: "bg-[#739664] text-white dark:bg-accent/30 dark:text-emerald-300",
   },
   REVIEW_BLOCK: {
     label: "Revisão de conteúdo",
