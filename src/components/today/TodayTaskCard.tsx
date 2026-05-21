@@ -19,6 +19,7 @@ type ActionType =
 interface TodayTaskCardProps {
   item: any;
   index: number;
+  isAdvanced?: boolean;
 }
 
 // ─── Action Config ──────────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ const ACTION_CONFIG: Record<ActionType, {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
+export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDone, setIsDone] = useState(item.status === "COMPLETED");
@@ -131,11 +132,16 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold text-sm">{item.subject?.name}</span>
               <span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-bold ${config.badgeColor}`}>
                 {config.label}
               </span>
+              {isAdvanced && (
+                <span className="px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-extrabold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                  ADIANTADO
+                </span>
+              )}
             </div>
             {item.studyBlock && (
               <p className="text-sm font-medium text-foreground/80 mt-0.5">
@@ -162,6 +168,14 @@ export function TodayTaskCard({ item, index }: TodayTaskCardProps) {
         <div className="flex items-start gap-2 pl-[52px]">
           <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-40" />
           <p className="text-xs text-foreground/60 italic leading-relaxed">{item.reason}</p>
+        </div>
+      )}
+
+      {isAdvanced && (
+        <div className="flex items-start gap-2 pl-[52px] pt-1">
+          <p className="text-xs text-muted-foreground/75 leading-relaxed italic">
+            Este conteúdo estava previsto para o próximo dia de estudo. Ao concluir agora, ele não ficará pendente depois.
+          </p>
         </div>
       )}
 

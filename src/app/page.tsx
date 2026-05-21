@@ -22,6 +22,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
 import { reorganizeActiveSchedule } from "@/lib/scheduler";
 import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
+import { NextDayStudySession } from "@/components/today/NextDayStudySession";
+import { getTodayRangeSP } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -73,10 +75,9 @@ export default async function Dashboard() {
   let todayItems: any[] = [];
 
   try {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
+    const todayRange = getTodayRangeSP(new Date());
+    const todayStart = todayRange.start;
+    const todayEnd = todayRange.end;
 
     // Auto-reorganizar se houverem tarefas pendentes no passado
     const hasPastPending = await (prisma as any).studyScheduleItem.findFirst({
@@ -162,6 +163,8 @@ export default async function Dashboard() {
   );
   const totalMinutes = theoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
 
+  const isDayCompleted = theoryTasks.length === 0 && todayStats.total === 0;
+
   return (
     <div className="space-y-10 max-w-4xl mx-auto animate-in fade-in duration-700 slide-in-from-bottom-4 pb-24">
       <PageHeader
@@ -176,8 +179,12 @@ export default async function Dashboard() {
         </Link>
       </PageHeader>
 
-      {/* ── Hero: Próxima Ação ─────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-sage-light/50 to-sage-light/20 dark:from-accent/10 dark:to-accent/5 border border-sage-light/60 dark:border-accent/15 p-7 shadow-sm">
+      {isDayCompleted ? (
+        <NextDayStudySession userId={userId} />
+      ) : (
+        <>
+          {/* ── Hero: Próxima Ação ─────────────────────────────────────────────── */}
+          <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-sage-light/50 to-sage-light/20 dark:from-accent/10 dark:to-accent/5 border border-sage-light/60 dark:border-accent/15 p-7 shadow-sm">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="space-y-2">
             <span className="inline-block bg-white/70 dark:bg-accent/15 text-accent px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-accent/10 dark:border-accent/20">
@@ -330,6 +337,8 @@ export default async function Dashboard() {
           </div>
         )}
       </section>
+      </>
+      )}
     </div>
   );
 }
