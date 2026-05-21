@@ -173,7 +173,7 @@ export function CloudUploadButton() {
         <div className="flex items-center gap-1.5 opacity-40">
            <FileText className="w-3 h-3 text-muted-foreground" />
            <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">
-             PDF • MÁULTIPLOS ARQUIVOS
+             PDF • MÚLTIPLOS ARQUIVOS
            </p>
         </div>
       </div>
