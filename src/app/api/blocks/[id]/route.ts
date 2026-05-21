@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { completeStudyBlock, reopenStudyBlock } from "@/lib/study/completion";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function PATCH(
   req: NextRequest,
@@ -10,17 +12,30 @@ export async function PATCH(
     const body = await req.json();
     const { title, description, pageStart, pageEnd, estimatedStudyMinutes, status } = body;
 
-    const updatedBlock = await prisma.studyBlock.update({
-      where: { id },
-      data: {
-        title,
-        description,
-        pageStart,
-        pageEnd,
-        estimatedStudyMinutes,
-        status,
-      },
-    });
+    const mockUserId = await getMockUserId();
+
+    let updatedBlock;
+    if (status !== undefined) {
+      if (status === "COMPLETED") {
+        const result = await completeStudyBlock(mockUserId, id);
+        updatedBlock = result.block;
+      } else {
+        const result = await reopenStudyBlock(mockUserId, id, status);
+        updatedBlock = result.block;
+      }
+
+      if (title !== undefined || description !== undefined || pageStart !== undefined || pageEnd !== undefined || estimatedStudyMinutes !== undefined) {
+        updatedBlock = await prisma.studyBlock.update({
+          where: { id },
+          data: { title, description, pageStart, pageEnd, estimatedStudyMinutes },
+        });
+      }
+    } else {
+      updatedBlock = await prisma.studyBlock.update({
+        where: { id },
+        data: { title, description, pageStart, pageEnd, estimatedStudyMinutes },
+      });
+    }
 
     return NextResponse.json(updatedBlock);
   } catch (error: any) {

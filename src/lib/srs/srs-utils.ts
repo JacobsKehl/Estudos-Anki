@@ -77,18 +77,32 @@ export async function getUnifiedTodayCards(userId: string) {
         { 
           nextReviewAt: { lte: now },
           reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] } // Overdue SRS
+        },
+        {
+          reviewState: "NEW",
+          OR: [
+            { lastReviewedAt: null },
+            { repetitionCount: 0 },
+            { repetitionCount: null }
+          ]
         }
       ]
     },
     include: {
-      subject: { select: { name: true } }
+      subject: { select: { name: true } },
+      studyBlock: { select: { id: true, title: true } }
     }
   });
 
-  // 3. Apply checkpoint logic:
+  // 3. Deduplicate by ID
+  const uniqueCards = Array.from(
+    new Map(cards.map((card: any) => [card.id, card])).values()
+  );
+
+  // 4. Apply checkpoint logic:
   // Exclude if (lastReviewedAt >= todayStart AND nextReviewAt > now)
   // This means the card was already done today and isn't due again yet.
-  const filteredCards = cards.filter((card: any) => {
+  const filteredCards = uniqueCards.filter((card: any) => {
     const wasReviewedToday = card.lastReviewedAt && card.lastReviewedAt >= todayStart;
     const isDueNow = card.nextReviewAt && card.nextReviewAt <= now;
     
@@ -97,10 +111,6 @@ export async function getUnifiedTodayCards(userId: string) {
     }
     return true;
   });
-
-  // Deduplication by ID is already handled by Prisma fetch (one record per card),
-  // but if we were merging lists we'd use a Map. 
-  // Since it's a single query with OR, it's already unique.
 
   return {
     cards: filteredCards,
