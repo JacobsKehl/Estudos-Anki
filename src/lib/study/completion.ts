@@ -26,6 +26,10 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
     });
 
     // 2. Synchronize with Schedule Item
+    const activeSchedule = await (tx as any).studySchedule.findFirst({
+      where: { userId, status: "ACTIVE" }
+    });
+
     let scheduleItem;
     
     if (scheduleItemId) {
@@ -36,11 +40,12 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
           completedAt: now,
         },
       });
-    } else {
-      // Find matching pending or in-progress schedule item for this block
+    } else if (activeSchedule) {
+      // Find matching pending or in-progress schedule item for this block in the active schedule
       const match = await (tx as any).studyScheduleItem.findFirst({
         where: {
           userId,
+          scheduleId: activeSchedule.id,
           studyBlockId: blockId,
           actionType: "THEORY",
           status: { in: ["PENDING", "IN_PROGRESS"] },
@@ -57,47 +62,60 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
           },
         });
       } else {
-        console.info(`[completeStudyBlock] Nenhum StudyScheduleItem pendente/em progresso do tipo THEORY encontrado para o bloco ${blockId}.`);
+        console.info(`[completeStudyBlock] Nenhum StudyScheduleItem pendente/em progresso do tipo THEORY encontrado para o bloco ${blockId} no cronograma ativo.`);
+        
+        // Se o bloco foi concluído sem tarefa pendente correspondente, criamos uma tarefa
+        // de forma concluída no cronograma ativo atual para sincronizar em tempo real.
+        scheduleItem = await (tx as any).studyScheduleItem.create({
+          data: {
+            userId,
+            scheduleId: activeSchedule.id,
+            subjectId: block.subjectId,
+            materialId: block.materialId,
+            studyBlockId: blockId,
+            actionType: "THEORY",
+            priorityScore: 90,
+            reason: "Concluído diretamente na matéria",
+            dayNumber: 1,
+            scheduledDate: now,
+            completedAt: now,
+            status: "COMPLETED",
+          }
+        });
       }
     }
 
     // 3. Schedule next review items in the schedule (D+1)
-    if (block.subjectId) {
-      const activeSchedule = await (tx as any).studySchedule.findFirst({
-        where: { userId, status: "ACTIVE" }
+    if (block.subjectId && activeSchedule) {
+      // Prevent duplication of pending D+1 reviews
+      const existingPendingReview = await (tx as any).studyScheduleItem.findFirst({
+        where: {
+          userId,
+          scheduleId: activeSchedule.id,
+          studyBlockId: block.id,
+          actionType: "REVIEW_BLOCK",
+          status: "PENDING",
+        }
       });
 
-      if (activeSchedule) {
-        // Prevent duplication of pending D+1 reviews
-        const existingPendingReview = await (tx as any).studyScheduleItem.findFirst({
-          where: {
+      if (!existingPendingReview) {
+        await (tx as any).studyScheduleItem.create({
+          data: {
             userId,
             scheduleId: activeSchedule.id,
+            subjectId: block.subjectId,
+            materialId: block.materialId,
             studyBlockId: block.id,
             actionType: "REVIEW_BLOCK",
+            reason: `Revisão D+1: ${block.title}`,
+            scheduledDate: addDays(now, 1),
+            dayNumber: 1, // Will be calculated by schedule logic if needed
+            priorityScore: 80, // High priority for reviews
             status: "PENDING",
           }
         });
-
-        if (!existingPendingReview) {
-          await (tx as any).studyScheduleItem.create({
-            data: {
-              userId,
-              scheduleId: activeSchedule.id,
-              subjectId: block.subjectId,
-              materialId: block.materialId,
-              studyBlockId: block.id,
-              actionType: "REVIEW_BLOCK",
-              reason: `Revisão D+1: ${block.title}`,
-              scheduledDate: addDays(now, 1),
-              dayNumber: 1, // Will be calculated by schedule logic if needed
-              priorityScore: 80, // High priority for reviews
-              status: "PENDING",
-            }
-          });
-        } else {
-          console.info(`[completeStudyBlock] Já existe revisão D+1 pendente para o bloco ${block.id}. Pulando duplicação.`);
-        }
+      } else {
+        console.info(`[completeStudyBlock] Já existe revisão D+1 pendente para o bloco ${block.id}. Pulando duplicação.`);
       }
     }
 
@@ -140,14 +158,23 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
     });
 
     // 2. Reopen the associated schedule item (THEORY that matches this block)
-    const matchingItem = await (tx as any).studyScheduleItem.findFirst({
-      where: {
-        userId,
-        studyBlockId: blockId,
-        actionType: "THEORY",
-      },
-      orderBy: { scheduledDate: "desc" }
+    // Find the active schedule first to prioritize updating its item
+    const activeSchedule = await (tx as any).studySchedule.findFirst({
+      where: { userId, status: "ACTIVE" }
     });
+
+    let matchingItem = null;
+    if (activeSchedule) {
+      matchingItem = await (tx as any).studyScheduleItem.findFirst({
+        where: {
+          userId,
+          scheduleId: activeSchedule.id,
+          studyBlockId: blockId,
+          actionType: "THEORY",
+        },
+        orderBy: { scheduledDate: "desc" }
+      });
+    }
 
     let scheduleItem;
     if (matchingItem) {

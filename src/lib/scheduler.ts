@@ -286,20 +286,66 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
   }
 
   // 3. Identificar os itens já concluídos no cronograma ativo
-  const completedItems = activeSchedule.items.filter((item: any) => item.status === "COMPLETED");
+  let completedItems = activeSchedule.items.filter((item: any) => item.status === "COMPLETED");
 
-  // Rastrear todos os blocos concluídos ou já agendados em itens concluídos para evitar duplicidade
+  // Rastrear todos os blocos que já possuem itens concluídos no cronograma
+  const completedBlockIdsFromSchedule = new Set<string>();
+  completedItems.forEach((item: any) => {
+    if (item.studyBlockId) {
+      completedBlockIdsFromSchedule.add(item.studyBlockId);
+    }
+  });
+
+  // Rastrear blocos concluídos de fato no banco de dados
+  const dbCompletedBlocks = await (prisma as any).studyBlock.findMany({
+    where: { userId, status: "COMPLETED" },
+    select: { id: true, subjectId: true, materialId: true, theoryCompletedAt: true, lastStudiedAt: true }
+  });
+
+  // Para blocos que estão concluídos no banco de dados, mas não possuem um item correspondente
+  // no cronograma ativo, criamos o item concluído para manter o histórico e a sincronização.
+  const missingCompletedItemsData: any[] = [];
+  for (const block of dbCompletedBlocks) {
+    if (!completedBlockIdsFromSchedule.has(block.id)) {
+      missingCompletedItemsData.push({
+        userId,
+        scheduleId: activeSchedule.id,
+        subjectId: block.subjectId,
+        materialId: block.materialId,
+        studyBlockId: block.id,
+        actionType: "THEORY",
+        priorityScore: 90,
+        reason: "Sincronizado na reorganização (bloco concluído)",
+        dayNumber: 1,
+        scheduledDate: block.theoryCompletedAt || block.lastStudiedAt || now,
+        completedAt: block.theoryCompletedAt || block.lastStudiedAt || now,
+        status: "COMPLETED",
+      });
+    }
+  }
+
+  if (missingCompletedItemsData.length > 0) {
+    await (prisma as any).studyScheduleItem.createMany({
+      data: missingCompletedItemsData,
+    });
+    
+    // Atualizar nossa lista local de completedItems com os itens recém-criados
+    const newItems = await (prisma as any).studyScheduleItem.findMany({
+      where: {
+        scheduleId: activeSchedule.id,
+        status: "COMPLETED",
+        studyBlockId: { in: missingCompletedItemsData.map(d => d.studyBlockId) }
+      }
+    });
+    completedItems = [...completedItems, ...newItems];
+  }
+
+  // Rastrear todos os blocos concluídos (no banco e no cronograma) para evitar duplicidades
   const completedBlockIds = new Set<string>();
   completedItems.forEach((item: any) => {
     if (item.studyBlockId) {
       completedBlockIds.add(item.studyBlockId);
     }
-  });
-
-  // Rastrear também blocos concluídos de fato no banco
-  const dbCompletedBlocks = await (prisma as any).studyBlock.findMany({
-    where: { userId, status: "COMPLETED" },
-    select: { id: true }
   });
   dbCompletedBlocks.forEach((b: any) => completedBlockIds.add(b.id));
 
