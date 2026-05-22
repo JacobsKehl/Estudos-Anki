@@ -98,10 +98,10 @@ export async function POST(
             answer: card.answer,
             type: card.type,
             difficulty: card.difficulty,
-            status: "PENDING_APPROVAL",
+            status: "APPROVED",
             reviewState: "NEW",       
             nextReviewAt: new Date(),      
-            approvedAt: null,
+            approvedAt: new Date(),
             learningStep: 0,
             easeFactor: 2.5,
             intervalDays: 0,
@@ -115,7 +115,7 @@ export async function POST(
     );
 
     return NextResponse.json({
-      message: `${savedCards.length} flashcards criados com sucesso. Prontos para revisão.`,
+      message: `${savedCards.length} flashcards criados com sucesso. Prontos para praticar.`,
       count: savedCards.length,
       flashcards: savedCards
     });

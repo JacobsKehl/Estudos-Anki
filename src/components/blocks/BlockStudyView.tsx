@@ -151,7 +151,7 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // State 1: Action - complete reading and trigger flashcard generation
+  // State 1: Action - complete reading, trigger flashcard generation, and auto-approve / complete block
   const handleCompleteReading = async () => {
     setIsGeneratingCards(true);
     setIsTimerRunning(false);
@@ -165,33 +165,53 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
       const data = await response.json();
 
       if (!response.ok) {
+        // If cards were already generated, we just proceed to mark the block as completed if not already done
         if (response.status === 400 && data.error?.includes("já gerou")) {
-          toast.info("Flashcards já foram gerados anteriormente para este bloco.", { id: toastId });
-          // If we already have pending flashcards, go to curating
-          const pending = curatorCards.filter((c) => c.status === "PENDING_APPROVAL");
-          if (pending.length > 0) {
-            setStep("curating");
-          } else {
+          toast.loading("Flashcards já gerados. Registrando conclusão do bloco...", { id: toastId });
+          
+          const completeRes = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ step: "THEORY" }),
+          });
+
+          if (completeRes.ok) {
+            toast.success("Estudo concluído! Bons estudos.", { id: toastId });
             setStep("summary");
+          } else {
+            const completeData = await completeRes.json();
+            throw new Error(completeData.error || "Falha ao registrar conclusão do bloco");
           }
+          router.refresh();
           return;
         }
         throw new Error(data.error || "Falha ao gerar flashcards");
       }
 
-      toast.success(data.message || "Flashcards gerados para curadoria!", { id: toastId });
+      // Now complete the block study step automatically since curation is bypassed
+      toast.loading("Flashcards criados! Registrando conclusão do bloco...", { id: toastId });
+      
+      const completeRes = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "THEORY" }),
+      });
+
+      if (!completeRes.ok) {
+        const completeData = await completeRes.json();
+        throw new Error(completeData.error || "Flashcards gerados, mas falha ao concluir o bloco");
+      }
+
+      toast.success("Flashcards prontos e bloco concluído!", { id: toastId });
       
       if (data.flashcards && data.flashcards.length > 0) {
         setCuratorCards(data.flashcards);
-        setStep("curating");
-      } else {
-        setStep("summary");
       }
-      
+      setStep("summary");
       router.refresh();
     } catch (error: any) {
       console.error(error);
-      toast.error(error.message || "Erro ao gerar flashcards. Tente novamente.", { id: toastId });
+      toast.error(error.message || "Erro ao processar conclusão. Tente novamente.", { id: toastId });
       setIsTimerRunning(true); // Resume timer on failure
     } finally {
       setIsGeneratingCards(false);
