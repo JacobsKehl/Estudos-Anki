@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 interface ConfettiParticle {
@@ -32,6 +32,7 @@ interface StudyBlockItemProps {
 
 export function StudyBlockItem({ block }: StudyBlockItemProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
   const [isUpdating, setIsUpdating] = React.useState(false);
@@ -146,7 +147,7 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
   return (
     <div 
       className="group bg-card p-5 rounded-[2rem] border border-border/40 flex flex-col gap-3 hover:border-accent/30 transition-all shadow-[0_4px_12px_-4px_rgba(0,0,0,0.02)] cursor-pointer relative"
-      onClick={() => router.push(`/blocks/${block.id}`)}
+      onClick={() => router.push(`/blocks/${block.id}?returnTo=${encodeURIComponent(pathname)}`)}
     >
       <div className="flex justify-between items-start">
         <div className="space-y-1">

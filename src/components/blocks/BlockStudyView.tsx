@@ -71,10 +71,62 @@ interface BlockStudyViewProps {
     pending: number;
     approved: number;
   };
+  returnTo?: string | null;
+  from?: string | null;
 }
 
-export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
+// Helper functions moved outside of render to prevent ESLint static-components warnings and fix missing dependency warnings
+const getCleanPath = (path: string) => path.split("?")[0];
+
+const getReturnLabel = (path: string): string => {
+  const cleanPath = getCleanPath(path);
+  if (cleanPath === "/") return "Voltar para Hoje";
+  if (cleanPath === "/schedule") return "Voltar para Cronograma";
+  if (cleanPath.startsWith("/materials")) return "Voltar para Material";
+  if (cleanPath.startsWith("/subjects")) return "Voltar para Matéria";
+  if (cleanPath.startsWith("/flashcards")) return "Voltar para Flashcards";
+  return "Voltar";
+};
+
+const getReturnIcon = (path: string) => {
+  const cleanPath = getCleanPath(path);
+  if (cleanPath === "/") return Calendar;
+  if (cleanPath === "/schedule") return Clock;
+  if (cleanPath.startsWith("/materials")) return FileText;
+  if (cleanPath.startsWith("/subjects")) return BookOpen;
+  if (cleanPath.startsWith("/flashcards")) return BrainCircuit;
+  return ArrowLeft;
+};
+
+export function BlockStudyView({ block, content, stats, returnTo, from }: BlockStudyViewProps) {
   const router = useRouter();
+
+  // Get return target with validation (no external URL allowed to avoid open redirect)
+  const returnTarget = React.useMemo(() => {
+    if (returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+      return {
+        href: returnTo,
+        label: getReturnLabel(returnTo),
+      };
+    }
+    // Backward compatibility for the `from` query param
+    if (from === "today") return { href: "/", label: "Voltar para Hoje" };
+    if (from === "schedule") return { href: "/schedule", label: "Voltar para Cronograma" };
+    if (from === "materials") return { href: "/materials", label: "Voltar para Material" };
+    if (from && from.startsWith("material-")) {
+      const materialId = from.replace("material-", "");
+      return { href: `/materials/${materialId}`, label: "Voltar para Material" };
+    }
+    if (from && from.startsWith("subject-")) {
+      const subjectId = from.replace("subject-", "");
+      return { href: `/subjects/${subjectId}`, label: "Voltar para Matéria" };
+    }
+    // Safe default fallback
+    return {
+      href: `/subjects/${block.subjectId}`,
+      label: "Voltar para Matéria",
+    };
+  }, [returnTo, from, block.subjectId]);
   
   // Step State Flow: "reading" -> "curating" -> "summary"
   const [step, setStep] = React.useState<"reading" | "curating" | "summary">(() => {
@@ -408,8 +460,8 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
               className="rounded-2xl font-bold w-full sm:w-auto text-muted-foreground hover:text-foreground" 
               asChild
             >
-              <Link href={`/subjects/${block.subjectId}`}>
-                Voltar para Matéria
+              <Link href={returnTarget.href}>
+                {returnTarget.label}
               </Link>
             </Button>
           </div>
@@ -442,8 +494,8 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
       {/* Header Focado */}
       <header className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="iconOnly" className="rounded-full hover:bg-accent/5" asChild>
-            <Link href={`/subjects/${block.subjectId}`}>
+          <Button variant="ghost" size="iconOnly" className="rounded-full hover:bg-accent/5" aria-label={returnTarget.label} asChild>
+            <Link href={returnTarget.href}>
               <ArrowLeft className="w-5 h-5" />
             </Link>
           </Button>
@@ -757,9 +809,9 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
             </h3>
             <div className="flex flex-col gap-2">
               <Button variant="ghost" className="justify-start rounded-xl gap-3 h-11 font-medium hover:bg-accent/5" asChild>
-                <Link href={`/subjects/${block.subjectId}`}>
-                  <BookOpen className="w-4 h-4" />
-                  Voltar para Matéria
+                <Link href={returnTarget.href}>
+                  {React.createElement(getReturnIcon(returnTarget.href), { className: "w-4 h-4" })}
+                  {returnTarget.label}
                 </Link>
               </Button>
               <Button variant="ghost" className="justify-start rounded-xl gap-3 h-11 font-medium hover:bg-accent/5" asChild>

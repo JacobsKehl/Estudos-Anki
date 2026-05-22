@@ -248,7 +248,7 @@ export function FlashcardRepository({ initialFlashcards }: FlashcardRepositoryPr
                     className="rounded-xl h-8 text-xs text-muted-foreground hover:text-accent hover:bg-accent/5 gap-1.5"
                     asChild
                   >
-                    <Link href={`/blocks/${card.studyBlock.id}`}>
+                    <Link href={`/blocks/${card.studyBlock.id}?returnTo=/flashcards`}>
                       <ExternalLink className="w-3 h-3" />
                       Ver Fonte
                       {card.sourcePageStart && (

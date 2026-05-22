@@ -3,7 +3,7 @@
 import * as React from "react";
 import { FileText, ArrowRight, Sparkles, Layers, Clock, BookOpen, CheckCircle2, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 // Definindo o mapeamento de ícones e estilos para os diferentes tipos de apoio
 const SUPPORT_TYPE_CONFIG: Record<
@@ -102,11 +102,12 @@ interface SupportBlockItemProps {
 
 export function SupportBlockItem({ support }: SupportBlockItemProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const typeConfig = SUPPORT_TYPE_CONFIG[support.supportType || "OTHER"] || SUPPORT_TYPE_CONFIG.OTHER;
   const TypeIcon = typeConfig.icon;
 
   const handleCardClick = () => {
-    router.push(`/blocks/${support.studyBlockId}?tab=apoios`);
+    router.push(`/blocks/${support.studyBlockId}?tab=apoios&returnTo=${encodeURIComponent(pathname)}`);
   };
 
   return (
@@ -154,7 +155,7 @@ export function SupportBlockItem({ support }: SupportBlockItemProps) {
           <span 
             onClick={(e) => {
               e.stopPropagation();
-              router.push(`/blocks/${support.studyBlockId}`);
+              router.push(`/blocks/${support.studyBlockId}?returnTo=${encodeURIComponent(pathname)}`);
             }}
             className="font-bold text-foreground hover:text-accent transition-colors underline decoration-border/60 hover:decoration-accent/60"
           >

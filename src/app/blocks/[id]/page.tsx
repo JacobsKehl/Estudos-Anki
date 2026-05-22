@@ -6,8 +6,15 @@ import { BlockStudyView } from "@/components/blocks/BlockStudyView";
 
 export const dynamic = "force-dynamic";
 
-export default async function BlockPage({ params }: { params: { id: string } }) {
+export default async function BlockPage({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string; from?: string }>;
+}) {
   const { id } = await params;
+  const { returnTo, from } = await searchParams;
   const mockUserId = await getMockUserId();
 
   const block = await (prisma as any).studyBlock.findUnique({
@@ -66,6 +73,8 @@ export default async function BlockPage({ params }: { params: { id: string } }) 
         pending: pendingCount,
         approved: approvedCount
       }}
+      returnTo={returnTo || null}
+      from={from || null}
     />
   );
 }

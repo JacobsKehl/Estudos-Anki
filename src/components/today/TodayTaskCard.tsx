@@ -189,7 +189,7 @@ export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
               variant="link"
               size="sm"
               className="h-auto p-0 text-[10px] text-accent hover:text-accent/80 font-bold"
-              onClick={() => router.push(`/blocks/${item.studyBlockId}`)}
+              onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
             >
               [Ver apoios]
             </Button>
@@ -217,7 +217,7 @@ export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
               size="sm"
               variant="ghost"
               className="rounded-lg font-semibold hover:bg-black/5 dark:hover:bg-white/5"
-              onClick={() => router.push(`/blocks/${item.studyBlockId}`)}
+              onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
             >
               Ver detalhes
             </Button>
