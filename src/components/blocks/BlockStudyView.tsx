@@ -13,7 +13,6 @@ import {
   Loader2,
   Play,
   Layers,
-  Pause,
   RotateCcw,
   Sparkles,
   Trophy,
@@ -700,41 +699,8 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
 
         {/* Sidebar de Ações e Status */}
         <aside className="space-y-6 sticky top-8">
-          {/* Cronômetro Premium */}
-          <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm text-center">
-            <h4 className="text-xs font-bold text-accent uppercase tracking-widest flex items-center justify-center gap-2">
-              <Clock className="w-4 h-4" />
-              Tempo de Estudo
-            </h4>
-            <div className="text-4xl font-black text-foreground tabular-nums select-none tracking-tight py-1">
-              {formatTimer(timeSpent)}
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsTimerRunning(!isTimerRunning)}
-                className="rounded-xl px-4 py-1.5 text-xs font-bold border border-border/40 hover:bg-accent/5 hover:text-accent gap-1"
-              >
-                {isTimerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                {isTimerRunning ? "Pausar" : "Iniciar"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setTimeSpent(0);
-                  setIsTimerRunning(true);
-                }}
-                className="rounded-xl px-4 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground gap-1"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Zerar
-              </Button>
-            </div>
-          </div>
-
           {/* Ação de Conclusão e IA */}
+
           <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm">
             <h3 className="font-bold text-lg flex items-center gap-2">
               <BrainCircuit className="w-5 h-5 text-accent" />
