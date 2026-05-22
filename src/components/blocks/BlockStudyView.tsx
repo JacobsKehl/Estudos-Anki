@@ -11,17 +11,22 @@ import {
   ChevronRight,
   BrainCircuit,
   Loader2,
-  Info,
   Play,
-  Layers
+  Layers,
+  Pause,
+  RotateCcw,
+  Sparkles,
+  Trophy,
+  Calendar,
+  Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { GenerateFlashcardsButton } from "../subjects/GenerateFlashcardsButton";
 import { PdfBlockViewer } from "./PdfBlockViewer";
+import { CardCurator } from "@/components/flashcards/CardCurator";
 
 const SUPPORT_TYPE_LABELS: Record<string, string> = {
   SUMMARY: "Resumo Teórico",
@@ -53,7 +58,7 @@ const getSchemaSupportDescription = (supportType: string) => {
     case "SIMULATED_EXAM":
       return "Simulado de prova completo para testar seu desempenho sob condições reais de exame.";
     case "ANSWER_KEY":
-      return "Gabarito de conferência oficial para rápida verificação e validação das respostas dos respostas.";
+      return "Gabarito de conferência oficial para rápida verificação e validação das respostas.";
     default:
       return "Material complementar de apoio pedagógico focado em potencializar seu aprendizado e fixação.";
   }
@@ -71,7 +76,25 @@ interface BlockStudyViewProps {
 
 export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
   const router = useRouter();
+  
+  // Step State Flow: "reading" -> "curating" -> "summary"
+  const [step, setStep] = React.useState<"reading" | "curating" | "summary">(() => {
+    if (block.status === "COMPLETED") {
+      return "summary";
+    }
+    const pendingCards = (block.flashcards || []).filter((f: any) => f.status === "PENDING_APPROVAL");
+    if (pendingCards.length > 0) {
+      return "curating";
+    }
+    return "reading";
+  });
+
+  const [curatorCards, setCuratorCards] = React.useState<any[]>(block.flashcards || []);
+  const [timeSpent, setTimeSpent] = React.useState(0);
+  const [isTimerRunning, setIsTimerRunning] = React.useState(step === "reading");
+  const [isGeneratingCards, setIsGeneratingCards] = React.useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+
   const [activeTab, setActiveTab] = React.useState<"pdf" | "text" | "apoios">("pdf");
   const hasApoios = block.supportMaterials && block.supportMaterials.length > 0;
 
@@ -106,30 +129,133 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
     }
   }, []);
 
-  const updateStatus = async (newStatus: string) => {
-    setIsUpdatingStatus(true);
+  // Timer Tick Hook
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isTimerRunning && step === "reading") {
+      interval = setInterval(() => {
+        setTimeSpent((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isTimerRunning, step]);
+
+  const formatTimer = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) {
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // State 1: Action - complete reading and trigger flashcard generation
+  const handleCompleteReading = async () => {
+    setIsGeneratingCards(true);
+    setIsTimerRunning(false);
+    const toastId = toast.loading("Gerando flashcards com IA baseados na leitura...");
+    
     try {
-      if (newStatus === "COMPLETED") {
-        const res = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ step: "THEORY" }), // Mark theory as complete which triggers the whole block completion logic
-        });
-        if (!res.ok) throw new Error("Erro ao completar bloco");
-        const data = await res.json();
-        toast.success(data.message || "Bloco concluído! Parabéns pelos estudos.");
-      } else {
-        const res = await fetch(`/api/blocks/${block.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
-        });
-        if (!res.ok) throw new Error("Erro ao atualizar status");
-        toast.success("Status atualizado");
+      const response = await fetch(`/api/blocks/${block.id}/flashcards/generate`, {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 400 && data.error?.includes("já gerou")) {
+          toast.info("Flashcards já foram gerados anteriormente para este bloco.", { id: toastId });
+          // If we already have pending flashcards, go to curating
+          const pending = curatorCards.filter((c) => c.status === "PENDING_APPROVAL");
+          if (pending.length > 0) {
+            setStep("curating");
+          } else {
+            setStep("summary");
+          }
+          return;
+        }
+        throw new Error(data.error || "Falha ao gerar flashcards");
       }
+
+      toast.success(data.message || "Flashcards gerados para curadoria!", { id: toastId });
+      
+      if (data.flashcards && data.flashcards.length > 0) {
+        setCuratorCards(data.flashcards);
+        setStep("curating");
+      } else {
+        setStep("summary");
+      }
+      
       router.refresh();
-    } catch {
-      toast.error("Erro ao atualizar o status do bloco");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao gerar flashcards. Tente novamente.", { id: toastId });
+      setIsTimerRunning(true); // Resume timer on failure
+    } finally {
+      setIsGeneratingCards(false);
+    }
+  };
+
+  // State 2: Action - Curation complete, lock block as COMPLETED
+  const handleCurationComplete = async () => {
+    setIsUpdatingStatus(true);
+    const toastId = toast.loading("Registrando conclusão do bloco de estudo...");
+    
+    try {
+      const res = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "THEORY" }), // Triggers completion & scheduling
+      });
+      
+      if (!res.ok) throw new Error("Erro ao concluir bloco");
+      const data = await res.json();
+      
+      toast.success(data.message || "Bloco concluído! Parabéns pelos estudos.", { id: toastId });
+      setStep("summary");
+      router.refresh();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao concluir o bloco de estudo.", { id: toastId });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // State 3: Action - Reopen block
+  const handleReopen = async () => {
+    setIsUpdatingStatus(true);
+    const toastId = toast.loading("Reabrindo bloco de estudo...");
+    
+    try {
+      const res = await fetch(`/api/blocks/${block.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "IN_PROGRESS" }),
+      });
+      
+      if (!res.ok) throw new Error("Erro ao reabrir bloco");
+      
+      toast.success("Estudo teórico reaberto! O cronograma foi atualizado.", { id: toastId });
+      
+      // Reset local flow states
+      setStep("reading");
+      setTimeSpent(0);
+      setIsTimerRunning(true);
+      
+      // Update local flashcards state with latest fetched state
+      const updatedBlock = await res.json();
+      if (updatedBlock.flashcards) {
+        setCuratorCards(updatedBlock.flashcards);
+      }
+      
+      router.refresh();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao reabrir o bloco de estudo.", { id: toastId });
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -147,6 +273,151 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
 
   const statusInfo = getStatusDisplay(block.status);
 
+  // ==========================================
+  // RENDER STEP 2: CURATING (Full Width Curator)
+  // ==========================================
+  if (step === "curating") {
+    return (
+      <div className="max-w-5xl mx-auto space-y-8 pb-32 animate-in fade-in duration-500">
+        {/* Back navigation header to reading view */}
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="rounded-xl hover:bg-accent/5 gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            onClick={() => setStep("reading")}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar para Leitura
+          </Button>
+        </div>
+
+        <CardCurator 
+          blockId={block.id} 
+          initialCards={curatorCards} 
+          onCurationComplete={handleCurationComplete} 
+        />
+      </div>
+    );
+  }
+
+  // ==========================================
+  // RENDER STEP 3: SUMMARY
+  // ==========================================
+  if (step === "summary") {
+    const approvedCount = curatorCards.filter((c) => c.status === "APPROVED").length;
+
+    return (
+      <div className="max-w-3xl mx-auto py-12 animate-in fade-in zoom-in-95 duration-500">
+        <div className="bg-card rounded-[2.5rem] border border-border/40 p-10 shadow-sm text-center space-y-8">
+          {/* Celebratory Badge & Icon */}
+          <div className="flex flex-col items-center space-y-4">
+            <div className="w-20 h-20 rounded-[2rem] bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+              <Trophy className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <Badge variant="outline" className="bg-accent/10 text-accent border-none font-bold text-xs uppercase tracking-wider px-4 py-1 rounded-full">
+                Sessão Concluída!
+              </Badge>
+              <h2 className="text-3xl font-black text-foreground tracking-tight">{block.title}</h2>
+              <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                Seu estudo teórico foi registrado e os flashcards curados foram integrados ao seu cronograma de revisões ativas.
+              </p>
+            </div>
+          </div>
+
+          {/* Session Statistics Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-muted/30 border border-border/20 rounded-2xl p-5 flex flex-col items-center justify-center space-y-2">
+              <div className="p-2 rounded-xl bg-accent/5 text-accent">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div className="text-center">
+                <span className="block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Tempo de Leitura</span>
+                <span className="text-lg font-black text-foreground tabular-nums">{formatTimer(timeSpent || (block.estimatedStudyMinutes * 60))}</span>
+              </div>
+            </div>
+
+            <div className="bg-muted/30 border border-border/20 rounded-2xl p-5 flex flex-col items-center justify-center space-y-2">
+              <div className="p-2 rounded-xl bg-accent/5 text-accent">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="text-center">
+                <span className="block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Cards Adicionados</span>
+                <span className="text-lg font-black text-foreground">{approvedCount} cards</span>
+              </div>
+            </div>
+
+            <div className="bg-muted/30 border border-border/20 rounded-2xl p-5 flex flex-col items-center justify-center space-y-2">
+              <div className="p-2 rounded-xl bg-accent/5 text-accent">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div className="text-center">
+                <span className="block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Próxima Revisão</span>
+                <span className="text-lg font-black text-foreground">Amanhã (D+1)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="pt-4 border-t border-border/30 flex flex-col sm:flex-row items-center justify-center gap-4">
+            {approvedCount > 0 ? (
+              <Button 
+                variant="primary" 
+                size="lg" 
+                className="rounded-2xl font-bold w-full sm:w-auto shadow-md shadow-accent/15 transition-all hover:scale-[1.02]" 
+                asChild
+              >
+                <Link href={`/practice?blockId=${block.id}`}>
+                  <Play className="w-4 h-4 mr-2 fill-current" />
+                  Praticar Cards Agora
+                </Link>
+              </Button>
+            ) : (
+              <Button 
+                variant="primary" 
+                size="lg" 
+                className="rounded-2xl font-bold w-full sm:w-auto opacity-50 cursor-not-allowed" 
+                disabled
+              >
+                Nenhum card para praticar
+              </Button>
+            )}
+            <Button 
+              variant="soft" 
+              size="lg" 
+              className="rounded-2xl font-bold w-full sm:w-auto text-muted-foreground hover:text-foreground" 
+              asChild
+            >
+              <Link href={`/subjects/${block.subjectId}`}>
+                Voltar para Matéria
+              </Link>
+            </Button>
+          </div>
+
+          {/* Subtitle Links */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-2 text-xs font-semibold text-muted-foreground">
+            <Link href={`/flashcards?blockId=${block.id}`} className="hover:text-accent flex items-center gap-1.5 transition-colors">
+              <ExternalLink className="w-3.5 h-3.5" />
+              Ver repositório de cards
+            </Link>
+            <button 
+              onClick={handleReopen} 
+              disabled={isUpdatingStatus}
+              className="hover:text-accent flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 font-semibold transition-colors"
+            >
+              {isUpdatingStatus ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+              Reabrir bloco e reestudar teoria
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // RENDER STEP 1: READING (Original Flow View)
+  // ==========================================
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-32 animate-in fade-in duration-700">
       {/* Header Focado */}
@@ -185,31 +456,6 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
               <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed italic border-l-2 border-accent/20 pl-4 py-1">
                 {block.description}
               </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            {block.status !== "COMPLETED" ? (
-              <Button 
-                variant="primary"
-                size="lg"
-                onClick={() => updateStatus("COMPLETED")} 
-                disabled={isUpdatingStatus}
-                className="rounded-2xl gap-2 font-bold transition-all active:scale-95"
-              >
-                {isUpdatingStatus ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                Marcar como estudado
-              </Button>
-            ) : (
-              <Button 
-                variant="soft"
-                size="lg"
-                onClick={() => updateStatus("IN_PROGRESS")} 
-                disabled={isUpdatingStatus}
-                className="rounded-2xl gap-2 font-bold"
-              >
-                Retomar estudo
-              </Button>
             )}
           </div>
         </div>
@@ -286,7 +532,6 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
                         <span className="font-semibold text-foreground">{support.material?.fileName || "Material"}</span>
                       </div>
                       
-                      {/* Breve descrição do material de apoio */}
                       <p className="text-xs text-muted-foreground ml-6 max-w-2xl leading-relaxed">
                         {support.description || getSchemaSupportDescription(support.supportType)}
                       </p>
@@ -455,55 +700,69 @@ export function BlockStudyView({ block, content, stats }: BlockStudyViewProps) {
 
         {/* Sidebar de Ações e Status */}
         <aside className="space-y-6 sticky top-8">
-          <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-6 shadow-sm">
+          {/* Cronômetro Premium */}
+          <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm text-center">
+            <h4 className="text-xs font-bold text-accent uppercase tracking-widest flex items-center justify-center gap-2">
+              <Clock className="w-4 h-4" />
+              Tempo de Estudo
+            </h4>
+            <div className="text-4xl font-black text-foreground tabular-nums select-none tracking-tight py-1">
+              {formatTimer(timeSpent)}
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsTimerRunning(!isTimerRunning)}
+                className="rounded-xl px-4 py-1.5 text-xs font-bold border border-border/40 hover:bg-accent/5 hover:text-accent gap-1"
+              >
+                {isTimerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                {isTimerRunning ? "Pausar" : "Iniciar"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setTimeSpent(0);
+                  setIsTimerRunning(true);
+                }}
+                className="rounded-xl px-4 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground gap-1"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Zerar
+              </Button>
+            </div>
+          </div>
+
+          {/* Ação de Conclusão e IA */}
+          <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm">
             <h3 className="font-bold text-lg flex items-center gap-2">
               <BrainCircuit className="w-5 h-5 text-accent" />
               Memorização
             </h3>
             
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-accent/5 p-4 rounded-2xl border border-accent/10">
-                  <p className="text-[10px] uppercase font-bold text-accent/60 tracking-wider mb-1">Aprovados</p>
-                  <p className="text-2xl font-black text-accent">{stats.approved}</p>
-                </div>
-                <div className="bg-muted/30 p-4 rounded-2xl border border-border/40">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider mb-1">Pendentes</p>
-                  <p className="text-2xl font-black text-foreground/70">{stats.pending}</p>
-                </div>
-              </div>
-
-              {stats.pending > 0 && (
-                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex gap-3 text-amber-700">
-                  <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                  <p className="text-xs leading-relaxed font-medium">
-                    Você tem <strong>{stats.pending} cards</strong> aguardando curadoria.
-                  </p>
-                </div>
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-accent/15 transition-all hover:scale-[1.02] active:scale-95 py-6 text-sm"
+              onClick={handleCompleteReading}
+              disabled={isGeneratingCards}
+            >
+              {isGeneratingCards ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Gerando Cards...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 fill-current animate-pulse" />
+                  Concluir & Gerar Cards
+                </>
               )}
-
-              <div className="pt-2 flex flex-col gap-3">
-                {stats.approved > 0 && (
-                  <Button variant="primary" size="lg" className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-accent/20 transition-all hover:scale-[1.02]" asChild>
-                    <Link href={`/practice?blockId=${block.id}`}>
-                      <Play className="w-4 h-4 fill-current" />
-                      Praticar cards
-                    </Link>
-                  </Button>
-                )}
-                
-                <GenerateFlashcardsButton blockId={block.id} hasFlashcards={stats.total > 0} />
-                
-                {stats.total > 0 && (
-                  <Button variant="ghost" className="w-full rounded-xl gap-2 h-11 text-muted-foreground hover:text-accent hover:bg-accent/5" asChild>
-                    <Link href={`/flashcards?blockId=${block.id}`}>
-                      <ExternalLink className="w-4 h-4" />
-                      Repositório de cards
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </div>
+            </Button>
+            <p className="text-[10px] text-center text-muted-foreground font-medium leading-relaxed">
+              Ao concluir a leitura, o cronômetro será pausado e a IA gerará novos cards em estado de curadoria.
+            </p>
           </div>
 
           <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm">

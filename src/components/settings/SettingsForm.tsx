@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { 
   User, 
-  Target, 
   Sliders, 
   Mail, 
   Wrench, 
@@ -11,10 +10,9 @@ import {
   Loader2, 
   Info,
   ChevronDown,
-  ChevronUp,
   Layout,
-  Settings,
-  Bell
+  Trash2,
+  UploadCloud
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RepairSupportsButton } from "@/components/materials/RepairSupportsButton";
@@ -27,7 +25,7 @@ interface SettingsFormProps {
 }
 
 export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
-  const { preferences, updatePreferences, isLoading, syncWithServer } = useStudyPreferences();
+  const { preferences, updatePreferences, isLoading } = useStudyPreferences();
   
   // Local edit states synced with hook preferences on load
   const [name, setName] = useState(preferences.name);
@@ -41,9 +39,153 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
   const [animations, setAnimations] = useState(preferences.animations);
   const [theme, setTheme] = useState(preferences.theme);
 
+  // New preference states
+  const [studyResetTime, setStudyResetTime] = useState(preferences.studyResetTime || "00:00");
+  const [studyDaysOfWeek, setStudyDaysOfWeek] = useState(preferences.studyDaysOfWeek || "1,2,3,4,5");
+  const [defaultBlockDurationMinutes, setDefaultBlockDurationMinutes] = useState(preferences.defaultBlockDurationMinutes || 30);
+  const [maxNewCardsPerDay, setMaxNewCardsPerDay] = useState(preferences.maxNewCardsPerDay || 20);
+
+  // Diagnostics states
+  const [diagnosticsData, setDiagnosticsData] = useState<{
+    summary?: {
+      duplicateBlockGroups: number;
+      totalDuplicateBlocks: number;
+      orphanedFlashcards: number;
+    };
+  } | null>(null);
+  const [isLoadingDiagnostics, setIsLoadingDiagnostics] = useState(false);
+  const [isFixingDiagnostics, setIsFixingDiagnostics] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
+
+  // States for Flashcard Reset & Import
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<{
+    imported: number;
+    skippedDuplicates: number;
+    failedRows: number;
+    bySubject: Record<string, number>;
+  } | null>(null);
+
+  const handleResetFlashcards = async () => {
+    if (resetConfirmText !== "APAGAR") {
+      toast.error("Digite APAGAR para confirmar a exclusão.");
+      return;
+    }
+
+    setIsResetting(true);
+    const toastId = toast.loading("Apagando todos os flashcards...");
+    try {
+      const response = await fetch("/api/flashcards/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "DELETE_ALL_FLASHCARDS" }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(data.message || "Todos os flashcards foram excluídos com sucesso.", { id: toastId });
+        setResetConfirmText("");
+      } else {
+        toast.error(data.error || "Erro ao apagar flashcards.", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Erro de conexão ao apagar flashcards.", { id: toastId });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportSummary(null);
+    const toastId = toast.loading("Importando flashcards do arquivo CSV...");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/flashcards/import-csv", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success("Importação concluída!", { id: toastId });
+        setImportSummary(data);
+      } else {
+        toast.error(data.error || "Erro ao importar arquivo CSV.", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Erro de conexão ao importar flashcards.", { id: toastId });
+    } finally {
+      setIsImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  const activeDays = studyDaysOfWeek ? studyDaysOfWeek.split(",").map(Number) : [];
+  
+  const toggleDay = (dayNum: number) => {
+    let newDays;
+    if (activeDays.includes(dayNum)) {
+      newDays = activeDays.filter((d) => d !== dayNum);
+    } else {
+      newDays = [...activeDays, dayNum];
+    }
+    newDays.sort((a, b) => a - b);
+    setStudyDaysOfWeek(newDays.join(","));
+  };
+
+  const fetchDiagnostics = async () => {
+    setIsLoadingDiagnostics(true);
+    try {
+      const response = await fetch("/api/diagnostics");
+      if (response.ok) {
+        const data = await response.json();
+        setDiagnosticsData(data);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar diagnósticos:", err);
+    } finally {
+      setIsLoadingDiagnostics(false);
+    }
+  };
+
+  const handleFixDiagnostics = async (action: "fix_duplicates" | "fix_orphans" | "fix_all") => {
+    setIsFixingDiagnostics(true);
+    const toastId = toast.loading("Executando correções no banco de dados...");
+    try {
+      const response = await fetch("/api/diagnostics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success(
+          `Sucesso: ${data.fixedDuplicates} blocos duplicados corrigidos, ${data.deletedOrphans} cards órfãos limpos.`,
+          { id: toastId }
+        );
+        fetchDiagnostics();
+      } else {
+        toast.error(`Erro ao corrigir dados: ${data.error || "Erro desconhecido."}`, { id: toastId });
+      }
+    } catch (err: any) {
+      console.error("Erro ao executar diagnóstico:", err);
+      toast.error(`Erro: ${err.message || "Erro de conexão."}`, { id: toastId });
+    } finally {
+      setIsFixingDiagnostics(false);
+    }
+  };
 
   // Sync state from hook when preferences load
   useEffect(() => {
@@ -57,7 +199,17 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
     setDisplayDensity(preferences.displayDensity);
     setAnimations(preferences.animations);
     setTheme(preferences.theme);
+    setStudyResetTime(preferences.studyResetTime || "00:00");
+    setStudyDaysOfWeek(preferences.studyDaysOfWeek || "1,2,3,4,5");
+    setDefaultBlockDurationMinutes(preferences.defaultBlockDurationMinutes || 30);
+    setMaxNewCardsPerDay(preferences.maxNewCardsPerDay || 20);
   }, [preferences]);
+
+  useEffect(() => {
+    if (isToolsOpen) {
+      fetchDiagnostics();
+    }
+  }, [isToolsOpen]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +227,10 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
         displayDensity,
         animations,
         theme,
+        studyResetTime,
+        studyDaysOfWeek,
+        defaultBlockDurationMinutes,
+        maxNewCardsPerDay,
       });
 
       if (success) {
@@ -254,12 +410,12 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-foreground">Preferências do SRS & Flashcards</h2>
-                <p className="text-xs text-muted-foreground">Ajuste o nível de cobrança da inteligência artificial para os flashcards.</p>
+                <p className="text-xs text-muted-foreground">Ajuste o nível de cobrança da inteligência artificial para os flashcards e comportamento do cronograma.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2 md:col-span-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Dificuldade das Questões e Flashcards
                 </label>
@@ -275,6 +431,85 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
                 <p className="text-[11px] text-muted-foreground">
                   A opção <strong>Mais desafiadora</strong> instrui o gerador a construir clozes inteligentes sobre requisitos legais, regras rígidas, exceções e prazos de concursos reais, com respostas extremamente concisas.
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Duração Padrão do Bloco (minutos)
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  max="360"
+                  value={defaultBlockDurationMinutes}
+                  onChange={(e) => setDefaultBlockDurationMinutes(parseInt(e.target.value, 10))}
+                  className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Limite de Novos Cards por Bloco
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={maxNewCardsPerDay}
+                  onChange={(e) => setMaxNewCardsPerDay(parseInt(e.target.value, 10))}
+                  className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Horário de Reset do Estudo Diário
+                </label>
+                <input
+                  type="time"
+                  value={studyResetTime}
+                  onChange={(e) => setStudyResetTime(e.target.value)}
+                  className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all cursor-pointer"
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Horário de Brasília em que as metas diárias e limites de revisão são zerados.
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                  Dias da Semana Disponíveis para Estudo
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Dom", value: 0 },
+                    { label: "Seg", value: 1 },
+                    { label: "Ter", value: 2 },
+                    { label: "Qua", value: 3 },
+                    { label: "Qui", value: 4 },
+                    { label: "Sex", value: 5 },
+                    { label: "Sáb", value: 6 },
+                  ].map((day) => {
+                    const isSelected = activeDays.includes(day.value);
+                    return (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => toggleDay(day.value)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                          isSelected
+                            ? "bg-accent border-accent text-accent-foreground shadow-sm shadow-accent/25"
+                            : "bg-background border-border/50 text-foreground hover:bg-muted/30 hover:border-border"
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -457,8 +692,8 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
           >
             <summary className="flex items-center justify-between p-8 cursor-pointer select-none list-none">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
-                  <Wrench className="w-5 h-5 text-rose-600" />
+                <div className="w-10 h-10 rounded-2xl bg-muted border border-border flex items-center justify-center shrink-0">
+                  <Wrench className="w-5 h-5 text-accent" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-foreground">Ferramentas avançadas do sistema</h2>
@@ -472,14 +707,196 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
 
             <div className="px-8 pb-8 space-y-6 border-t border-border/20 pt-6">
               {/* Warning Banner */}
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-rose-50/50 border border-rose-100 text-rose-800 text-xs">
-                <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/40 border border-border/40 text-foreground text-xs">
+                <ShieldAlert className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <p className="font-bold">Use apenas se algo parecer fora do lugar</p>
                   <p className="text-muted-foreground text-[11px] leading-relaxed">
-                    Estas ações perigosas e administrativas manipulam dados importantes da sua biblioteca diretamente. Use com extrema cautela.
+                    Estas ações avançadas e administrativas manipulam dados importantes da sua biblioteca diretamente. Use com cautela.
                   </p>
                 </div>
+              </div>
+
+              {/* Integrity Diagnostics Panel */}
+              <div className="border border-border/40 bg-background rounded-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-border/20 pb-3">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-bold text-foreground">Diagnóstico de Integridade</h3>
+                    <p className="text-xs text-muted-foreground">Analise inconsistências do banco (blocos duplicados e cards órfãos).</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchDiagnostics}
+                    disabled={isLoadingDiagnostics}
+                    className="rounded-xl h-9 text-xs"
+                  >
+                    {isLoadingDiagnostics ? "Analisando..." : "Analisar Agora"}
+                  </Button>
+                </div>
+
+                {diagnosticsData?.summary ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
+                    <div className="bg-muted/20 border border-border/30 rounded-xl p-4 text-center">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Grupos Duplicados</span>
+                      <span className="text-2xl font-black text-foreground mt-1 block">
+                        {diagnosticsData.summary.duplicateBlockGroups}
+                      </span>
+                    </div>
+                    <div className="bg-muted/20 border border-border/30 rounded-xl p-4 text-center">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Total Blocos Duplicados</span>
+                      <span className={`text-2xl font-black mt-1 block ${diagnosticsData.summary.totalDuplicateBlocks > 0 ? "text-accent" : "text-foreground"}`}>
+                        {diagnosticsData.summary.totalDuplicateBlocks}
+                      </span>
+                    </div>
+                    <div className="bg-muted/20 border border-border/30 rounded-xl p-4 text-center">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Cards Órfãos</span>
+                      <span className={`text-2xl font-black mt-1 block ${diagnosticsData.summary.orphanedFlashcards > 0 ? "text-accent" : "text-foreground"}`}>
+                        {diagnosticsData.summary.orphanedFlashcards}
+                      </span>
+                    </div>
+                  </div>
+                ) : isLoadingDiagnostics ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-4">Clique em Analisar Agora para checar a saúde dos dados.</p>
+                )}
+
+                {diagnosticsData?.summary && (
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
+                    {(diagnosticsData.summary.totalDuplicateBlocks > 0 || diagnosticsData.summary.orphanedFlashcards > 0) ? (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={() => handleFixDiagnostics("fix_all")}
+                        disabled={isFixingDiagnostics}
+                        className="rounded-xl text-xs h-10 px-5 bg-accent border-accent text-accent-foreground hover:scale-[1.01] transition-transform"
+                      >
+                        {isFixingDiagnostics ? "Executando Correções..." : "Corrigir Todas Inconsistências"}
+                      </Button>
+                    ) : (
+                      <div className="text-xs font-bold text-foreground flex items-center bg-sage-light/10 px-3 py-2 rounded-xl border border-accent/20">
+                        ✓ Nenhum erro ou duplicidade encontrado. Dados íntegros!
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Gerenciamento de Flashcards */}
+              <div className="border border-border/40 bg-background rounded-2xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-border/20 pb-3">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-bold text-foreground">Gerenciamento de Flashcards</h3>
+                    <p className="text-xs text-muted-foreground">Importe históricos ou limpe a base de cards do sistema.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {/* Reset Section */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Resetar Flashcards</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Apague de forma irreversível todos os flashcards e revisões geradas, sem afetar seu cronograma de estudos ou blocos teóricos concluídos.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={resetConfirmText}
+                        onChange={(e) => setResetConfirmText(e.target.value)}
+                        placeholder="Digite APAGAR para confirmar"
+                        className="flex-1 h-10 px-3 rounded-xl border border-border/50 bg-background text-xs focus:outline-none focus:ring-2 focus:ring-accent/15 focus:border-accent transition-all"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleResetFlashcards}
+                        disabled={isResetting}
+                        className="rounded-xl h-10 text-xs px-4 border-red-200/50 hover:bg-red-50 hover:text-red-600 dark:border-red-900/30 dark:hover:bg-red-950/20 text-red-500 font-bold active:scale-[0.98] transition-all"
+                      >
+                        {isResetting ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="w-3.5 h-3.5 mr-1" />
+                            Apagar Tudo
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Import Section */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Importar Histórico CSV</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Importe flashcards a partir de um arquivo CSV. O sistema detectará automaticamente a matéria e removerá duplicados.
+                    </p>
+                    <div>
+                      <label className="inline-flex items-center justify-center rounded-xl h-10 text-xs px-4 font-bold border border-accent/30 text-accent hover:bg-accent/5 active:scale-[0.98] cursor-pointer transition-all w-full sm:w-auto">
+                        {isImporting ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                            Importando...
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud className="w-3.5 h-3.5 mr-2" />
+                            Selecionar CSV e Importar
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={handleImportCSV}
+                          disabled={isImporting}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Import Summary Results */}
+                {importSummary && (
+                  <div className="mt-4 p-4 rounded-xl border border-accent/20 bg-accent/5 space-y-3">
+                    <div className="flex items-center justify-between border-b border-accent/15 pb-2">
+                      <span className="text-xs font-bold text-accent">Resumo da Importação</span>
+                      <span className="text-[10px] text-muted-foreground">Concluído</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="p-2 bg-background rounded-lg border border-border/30">
+                        <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider block">Importados</span>
+                        <span className="text-base font-black text-foreground">{importSummary.imported}</span>
+                      </div>
+                      <div className="p-2 bg-background rounded-lg border border-border/30">
+                        <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider block">Duplicados</span>
+                        <span className="text-base font-black text-foreground">{importSummary.skippedDuplicates}</span>
+                      </div>
+                      <div className="p-2 bg-background rounded-lg border border-border/30">
+                        <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider block">Falhas</span>
+                        <span className="text-base font-black text-foreground">{importSummary.failedRows}</span>
+                      </div>
+                    </div>
+
+                    {importSummary.bySubject && Object.keys(importSummary.bySubject).length > 0 && (
+                      <div className="space-y-1.5 pt-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Distribuição por Disciplina</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                          {Object.entries(importSummary.bySubject).map(([subj, count]) => (
+                            <div key={subj} className="flex justify-between items-center py-1 px-2 bg-background/50 rounded-lg border border-border/20">
+                              <span className="text-muted-foreground truncate mr-2">{subj}</span>
+                              <span className="font-bold text-foreground">{count} cards</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

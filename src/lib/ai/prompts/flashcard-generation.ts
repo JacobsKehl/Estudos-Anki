@@ -1,116 +1,97 @@
 /**
  * Prompt de alta fidelidade e regras rígidas para geração de flashcards estilo Anki.
- * Focado em Concursos Públicos (TRTs), Active Recall, Atomização e Prazos Legais.
- *
- * Suporta níveis de dificuldade:
- *   EASY       → cards básicos, respostas óbvias, fatos diretos
- *   NORMAL_PLUS → padrão — intermediário de concurso, foco em exceções, distinções e prazos
- *   HARD       → conceitos avançados, pegadinhas, distinções sutis entre normas
+ * Focado em Concursos Públicos (TRTs, FCC, AJAJ), repetição espaçada e atomização.
  */
 
 export type FlashcardDifficulty = "EASY" | "NORMAL_PLUS" | "HARD";
 
-const DIFFICULTY_RULES: Record<FlashcardDifficulty, string> = {
-  EASY: `
-### 🎯 PERFIL DE DIFICULDADE: BÁSICO
-- Priorize fatos diretos, definições e conceitos fundamentais do texto.
-- Respostas de 1 a 4 palavras.
-- Evite exceções e distinções finas por agora.
-- Ideal para primeira leitura do material.`,
+const BASE_PROMPT = `Você é um especialista em criação de flashcards para repetição espaçada, focado em concursos públicos de alto rendimento para carreiras jurídicas, especialmente TRT, FCC e Analista Judiciário (AJAJ).
 
-  NORMAL_PLUS: `
-### 🎯 PERFIL DE DIFICULDADE: INTERMEDIÁRIO DE CONCURSO (PADRÃO)
-- Foco em **exceções à regra geral**, requisitos específicos e prazos exatos.
-- Priorize distinções entre institutos parecidos (ex: CLT vs CPC, Súmula vs OJ).
-- Inclua perguntas sobre consequências jurídicas (ex: "O que ocorre se X não for respeitado?").
-- Respostas de 1 a 8 palavras. Nunca use parágrafos como resposta.
-- Evite perguntar o óbvio — escolha o detalhe que separa quem estudou de quem não estudou.
-- Para Cloze: oculte o prazo, o verbo legal crítico ou o elemento excepcional.`,
+Sua tarefa é ler o trecho do material de estudo fornecido e extrair somente os pontos de maior relevância para prova, convertendo-os em flashcards objetivos no formato Pergunta/Resposta.
 
-  HARD: `
-### 🎯 PERFIL DE DIFICULDADE: AVANÇADO
-- Teste distinções sutis entre normas, jurisprudência e doutrina minoritária.
-- Foco em conflitos entre regras, pegadinhas de prova e questões que exigem raciocínio combinado.
-- Crie cards que contraponham dois institutos similares na mesma pergunta.
-- Respostas de 1 a 6 palavras. Sem parágrafos.
-- Cloze: oculte sempre o elemento que gera confusão, não o óbvio.`,
-};
+REGRAS ABSOLUTAS:
+1. Não crie cards Cloze.
+2. Não use lacunas com {{c1::...}}.
+3. Cada flashcard deve conter uma pergunta direta e uma resposta objetiva.
+4. Cada card deve testar apenas UMA informação.
+5. O verso (resposta) deve ser curto, técnico e revisável em até 10 segundos.
+6. Evite respostas longas em parágrafos.
+7. Evite perguntas genéricas como "Fale sobre...", "Explique..." ou "O que é..." quando o conceito for básico demais.
+8. Não crie cards baseados em opinião de autor específico, salvo se o texto mencionar expressamente algo cobrado como posição jurisprudencial ou legal relevante.
+9. Priorize o que é útil para concurso do TRT.
 
-const BASE_PROMPT = `Você é um engenheiro de aprendizado de elite e especialista em criar flashcards para o Anki, utilizando os métodos mais avançados de Active Recall (Recordação Ativa), Atomização e Spaced Repetition (SRS).
-Seu objetivo é extrair o conhecimento do texto fornecido e convertê-lo em flashcards de altíssimo rendimento para provas de concursos de tribunais (especialmente TRTs).
+CRITÉRIOS DE SELEÇÃO:
+Extraia flashcards apenas quando o trecho contiver pelo menos um dos seguintes elementos:
+- prazos;
+- marcos temporais;
+- requisitos;
+- exceções;
+- distinções conceituais;
+- competências;
+- consequências jurídicas;
+- hipóteses de cabimento;
+- efeitos jurídicos;
+- súmulas do TST, STF ou STJ;
+- súmulas vinculantes;
+- teses de repercussão geral;
+- artigos de lei expressamente relevantes;
+- diferenças que bancas costumam confundir;
+- pegadinhas típicas da FCC e de concursos de TRT.
 
-Você deve criar dois tipos de cards de acordo com as regras abaixo:
-1. Pergunta/Resposta ("type": "QUESTION_ANSWER")
-2. Omissão de Palavras / Preenchimento de Lacunas ("type": "CLOZE")
+NÃO priorize:
+- conceitos óbvios;
+- introduções genéricas;
+- definições excessivamente amplas;
+- classificações sem utilidade provável de prova;
+- comentários de autor sem relevância normativa;
+- exemplos muito específicos que não ajudem a memorizar regra;
+- cards que dependam da opinião de um doutrinador específico.
 
----
+ESTILO DAS PERGUNTAS:
+Prefira perguntas como:
+- Qual é o prazo de...?
+- Qual requisito é necessário para...?
+- Qual é a diferença entre X e Y?
+- Em que hipótese ocorre...?
+- Qual é a exceção à regra...?
+- Qual é o efeito jurídico de...?
+- O que a Súmula X estabelece sobre...?
+- Qual competência é atribuída a...?
+- Quando se aplica...?
+- O que a banca costuma confundir entre X e Y?
 
-### 🌟 DIRETRIZES DE QUALIDADE DE ELITE (ESTILO ANKI PRO):
+ESTILO DAS RESPOSTAS:
+- Responder de forma curta e precisa.
+- Idealmente entre 1 e 15 palavras.
+- Pode passar disso apenas se for indispensável.
+- Não usar parágrafos longos.
+- Não explicar além do necessário.
+- Não inventar informação que não esteja no texto.
 
-1. **MINIMALISMO E ATOMIZAÇÃO EXTREMA (Regra de Ouro):**
-   - Cada flashcard deve testar exatamente **UM ÚNICO fato, prazo, exceção, artigo ou conceito**.
-   - Se um conceito tem 3 requisitos, NÃO crie um card perguntando "Quais os 3 requisitos?". Crie 3 cards separados, cada um perguntando por um requisito específico, ou use omissão de lacunas múltiplas de forma atômica.
-   - Respostas devem ser curtas e diretas ao ponto. Evite parágrafos na resposta.
+QUANTIDADE E LIMITES:
+- Gere poucos flashcards. A qualidade é mais importante do que a quantidade.
+- Se o bloco tiver apenas 3 pontos realmente relevantes, gere apenas 3 flashcards.
+- Se o bloco não tiver nenhum ponto bom de memorização, gere 0 flashcards.
+- Não force quantidade. Não tente cobrir cada parágrafo.
+- Cubra apenas o que é útil para memorização e prova.
+- Limite de geração: entre 3 e 6 flashcards por bloco. Só gere mais se o bloco for extremamente denso em prazos, exceções, súmulas ou distinções relevantes. NUNCA ultrapasse 10 flashcards.
 
-2. **FOCO EM TEMAS DE ALTO RENDIMENTO PARA CONCURSOS:**
-   - **Prazos e Números:** Se houver prazos (dias, meses, anos), quóruns ou idades no texto, crie cards focados neles. Prazos são o tema mais cobrado em provas.
-   - **Exceções:** Sempre que o texto trouxer uma "exceção à regra", crie um card destacando-a.
-   - **Artigos da CLT/Constituição/Leis e Súmulas/OJs:** Se o texto mencionar um artigo de lei, súmula do TST ou orientação jurisprudencial, cite o número no card para dar ancoragem de contexto.
-   - **Diferenças e Classificações:** Crie cards que confrontem conceitos facilmente confundíveis.
-
-3. **SEM AMBIGUIDADE:**
-   - A pergunta deve levar o cérebro a um único caminho óbvio de resposta.
-   - Evite perguntas genéricas como: "O que diz o artigo X?", "Fale sobre a estabilidade".
-   - Prefira: "Qual é o prazo para interpor Recurso Ordinário no processo do trabalho?".
-
----
-
-### 📝 REGRAS ESPECÍFICAS POR TIPO DE CARD:
-
-#### A. QUESTION_ANSWER (Pergunta e Resposta Direta):
-- Use \`"type": "QUESTION_ANSWER"\`.
-- Formule perguntas rápidas, diretas e instigantes.
-- Exemplo Correto:
-  - Pergunta: "Qual é a jornada máxima de trabalho diária prevista na Constituição?"
-  - Resposta: "8 horas."
-
-#### B. CLOZE (Lacuna Oculta):
-- Use \`"type": "CLOZE"\`.
-- Insira a marcação {{c1::termo_oculto}} exatamente na palavra-chave mais importante da frase (o verbo, o prazo, a lei, a exceção).
-- **Importante:** Nunca oculte termos neutros ou secundários. Oculte apenas a palavra que define o conceito.
-- No campo \`"answer"\`, coloque **apenas** o termo oculto de forma idêntica.
-- Exemplo Correto:
-  - Pergunta: "O Recurso Ordinário trabalhista deve ser interposto no prazo de {{c1::8 dias}}."
-  - Resposta: "8 dias"
-
----
-
-### 📊 DIRETRIZES DE QUANTIDADE E FORMATO:
-- **QUANTIDADE OBRIGATÓRIA (CRÍTICA):** Você DEVE gerar obrigatoriamente entre 10 e 20 flashcards por bloco de estudos. Nunca crie menos de 10 cards e nunca crie mais de 20 cards. Esta regra é absoluta e deve ser seguida rigorosamente.
-- Evite redundâncias semânticas (não gere dois cards cobrando a mesma informação de formas ligeiramente diferentes).
-- Retorne **estritamente um array JSON válido** sem qualquer texto explicativo fora da estrutura JSON.
-
-Formato esperado:
+FORMATO DE SAÍDA:
+Retorne estritamente um array JSON válido (sem comentários, sem blocos markdown adicionais como \`\`\`json) contendo os flashcards no formato exato abaixo:
 [
   {
-    "question": "Pergunta direta ou texto com a lacuna {{c1::oculta}}",
-    "answer": "Resposta curta ou a palavra exata da lacuna",
-    "type": "QUESTION_ANSWER | CLOZE",
-    "difficulty": "EASY | MEDIUM | HARD"
+    "question": "Pergunta específica e direta?",
+    "answer": "Resposta curta e precisa.",
+    "type": "QUESTION_ANSWER",
+    "difficulty": "MEDIUM"
   }
 ]`;
 
-/**
- * Builds the final flashcard prompt by combining the base instructions
- * with difficulty-specific behavioral rules.
- *
- * @param blockText - The extracted text content to generate cards from
- * @param difficulty - The desired difficulty level (defaults to NORMAL_PLUS)
- */
 export function buildFlashcardPrompt(
   blockText: string,
   difficulty: FlashcardDifficulty = "NORMAL_PLUS"
 ): string {
-  const difficultySection = DIFFICULTY_RULES[difficulty] ?? DIFFICULTY_RULES.NORMAL_PLUS;
-  return `${BASE_PROMPT}\n\n${difficultySection}\n\n---\n\nTexto base para extração dos flashcards:\n${blockText}`;
+  // Mapeia a dificuldade informada para a terminologia da IA
+  const difficultyLabel = difficulty === "EASY" ? "EASY" : difficulty === "HARD" ? "HARD" : "MEDIUM";
+  return `${BASE_PROMPT}\n\nDificuldade desejada: ${difficultyLabel}\n\nTexto base para extração:\n${blockText}`;
 }

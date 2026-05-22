@@ -93,7 +93,6 @@ export function EditFlashcardDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="QUESTION_ANSWER">Pergunta & Resposta</SelectItem>
-                <SelectItem value="CLOZE">Cloze (Omissão)</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -77,13 +77,15 @@ export async function POST(
     const generatedCards = await generateFlashcards(fullText, difficulty);
 
     if (!generatedCards || generatedCards.length === 0) {
-      return NextResponse.json({ 
-        error: "A IA não conseguiu identificar conceitos importantes para transformar em flashcards neste trecho." 
-      }, { status: 400 });
+      return NextResponse.json({
+        message: "Nenhum conceito importante foi identificado para transformar em flashcards neste trecho.",
+        count: 0,
+        flashcards: []
+      });
     }
 
     // 6. Save to database with full traceability
-    const limitedCards = generatedCards.slice(0, 15);
+    const limitedCards = generatedCards.slice(0, 8);
     const savedCards = await prisma.$transaction(
       limitedCards.map(card => 
         (prisma as any).flashcard.create({
@@ -96,10 +98,10 @@ export async function POST(
             answer: card.answer,
             type: card.type,
             difficulty: card.difficulty,
-            status: "APPROVED",
+            status: "PENDING_APPROVAL",
             reviewState: "NEW",       
             nextReviewAt: new Date(),      
-            approvedAt: new Date(),
+            approvedAt: null,
             learningStep: 0,
             easeFactor: 2.5,
             intervalDays: 0,

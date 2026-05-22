@@ -31,15 +31,15 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-// Dias úteis: segunda (1) a sábado (6)
-function isStudyDay(date: Date): boolean {
+// Dias úteis de acordo com as preferências do usuário
+function isStudyDay(date: Date, studyDays: number[] = [1, 2, 3, 4, 5, 6]): boolean {
   const day = date.getDay(); // 0=Dom, 6=Sab
-  return day >= 1 && day <= 6;
+  return studyDays.includes(day);
 }
 
-function getNextStudyDay(from: Date): Date {
+function getNextStudyDay(from: Date, studyDays: number[] = [1, 2, 3, 4, 5, 6]): Date {
   let d = new Date(from);
-  while (!isStudyDay(d)) {
+  while (!isStudyDay(d, studyDays)) {
     d = addDays(d, 1);
   }
   return d;
@@ -63,7 +63,15 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
     minutesPerSubject = 60,
   } = options;
 
-  const startDate = options.startDate ?? getNextStudyDay(new Date());
+  // Obter dias de estudo das preferências
+  const userPrefs = await prisma.userPreferences.findUnique({
+    where: { userId }
+  });
+  const studyDays = userPrefs?.studyDaysOfWeek
+    ? userPrefs.studyDaysOfWeek.split(",").map(Number)
+    : [1, 2, 3, 4, 5, 6];
+
+  const startDate = options.startDate ?? getNextStudyDay(new Date(), studyDays);
 
   // 1. Obter todas as matérias do usuário para mapeamento
   const userSubjects = await prisma.studySubject.findMany({
@@ -101,11 +109,16 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
     dbCompletedBlocks.map((b: any) => b.id)
   );
 
-  // Busca TODOS os blocos pendentes do usuário em uma única consulta rápida
+  // Busca TODOS os blocos pendentes do usuário em uma única consulta rápida, ignorando materiais de apoio
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
-      status: { not: "COMPLETED" }
+      status: { not: "COMPLETED" },
+      material: {
+        materialRole: {
+          not: "SUPPORT_MATERIAL"
+        }
+      }
     },
     include: {
       material: true
@@ -123,7 +136,7 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const candidateDate = addDays(startDate, dayOffset);
-    if (!isStudyDay(candidateDate)) continue;
+    if (!isStudyDay(candidateDate, studyDays)) continue;
 
     const cycleDay = dayOffset % 6;
     const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
@@ -265,6 +278,14 @@ export async function generateSimpleSchedule(
 export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
   const now = new Date();
 
+  // Obter dias de estudo das preferências
+  const userPrefs = await prisma.userPreferences.findUnique({
+    where: { userId }
+  });
+  const studyDays = userPrefs?.studyDaysOfWeek
+    ? userPrefs.studyDaysOfWeek.split(",").map(Number)
+    : [1, 2, 3, 4, 5, 6];
+
   // 1. Obter todas as matérias do usuário para mapeamento
   const userSubjects = await prisma.studySubject.findMany({
     where: { userId },
@@ -362,14 +383,19 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
 
   // 5. Redistribuir novos blocos pendentes de teoria nos dias livres do ciclo
   const scheduleItemsData: any[] = [];
-  const startDate = activeSchedule.startDate ?? getNextStudyDay(new Date());
+  const startDate = activeSchedule.startDate ?? getNextStudyDay(new Date(), studyDays);
 
-  // Busca TODOS os blocos pendentes do usuário em uma única consulta rápida
+  // Busca TODOS os blocos pendentes do usuário em uma única consulta rápida, ignorando materiais de apoio
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
       status: { not: "COMPLETED" },
-      id: { notIn: Array.from(completedBlockIds) }
+      id: { notIn: Array.from(completedBlockIds) },
+      material: {
+        materialRole: {
+          not: "SUPPORT_MATERIAL"
+        }
+      }
     },
     include: {
       material: true
@@ -388,7 +414,7 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
   const scheduledBlockIds = new Set<string>(completedBlockIds);
 
   // A data de início para os novos blocos pendentes deve ser hoje
-  let nextAvailableDate = getNextStudyDay(new Date());
+  let nextAvailableDate = getNextStudyDay(new Date(), studyDays);
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const dayNumber = dayOffset + 1;
@@ -400,7 +426,7 @@ export async function reorganizeActiveSchedule(userId: string, daysAhead = 30) {
     // Avança a data para a próxima iteração
     nextAvailableDate = addDays(nextAvailableDate, 1);
 
-    if (!isStudyDay(candidateDate)) continue;
+    if (!isStudyDay(candidateDate, studyDays)) continue;
 
     const cycleDay = dayOffset % 6;
     const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];

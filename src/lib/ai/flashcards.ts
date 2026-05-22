@@ -45,10 +45,10 @@ export async function generateFlashcards(
 
     // Validações básicas e normalização
     return cards
-      .filter(card => card.question && card.answer && card.type)
+      .filter(card => card.question && card.answer)
       .map(card => ({
         ...card,
-        type: (card.type.toUpperCase() === "CLOZE" ? "CLOZE" : "QUESTION_ANSWER") as any,
+        type: "QUESTION_ANSWER" as const,
         difficulty: (["EASY", "MEDIUM", "HARD"].includes(card.difficulty?.toUpperCase?.() ?? "") 
           ? card.difficulty.toUpperCase() 
           : "MEDIUM") as any

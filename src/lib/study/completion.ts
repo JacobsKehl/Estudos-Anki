@@ -157,7 +157,7 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
       },
     });
 
-    // 2. Reopen the associated schedule item (THEORY that matches this block)
+    // 2. Reopen the associated schedule item (THEORY that matches this block and is completed)
     // Find the active schedule first to prioritize updating its item
     const activeSchedule = await (tx as any).studySchedule.findFirst({
       where: { userId, status: "ACTIVE" }
@@ -171,8 +171,9 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
           scheduleId: activeSchedule.id,
           studyBlockId: blockId,
           actionType: "THEORY",
+          status: "COMPLETED",
         },
-        orderBy: { scheduledDate: "desc" }
+        orderBy: { completedAt: "desc" }
       });
     }
 

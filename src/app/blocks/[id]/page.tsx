@@ -25,6 +25,10 @@ export default async function BlockPage({ params }: { params: { id: string } }) 
         where: { userId: mockUserId },
         select: {
           id: true,
+          question: true,
+          answer: true,
+          type: true,
+          difficulty: true,
           status: true
         }
       }

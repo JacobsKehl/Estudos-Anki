@@ -227,12 +227,17 @@ export async function getAdaptiveStudyQueue(
       }
     }
 
-    // 5. Blocos não iniciados → THEORY
+    // 5. Blocos não iniciados → THEORY (ignoring support materials)
     const notStartedBlocks = await (prisma as any).studyBlock.findMany({
       where: {
         subjectId: subject.id,
         userId,
         theoryStatus: "NOT_STARTED",
+        material: {
+          materialRole: {
+            not: "SUPPORT_MATERIAL"
+          }
+        }
       },
       include: {
         material: true

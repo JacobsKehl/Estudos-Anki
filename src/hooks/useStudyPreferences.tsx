@@ -5,27 +5,43 @@ import { toast } from "sonner";
 
 export interface StudyPreferences {
   name: string;
+  displayName: string;
   studyFocus: string;
+  focusArea: string;
   dailyGoalMinutes: number;
+  studyResetTime: string;
+  studyDaysOfWeek: string;
+  defaultBlockDurationMinutes: number;
+  maxNewCardsPerDay: number;
   flashcardDifficulty: string;
   emailReminderEnabled: boolean;
   emailReminderTime: string;
   dailyReminderEmail: string;
   displayDensity: "comfortable" | "compact";
+  visualDensity: "comfortable" | "compact";
   animations: "normal" | "reduced";
+  reducedMotion: boolean;
   theme: "light" | "dark" | "system";
 }
 
 const DEFAULT_PREFERENCES: StudyPreferences = {
   name: "Henrique Kehl",
+  displayName: "Henrique Kehl",
   studyFocus: "Ciência da Computação & Inteligência Artificial",
+  focusArea: "Ciência da Computação & Inteligência Artificial",
   dailyGoalMinutes: 120,
+  studyResetTime: "00:00",
+  studyDaysOfWeek: "1,2,3,4,5",
+  defaultBlockDurationMinutes: 30,
+  maxNewCardsPerDay: 20,
   flashcardDifficulty: "NORMAL_PLUS",
   emailReminderEnabled: true,
   emailReminderTime: "08:00",
   dailyReminderEmail: "gabriela.furtado.p@gmail.com",
   displayDensity: "comfortable",
+  visualDensity: "comfortable",
   animations: "normal",
+  reducedMotion: false,
   theme: "system",
 };
 
@@ -107,15 +123,23 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
         
         // Merge DB preferences into current state, preserving db schema keys
         const merged: StudyPreferences = {
-          name: dbPrefs.name ?? preferences.name,
-          studyFocus: dbPrefs.studyFocus ?? preferences.studyFocus,
+          name: dbPrefs.name ?? dbPrefs.displayName ?? preferences.name,
+          displayName: dbPrefs.displayName ?? dbPrefs.name ?? preferences.displayName,
+          studyFocus: dbPrefs.studyFocus ?? dbPrefs.focusArea ?? preferences.studyFocus,
+          focusArea: dbPrefs.focusArea ?? dbPrefs.studyFocus ?? preferences.focusArea,
           dailyGoalMinutes: Number(dbPrefs.dailyGoalMinutes) || preferences.dailyGoalMinutes,
+          studyResetTime: dbPrefs.studyResetTime ?? preferences.studyResetTime,
+          studyDaysOfWeek: dbPrefs.studyDaysOfWeek ?? preferences.studyDaysOfWeek,
+          defaultBlockDurationMinutes: Number(dbPrefs.defaultBlockDurationMinutes) || preferences.defaultBlockDurationMinutes,
+          maxNewCardsPerDay: Number(dbPrefs.maxNewCardsPerDay) || preferences.maxNewCardsPerDay,
           flashcardDifficulty: dbPrefs.flashcardDifficulty ?? preferences.flashcardDifficulty,
           emailReminderEnabled: dbPrefs.emailReminderEnabled ?? preferences.emailReminderEnabled,
           emailReminderTime: dbPrefs.emailReminderTime ?? preferences.emailReminderTime,
           dailyReminderEmail: dbPrefs.dailyReminderEmail ?? preferences.dailyReminderEmail,
-          displayDensity: (dbPrefs.displayDensity as any) ?? preferences.displayDensity,
+          displayDensity: (dbPrefs.displayDensity ?? dbPrefs.visualDensity as any) ?? preferences.displayDensity,
+          visualDensity: (dbPrefs.visualDensity ?? dbPrefs.displayDensity as any) ?? preferences.visualDensity,
           animations: (dbPrefs.animations as any) ?? preferences.animations,
+          reducedMotion: dbPrefs.reducedMotion ?? (dbPrefs.animations ? dbPrefs.animations === "reduced" : preferences.reducedMotion),
           theme: (dbPrefs.theme as any) ?? preferences.theme,
         };
         

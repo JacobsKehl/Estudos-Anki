@@ -30,7 +30,7 @@ model User {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   
-  // Real preference fields
+  // Real preference fields (DEPRECATED - moving to UserPreferences)
   dailyGoalMinutes       Int                 @default(120)
   studyFocus             String              @default("Ciência da Computação & Inteligência Artificial")
   flashcardDifficulty    String              @default("NORMAL_PLUS")
@@ -41,6 +41,8 @@ model User {
   animations             String              @default("normal")
   theme                  String              @default("light")
 
+  preferences            UserPreferences?
+
   subjects               StudySubject[]
   studyPlans             StudyPlan[]
   flashcards             Flashcard[]
@@ -49,6 +51,28 @@ model User {
   studyBlocks            StudyBlock[]
   studySchedules         StudySchedule[]
   studyScheduleItems     StudyScheduleItem[]
+}
+
+model UserPreferences {
+  id                          String   @id @default(cuid())
+  userId                      String   @unique
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  dailyGoalMinutes            Int      @default(120)
+  studyResetTime              String   @default("00:00")
+  studyDaysOfWeek             String   @default("1,2,3,4,5")
+  defaultBlockDurationMinutes Int      @default(30)
+  maxNewCardsPerDay           Int      @default(20)
+  flashcardDifficulty         String   @default("NORMAL_PLUS")
+  emailReminderEnabled        Boolean  @default(true)
+  emailReminderTime           String   @default("08:00")
+  visualDensity               String   @default("comfortable")
+  reducedMotion               Boolean  @default(false)
+  focusArea                   String   @default("Geral")
+  displayName                 String   @default("Estudante")
+  
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 }
 
 model StudySubject {
