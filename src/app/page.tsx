@@ -31,100 +31,54 @@ export default async function Dashboard() {
   const userId = await getMockUserId();
   const now = new Date();
 
-  // ─── 1. LOAD UNIFIED CARDS (needed for metrics and hero) ──────────────────
-  const unifiedData = await getUnifiedTodayCards(userId);
-  const { cards: todayCards, stats: todayStats } = unifiedData;
+  // ─── PARALLEL INITIAL QUERIES ─────────────────────────────────────────────
+  const todayRange = getTodayRangeSP(now);
+  const todayStart = todayRange.start;
+  const todayEnd = todayRange.end;
 
-  // ─── 2. NEXT BEST ACTION (hero card) ──────────────────────────────────────
+  let unifiedData;
   let subjectsCount = 0;
   let materialsCount = 0;
   let blocksCount = 0;
-  let nextAction = {
-    type: "DASHBOARD",
-    title: "Tudo pronto",
-    description: "Vamos começar a estudar.",
-    cta: "Ver Matérias",
-    href: "/subjects",
-  };
+  let unorganizedMaterial = null;
+  let hasPastPending = null;
+  let initialTodayItems: any[] = [];
 
   try {
-    subjectsCount = await prisma.studySubject.count({ where: { userId } });
-    materialsCount = await prisma.studyMaterial.count({ where: { userId } } as any);
-    blocksCount = await (prisma as any).studyBlock.count({ where: { userId } });
-
-    const unorganizedMaterial = await prisma.studyMaterial.findFirst({
-      where: { userId, organizationStatus: { not: "ORGANIZED" } }
-    });
-
-    if (materialsCount === 0) {
-      nextAction = { type: "NO_MATERIALS", title: "Suba seus PDFs", description: "Envie seus arquivos para a nuvem para começar a organizar seus estudos com IA.", cta: "Ir para Biblioteca", href: "/materials" };
-    } else if (unorganizedMaterial) {
-      nextAction = { type: "NEEDS_ORGANIZATION", title: "Organize seus Estudos", description: "Você tem PDFs aguardando a IA. Organize-os para atualizar seu roteiro.", cta: "Ir para Biblioteca", href: "/materials" };
-    } else if (blocksCount === 0) {
-      nextAction = { type: "NO_BLOCKS", title: "Crie Matérias", description: "Organize seus PDFs em matérias para gerar os blocos de estudo.", cta: "Ver Matérias", href: "/subjects" };
-    } else if (todayStats.total > 0) {
-      nextAction = { type: "REVIEW", title: "Cards do Dia", description: `Você tem ${todayStats.total} flashcards para praticar hoje.`, cta: "Iniciar Revisão", href: "/practice?source=today" };
-    } else {
-      nextAction = { type: "STUDY_TODAY", title: "Foco no Estudo", description: "Siga as tarefas recomendadas abaixo para avançar no seu aprendizado.", cta: "Ver Matérias", href: "/subjects" };
-    }
-  } catch (error) {
-    console.error("Error loading metrics:", error);
-  }
-
-  // ─── 3. ESTUDO DO DIA (only theory blocks from schedule / queue) ──────────
-  let todayItems: any[] = [];
-
-  try {
-    const todayRange = getTodayRangeSP(new Date());
-    const todayStart = todayRange.start;
-    const todayEnd = todayRange.end;
-
-    // Auto-reorganizar se houverem tarefas pendentes no passado
-    const hasPastPending = await (prisma as any).studyScheduleItem.findFirst({
-      where: {
-        userId,
-        status: { in: ["PENDING", "IN_PROGRESS"] },
-        schedule: { status: "ACTIVE" },
-        scheduledDate: { lt: todayStart }
-      }
-    });
-
-    if (hasPastPending) {
-      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
-      await reorganizeActiveSchedule(userId, 30);
-    }
-
-    todayItems = await (prisma as any).studyScheduleItem.findMany({
-      where: {
-        userId,
-        status: { in: ["PENDING", "IN_PROGRESS"] },
-        schedule: { status: "ACTIVE" },
-        scheduledDate: { gte: todayStart, lt: todayEnd },
-      },
-      include: {
-        subject: true,
-        studyBlock: { 
-          include: { 
-            material: true,
-            supportMaterials: {
-              include: { material: true }
-            },
-            _count: {
-              select: { flashcards: true }
-            }
-          } 
+    const [
+      unifiedDataRes,
+      subjectsCountRes,
+      materialsCountRes,
+      blocksCountRes,
+      unorganizedMaterialRes,
+      hasPastPendingRes,
+      todayItemsRes
+    ] = await Promise.all([
+      getUnifiedTodayCards(userId),
+      prisma.studySubject.count({ where: { userId } }),
+      prisma.studyMaterial.count({ where: { userId } } as any),
+      (prisma as any).studyBlock.count({ where: { userId } }),
+      prisma.studyMaterial.findFirst({
+        where: { userId, organizationStatus: { not: "ORGANIZED" } }
+      }),
+      (prisma as any).studyScheduleItem.findFirst({
+        where: {
+          userId,
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+          schedule: { status: "ACTIVE" },
+          scheduledDate: { lt: todayStart }
+        }
+      }),
+      (prisma as any).studyScheduleItem.findMany({
+        where: {
+          userId,
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+          schedule: { status: "ACTIVE" },
+          scheduledDate: { gte: todayStart, lt: todayEnd },
         },
-      },
-      orderBy: { priorityScore: "desc" },
-    });
-
-    // Fallback to adaptive queue if no schedule
-    if (todayItems.length === 0) {
-      const queue = await getAdaptiveStudyQueue(userId, 2);
-      for (const task of queue) {
-        if (task.studyBlockId) {
-          const block = await (prisma as any).studyBlock.findUnique({
-            where: { id: task.studyBlockId },
+        include: {
+          subject: true,
+          studyBlock: { 
             include: { 
               material: true,
               supportMaterials: {
@@ -133,23 +87,125 @@ export default async function Dashboard() {
               _count: {
                 select: { flashcards: true }
               }
-            },
+            } 
+          },
+        },
+        orderBy: { priorityScore: "desc" },
+      })
+    ]);
+
+    unifiedData = unifiedDataRes;
+    subjectsCount = subjectsCountRes;
+    materialsCount = materialsCountRes;
+    blocksCount = blocksCountRes;
+    unorganizedMaterial = unorganizedMaterialRes;
+    hasPastPending = hasPastPendingRes;
+    initialTodayItems = todayItemsRes;
+  } catch (error) {
+    console.error("Error loading dashboard pre-fetch:", error);
+    // Fallback if anything fails
+    unifiedData = await getUnifiedTodayCards(userId);
+  }
+
+  const { stats: todayStats } = unifiedData;
+
+  // ─── NEXT BEST ACTION (hero card) ──────────────────────────────────────
+  let nextAction = {
+    type: "DASHBOARD",
+    title: "Tudo pronto",
+    description: "Vamos começar a estudar.",
+    cta: "Ver Matérias",
+    href: "/subjects",
+  };
+
+  if (materialsCount === 0) {
+    nextAction = { type: "NO_MATERIALS", title: "Suba seus PDFs", description: "Envie seus arquivos para a nuvem para começar a organizar seus estudos com IA.", cta: "Ir para Biblioteca", href: "/materials" };
+  } else if (unorganizedMaterial) {
+    nextAction = { type: "NEEDS_ORGANIZATION", title: "Organize seus Estudos", description: "Você tem PDFs aguardando a IA. Organize-os para atualizar seu roteiro.", cta: "Ir para Biblioteca", href: "/materials" };
+  } else if (blocksCount === 0) {
+    nextAction = { type: "NO_BLOCKS", title: "Crie Matérias", description: "Organize seus PDFs em matérias para gerar os blocos de estudo.", cta: "Ver Matérias", href: "/subjects" };
+  } else if (todayStats.total > 0) {
+    nextAction = { type: "REVIEW", title: "Cards do Dia", description: `Você tem ${todayStats.total} flashcards para praticar hoje.`, cta: "Iniciar Revisão", href: "/practice?source=today" };
+  } else {
+    nextAction = { type: "STUDY_TODAY", title: "Foco no Estudo", description: "Siga as tarefas recomendadas abaixo para avançar no seu aprendizado.", cta: "Ver Matérias", href: "/subjects" };
+  }
+
+  // ─── ESTUDO DO DIA (only theory blocks from schedule / queue) ──────────
+  let todayItems: any[] = [];
+
+  try {
+    if (hasPastPending) {
+      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
+      await reorganizeActiveSchedule(userId, 30);
+      
+      // Re-fetch since it has been reorganized
+      todayItems = await (prisma as any).studyScheduleItem.findMany({
+        where: {
+          userId,
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+          schedule: { status: "ACTIVE" },
+          scheduledDate: { gte: todayStart, lt: todayEnd },
+        },
+        include: {
+          subject: true,
+          studyBlock: { 
+            include: { 
+              material: true,
+              supportMaterials: {
+                include: { material: true }
+              },
+              _count: {
+                select: { flashcards: true }
+              }
+            } 
+          },
+        },
+        orderBy: { priorityScore: "desc" },
+      });
+    } else {
+      todayItems = initialTodayItems;
+    }
+
+    // Fallback to adaptive queue if no schedule
+    if (todayItems.length === 0) {
+      const queue = await getAdaptiveStudyQueue(userId, 2);
+      const queueItemsDetails = await Promise.all(
+        queue.map(async (task) => {
+          if (!task.studyBlockId) return null;
+          const [block, subject] = await Promise.all([
+            (prisma as any).studyBlock.findUnique({
+              where: { id: task.studyBlockId },
+              include: { 
+                material: true,
+                supportMaterials: {
+                  include: { material: true }
+                },
+                _count: {
+                  select: { flashcards: true }
+                }
+              },
+            }),
+            prisma.studySubject.findUnique({ where: { id: task.subjectId } })
+          ]);
+          return { task, block, subject };
+        })
+      );
+
+      for (const details of queueItemsDetails) {
+        if (details && details.block && details.subject) {
+          const { task, block, subject } = details;
+          todayItems.push({
+            id: `queue-${task.studyBlockId}`,
+            actionType: task.type,
+            reason: task.reason,
+            priorityScore: task.priorityScore,
+            estimatedMinutes: task.estimatedMinutes,
+            subject,
+            studyBlock: block,
+            studyBlockId: task.studyBlockId,
+            status: "PENDING",
+            _fromQueue: true,
           });
-          const subject = await prisma.studySubject.findUnique({ where: { id: task.subjectId } });
-          if (block && subject) {
-            todayItems.push({
-              id: `queue-${task.studyBlockId}`,
-              actionType: task.type,
-              reason: task.reason,
-              priorityScore: task.priorityScore,
-              estimatedMinutes: task.estimatedMinutes,
-              subject,
-              studyBlock: block,
-              studyBlockId: task.studyBlockId,
-              status: "PENDING",
-              _fromQueue: true,
-            });
-          }
         }
       }
     }

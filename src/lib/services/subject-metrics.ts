@@ -22,28 +22,45 @@ export interface SubjectMetrics {
  * Service to calculate metrics and health for a specific subject
  */
 export async function getSubjectMetrics(subjectId: string, userId: string): Promise<SubjectMetrics> {
-  // 1. Fetch counts
-  const subject = await prisma.studySubject.findUnique({
-    where: { id: subjectId },
-    include: {
-      _count: {
-        select: {
-          materials: true,
-          studyBlocks: true,
-          flashcards: true,
-        }
-      },
-      studyBlocks: {
-        select: { status: true }
-      },
-      flashcards: {
-        select: { 
-          status: true,
-          nextReviewAt: true,
+  // Fetch subject counts/details, reviews, and last studied block in parallel to avoid sequential query waterfall
+  const [subject, reviews, lastBlock] = await Promise.all([
+    prisma.studySubject.findUnique({
+      where: { id: subjectId },
+      include: {
+        _count: {
+          select: {
+            materials: true,
+            studyBlocks: true,
+            flashcards: true,
+          }
+        },
+        studyBlocks: {
+          select: { status: true }
+        },
+        flashcards: {
+          select: { 
+            status: true,
+            nextReviewAt: true,
+            easeFactor: true,
+          }
         }
       }
-    }
-  });
+    }),
+    prisma.flashcardReview.findMany({
+      where: {
+        userId,
+        flashcard: { subjectId }
+      },
+      select: { rating: true },
+      orderBy: { reviewedAt: 'desc' },
+      take: 100 // Last 100 reviews for health calculation
+    }),
+    (prisma as any).studyBlock.findFirst({
+      where: { subjectId, status: 'COMPLETED' },
+      orderBy: { updatedAt: 'desc' },
+      select: { updatedAt: true }
+    })
+  ]);
 
   if (!subject) throw new Error("Subject not found");
 
@@ -57,17 +74,6 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
     f.status === 'APPROVED' && f.nextReviewAt && f.nextReviewAt <= now
   ).length;
 
-  // 3. Accuracy Rate (from actual reviews)
-  const reviews = await prisma.flashcardReview.findMany({
-    where: {
-      userId,
-      flashcard: { subjectId }
-    },
-    select: { rating: true },
-    orderBy: { reviewedAt: 'desc' },
-    take: 100 // Last 100 reviews for health calculation
-  });
-
   const correctReviews = reviews.filter(r => r.rating >= 3).length; // 3=Good, 4=Easy
   const accuracyRate = reviews.length > 0 ? (correctReviews / reviews.length) * 100 : 100;
 
@@ -78,13 +84,6 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
 
   // 5. Health Logic
   let health: SubjectHealth = 'GOOD';
-  
-  // Weights for health
-  // - High due reviews (>10) -> Attention
-  // - High due reviews (>30) -> Critical
-  // - Accuracy < 70% -> Attention
-  // - Accuracy < 50% -> Critical
-  // - Progress = 100% AND Accuracy > 90% AND Due = 0 -> Excellent
   
   if (dueReviews > 30 || accuracyRate < 50) {
     health = 'CRITICAL';
@@ -100,12 +99,6 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
   const criticalCards = subject.flashcards.filter(f => 
     f.status === 'APPROVED' && (f as any).easeFactor < 1.3
   ).length;
-
-  const lastBlock = await (prisma as any).studyBlock.findFirst({
-    where: { subjectId, status: 'COMPLETED' },
-    orderBy: { updatedAt: 'desc' },
-    select: { updatedAt: true }
-  });
 
   return {
     totalMaterials: subject._count.materials,
@@ -146,8 +139,27 @@ export async function getAllSubjectsMetrics(userId: string) {
  * Get global study metrics for the user
  */
 export async function getGlobalMetrics(userId: string) {
-  const subjectsMetrics = await getAllSubjectsMetrics(userId);
-  const now = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  // Fetch subject metrics, reviews heatmap, and mastery breakdown in parallel
+  const [subjectsMetrics, reviews, flashcards] = await Promise.all([
+    getAllSubjectsMetrics(userId),
+    prisma.flashcardReview.findMany({
+      where: {
+        userId,
+        reviewedAt: { gte: thirtyDaysAgo }
+      },
+      select: {
+        reviewedAt: true
+      }
+    }),
+    (prisma as any).flashcard.groupBy({
+      by: ['reviewState'],
+      where: { userId, status: 'APPROVED' },
+      _count: { _all: true }
+    })
+  ]);
   
   // Total summary
   const summary = {
@@ -165,20 +177,6 @@ export async function getGlobalMetrics(userId: string) {
       : 0
   };
 
-  // Heatmap Data (Last 30 days of study)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  const reviews = await prisma.flashcardReview.findMany({
-    where: {
-      userId,
-      reviewedAt: { gte: thirtyDaysAgo }
-    },
-    select: {
-      reviewedAt: true
-    }
-  });
-
   // Group by date (ignoring time)
   const heatmap: Record<string, number> = {};
   reviews.forEach(review => {
@@ -188,15 +186,6 @@ export async function getGlobalMetrics(userId: string) {
     } catch (e) {
       // Ignore
     }
-  });
-
-
-
-  // Study states (Mastery breakdown)
-  const flashcards = await (prisma as any).flashcard.groupBy({
-    by: ['reviewState'],
-    where: { userId, status: 'APPROVED' },
-    _count: { _all: true }
   });
 
   const mastery = {

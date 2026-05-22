@@ -19,21 +19,7 @@ export default async function SchedulePage() {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    // Auto-reorganizar se houverem tarefas pendentes no passado
-    const hasPastPending = await (prisma as any).studyScheduleItem.findFirst({
-      where: {
-        userId: mockUserId,
-        status: { in: ["PENDING", "IN_PROGRESS"] },
-        schedule: { status: "ACTIVE" },
-        scheduledDate: { lt: todayStart }
-      }
-    });
-
-    if (hasPastPending) {
-      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
-      await reorganizeActiveSchedule(mockUserId, 30);
-    }
-
+    // Fetch the active schedule first
     schedule = await (prisma as any).studySchedule.findFirst({
       where: { userId: mockUserId, status: "ACTIVE" },
       include: {
@@ -54,6 +40,42 @@ export default async function SchedulePage() {
         }
       }
     });
+
+    if (schedule && schedule.items) {
+      // In-memory check for past pending items
+      const hasPastPending = schedule.items.some((item: any) => 
+        (item.status === "PENDING" || item.status === "IN_PROGRESS") && 
+        item.scheduledDate && 
+        new Date(item.scheduledDate) < todayStart
+      );
+
+      if (hasPastPending) {
+        console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
+        await reorganizeActiveSchedule(mockUserId, 30);
+
+        // Re-fetch the schedule since it was reorganized in the DB
+        schedule = await (prisma as any).studySchedule.findFirst({
+          where: { userId: mockUserId, status: "ACTIVE" },
+          include: {
+            items: {
+              include: {
+                subject: true,
+                studyBlock: {
+                  include: {
+                    supportMaterials: {
+                      include: { material: true }
+                    },
+                    material: true
+                  }
+                },
+                material: true
+              },
+              orderBy: { dayNumber: "asc" }
+            }
+          }
+        });
+      }
+    }
   } catch (error) {
     console.error("Failed to fetch schedule:", error);
   }
