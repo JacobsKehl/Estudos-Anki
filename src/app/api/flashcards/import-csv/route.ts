@@ -167,8 +167,10 @@ export async function POST(req: NextRequest) {
       subjectMap["Português"] = subjectMap["Língua Portuguesa"];
     }
 
-    // Garantir que a matéria de fallback "Revisão Geral TRT" existe
-    let fallbackSubjectId = subjectMap["Revisão Geral TRT"];
+    // Garantir que a matéria de fallback exista
+    const fallbackSubjectIdFromRequest = formData.get("fallbackSubjectId") as string | null;
+    let fallbackSubjectId = fallbackSubjectIdFromRequest || subjectMap["Revisão Geral TRT"];
+    
     if (!fallbackSubjectId) {
       const createdFallback = await prisma.studySubject.create({
         data: {
@@ -243,7 +245,13 @@ export async function POST(req: NextRequest) {
       const detectedSubjectName = detectSubjectForImportedFlashcard(front, back);
       
       // Resolve subject ID
-      let subjectId = subjectMap[detectedSubjectName];
+      let subjectId = null;
+      if (detectedSubjectName === "Revisão Geral TRT" && fallbackSubjectIdFromRequest) {
+        subjectId = fallbackSubjectIdFromRequest;
+      } else {
+        subjectId = subjectMap[detectedSubjectName];
+      }
+
       if (!subjectId) {
         // Se a matéria classificada não existe no banco, tentar criar ou usar fallback
         // Para matérias oficiais do TRT, se não existirem, vamos criar

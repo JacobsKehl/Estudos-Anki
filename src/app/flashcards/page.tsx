@@ -12,6 +12,7 @@ export default async function FlashcardsPage({ searchParams }: { searchParams: {
   const { blockId } = await searchParams;
 
   let flashcards: any[] = [];
+  let subjects: any[] = [];
   try {
     flashcards = await (prisma as any).flashcard.findMany({
       where: { 
@@ -25,8 +26,13 @@ export default async function FlashcardsPage({ searchParams }: { searchParams: {
       },
       orderBy: { createdAt: "desc" }
     });
+
+    subjects = await prisma.studySubject.findMany({
+      where: { userId: mockUserId },
+      orderBy: { name: "asc" }
+    });
   } catch (error) {
-    console.error("Failed to fetch flashcards:", error);
+    console.error("Failed to fetch page data:", error);
   }
 
   return (
@@ -37,7 +43,7 @@ export default async function FlashcardsPage({ searchParams }: { searchParams: {
         description="Área de edição e gerenciamento dos cards gerados automaticamente."
       />
 
-      <FlashcardRepository initialFlashcards={flashcards} />
+      <FlashcardRepository initialFlashcards={flashcards} subjects={subjects} />
     </div>
   );
 }
