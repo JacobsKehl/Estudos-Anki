@@ -221,7 +221,7 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
     });
 
     // B. Selecionar as 2 matérias do dia (Intercalando matérias ACTIVE se houver)
-    let subName1 = subjectsTodayNames[0];
+    const subName1 = subjectsTodayNames[0];
     let subName2 = subjectsTodayNames[1];
 
     if (activeSecondarySubjects.length > 0 && dayOffset % 3 === 0) {
@@ -461,7 +461,7 @@ export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 
     });
 
     // B. Selecionar as 2 matérias do dia (Intercalando matérias ACTIVE se houver)
-    let subName1 = subjectsTodayNames[0];
+    const subName1 = subjectsTodayNames[0];
     let subName2 = subjectsTodayNames[1];
 
     if (activeSecondarySubjects.length > 0 && dayOffset % 3 === 0) {
