@@ -82,6 +82,7 @@ model StudySubject {
   priority         Int                 @default(1)
   examWeight       Float               @default(1.0)
   progress         Float               @default(0)
+  studyPriority    String              @default("PRIMARY")
   userId           String
   user             User                @relation(fields: [userId], references: [id])
   materials        StudyMaterial[]

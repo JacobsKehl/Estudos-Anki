@@ -11,15 +11,106 @@ import { GenerateScheduleCTA } from "@/components/schedule/GenerateScheduleCTA";
 import { PageHeader } from "@/components/ui/page-header";
 import { ReorganizeScheduleButton } from "@/components/schedule/ReorganizeScheduleButton";
 import { reorganizeActiveSchedule } from "@/lib/scheduler";
+import { ActivateSecondaryModal } from "@/components/schedule/ActivateSecondaryModal";
 
 export default async function SchedulePage() {
   const mockUserId = await getMockUserId();
   let schedule: any = null;
+  
+  // ─── 1. FETCH PREFERENCES, SUBJECTS, AND BLOCKS ───
+  let dailyGoalMinutes = 120;
+  let primarySubjects: any[] = [];
+  let activeSecondarySubjects: any[] = [];
+  let secondarySubjects: any[] = [];
+  let excludedSubjects: any[] = [];
+  
+  let remainingDays = 0;
+  let totalRequiredHours = 0;
+  let totalAvailableTheoryHours = 0;
+  let isViable = true;
+  let deficitHours = 0;
+  let suggestedDailyGoal = 120;
+  let dailyTheoryMinutes = 90;
+
+  try {
+    const userPrefs = await prisma.userPreferences.findUnique({
+      where: { userId: mockUserId }
+    });
+    dailyGoalMinutes = userPrefs?.dailyGoalMinutes || 120;
+    dailyTheoryMinutes = dailyGoalMinutes - 30; // 30 mins SRS
+
+    const subjects = await prisma.studySubject.findMany({
+      where: { userId: mockUserId },
+      orderBy: { name: "asc" }
+    });
+
+    primarySubjects = subjects.filter(s => s.studyPriority === "PRIMARY");
+    activeSecondarySubjects = subjects.filter(s => s.studyPriority === "ACTIVE");
+    secondarySubjects = subjects.filter(s => s.studyPriority === "SECONDARY");
+    excludedSubjects = subjects.filter(s => s.studyPriority === "EXCLUDED");
+
+    // Calcular dias restantes até 30/11/2026
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadline = new Date("2026-11-30T23:59:59");
+    
+    if (today < deadline) {
+      const diffTime = deadline.getTime() - today.getTime();
+      remainingDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    }
+
+    const totalAvailableTheoryMinutes = remainingDays * dailyTheoryMinutes;
+    totalAvailableTheoryHours = Math.ceil(totalAvailableTheoryMinutes / 60);
+
+    // Blocos pendentes teóricos (ignora materiais de apoio) das matérias PRIMARY e ACTIVE
+    const activeSubjectIds = [...primarySubjects, ...activeSecondarySubjects].map(s => s.id);
+    const pendingBlocks = await prisma.studyBlock.findMany({
+      where: {
+        userId: mockUserId,
+        subjectId: { in: activeSubjectIds },
+        status: { not: "COMPLETED" },
+        material: {
+          materialRole: { not: "SUPPORT_MATERIAL" }
+        }
+      },
+      include: {
+        subject: { select: { name: true } }
+      }
+    });
+
+    let totalRequiredMinutes = 0;
+    for (const block of pendingBlocks) {
+      if (block.estimatedStudyMinutes && block.estimatedStudyMinutes > 0) {
+        totalRequiredMinutes += block.estimatedStudyMinutes;
+      } else {
+        const pageCount = block.pageEnd - block.pageStart + 1;
+        const isDense = ["direito", "processo", "processual", "regimento", "deficiência", "legislação"].some(k => block.subject.name.toLowerCase().includes(k));
+        const minPerPage = isDense ? 4 : 3;
+        totalRequiredMinutes += pageCount * minPerPage;
+      }
+    }
+
+    totalRequiredHours = Math.ceil(totalRequiredMinutes / 60);
+    isViable = totalRequiredMinutes <= totalAvailableTheoryMinutes;
+
+    if (!isViable) {
+      const deficitMinutes = totalRequiredMinutes - totalAvailableTheoryMinutes;
+      deficitHours = Math.ceil(deficitMinutes / 60);
+
+      if (remainingDays > 0) {
+        const neededDailyTheory = Math.ceil(totalRequiredMinutes / remainingDays);
+        suggestedDailyGoal = neededDailyTheory + 30; // +30 srs
+      }
+    }
+  } catch (error) {
+    console.error("Failed to calculate viability stats:", error);
+  }
+
+  // ─── 2. ACTIVE SCHEDULE RUN REORGANIZATION & FETCH ───
   try {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    // Fetch the active schedule first
     schedule = await (prisma as any).studySchedule.findFirst({
       where: { userId: mockUserId, status: "ACTIVE" },
       include: {
@@ -42,7 +133,6 @@ export default async function SchedulePage() {
     });
 
     if (schedule && schedule.items) {
-      // In-memory check for past pending items
       const hasPastPending = schedule.items.some((item: any) => 
         (item.status === "PENDING" || item.status === "IN_PROGRESS") && 
         item.scheduledDate && 
@@ -53,7 +143,6 @@ export default async function SchedulePage() {
         console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
         await reorganizeActiveSchedule(mockUserId, 30);
 
-        // Re-fetch the schedule since it was reorganized in the DB
         schedule = await (prisma as any).studySchedule.findFirst({
           where: { userId: mockUserId, status: "ACTIVE" },
           include: {
@@ -84,7 +173,7 @@ export default async function SchedulePage() {
     return <GenerateScheduleCTA />;
   }
 
-  // --- HELPER: Get human-readable day label ---
+  // Helper label data
   function getScheduleDayLabel(date: Date | string): { label: string; dateLabel: string } {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -100,7 +189,6 @@ export default async function SchedulePage() {
     return { label: `D+${diffDays}`, dateLabel };
   }
 
-  // --- Separate active items from completed items ---
   const allItems = schedule.items.filter(
     (item: any) => item.actionType !== "REVIEW_FLASHCARDS" && item.actionType !== "PRACTICE_CARDS"
   );
@@ -108,7 +196,6 @@ export default async function SchedulePage() {
   const activeItems = allItems.filter((item: any) => item.status !== "COMPLETED");
   const completedItems = allItems.filter((item: any) => item.status === "COMPLETED");
 
-  // Group ACTIVE items by scheduledDate
   const groupedActive = activeItems.reduce((acc: any, item: any) => {
     const dateKey = item.scheduledDate
       ? new Date(item.scheduledDate).toISOString().split("T")[0]
@@ -118,7 +205,6 @@ export default async function SchedulePage() {
     return acc;
   }, {});
 
-  // Sort date groups chronologically
   const sortedDateKeys = Object.keys(groupedActive).sort((a, b) => {
     const dateA = groupedActive[a].date ? new Date(groupedActive[a].date).getTime() : 0;
     const dateB = groupedActive[b].date ? new Date(groupedActive[b].date).getTime() : 0;
@@ -140,13 +226,103 @@ export default async function SchedulePage() {
         title="Roteiro de Estudo"
         description="Visualize sua jornada de aprendizado completa organizada por blocos teóricos."
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <ActivateSecondaryModal secondarySubjects={secondarySubjects} />
           <ReorganizeScheduleButton />
           <Link href="/">
             <Button variant="outline" className="rounded-xl">Voltar ao Hoje</Button>
           </Link>
         </div>
       </PageHeader>
+
+      {/* ─── VIABILITY PANEL ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Viability Main Alert Card */}
+        <div className={cn(
+          "lg:col-span-2 border rounded-[2rem] p-6 shadow-sm flex flex-col justify-between gap-4",
+          isViable 
+            ? "bg-accent/5 border-accent/25 text-foreground" 
+            : "bg-amber-50/20 border-amber-200/50 text-foreground"
+        )}>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-8 h-8 rounded-xl flex items-center justify-center shrink-0",
+                isViable ? "bg-accent/15 text-accent" : "bg-amber-100/50 text-amber-700"
+              )}>
+                {isViable ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+              </div>
+              <h3 className={cn(
+                "text-sm font-bold uppercase tracking-wider",
+                isViable ? "text-accent" : "text-amber-800"
+              )}>
+                {isViable ? "Cronograma Viável" : "Viabilidade do Cronograma"}
+              </h3>
+            </div>
+            
+            {isViable ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                🎉 <strong>Seu plano de estudos é viável!</strong> Todo o conteúdo das matérias ativas cabe no prazo estabelecido (até 30/11/2026) com a sua meta diária atual de <strong>{dailyGoalMinutes} min/dia</strong>.
+              </p>
+            ) : (
+              <div className="space-y-2 text-sm text-muted-foreground leading-relaxed">
+                <p>
+                  ⚠️ <strong>Atenção:</strong> o conteúdo principal não cabe integralmente até <strong>30/11/2026</strong> com a carga diária atual.
+                </p>
+                <p>
+                  Com a meta atual de <strong>{dailyGoalMinutes} min/dia</strong>, faltam aproximadamente <strong className="text-amber-800 font-bold">{deficitHours} horas</strong> para cobrir todo o conteúdo teórico.
+                </p>
+                <p className="text-xs bg-amber-50/60 border border-amber-200 p-3 rounded-xl text-amber-850 font-medium leading-relaxed">
+                  💡 Para concluir todo o conteúdo dentro do prazo, a meta diária sugerida seria de aproximadamente <strong>{suggestedDailyGoal} minutos</strong>.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center justify-between text-xs text-muted-foreground/60 border-t border-border/40 pt-4">
+            <span>Prazo Final: <strong>30/11/2026</strong></span>
+            <span>Dias Restantes: <strong>{remainingDays} dias</strong></span>
+          </div>
+        </div>
+
+        {/* Carga Horária Stats Card */}
+        <div className="bg-card border border-border/40 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between">
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+              Análise de Carga Teórica
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs py-1 border-b border-border/20">
+                <span className="text-muted-foreground">Total Necessário (Teoria)</span>
+                <span className="font-semibold text-foreground">{totalRequiredHours} horas</span>
+              </div>
+              <div className="flex justify-between items-center text-xs py-1 border-b border-border/20">
+                <span className="text-muted-foreground">Total Disponível (Teoria)</span>
+                <span className="font-semibold text-foreground">{totalAvailableTheoryHours} horas</span>
+              </div>
+              <div className="flex justify-between items-center text-xs py-1">
+                <span className="text-muted-foreground">Carga Diária Atual (Teoria)</span>
+                <span className="font-semibold text-foreground">{dailyTheoryMinutes} min/dia</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-muted/30 border border-border/30 rounded-2xl p-4 mt-4 text-center">
+            <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Matérias no Ciclo Principal</span>
+            <span className="text-lg font-black text-accent mt-1 block">
+              {primarySubjects.length + activeSecondarySubjects.length} ativas
+            </span>
+            {secondarySubjects.length > 0 && (
+              <div className="mt-3 text-xs bg-muted/40 border border-border/30 p-3 rounded-xl flex justify-between items-center">
+                <span className="text-muted-foreground text-[10px]">Secundárias aguardando:</span>
+                <Badge variant="outline" className="bg-accent/5 text-accent border-accent/20 rounded-md font-bold text-[9px] py-0">
+                  {secondarySubjects.length} matérias
+                </Badge>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* ─── ACTIVE SCHEDULE (Pending/Future items) ─── */}
       {sortedDateKeys.length > 0 ? (
@@ -160,7 +336,6 @@ export default async function SchedulePage() {
 
             return (
               <div key={dateKey} className="relative pl-12 space-y-4">
-                {/* Timeline node */}
                 <div
                   className={cn(
                     "absolute left-0 top-1 flex h-10 w-10 items-center justify-center rounded-full border-2 bg-background z-10 transition-colors",
@@ -172,7 +347,6 @@ export default async function SchedulePage() {
                   <Calendar className="w-4 h-4" />
                 </div>
 
-                {/* Day header */}
                 <div className="flex items-center gap-3">
                   <div>
                     <h2
@@ -195,7 +369,6 @@ export default async function SchedulePage() {
                   <div className="h-px flex-1 bg-border/30" />
                 </div>
 
-                {/* Items grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {group.items.map((item: any) => (
                     <div
@@ -232,7 +405,6 @@ export default async function SchedulePage() {
                         </span>
                       </div>
 
-                      {/* Support materials */}
                       <div className="flex flex-col gap-2 pt-1 border-t border-border/40">
                         {(() => {
                           const supports = item.studyBlock?.supportMaterials || [];
@@ -301,7 +473,6 @@ export default async function SchedulePage() {
                         })()}
                       </div>
 
-                      {/* Action button */}
                       <div className="pt-2 flex gap-2">
                         <Link href="/" className="flex-1">
                           <Button variant="primary" size="sm" className="w-full rounded-xl gap-2 font-bold">

@@ -49,7 +49,8 @@ function generateEmailHtml(
   todayCardsCount: number,
   yesterdayStats: { completed: number; pending: number; skipped: number },
   yesterdayItems: any[],
-  appUrl: string
+  appUrl: string,
+  nextTheoryItem?: any
 ) {
   const yesterdayCompletedList = yesterdayItems.filter((i: any) => i.status === "COMPLETED");
   const yesterdayPendingList = yesterdayItems.filter(
@@ -60,13 +61,46 @@ function generateEmailHtml(
     todayTasks.length > 0
       ? todayTasks
           .map(
-            (t) => `
-        <li style="margin-bottom: 8px; font-size: 15px; color: #2d3748; list-style-type: none; padding-left: 0;">
-          <span style="color: #869774; font-weight: bold; margin-right: 6px;">•</span>
-          <strong>${t.subject?.name || "Matéria"}:</strong> ${t.studyBlock?.title || "Bloco de Estudo"}
-          <span style="font-size: 12px; color: #718096; margin-left: 6px;">(${t.estimatedMinutes || 60} min)</span>
-        </li>
-      `
+            (t) => {
+              const material = t.studyBlock?.material || t.material;
+              const pdfName = material 
+                ? (material.originalFileName || (material as any).originalName || material.fileName || (material as any).title || "PDF não identificado") 
+                : "PDF não identificado";
+              const pageStart = t.studyBlock?.pageStart;
+              const pageEnd = t.studyBlock?.pageEnd;
+              const pageRange = pageStart !== undefined && pageEnd !== undefined ? `Páginas: ${pageStart} - ${pageEnd}` : "";
+              const pdfHtml = material 
+                ? `<div style="font-size: 13px; color: #4a5568; margin-top: 2px;">
+                     <strong>PDF:</strong> ${pdfName} ${pageRange ? `(${pageRange})` : ""}
+                   </div>` 
+                : "";
+
+              let actionLabel = "Estudo";
+              if (t.actionType === "THEORY") actionLabel = "Teoria";
+              else if (t.actionType === "QUESTIONS") actionLabel = "Questões";
+              else if (t.actionType === "GENERATE_FLASHCARDS") actionLabel = "Criar Cards";
+              else if (t.actionType === "REVIEW_BLOCK") actionLabel = "Revisar Bloco";
+              else if (t.actionType === "REVIEW_FLASHCARDS") actionLabel = "Revisar Cards";
+              else if (t.actionType === "REINFORCEMENT") actionLabel = "Reforço";
+
+              return `
+                <li style="margin-bottom: 16px; font-size: 15px; color: #2d3748; list-style-type: none; padding-left: 12px; border-left: 3px solid #869774;">
+                  <div style="font-weight: 700; color: #2d3748; font-size: 15px;">
+                    ${t.subject?.name || "Matéria"}
+                  </div>
+                  <div style="font-size: 14px; color: #4a5568; margin-top: 2px;">
+                    <strong>Bloco:</strong> ${t.studyBlock?.title || "Bloco de Estudo"}
+                  </div>
+                  ${pdfHtml}
+                  <div style="font-size: 13px; color: #718096; margin-top: 4px;">
+                    <span style="background-color: #f0f2ed; color: #869774; padding: 2px 6px; border-radius: 4px; font-weight: 500; font-size: 11px; margin-right: 6px; text-transform: uppercase;">
+                      ${actionLabel}
+                    </span>
+                    <strong>Tempo estimado:</strong> ${t.estimatedMinutes || 30} min
+                  </div>
+                </li>
+              `;
+            }
           )
           .join("")
       : `
@@ -102,6 +136,43 @@ function generateEmailHtml(
           )
           .join("")
       : "";
+
+  let nextTheoryItemHtml = "";
+  if (nextTheoryItem) {
+    const nextMaterial = nextTheoryItem.studyBlock?.material || nextTheoryItem.material;
+    const nextPdfName = nextMaterial 
+      ? (nextMaterial.originalFileName || (nextMaterial as any).originalName || nextMaterial.fileName || (nextMaterial as any).title || "PDF não identificado") 
+      : "PDF não identificado";
+    const nextPageStart = nextTheoryItem.studyBlock?.pageStart;
+    const nextPageEnd = nextTheoryItem.studyBlock?.pageEnd;
+    const nextPageRange = nextPageStart !== undefined && nextPageEnd !== undefined ? `Páginas: ${nextPageStart} - ${nextPageEnd}` : "";
+    
+    nextTheoryItemHtml = `
+      <!-- Section: Sugestão de Adiantamento -->
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px; background-color: #f7fafc; border: 1px solid #edf2f7; border-radius: 12px; padding: 20px;">
+        <tr>
+          <td>
+            <h2 style="font-size: 16px; color: #4a5568; margin-top: 0; margin-bottom: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">🚀 Se quiser adiantar</h2>
+            <div style="font-size: 14px; color: #2d3748; line-height: 1.6;">
+              Se sobrar tempo hoje, você pode adiantar a próxima teoria do seu cronograma (sem alterar a data original do agendamento):
+              <div style="margin-top: 10px; padding: 12px; background-color: #ffffff; border: 1px solid #edf2f7; border-radius: 8px; border-left: 3px solid #869774;">
+                <div style="font-weight: 700; color: #2d3748; font-size: 14px; margin-bottom: 4px;">
+                  ${nextTheoryItem.subject?.name || "Matéria"}
+                </div>
+                <div style="font-size: 13px; color: #4a5568; margin-bottom: 2px;">
+                  <strong>Bloco:</strong> ${nextTheoryItem.studyBlock?.title || "Bloco de Estudo"}
+                </div>
+                ${nextMaterial ? `<div style="font-size: 13px; color: #4a5568; margin-bottom: 4px;"><strong>PDF:</strong> ${nextPdfName} ${nextPageRange ? `(${nextPageRange})` : ""}</div>` : ""}
+                <div style="font-size: 12px; color: #718096;">
+                  <strong>Tempo estimado:</strong> ${nextTheoryItem.estimatedMinutes || 30} min
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+    `;
+  }
 
   return `
 <!DOCTYPE html>
@@ -188,6 +259,9 @@ function generateEmailHtml(
                   </td>
                 </tr>
               </table>
+
+              <!-- Section: Sugestão de Adiantamento -->
+              ${nextTheoryItemHtml}
 
               <!-- CTA -->
               <table border="0" cellpadding="0" cellspacing="0" width="100%" style="text-align: center; margin-top: 30px; margin-bottom: 20px;">
@@ -277,7 +351,12 @@ export async function GET(req: NextRequest) {
       },
       include: {
         subject: true,
-        studyBlock: true,
+        studyBlock: {
+          include: {
+            material: true
+          }
+        },
+        material: true
       },
     });
 
@@ -299,7 +378,12 @@ export async function GET(req: NextRequest) {
       },
       include: {
         subject: true,
-        studyBlock: true,
+        studyBlock: {
+          include: {
+            material: true
+          }
+        },
+        material: true
       },
     });
 
@@ -307,6 +391,33 @@ export async function GET(req: NextRequest) {
     const todayTasks = todayItems.filter(
       (i: any) => i.actionType !== "REVIEW_FLASHCARDS" && i.actionType !== "PRACTICE_CARDS"
     );
+
+    // Buscar a sugestão de adiantamento (próximo item teórico pendente a partir de amanhã)
+    const nextTheoryItem = await (prisma as any).studyScheduleItem.findFirst({
+      where: {
+        userId: user.id,
+        status: "PENDING",
+        actionType: "THEORY",
+        scheduledDate: { gte: todayRange.end },
+        subject: {
+          studyPriority: { not: "EXCLUDED" }
+        }
+      },
+      include: {
+        subject: true,
+        studyBlock: {
+          include: {
+            material: true
+          }
+        },
+        material: true
+      },
+      orderBy: [
+        { scheduledDate: "asc" },
+        { dayNumber: "asc" },
+        { id: "asc" }
+      ]
+    });
 
     // 7. Obter contagem de cards SRS para hoje
     let todayCardsCount = 0;
@@ -331,7 +442,8 @@ export async function GET(req: NextRequest) {
         skipped: yesterdaySkipped,
       },
       yesterdayItems,
-      appUrl
+      appUrl,
+      nextTheoryItem
     );
 
     // 9. Envio por Resend (Principal) ou Nodemailer (Fallback)
