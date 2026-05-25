@@ -534,3 +534,6 @@ export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 
 
   return { schedule: activeSchedule, itemsCount: completedItems.length + scheduleItemsData.length };
 }
+
+// Otimização de deploy ativa: regiões de funções alinhadas para sao1 (São Paulo)
+
