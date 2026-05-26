@@ -45,10 +45,20 @@ export default async function ProfilePage() {
     where: { userId, status: "COMPLETED" }
   });
 
-  // 3. Buscar blocos pendentes para cálculo de viabilidade (ignorando material de suporte)
+  // 3. Buscar blocos pendentes para cálculo de viabilidade (ignorando material de suporte) das matérias do ciclo ativo
+  const subjects = await prisma.studySubject.findMany({
+    where: { userId },
+    select: { id: true, studyPriority: true }
+  });
+
+  const activeSubjectIds = subjects
+    .filter(s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE")
+    .map(s => s.id);
+
   const pendingBlocks = await prisma.studyBlock.findMany({
     where: {
       userId,
+      subjectId: { in: activeSubjectIds },
       status: { not: "COMPLETED" },
       material: {
         materialRole: {

@@ -115,6 +115,11 @@ export function ProfilePlanStatus({
             </div>
           </div>
 
+          {/* Aviso de escopo do cálculo */}
+          <p className="text-[10px] text-muted-foreground/60 text-center leading-relaxed pt-2 border-t border-border/10">
+            * O cálculo de viabilidade considera apenas as matérias ativas do ciclo principal. Matérias e atividades secundárias ainda não dispostas no cronograma não estão incluídas.
+          </p>
+
         </div>
 
       </CardContent>
