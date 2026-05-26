@@ -5,12 +5,13 @@ import { Target, CheckCircle2, Award } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface DailyGoalAlertProps {
+  completedMinutes: number;
   totalMinutes: number;
 }
 
 import { useStudyPreferences } from "@/hooks/useStudyPreferences";
 
-export function DailyGoalAlert({ totalMinutes }: DailyGoalAlertProps) {
+export function DailyGoalAlert({ completedMinutes, totalMinutes }: DailyGoalAlertProps) {
   const { preferences, isLoading } = useStudyPreferences();
   const [mounted, setMounted] = useState(false);
 
@@ -34,8 +35,8 @@ export function DailyGoalAlert({ totalMinutes }: DailyGoalAlertProps) {
   const name = preferences.name ? preferences.name.split(" ")[0] : "Estudante";
   const dailyGoal = preferences.dailyGoalMinutes || 120;
 
-  const percentage = Math.min(100, Math.round((totalMinutes / dailyGoal) * 100));
-  const isGoalReached = totalMinutes >= dailyGoal;
+  const percentage = Math.min(100, Math.round((completedMinutes / dailyGoal) * 100));
+  const isGoalReached = completedMinutes >= dailyGoal;
 
   return (
     <div className="bg-gradient-to-r from-card to-butter/20 border border-border/30 rounded-2xl p-6 shadow-sm space-y-4">
@@ -59,14 +60,14 @@ export function DailyGoalAlert({ totalMinutes }: DailyGoalAlertProps) {
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             {isGoalReached
-              ? `Você agendou ou completou ${totalMinutes} minutos de estudos hoje, ultrapassando sua meta diária de ${dailyGoal} minutos!`
-              : `Você tem ${totalMinutes} minutos de estudo recomendados hoje. Isso representa ~${percentage}% da sua meta diária de ${dailyGoal} minutos.`}
+              ? `Você completou ${completedMinutes} minutos de estudos hoje, atingindo sua meta diária de ${dailyGoal} minutos!`
+              : `Você completou ${completedMinutes} minutos de estudo de um total de ${totalMinutes} minutos recomendados hoje. Isso representa ~${percentage}% da sua meta diária de ${dailyGoal} minutos.`}
           </p>
         </div>
         
         <div className="flex items-center gap-2 text-right shrink-0">
           <div className="text-xs font-bold uppercase tracking-wider text-accent">
-            {totalMinutes} / {dailyGoal} <span className="text-[10px] text-muted-foreground">min</span>
+            {completedMinutes} / {dailyGoal} <span className="text-[10px] text-muted-foreground">min</span>
           </div>
         </div>
       </div>

@@ -43,6 +43,7 @@ export default async function Dashboard() {
   let unorganizedMaterial = null;
   let hasPastPending = null;
   let initialTodayItems: any[] = [];
+  let activeSchedule = null;
 
   try {
     const [
@@ -52,7 +53,8 @@ export default async function Dashboard() {
       blocksCountRes,
       unorganizedMaterialRes,
       hasPastPendingRes,
-      todayItemsRes
+      todayItemsRes,
+      activeScheduleRes
     ] = await Promise.all([
       getUnifiedTodayCards(userId),
       prisma.studySubject.count({ where: { userId } }),
@@ -72,7 +74,6 @@ export default async function Dashboard() {
       (prisma as any).studyScheduleItem.findMany({
         where: {
           userId,
-          status: { in: ["PENDING", "IN_PROGRESS"] },
           schedule: { status: "ACTIVE" },
           scheduledDate: { gte: todayStart, lt: todayEnd },
         },
@@ -91,6 +92,9 @@ export default async function Dashboard() {
           },
         },
         orderBy: { priorityScore: "desc" },
+      }),
+      (prisma as any).studySchedule.findFirst({
+        where: { userId, status: "ACTIVE" }
       })
     ]);
 
@@ -101,6 +105,7 @@ export default async function Dashboard() {
     unorganizedMaterial = unorganizedMaterialRes;
     hasPastPending = hasPastPendingRes;
     initialTodayItems = todayItemsRes;
+    activeSchedule = activeScheduleRes;
   } catch (error) {
     console.error("Error loading dashboard pre-fetch:", error);
     // Fallback if anything fails
@@ -134,15 +139,29 @@ export default async function Dashboard() {
   let todayItems: any[] = [];
 
   try {
+    let shouldReorganize = false;
     if (hasPastPending) {
-      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
+      if (activeSchedule) {
+        const scheduleTodayStr = getTodayRangeSP(activeSchedule.updatedAt).dateString;
+        const todayStr = todayRange.dateString;
+        if (scheduleTodayStr !== todayStr) {
+          shouldReorganize = true;
+        } else {
+          console.log(`[Dashboard] Skip auto-reorganization: already ran today (${todayStr})`);
+        }
+      } else {
+        shouldReorganize = true;
+      }
+    }
+
+    if (shouldReorganize) {
+      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado (primeiro carregamento do dia)...");
       await reorganizeActiveSchedule(userId, 30);
       
       // Re-fetch since it has been reorganized
       todayItems = await (prisma as any).studyScheduleItem.findMany({
         where: {
           userId,
-          status: { in: ["PENDING", "IN_PROGRESS"] },
           schedule: { status: "ACTIVE" },
           scheduledDate: { gte: todayStart, lt: todayEnd },
         },
@@ -217,6 +236,16 @@ export default async function Dashboard() {
   const theoryTasks = todayItems.filter(item =>
     item.actionType === "THEORY" || item.actionType === "REVIEW_BLOCK"
   );
+  
+  const pendingTheoryTasks = theoryTasks.filter(item =>
+    item.status === "PENDING" || item.status === "IN_PROGRESS"
+  );
+
+  const completedTheoryTasks = theoryTasks.filter(item =>
+    item.status === "COMPLETED"
+  );
+
+  const completedMinutes = completedTheoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
   const totalMinutes = theoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
 
   const isDayCompleted = theoryTasks.length === 0 && todayStats.total === 0;
@@ -263,7 +292,7 @@ export default async function Dashboard() {
       </section>
 
       {/* Daily progress against minutes target */}
-      <DailyGoalAlert totalMinutes={totalMinutes} />
+      <DailyGoalAlert completedMinutes={completedMinutes} totalMinutes={totalMinutes} />
 
       {/* ══ SEÇÃO 1: ESTUDO DO DIA ═══ teoria, blocos, PDF ═══════════════════ */}
       <section className="space-y-4">
@@ -393,6 +422,13 @@ export default async function Dashboard() {
           </div>
         )}
       </section>
+
+      {/* Next Day Advancement section if today's theory tasks are completed */}
+      {theoryTasks.length > 0 && pendingTheoryTasks.length === 0 && (
+        <div className="pt-6 border-t border-sage-light/60 dark:border-accent/15">
+          <NextDayStudySession userId={userId} />
+        </div>
+      )}
       </>
       )}
     </div>

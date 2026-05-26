@@ -532,6 +532,12 @@ export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 
     });
   }
 
+  // Update activeSchedule updatedAt so rollover logic knows reorganization occurred today
+  await (prisma as any).studySchedule.update({
+    where: { id: activeSchedule.id },
+    data: { updatedAt: now }
+  });
+
   return { schedule: activeSchedule, itemsCount: completedItems.length + scheduleItemsData.length };
 }
 
