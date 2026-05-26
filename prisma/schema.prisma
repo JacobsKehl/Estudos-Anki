@@ -24,6 +24,8 @@ model User {
   name                   String?
   email                  String?             @unique
   passwordHash           String?
+  authUserId             String?             @unique
+  lastLoginAt            DateTime?
   googleAccountConnected Boolean             @default(false)
   googleAccessToken      String?
   googleRefreshToken     String?
@@ -70,6 +72,9 @@ model UserPreferences {
   reducedMotion               Boolean  @default(false)
   focusArea                   String   @default("Geral")
   displayName                 String   @default("Estudante")
+  examGoal                    String   @default("TRT4")
+  deadline                    DateTime?
+  avatarUrl                   String?
   
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt

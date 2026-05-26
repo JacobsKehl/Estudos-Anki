@@ -22,16 +22,19 @@ export interface StudyPreferences {
   animations: "normal" | "reduced";
   reducedMotion: boolean;
   theme: "light" | "dark" | "system";
+  examGoal: string;
+  deadline: string | null;
+  avatarUrl: string | null;
 }
 
 const DEFAULT_PREFERENCES: StudyPreferences = {
-  name: "Henrique Kehl",
-  displayName: "Henrique Kehl",
-  studyFocus: "Ciência da Computação & Inteligência Artificial",
-  focusArea: "Ciência da Computação & Inteligência Artificial",
+  name: "Gabriela Furtado",
+  displayName: "Gabriela",
+  studyFocus: "Estudando para TRT4",
+  focusArea: "Estudando para TRT4",
   dailyGoalMinutes: 120,
   studyResetTime: "00:00",
-  studyDaysOfWeek: "1,2,3,4,5",
+  studyDaysOfWeek: "1,2,3,4,5,6,0", // 7 dias por semana por padrão
   defaultBlockDurationMinutes: 30,
   maxNewCardsPerDay: 20,
   flashcardDifficulty: "NORMAL_PLUS",
@@ -43,6 +46,9 @@ const DEFAULT_PREFERENCES: StudyPreferences = {
   animations: "normal",
   reducedMotion: false,
   theme: "system",
+  examGoal: "TRT4",
+  deadline: "2026-11-30",
+  avatarUrl: null,
 };
 
 interface StudyPreferencesContextType {
@@ -141,6 +147,9 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
           animations: (dbPrefs.animations as any) ?? preferences.animations,
           reducedMotion: dbPrefs.reducedMotion ?? (dbPrefs.animations ? dbPrefs.animations === "reduced" : preferences.reducedMotion),
           theme: (dbPrefs.theme as any) ?? preferences.theme,
+          examGoal: dbPrefs.examGoal ?? preferences.examGoal,
+          deadline: dbPrefs.deadline ? new Date(dbPrefs.deadline).toISOString().split('T')[0] : preferences.deadline,
+          avatarUrl: dbPrefs.avatarUrl ?? preferences.avatarUrl,
         };
         
         setPreferences(merged);

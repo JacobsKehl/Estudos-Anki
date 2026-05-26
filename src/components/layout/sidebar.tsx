@@ -9,7 +9,8 @@ import {
   Target,
   BookMarked,
   Settings,
-  Trophy
+  Trophy,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLockup } from "@/components/brand/BrandLockup";
@@ -54,7 +55,22 @@ export function Sidebar() {
         ))}
       </div>
 
-      <div className="mt-auto border-t border-border p-4">
+      <div className="mt-auto border-t border-border p-4 space-y-1">
+        <Link
+          href="/profile"
+          className={cn(
+            "group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all hover:bg-muted/80",
+            pathname === "/profile"
+              ? "bg-muted text-foreground shadow-[inset_0_0_0_1px_rgba(0,0,0,0.1)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"
+              : "text-muted-foreground"
+          )}
+        >
+          <User className={cn(
+            "h-5 w-5 transition-transform group-hover:scale-110",
+            pathname === "/profile" ? "text-foreground" : "text-muted-foreground"
+          )} />
+          Perfil
+        </Link>
         <Link
           href="/settings"
           className={cn(

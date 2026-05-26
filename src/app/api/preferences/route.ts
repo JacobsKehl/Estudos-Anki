@@ -33,6 +33,9 @@ export async function GET() {
           reducedMotion: user.animations === "reduced",
           focusArea: user.studyFocus,
           displayName: user.name || "Estudante",
+          examGoal: "TRT4",
+          deadline: new Date("2026-11-30T23:59:59"),
+          avatarUrl: null,
         },
       });
       return NextResponse.json({
@@ -107,6 +110,12 @@ export async function POST(request: Request) {
     } else if (body.name !== undefined) {
       data.displayName = body.name;
     }
+
+    if (body.examGoal !== undefined) data.examGoal = body.examGoal;
+    if (body.deadline !== undefined) {
+      data.deadline = body.deadline ? new Date(body.deadline) : null;
+    }
+    if (body.avatarUrl !== undefined) data.avatarUrl = body.avatarUrl;
 
     let updatedPrefs;
     if (!user.preferences) {
