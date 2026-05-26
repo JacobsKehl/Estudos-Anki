@@ -30,14 +30,18 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-// Enforça 7 dias por semana de estudo conforme regras da cliente
-function isStudyDay(date: Date, studyDays: number[] = [0, 1, 2, 3, 4, 5, 6]): boolean {
-  return true;
+// Enforça os dias selecionados nas preferências do estudante
+function isStudyDay(date: Date, studyDays: number[]): boolean {
+  const day = date.getDay(); // 0 = Domingo, 1 = Segunda...
+  return studyDays.includes(day);
 }
 
-function getNextStudyDay(from: Date, studyDays: number[] = [0, 1, 2, 3, 4, 5, 6]): Date {
+function getNextStudyDay(from: Date, studyDays: number[]): Date {
   const d = new Date(from);
   d.setHours(0, 0, 0, 0);
+  while (!isStudyDay(d, studyDays)) {
+    d.setDate(d.getDate() + 1);
+  }
   return d;
 }
 
@@ -119,15 +123,18 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
     dailyMinutes = 120,
   } = options;
 
-  const studyDays = [0, 1, 2, 3, 4, 5, 6]; // 7 dias por semana
+  // Buscar preferências de dias de estudo do usuário
+  const userPrefs = await prisma.userPreferences.findUnique({
+    where: { userId }
+  });
+  const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
+  const studyDays = studyDaysStr.split(",").map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n));
 
   const startDate = options.startDate ?? new Date();
   startDate.setHours(0, 0, 0, 0);
 
   // Calcular dias pendentes de forma rígida até 30/11/2026
   const deadline = new Date("2026-11-30T23:59:59");
-  const diffTime = deadline.getTime() - startDate.getTime();
-  const daysAhead = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   // 1. Obter matérias do usuário
   const userSubjects = await prisma.studySubject.findMany({
@@ -200,91 +207,105 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
   let activeSecondaryIndex = 0;
   const activeSecondarySubjects = eligibleSubjects.filter(s => s.studyPriority === "ACTIVE");
 
-  for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
-    const candidateDate = addDays(startDate, dayOffset);
-    const cycleDay = dayOffset % 6;
-    const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
-    const dayNumber = dayOffset + 1;
+  let currentDate = new Date(startDate);
+  let nextStudyDayNumber = 1;
+  let cycleDayIndex = 0;
 
-    // A. Lembrete SRS diário (30 min)
-    scheduleItemsData.push({
-      userId,
-      scheduleId: schedule.id,
-      subjectId: eligibleSubjects[0]?.id || "default",
-      actionType: "REVIEW_FLASHCARDS",
-      priorityScore: 100,
-      reason: "Sessão diária de Revisão de Cards (SRS)",
-      dayNumber,
-      scheduledDate: candidateDate,
-      estimatedMinutes: 30,
-      status: "PENDING",
-    });
+  while (currentDate.getTime() <= deadline.getTime()) {
+    const isStudy = isStudyDay(currentDate, studyDays);
+    
+    if (isStudy) {
+      const candidateDate = new Date(currentDate);
+      const dayNumber = nextStudyDayNumber;
+      nextStudyDayNumber++;
+      
+      const cycleDay = cycleDayIndex % 6;
+      cycleDayIndex++;
+      
+      const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
 
-    // B. Selecionar as 2 matérias do dia (Intercalando matérias ACTIVE se houver)
-    const subName1 = subjectsTodayNames[0];
-    let subName2 = subjectsTodayNames[1];
+      // A. Lembrete SRS diário (30 min)
+      scheduleItemsData.push({
+        userId,
+        scheduleId: schedule.id,
+        subjectId: eligibleSubjects[0]?.id || "default",
+        actionType: "REVIEW_FLASHCARDS",
+        priorityScore: 100,
+        reason: "Sessão diária de Revisão de Cards (SRS)",
+        dayNumber,
+        scheduledDate: candidateDate,
+        estimatedMinutes: 30,
+        status: "PENDING",
+      });
 
-    if (activeSecondarySubjects.length > 0 && dayOffset % 3 === 0) {
-      const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
-      subName2 = secSubject.name;
-      activeSecondaryIndex++;
-    }
+      // B. Selecionar as 2 matérias do dia (Intercalando matérias ACTIVE se houver)
+      const subName1 = subjectsTodayNames[0];
+      let subName2 = subjectsTodayNames[1];
 
-    const subject1 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName1.toLowerCase()));
-    const subject2 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName2.toLowerCase()));
+      if (activeSecondarySubjects.length > 0 && cycleDayIndex % 3 === 0) {
+        const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
+        subName2 = secSubject.name;
+        activeSecondaryIndex++;
+      }
 
-    const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
-    const theoryMinutes = dailyMinutes - 30;
-    const targetPerSubject = theoryMinutes / 2;
-    let remainingTheoryMinutes = theoryMinutes;
+      const subject1 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName1.toLowerCase()));
+      const subject2 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName2.toLowerCase()));
 
-    for (let i = 0; i < subjectsToSchedule.length; i++) {
-      const subject = subjectsToSchedule[i];
-      const targetForThisSubject = i === 0 ? Math.min(targetPerSubject, remainingTheoryMinutes) : remainingTheoryMinutes;
-      let scheduledMinutesForThisSubject = 0;
+      const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
+      const theoryMinutes = dailyMinutes - 30;
+      const targetPerSubject = theoryMinutes / 2;
+      let remainingTheoryMinutes = theoryMinutes;
 
-      while (scheduledMinutesForThisSubject < targetForThisSubject) {
-        // Encontra o próximo bloco
-        let nextBlock = allPendingBlocks.find((b: any) =>
-          b.subjectId === subject.id &&
-          !scheduledBlockIds.has(b.id)
-        );
+      for (let i = 0; i < subjectsToSchedule.length; i++) {
+        const subject = subjectsToSchedule[i];
+        const targetForThisSubject = i === 0 ? Math.min(targetPerSubject, remainingTheoryMinutes) : remainingTheoryMinutes;
+        let scheduledMinutesForThisSubject = 0;
 
-        // Fallback para outra matéria ativa se não encontrar mais blocos
-        if (!nextBlock) {
-          const fallbackSubjects = eligibleSubjects.filter(s => s.id !== subject.id);
-          for (const fs of fallbackSubjects) {
-            nextBlock = allPendingBlocks.find((b: any) =>
-              b.subjectId === fs.id &&
-              !scheduledBlockIds.has(b.id)
-            );
-            if (nextBlock) break;
+        while (scheduledMinutesForThisSubject < targetForThisSubject) {
+          // Encontra o próximo bloco
+          let nextBlock = allPendingBlocks.find((b: any) =>
+            b.subjectId === subject.id &&
+            !scheduledBlockIds.has(b.id)
+          );
+
+          // Fallback para outra matéria ativa se não encontrar mais blocos
+          if (!nextBlock) {
+            const fallbackSubjects = eligibleSubjects.filter(s => s.id !== subject.id);
+            for (const fs of fallbackSubjects) {
+              nextBlock = allPendingBlocks.find((b: any) =>
+                b.subjectId === fs.id &&
+                !scheduledBlockIds.has(b.id)
+              );
+              if (nextBlock) break;
+            }
           }
+
+          if (!nextBlock) break;
+
+          const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
+
+          scheduleItemsData.push({
+            userId,
+            scheduleId: schedule.id,
+            subjectId: nextBlock.subjectId,
+            studyBlockId: nextBlock.id,
+            actionType: "THEORY",
+            priorityScore: 90,
+            reason: `Roteiro: Teoria de ${subject.name}`,
+            dayNumber,
+            scheduledDate: candidateDate,
+            estimatedMinutes: blockMins,
+            status: "PENDING",
+          });
+
+          scheduledBlockIds.add(nextBlock.id);
+          scheduledMinutesForThisSubject += blockMins;
+          remainingTheoryMinutes -= blockMins;
         }
-
-        if (!nextBlock) break;
-
-        const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
-
-        scheduleItemsData.push({
-          userId,
-          scheduleId: schedule.id,
-          subjectId: nextBlock.subjectId,
-          studyBlockId: nextBlock.id,
-          actionType: "THEORY",
-          priorityScore: 90,
-          reason: `Roteiro: Teoria de ${subject.name}`,
-          dayNumber,
-          scheduledDate: candidateDate,
-          estimatedMinutes: blockMins,
-          status: "PENDING",
-        });
-
-        scheduledBlockIds.add(nextBlock.id);
-        scheduledMinutesForThisSubject += blockMins;
-        remainingTheoryMinutes -= blockMins;
       }
     }
+
+    currentDate = addDays(currentDate, 1);
   }
 
   // 5. Salvar em batch
@@ -299,7 +320,13 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
 
 export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 30) {
   const now = new Date();
-  const studyDays = [0, 1, 2, 3, 4, 5, 6]; // 7 dias por semana
+  
+  // Buscar preferências de dias de estudo do usuário
+  const userPrefs = await prisma.userPreferences.findUnique({
+    where: { userId }
+  });
+  const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
+  const studyDays = studyDaysStr.split(",").map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n));
 
   // 1. Obter matérias do usuário
   const userSubjects = await prisma.studySubject.findMany({
@@ -326,14 +353,12 @@ export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 
     return generateSmartSchedule(userId);
   }
 
-  // Calcular dias pendentes até 30/11/2026 a partir de hoje
+  // Calcular prazo final rígido até 30/11/2026
   const deadline = new Date("2026-11-30T23:59:59");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const diffTime = deadline.getTime() - today.getTime();
-  const daysAhead = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  // 3. Identificar itens concluídos
+  // 3. Identificar itens concluídos ou que devem ser mantidos (hoje ou no passado)
   let completedItems = activeSchedule.items.filter((item: any) => item.status === "COMPLETED");
 
   const completedBlockIdsFromSchedule = new Set<string>();
@@ -382,26 +407,40 @@ export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 
     completedItems = [...completedItems, ...newItems];
   }
 
+  // Preservar todos os itens agendados para hoje ou no passado (concluídos ou pendentes)
+  const preservedItems = activeSchedule.items.filter((item: any) => {
+    const itemDate = new Date(item.scheduledDate);
+    itemDate.setHours(0, 0, 0, 0);
+    return itemDate.getTime() <= today.getTime();
+  });
+
   const completedBlockIds = new Set<string>();
   completedItems.forEach((item: any) => {
     if (item.studyBlockId) {
       completedBlockIds.add(item.studyBlockId);
     }
   });
+  preservedItems.forEach((item: any) => {
+    if (item.studyBlockId) {
+      completedBlockIds.add(item.studyBlockId);
+    }
+  });
   dbCompletedBlocks.forEach((b: any) => completedBlockIds.add(b.id));
 
-  // 4. Deletar itens não concluídos
+  // 4. Deletar apenas itens não concluídos agendados para AMANHÃ ou depois
   await (prisma as any).studyScheduleItem.deleteMany({
     where: {
       scheduleId: activeSchedule.id,
-      status: { not: "COMPLETED" }
+      status: { not: "COMPLETED" },
+      scheduledDate: {
+        gt: today
+      }
     }
   });
 
-  const completedDays = new Set<number>(completedItems.map((item: any) => item.dayNumber));
   const scheduleItemsData: any[] = [];
 
-  // Buscar todos os blocos pendentes das matérias elegíveis
+  // Buscar todos os blocos pendentes das matérias elegíveis (não concluídos e não agendados nos itens preservados)
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
@@ -429,101 +468,116 @@ export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 
   });
 
   const scheduledBlockIds = new Set<string>(completedBlockIds);
-  let nextAvailableDate = new Date();
-  nextAvailableDate.setHours(0, 0, 0, 0);
+
+  // Determinar o próximo dia de estudo para começar o agendamento a partir de amanhã
+  const tomorrow = addDays(today, 1);
+  let currentDate = new Date(tomorrow);
+
+  // Calcular qual é o próximo número de dia de estudo e índice no ciclo baseado nos itens que preservamos/concluímos
+  const usedDayNumbers = new Set<number>();
+  preservedItems.forEach((item: any) => usedDayNumbers.add(item.dayNumber));
+  completedItems.forEach((item: any) => usedDayNumbers.add(item.dayNumber));
+  
+  let nextStudyDayNumber = usedDayNumbers.size > 0 ? Math.max(...Array.from(usedDayNumbers)) + 1 : 1;
+  let cycleDayIndex = nextStudyDayNumber - 1;
 
   let activeSecondaryIndex = 0;
   const activeSecondarySubjects = eligibleSubjects.filter(s => s.studyPriority === "ACTIVE");
 
-  for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
-    const dayNumber = dayOffset + 1;
-    
-    if (completedDays.has(dayNumber)) continue;
+  while (currentDate.getTime() <= deadline.getTime()) {
+    const isStudy = isStudyDay(currentDate, studyDays);
 
-    const candidateDate = new Date(nextAvailableDate);
-    nextAvailableDate = addDays(nextAvailableDate, 1);
+    if (isStudy) {
+      const candidateDate = new Date(currentDate);
+      const dayNumber = nextStudyDayNumber;
+      nextStudyDayNumber++;
 
-    const cycleDay = dayOffset % 6;
-    const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
+      const cycleDay = cycleDayIndex % 6;
+      cycleDayIndex++;
 
-    // A. Lembrete SRS
-    scheduleItemsData.push({
-      userId,
-      scheduleId: activeSchedule.id,
-      subjectId: eligibleSubjects[0]?.id || "default",
-      actionType: "REVIEW_FLASHCARDS",
-      priorityScore: 100,
-      reason: "Sessão diária de Revisão de Cards (SRS)",
-      dayNumber,
-      scheduledDate: candidateDate,
-      estimatedMinutes: 30,
-      status: "PENDING",
-    });
+      const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
 
-    // B. Selecionar as 2 matérias do dia (Intercalando matérias ACTIVE se houver)
-    const subName1 = subjectsTodayNames[0];
-    let subName2 = subjectsTodayNames[1];
+      // A. Lembrete SRS
+      scheduleItemsData.push({
+        userId,
+        scheduleId: activeSchedule.id,
+        subjectId: eligibleSubjects[0]?.id || "default",
+        actionType: "REVIEW_FLASHCARDS",
+        priorityScore: 100,
+        reason: "Sessão diária de Revisão de Cards (SRS)",
+        dayNumber,
+        scheduledDate: candidateDate,
+        estimatedMinutes: 30,
+        status: "PENDING",
+      });
 
-    if (activeSecondarySubjects.length > 0 && dayOffset % 3 === 0) {
-      const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
-      subName2 = secSubject.name;
-      activeSecondaryIndex++;
-    }
+      // B. Selecionar as 2 matérias do dia (Intercalando matérias ACTIVE se houver)
+      const subName1 = subjectsTodayNames[0];
+      let subName2 = subjectsTodayNames[1];
 
-    const subject1 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName1.toLowerCase()));
-    const subject2 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName2.toLowerCase()));
+      if (activeSecondarySubjects.length > 0 && cycleDayIndex % 3 === 0) {
+        const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
+        subName2 = secSubject.name;
+        activeSecondaryIndex++;
+      }
 
-    const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
-    const dailyMinutes = activeSchedule.dailyStudyMinutes || 120;
-    const theoryMinutes = dailyMinutes - 30;
-    const targetPerSubject = theoryMinutes / 2;
-    let remainingTheoryMinutes = theoryMinutes;
+      const subject1 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName1.toLowerCase()));
+      const subject2 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName2.toLowerCase()));
 
-    for (let i = 0; i < subjectsToSchedule.length; i++) {
-      const subject = subjectsToSchedule[i];
-      const targetForThisSubject = i === 0 ? Math.min(targetPerSubject, remainingTheoryMinutes) : remainingTheoryMinutes;
-      let scheduledMinutesForThisSubject = 0;
+      const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
+      const dailyMinutes = activeSchedule.dailyStudyMinutes || 120;
+      const theoryMinutes = dailyMinutes - 30;
+      const targetPerSubject = theoryMinutes / 2;
+      let remainingTheoryMinutes = theoryMinutes;
 
-      while (scheduledMinutesForThisSubject < targetForThisSubject) {
-        let nextBlock = allPendingBlocks.find((b: any) =>
-          b.subjectId === subject.id &&
-          !scheduledBlockIds.has(b.id)
-        );
+      for (let i = 0; i < subjectsToSchedule.length; i++) {
+        const subject = subjectsToSchedule[i];
+        const targetForThisSubject = i === 0 ? Math.min(targetPerSubject, remainingTheoryMinutes) : remainingTheoryMinutes;
+        let scheduledMinutesForThisSubject = 0;
 
-        if (!nextBlock) {
-          const fallbackSubjects = eligibleSubjects.filter(s => s.id !== subject.id);
-          for (const fs of fallbackSubjects) {
-            nextBlock = allPendingBlocks.find((b: any) =>
-              b.subjectId === fs.id &&
-              !scheduledBlockIds.has(b.id)
-            );
-            if (nextBlock) break;
+        while (scheduledMinutesForThisSubject < targetForThisSubject) {
+          let nextBlock = allPendingBlocks.find((b: any) =>
+            b.subjectId === subject.id &&
+            !scheduledBlockIds.has(b.id)
+          );
+
+          if (!nextBlock) {
+            const fallbackSubjects = eligibleSubjects.filter(s => s.id !== subject.id);
+            for (const fs of fallbackSubjects) {
+              nextBlock = allPendingBlocks.find((b: any) =>
+                b.subjectId === fs.id &&
+                !scheduledBlockIds.has(b.id)
+              );
+              if (nextBlock) break;
+            }
           }
+
+          if (!nextBlock) break;
+
+          const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
+
+          scheduleItemsData.push({
+            userId,
+            scheduleId: activeSchedule.id,
+            subjectId: nextBlock.subjectId,
+            studyBlockId: nextBlock.id,
+            actionType: "THEORY",
+            priorityScore: 90,
+            reason: `Roteiro: Teoria de ${subject.name}`,
+            dayNumber,
+            scheduledDate: candidateDate,
+            estimatedMinutes: blockMins,
+            status: "PENDING",
+          });
+
+          scheduledBlockIds.add(nextBlock.id);
+          scheduledMinutesForThisSubject += blockMins;
+          remainingTheoryMinutes -= blockMins;
         }
-
-        if (!nextBlock) break;
-
-        const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
-
-        scheduleItemsData.push({
-          userId,
-          scheduleId: activeSchedule.id,
-          subjectId: nextBlock.subjectId,
-          studyBlockId: nextBlock.id,
-          actionType: "THEORY",
-          priorityScore: 90,
-          reason: `Roteiro: Teoria de ${subject.name}`,
-          dayNumber,
-          scheduledDate: candidateDate,
-          estimatedMinutes: blockMins,
-          status: "PENDING",
-        });
-
-        scheduledBlockIds.add(nextBlock.id);
-        scheduledMinutesForThisSubject += blockMins;
-        remainingTheoryMinutes -= blockMins;
       }
     }
+
+    currentDate = addDays(currentDate, 1);
   }
 
   if (scheduleItemsData.length > 0) {
@@ -538,7 +592,7 @@ export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 
     data: { updatedAt: now }
   });
 
-  return { schedule: activeSchedule, itemsCount: completedItems.length + scheduleItemsData.length };
+  return { schedule: activeSchedule, itemsCount: preservedItems.length + scheduleItemsData.length };
 }
 
 // Otimização de deploy ativa: regiões de funções alinhadas para sao1 (São Paulo)
