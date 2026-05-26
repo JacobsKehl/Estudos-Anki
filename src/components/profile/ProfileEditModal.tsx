@@ -39,8 +39,27 @@ export function ProfileEditModal({
 
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState(preferences.dailyGoalMinutes);
   const [studyResetTime, setStudyResetTime] = useState(preferences.studyResetTime || "00:00");
+  const [studyDaysOfWeek, setStudyDaysOfWeek] = useState(preferences.studyDaysOfWeek || "1,2,3,4,5");
   const [emailReminderEnabled, setEmailReminderEnabled] = useState(preferences.emailReminderEnabled);
   const [emailReminderTime, setEmailReminderTime] = useState(preferences.emailReminderTime || "08:00");
+
+  const getActiveDaysCount = (daysStr: string) => {
+    if (!daysStr) return 5;
+    const count = daysStr.split(",").map(d => d.trim()).filter(Boolean).length;
+    if (count <= 3) return 3;
+    if (count <= 5) return 5;
+    return 7;
+  };
+
+  const handleSelectDaysCount = (count: number) => {
+    if (count === 3) {
+      setStudyDaysOfWeek("1,3,5"); // Seg, Qua, Sex
+    } else if (count === 5) {
+      setStudyDaysOfWeek("1,2,3,4,5"); // Seg a Sex
+    } else {
+      setStudyDaysOfWeek("0,1,2,3,4,5,6"); // Todos os dias
+    }
+  };
 
   // Atualiza estados locais quando modal abre ou preferences mudam
   useEffect(() => {
@@ -52,6 +71,7 @@ export function ProfileEditModal({
       setAvatarUrl(preferences.avatarUrl || "");
       setDailyGoalMinutes(preferences.dailyGoalMinutes);
       setStudyResetTime(preferences.studyResetTime || "00:00");
+      setStudyDaysOfWeek(preferences.studyDaysOfWeek || "1,2,3,4,5");
       setEmailReminderEnabled(preferences.emailReminderEnabled);
       setEmailReminderTime(preferences.emailReminderTime || "08:00");
       setActiveTab("identidade"); // Inicia na primeira aba
@@ -73,6 +93,7 @@ export function ProfileEditModal({
         avatarUrl: avatarUrl || null,
         dailyGoalMinutes,
         studyResetTime,
+        studyDaysOfWeek,
         emailReminderEnabled,
         emailReminderTime
       });
@@ -234,6 +255,31 @@ export function ProfileEditModal({
                         {mins} min
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Dias de Estudo por Semana
+                  </Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[3, 5, 7].map((daysCount) => {
+                      const isActive = getActiveDaysCount(studyDaysOfWeek) === daysCount;
+                      return (
+                        <button
+                          key={daysCount}
+                          type="button"
+                          onClick={() => handleSelectDaysCount(daysCount)}
+                          className={`h-10 rounded-xl text-xs font-bold transition-all border ${
+                            isActive
+                              ? "bg-accent border-accent text-accent-foreground shadow-sm"
+                              : "bg-card border-border/60 text-foreground hover:bg-muted/30"
+                          }`}
+                        >
+                          {daysCount} dias {daysCount === 5 ? "(Seg–Sex)" : daysCount === 7 ? "(Todos)" : "(Alternados)"}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
