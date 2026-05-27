@@ -153,7 +153,7 @@ export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
 
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium shrink-0">
           <Clock className="w-3.5 h-3.5" />
-          <span>{item.estimatedMinutes ?? 60} min</span>
+          <span>{item.estimatedMinutes ?? (item.actionType === "REVIEW_BLOCK" ? 0 : 60)} min</span>
         </div>
       </div>
 

@@ -245,8 +245,8 @@ export default async function Dashboard() {
     item.status === "COMPLETED"
   );
 
-  const completedMinutes = completedTheoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
-  const totalMinutes = theoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
+  const completedMinutes = completedTheoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? (i.actionType === "REVIEW_BLOCK" ? 0 : 60)), 0);
+  const totalMinutes = theoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? (i.actionType === "REVIEW_BLOCK" ? 0 : 60)), 0);
 
   const isDayCompleted = theoryTasks.length === 0 && todayStats.total === 0;
 
