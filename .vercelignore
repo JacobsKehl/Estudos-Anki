@@ -6,3 +6,6 @@ dist
 eslint_out.txt
 tmp
 temp
+.env
+.env.*
+.env.local
