@@ -23,3 +23,7 @@ prisma/dev.db-journal
 .env.vercel.production
 .env*.vercel
 .vercel
+
+# Backups e relatórios locais temporários
+scratch/
+
