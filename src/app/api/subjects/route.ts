@@ -24,8 +24,9 @@ export async function GET() {
     return NextResponse.json(subjects);
   } catch (error: unknown) {
     const err = error as Error;
+    console.error("[GET /api/subjects] error:", err);
     return NextResponse.json(
-      { error: "Erro ao buscar matérias", details: err.message },
+      { error: "Não foi possível processar a solicitação." },
       { status: 500 }
     );
   }
@@ -55,9 +56,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(subject, { status: 201 });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error("CRITICAL API ERROR (POST /api/subjects):", err);
+    console.error("[POST /api/subjects] error:", err);
     return NextResponse.json(
-      { error: "Erro ao criar matéria", details: err.message, stack: err.stack },
+      { error: "Não foi possível processar a solicitação." },
       { status: 500 }
     );
   }

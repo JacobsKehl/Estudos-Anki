@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { reorganizeActiveSchedule } from "@/lib/scheduler";
 import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
+import { getMockUserId } from "@/lib/auth-mock";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 
@@ -130,7 +130,7 @@ function generateEmailHtml(
             (t) => `
         <li style="margin-bottom: 6px; font-size: 14px; color: #c53030; list-style-type: none; padding-left: 0;">
           <span style="margin-right: 6px; font-weight: bold;">⚠</span>
-          <strong>${t.subject?.name || "Matéria"}:</strong> ${t.studyBlock?.title || "Bloco de Estudo"} (Movido para hoje)
+          <strong>${t.subject?.name || "Matéria"}:</strong> ${t.studyBlock?.title || "Bloco de Estudo"} (Pendente)
         </li>
       `
           )
@@ -248,7 +248,7 @@ function generateEmailHtml(
                       yesterdayPendingHtml
                         ? `
                       <div style="border-top: 1px dashed #feebc8; margin-top: 12px; padding-top: 12px;">
-                        <span style="font-size: 12px; font-weight: bold; color: #dd6b20; text-transform: uppercase; display: block; margin-bottom: 8px;">Pendências movidas para hoje:</span>
+                        <span style="font-size: 12px; font-weight: bold; color: #dd6b20; text-transform: uppercase; display: block; margin-bottom: 8px;">Pendências de ontem:</span>
                         <ul style="margin: 0; padding: 0;">
                           ${yesterdayPendingHtml}
                         </ul>
@@ -296,242 +296,340 @@ function generateEmailHtml(
   `;
 }
 
+/**
+ * Função isolada e pura (sem efeitos colaterais de reordenação) para compor e enviar o lembrete para um usuário.
+ */
+async function processUserReminder(
+  user: any,
+  isManualTrigger: boolean,
+  todayRange: any,
+  yesterdayRange: any
+) {
+  // Resolve o e-mail sem fallbacks estáticos baseados em strings hardcoded.
+  const targetEmail = user.dailyReminderEmail || user.email;
+  if (!targetEmail) {
+    return {
+      success: false,
+      skipped: true,
+      reason: "Erro: Usuário não possui e-mail cadastrado ou configurado."
+    };
+  }
+
+  // 1. Obter itens do cronograma de ontem
+  const yesterdayItems = await (prisma as any).studyScheduleItem.findMany({
+    where: {
+      userId: user.id,
+      schedule: { status: "ACTIVE" },
+      scheduledDate: { gte: yesterdayRange.start, lt: yesterdayRange.end },
+    },
+    include: {
+      subject: true,
+      studyBlock: {
+        include: {
+          material: true
+        }
+      },
+      material: true
+    },
+  });
+
+  const yesterdayCompleted = yesterdayItems.filter((i: any) => i.status === "COMPLETED").length;
+  const yesterdayPending = yesterdayItems.filter(
+    (i: any) => i.status !== "COMPLETED" && i.status !== "SKIPPED"
+  ).length;
+  const yesterdaySkipped = yesterdayItems.filter((i: any) => i.status === "SKIPPED").length;
+
+  // H4 - REMOVIDO: reorganizeActiveSchedule(user.id, 30);
+  // O cron de e-mail agora é 100% read-only para evitar alterações inesperadas no cronograma.
+
+  // 2. Obter itens agendados para hoje
+  const todayItems = await (prisma as any).studyScheduleItem.findMany({
+    where: {
+      userId: user.id,
+      schedule: { status: "ACTIVE" },
+      scheduledDate: { gte: todayRange.start, lt: todayRange.end },
+    },
+    include: {
+      subject: true,
+      studyBlock: {
+        include: {
+          material: true
+        }
+      },
+      material: true
+    },
+  });
+
+  const todayTasks = todayItems.filter(
+    (i: any) => i.actionType !== "REVIEW_FLASHCARDS" && i.actionType !== "PRACTICE_CARDS"
+  );
+
+  // 3. Buscar a próxima teoria pendente (sugestão de adiantamento)
+  const nextTheoryItem = await (prisma as any).studyScheduleItem.findFirst({
+    where: {
+      userId: user.id,
+      status: "PENDING",
+      actionType: "THEORY",
+      scheduledDate: { gte: todayRange.end },
+      subject: {
+        studyPriority: { not: "EXCLUDED" }
+      }
+    },
+    include: {
+      subject: true,
+      studyBlock: {
+        include: {
+          material: true
+        }
+      },
+      material: true
+    },
+    orderBy: [
+      { scheduledDate: "asc" },
+      { dayNumber: "asc" },
+      { id: "asc" }
+    ]
+  });
+
+  // 4. Obter contagem de cards do SRS
+  let todayCardsCount = 0;
+  try {
+    const unifiedData = await getUnifiedTodayCards(user.id);
+    todayCardsCount = unifiedData.stats.total;
+  } catch (err) {
+    console.error(`[CRON] Erro ao carregar SRS para usuário ${user.id}:`, err);
+  }
+
+  // 5. Renderizar HTML
+  const studentName = user.name || "Estudante";
+  const appUrl = process.env.APP_BASE_URL || "https://kehlstudy.com";
+  const emailHtml = generateEmailHtml(
+    studentName,
+    todayRange.label,
+    todayTasks,
+    todayCardsCount,
+    {
+      completed: yesterdayCompleted,
+      pending: yesterdayPending,
+      skipped: yesterdaySkipped,
+    },
+    yesterdayItems,
+    appUrl,
+    nextTheoryItem
+  );
+
+  // 6. Enviar e-mail
+  let emailSent = false;
+  let provider = "none";
+  let messageId = "";
+
+  const fromName = process.env.EMAIL_FROM || "Kehl Study <noreply@kehlstudy.com>";
+
+  if (process.env.RESEND_API_KEY) {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { data, error } = await resend.emails.send({
+      from: fromName,
+      to: [targetEmail],
+      subject: "Kehl Study — Seus estudos de hoje",
+      html: emailHtml,
+    });
+
+    if (error) {
+      throw new Error(`Resend error: ${error.message}`);
+    }
+
+    emailSent = true;
+    provider = "resend";
+    messageId = data?.id || "";
+  } else if (
+    process.env.SMTP_HOST &&
+    process.env.SMTP_USER &&
+    process.env.SMTP_PASS
+  ) {
+    const smtpPort = parseInt(process.env.SMTP_PORT || "587");
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || fromName,
+      to: targetEmail,
+      subject: "Kehl Study — Seus estudos de hoje",
+      html: emailHtml,
+    });
+
+    emailSent = true;
+    provider = "smtp";
+    messageId = info.messageId;
+  } else if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+    console.log("=== EMAIL CRON FALLBACK (DEV CONSOLE) ===");
+    console.log(`To: ${targetEmail}`);
+    console.log(`Subject: Kehl Study — Seus estudos de hoje`);
+    console.log("=========================================");
+    emailSent = true;
+    provider = "console";
+    messageId = "dev-console-stub";
+  } else {
+    throw new Error("Nenhum provedor de e-mail configurado em produção.");
+  }
+
+  return {
+    success: true,
+    emailSent,
+    provider,
+    messageId,
+    recipient: targetEmail,
+    tasksCount: todayTasks.length,
+    cardsCount: todayCardsCount
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
-    // 1. Validação de Segurança (CRON_SECRET ou manual trigger key)
     const authHeader = req.headers.get("authorization");
     const secret = process.env.CRON_SECRET;
     const manualKey = process.env.MANUAL_TRIGGER_KEY;
     const queryKey = req.nextUrl.searchParams.get("manual_key");
+    const userIdParam = req.nextUrl.searchParams.get("userId");
 
-    // Permite bypass via query param seguro (para envio manual pontual)
-    const isManualTrigger = manualKey && queryKey === manualKey;
+    const isCronSecretValid = secret && authHeader === `Bearer ${secret}`;
+    const isManualKeyValid = manualKey && queryKey === manualKey;
+    const isSystemCall = isCronSecretValid || isManualKeyValid;
 
-    if (!isManualTrigger) {
-      if (process.env.NODE_ENV !== "development") {
-        if (!secret || authHeader !== `Bearer ${secret}`) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let sessionUserId: string | null = null;
+    let sessionUser: any = null;
+    let isAdmin = false;
+
+    // Tentar ler a sessão para chamadas manuais logadas
+    try {
+      sessionUserId = await getMockUserId();
+      if (sessionUserId) {
+        sessionUser = await prisma.user.findUnique({
+          where: { id: sessionUserId },
+          include: { preferences: true },
+        });
+        if (sessionUser) {
+          const adminEmail = process.env.ADMIN_EMAIL || "dev@kehl.study";
+          isAdmin = sessionUser.email === adminEmail;
         }
+      }
+    } catch (err) {
+      // Sem sessão ativa - comum para disparos de cron
+    }
+
+    // 1. Garantir que a chamada é autorizada (sistema ou sessão ativa)
+    if (!isSystemCall && !sessionUser) {
+      return NextResponse.json({ error: "Acesso não autorizado." }, { status: 401 });
+    }
+
+    let targetUsers: any[] = [];
+
+    // 2. Tratar userIdParam (com restrição de privilégio)
+    if (userIdParam) {
+      // O userId por query param só é aceito se a chamada for do sistema (Cron/Manual key) ou admin autenticado
+      if (!isSystemCall && !isAdmin) {
+        return NextResponse.json(
+          { error: "Acesso negado: Apenas administradores podem especificar o userId via query param." },
+          { status: 403 }
+        );
+      }
+
+      const specificUser = await prisma.user.findUnique({
+        where: { id: userIdParam },
+        include: { preferences: true },
+      });
+
+      if (!specificUser) {
+        return NextResponse.json(
+          { error: "Usuário especificado não encontrado." },
+          { status: 404 }
+        );
+      }
+
+      targetUsers = [specificUser];
+    } else {
+      // 3. Sem userIdParam
+      if (isSystemCall) {
+        // Disparo geral do sistema: buscar todos com lembrete habilitado
+        targetUsers = await prisma.user.findMany({
+          where: {
+            preferences: {
+              emailReminderEnabled: true
+            }
+          },
+          include: { preferences: true },
+        });
       } else {
-        if (secret && authHeader !== `Bearer ${secret}`) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        // Chamada autenticada de usuário comum: processa apenas a si mesmo
+        if (sessionUser) {
+          targetUsers = [sessionUser];
         }
       }
     }
 
-    // 2. Localizar usuário destinatário
-    const user = await prisma.user.findFirst();
-
-    if (!user) {
-      return NextResponse.json({ error: "Nenhum usuário encontrado no banco de dados." }, { status: 404 });
-    }
-
-    // Se o lembrete estiver desativado e NÃO for um disparo de teste manual, abortar o envio
-    if (!user.emailReminderEnabled && !isManualTrigger) {
-      return NextResponse.json({ 
-        success: false, 
-        skipped: true, 
-        reason: "Envio cancelado: lembrete diário por e-mail desativado nas configurações do usuário." 
+    if (targetUsers.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "Nenhum usuário qualificado para envio de lembrete diário."
       });
     }
 
-    const targetEmail = user.dailyReminderEmail || "gabriela.furtado.p@gmail.com";
-
-    // 3. Obter datas em America/Sao_Paulo (Ontem e Hoje)
+    // 4. Executar envios
     const now = new Date();
     const yesterdayRange = getDayRangeInSP(now, -1);
     const todayRange = getDayRangeInSP(now, 0);
+    const results = [];
 
-    // 4. Coletar tarefas de ontem antes da reorganização
-    const yesterdayItems = await (prisma as any).studyScheduleItem.findMany({
-      where: {
-        userId: user.id,
-        schedule: { status: "ACTIVE" },
-        scheduledDate: { gte: yesterdayRange.start, lt: yesterdayRange.end },
-      },
-      include: {
-        subject: true,
-        studyBlock: {
-          include: {
-            material: true
-          }
-        },
-        material: true
-      },
-    });
-
-    const yesterdayCompleted = yesterdayItems.filter((i: any) => i.status === "COMPLETED").length;
-    const yesterdayPending = yesterdayItems.filter(
-      (i: any) => i.status !== "COMPLETED" && i.status !== "SKIPPED"
-    ).length;
-    const yesterdaySkipped = yesterdayItems.filter((i: any) => i.status === "SKIPPED").length;
-
-    // 5. Aplicar reorganização ativa leve (carry-over das pendências passadas)
-    await reorganizeActiveSchedule(user.id, 30);
-
-    // 6. Buscar tarefas de hoje atualizadas após carry-over
-    const todayItems = await (prisma as any).studyScheduleItem.findMany({
-      where: {
-        userId: user.id,
-        schedule: { status: "ACTIVE" },
-        scheduledDate: { gte: todayRange.start, lt: todayRange.end },
-      },
-      include: {
-        subject: true,
-        studyBlock: {
-          include: {
-            material: true
-          }
-        },
-        material: true
-      },
-    });
-
-    // Filtra tarefas teóricas ou de exercícios (exclui REVIEW_FLASHCARDS que tem exibição própria)
-    const todayTasks = todayItems.filter(
-      (i: any) => i.actionType !== "REVIEW_FLASHCARDS" && i.actionType !== "PRACTICE_CARDS"
-    );
-
-    // Buscar a sugestão de adiantamento (próximo item teórico pendente a partir de amanhã)
-    const nextTheoryItem = await (prisma as any).studyScheduleItem.findFirst({
-      where: {
-        userId: user.id,
-        status: "PENDING",
-        actionType: "THEORY",
-        scheduledDate: { gte: todayRange.end },
-        subject: {
-          studyPriority: { not: "EXCLUDED" }
+    for (const user of targetUsers) {
+      try {
+        // Disparos manuais ignoram a flag de lembrete desativado se especificados via query param ou manual key
+        const bypassReminderCheck = isManualKeyValid || (userIdParam !== null);
+        const emailReminderEnabled = user.preferences?.emailReminderEnabled !== false;
+        if (!emailReminderEnabled && !bypassReminderCheck) {
+          results.push({
+            userId: user.id,
+            email: user.email,
+            success: false,
+            skipped: true,
+            reason: "Lembrete diário por e-mail desativado nas configurações do usuário."
+          });
+          continue;
         }
-      },
-      include: {
-        subject: true,
-        studyBlock: {
-          include: {
-            material: true
-          }
-        },
-        material: true
-      },
-      orderBy: [
-        { scheduledDate: "asc" },
-        { dayNumber: "asc" },
-        { id: "asc" }
-      ]
-    });
 
-    // 7. Obter contagem de cards SRS para hoje
-    let todayCardsCount = 0;
-    try {
-      const unifiedData = await getUnifiedTodayCards(user.id);
-      todayCardsCount = unifiedData.stats.total;
-    } catch (err) {
-      console.error("Erro ao carregar métricas do SRS:", err);
-    }
-
-    // 8. Renderizar HTML do e-mail
-    const studentName = user.name || "Gabriela";
-    const appUrl = process.env.APP_BASE_URL || "https://kehlstudy.com";
-    const emailHtml = generateEmailHtml(
-      studentName,
-      todayRange.label,
-      todayTasks,
-      todayCardsCount,
-      {
-        completed: yesterdayCompleted,
-        pending: yesterdayPending,
-        skipped: yesterdaySkipped,
-      },
-      yesterdayItems,
-      appUrl,
-      nextTheoryItem
-    );
-
-    // 9. Envio por Resend (Principal) ou Nodemailer (Fallback)
-    let emailSent = false;
-    let provider = "none";
-    let messageId = "";
-
-    const fromName = process.env.EMAIL_FROM || "Kehl Study <noreply@kehlstudy.com>";
-
-    if (process.env.RESEND_API_KEY) {
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      const { data, error } = await resend.emails.send({
-        from: fromName,
-        to: [targetEmail],
-        subject: "Kehl Study — Seus estudos de hoje",
-        html: emailHtml,
-      });
-
-      if (error) {
-        throw new Error(`Resend error: ${error.message}`);
+        const result = await processUserReminder(user, bypassReminderCheck, todayRange, yesterdayRange);
+        results.push({
+          userId: user.id,
+          email: user.email,
+          ...result
+        });
+      } catch (err: any) {
+        console.error(`Erro ao processar lembrete para usuário ${user.id}:`, err);
+        results.push({
+          userId: user.id,
+          email: user.email,
+          success: false,
+          error: err.message || "Erro desconhecido durante o processamento."
+        });
       }
-
-      emailSent = true;
-      provider = "resend";
-      messageId = data?.id || "";
-    } else if (
-      process.env.SMTP_HOST &&
-      process.env.SMTP_USER &&
-      process.env.SMTP_PASS
-    ) {
-      const smtpPort = parseInt(process.env.SMTP_PORT || "587");
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-
-      const info = await transporter.sendMail({
-        from: process.env.SMTP_FROM || fromName,
-        to: targetEmail,
-        subject: "Kehl Study — Seus estudos de hoje",
-        html: emailHtml,
-      });
-
-      emailSent = true;
-      provider = "smtp";
-      messageId = info.messageId;
-    } else if (process.env.NODE_ENV === "development") {
-      console.log("=== EMAIL CRON FALLBACK (DEV CONSOLE) ===");
-      console.log(`To: ${targetEmail}`);
-      console.log(`Subject: Kehl Study — Seus estudos de hoje`);
-      console.log("HTML Content preview: (Ver HTML gerado)");
-      console.log("=========================================");
-      emailSent = true;
-      provider = "console";
-      messageId = "dev-console-stub";
-    } else {
-      return NextResponse.json(
-        { error: "Nenhum provedor de e-mail configurado em produção." },
-        { status: 500 }
-      );
     }
 
-    // 10. Retornar resposta de sucesso
     return NextResponse.json({
       success: true,
-      emailSent,
-      provider,
-      messageId,
-      recipient: targetEmail,
       date: todayRange.label,
-      yesterday: {
-        completed: yesterdayCompleted,
-        pending: yesterdayPending,
-      },
-      today: {
-        tasksCount: todayTasks.length,
-        cardsCount: todayCardsCount,
-      },
+      totalProcessed: targetUsers.length,
+      results
     });
+
   } catch (error: any) {
-    console.error("Erro na rota de Cron de Lembrete Diário:", error);
+    console.error("Erro crítico na rota do cron de lembrete:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Internal Server Error" },
+      { success: false, error: "Erro crítico no servidor durante a execução do cron." },
       { status: 500 }
     );
   }

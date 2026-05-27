@@ -4,6 +4,17 @@
  */
 
 /**
+ * Retorna a diferença de fuso horário de São Paulo em relação ao UTC (em horas) para uma determinada data.
+ * Normalmente retorna 3 (UTC-3), mas compensará de forma 100% dinâmica se houver alterações ou horário de verão.
+ */
+function getSPOffsetHours(date: Date): number {
+  const utcS = date.toLocaleString("en-US", { timeZone: "UTC" });
+  const tzS = date.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
+  const diffMs = new Date(utcS).getTime() - new Date(tzS).getTime();
+  return Math.round(diffMs / 3600000);
+}
+
+/**
  * Retorna o intervalo do dia de hoje (00:00 às 23:59:59 em São Paulo) convertido em UTC.
  * Como São Paulo é UTC-3, 00:00 SP = 03:00 UTC.
  */
@@ -21,8 +32,11 @@ export function getTodayRangeSP(now: Date = new Date(), offsetDays = 0) {
   const month = parseInt(partMap.month) - 1; // 0-indexed
   const day = parseInt(partMap.day);
 
-  // 00:00 local em São Paulo = 03:00 UTC
-  const start = new Date(Date.UTC(year, month, day, 3));
+  // Calcula o offset dinâmico de fuso para este dia específico
+  const tempDate = new Date(Date.UTC(year, month, day, 12));
+  const offset = getSPOffsetHours(tempDate);
+
+  const start = new Date(Date.UTC(year, month, day, offset));
   start.setUTCDate(start.getUTCDate() + offsetDays);
 
   const end = new Date(start);
@@ -45,8 +59,6 @@ export function getTodayRangeSP(now: Date = new Date(), offsetDays = 0) {
  * Exemplo: se agora é 12:00 do dia 21/05, retorna 00:00 do dia 22/05 (representado em UTC às 03:00).
  */
 export function getNextStudyResetAt(now: Date = new Date(), customHour = 0): Date {
-  const utcOffsetHour = (customHour + 3) % 24; // Compensação UTC-3
-
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -62,6 +74,11 @@ export function getNextStudyResetAt(now: Date = new Date(), customHour = 0): Dat
   const month = parseInt(partMap.month) - 1;
   const day = parseInt(partMap.day);
   const hour = parseInt(partMap.hour);
+
+  // Calcula o offset dinâmico de fuso para este dia
+  const tempDate = new Date(Date.UTC(year, month, day, 12));
+  const offset = getSPOffsetHours(tempDate);
+  const utcOffsetHour = (customHour + offset) % 24;
 
   const resetDate = new Date(Date.UTC(year, month, day, utcOffsetHour));
 

@@ -10,10 +10,13 @@ import {
   BookMarked,
   Settings,
   Trophy,
-  User
+  User,
+  LogOut,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLockup } from "@/components/brand/BrandLockup";
+import { useLogout } from "@/hooks/useLogout";
 
 const navItems = [
   { label: "Hoje", href: "/", icon: Target },
@@ -25,6 +28,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { performLogout, isLoggingOut } = useLogout();
 
   return (
     <aside className="fixed left-0 top-0 hidden h-full w-64 flex-col border-r border-border bg-card/50 backdrop-blur-md md:flex">
@@ -86,6 +90,18 @@ export function Sidebar() {
           )} />
           Configurações
         </Link>
+        <button
+          onClick={performLogout}
+          disabled={isLoggingOut}
+          className="w-full group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 cursor-pointer disabled:opacity-50"
+        >
+          {isLoggingOut ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <LogOut className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
+          )}
+          Sair
+        </button>
       </div>
     </aside>
   );

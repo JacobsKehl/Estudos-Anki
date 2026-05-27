@@ -474,10 +474,17 @@ export function FlashcardRepository({ initialFlashcards, subjects }: FlashcardRe
                       {card.subject.name}
                     </span>
                     <ChevronRight className="w-3 h-3" />
-                    <span className="flex items-center gap-1">
-                      <Layers className="w-3 h-3" />
-                      {card.studyBlock?.title || "Bloco s/ nome"}
-                    </span>
+                    {!card.material && !card.studyBlock ? (
+                      <span className="flex items-center gap-1 text-rose-500 font-semibold">
+                        <Layers className="w-3 h-3 text-rose-400" />
+                        Origem removida
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <Layers className="w-3 h-3" />
+                        {card.studyBlock?.title || card.material?.fileName || "Material/Bloco s/ nome"}
+                      </span>
+                    )}
                   </div>
                 </div>
                 
@@ -522,7 +529,17 @@ export function FlashcardRepository({ initialFlashcards, subjects }: FlashcardRe
               {/* Ações */}
               <div className="pt-2 flex flex-wrap gap-2">
                 {/* Ver Fonte — links to block PDF viewer at the source pages */}
-                {card.studyBlock && (
+                {!card.material && !card.studyBlock ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-xl h-8 text-xs text-muted-foreground/60 gap-1.5 hover:bg-rose-50 hover:text-rose-600"
+                    onClick={() => toast.info("A origem deste flashcard foi removida, mas o card foi preservado para manter seu histórico de revisão.")}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Material original não disponível
+                  </Button>
+                ) : card.studyBlock ? (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -537,7 +554,7 @@ export function FlashcardRepository({ initialFlashcards, subjects }: FlashcardRe
                       )}
                     </Link>
                   </Button>
-                )}
+                ) : null}
 
                 {activeTab === "PENDING" && (
                   <>

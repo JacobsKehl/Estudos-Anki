@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateSmartSchedule } from "@/lib/scheduler";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await prisma.user.findFirst();
+    const userId = await getMockUserId();
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
     if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
     const body = await req.json().catch(() => ({}));

@@ -198,6 +198,20 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
     };
   }, [preferences.theme]);
 
+  // Sincronizar logout em multi-abas
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "kehl_auth_logout_event") {
+        window.location.href = "/login";
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   const updatePreferences = async (newPrefs: Partial<StudyPreferences>): Promise<boolean> => {
     // 1. Optimistic Update in UI & localStorage
     const updated = { ...preferences, ...newPrefs };

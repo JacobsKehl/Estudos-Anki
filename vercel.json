@@ -2,7 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["gru1"],
   "functions": {
-    "src/app/api/**/*.ts": {
+    "src/app/api/materials/organize-all/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/materials/[id]/organize/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/materials/[id]/process/route.ts": {
       "maxDuration": 300
     }
   },

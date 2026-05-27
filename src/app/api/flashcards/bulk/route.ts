@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function PATCH(req: NextRequest) {
   try {
+    const userId = await getMockUserId();
     const { ids, status } = await req.json();
 
     if (!Array.isArray(ids) || !status) {
@@ -25,9 +27,11 @@ export async function PATCH(req: NextRequest) {
       updateData.lapseCount = 0;
     }
 
+    // Atualiza apenas os flashcards pertencentes ao próprio usuário autenticado (Anti-IDOR)
     const updated = await (prisma as any).flashcard.updateMany({
       where: {
-        id: { in: ids }
+        id: { in: ids },
+        userId
       },
       data: updateData
     });

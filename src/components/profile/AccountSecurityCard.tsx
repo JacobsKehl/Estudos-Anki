@@ -12,10 +12,12 @@ import {
   CheckCircle2, 
   AlertTriangle,
   Loader2,
-  Lock
+  Lock,
+  LogOut
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChangePasswordModal } from "./ChangePasswordModal";
+import { useLogout } from "@/hooks/useLogout";
 
 interface AccountSecurityCardProps {
   email: string;
@@ -35,6 +37,7 @@ export function AccountSecurityCard({
   const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const { performLogout, isLoggingOut } = useLogout();
 
   // Carregar/gerenciar cooldown persistido no localStorage
   useEffect(() => {
@@ -230,6 +233,21 @@ export function AccountSecurityCard({
           >
             <Lock className="w-3.5 h-3.5" />
             Alterar Senha
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isLoggingOut}
+            onClick={performLogout}
+            className="rounded-xl h-10 text-xs font-bold border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+          >
+            {isLoggingOut ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <LogOut className="w-3.5 h-3.5" />
+            )}
+            Sair da Conta
           </Button>
 
           {!emailVerified && (

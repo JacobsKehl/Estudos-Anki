@@ -1,7 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { getMockUserId } from "@/lib/auth-mock";
+import { checkRateLimit, rateLimitErrorResponse } from "@/lib/rate-limit";
 import { identifySubject, detectStructure, findBestOfficialTopic } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
@@ -535,13 +536,22 @@ export async function POST(req: NextRequest) {
     const materialId = body.materialId as string | undefined;
 
     // 1. Usuário real
-    let user = await prisma.user.findFirst();
-    if (!user) {
-      user = await prisma.user.create({
-        data: { name: "Usuário Dev", email: "dev@kehl.study" }
-      });
+    const userId = await getMockUserId();
+
+    // Rate Limiting: 3 execuções por 30 minutos por usuário (apenas execuções reais, não polling)
+    if (body.getPendingIds !== true) {
+      const rateLimitKey = `organize-all:${userId}`;
+      const rateCheck = await checkRateLimit(rateLimitKey, 3, 1800);
+      if (!rateCheck.success) {
+        return rateLimitErrorResponse(rateCheck.reset);
+      }
     }
-    const userId = user.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    if (!user) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+    }
 
     // Retorna IDs de todos os materiais pendentes para polling real no frontend
     if (body.getPendingIds === true) {

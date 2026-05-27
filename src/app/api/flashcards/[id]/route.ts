@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function PATCH(
   req: NextRequest,
@@ -9,6 +10,17 @@ export async function PATCH(
   const { id } = await params;
 
   try {
+    const userId = await getMockUserId();
+
+    // Validar propriedade do flashcard (ownership)
+    const flashcard = await prisma.flashcard.findFirst({
+      where: { id, userId }
+    });
+
+    if (!flashcard) {
+      return NextResponse.json({ error: "Flashcard não encontrado ou acesso não autorizado." }, { status: 404 });
+    }
+
     const body = await req.json();
     const { question, answer, status, difficulty, type } = body;
 
@@ -41,8 +53,9 @@ export async function PATCH(
     return NextResponse.json(updated);
   } catch (error: unknown) {
     const err = error as Error;
+    console.error("Flashcard patch error:", err);
     return NextResponse.json(
-      { error: "Erro ao atualizar flashcard", details: err.message },
+      { error: "Erro ao atualizar flashcard" },
       { status: 500 }
     );
   }
@@ -55,6 +68,17 @@ export async function DELETE(
   const { id } = await params;
 
   try {
+    const userId = await getMockUserId();
+
+    // Validar propriedade do flashcard (ownership)
+    const flashcard = await prisma.flashcard.findFirst({
+      where: { id, userId }
+    });
+
+    if (!flashcard) {
+      return NextResponse.json({ error: "Flashcard não encontrado ou acesso não autorizado." }, { status: 404 });
+    }
+
     await (prisma as any).flashcard.delete({
       where: { id }
     });
@@ -62,8 +86,9 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
+    console.error("Flashcard delete error:", err);
     return NextResponse.json(
-      { error: "Erro ao excluir flashcard", details: err.message },
+      { error: "Erro ao excluir flashcard" },
       { status: 500 }
     );
   }

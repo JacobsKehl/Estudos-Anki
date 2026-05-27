@@ -1,13 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseConfig, createSupabaseClient, setSessionCookies, syncSupabaseUserWithPrismaUser } from "@/lib/supabase-server";
+import { checkRateLimit, getClientIp, rateLimitErrorResponse } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { email, password, rememberMe } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const email = (body.email || "").toLowerCase().trim();
+    const password = body.password;
+    const rememberMe = body.rememberMe;
 
     if (!email || !password) {
       return NextResponse.json({ error: "E-mail e senha são obrigatórios" }, { status: 400 });
+    }
+
+    // Rate Limiting: 5 tentativas por 10 minutos por IP + e-mail normalizado
+    const ip = getClientIp(request);
+    const rateLimitKey = `login:${ip}:${email}`;
+    const rateCheck = await checkRateLimit(rateLimitKey, 5, 600);
+    if (!rateCheck.success) {
+      return rateLimitErrorResponse(rateCheck.reset);
     }
 
     const { isConfigured } = getSupabaseConfig();

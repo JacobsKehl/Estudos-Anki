@@ -1,25 +1,33 @@
 import { prisma } from "./prisma";
-import { getSessionUser, syncSupabaseUserWithPrismaUser, getSupabaseConfig } from "./supabase-server";
+import { getSessionUser, syncSupabaseUserWithPrismaUser } from "./supabase-server";
 
 /**
- * Retorna o ID do usuário atualmente autenticado.
- * Em desenvolvimento local, se permitido ou se o Supabase não estiver configurado, 
- * fornece o fallback para o usuário mock.
+ * Retorna o ID do usuário atualmente autenticado de forma segura.
+ * Chaveia entre o Supabase Auth real e a simulação de desenvolvimento local
+ * dependendo da configuração de AUTH_MODE e do ambiente atual.
  */
-export async function getMockUserId(): Promise<string> {
-  // 1. Tentar obter o usuário autenticado real da sessão
-  const sessionUser = await getSessionUser();
-  if (sessionUser) {
-    const internalUser = await syncSupabaseUserWithPrismaUser(sessionUser);
-    return internalUser.id;
+export async function getCurrentUserId(): Promise<string> {
+  const isProd = process.env.NODE_ENV === "production";
+  const authMode = process.env.AUTH_MODE || "SUPABASE";
+
+  // Em produção, AUTH_MODE=MOCK é expressamente proibido e seguro.
+  if (isProd && authMode === "MOCK") {
+    throw new Error("Erro de Segurança Crítico: AUTH_MODE=MOCK não é permitido em produção.");
   }
 
-  // 2. Fallback para simulação local se em desenvolvimento e se explicitamente habilitado ou Supabase inativo
-  const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
-  const allowMock = process.env.ALLOW_MOCK_USER === "true";
-  const { isConfigured } = getSupabaseConfig();
+  // Se o modo for Supabase (padrão em produção e recomendado),
+  // tentamos obter o ID real da sessão do Supabase.
+  if (authMode === "SUPABASE" || isProd) {
+    const sessionUser = await getSessionUser();
+    if (sessionUser) {
+      const internalUser = await syncSupabaseUserWithPrismaUser(sessionUser);
+      return internalUser.id;
+    }
+    throw new Error("Acesso não autorizado: Sessão não encontrada ou expirada no Supabase.");
+  }
 
-  if (isDev && (allowMock || !isConfigured)) {
+  // Fallback controlado para simulação local com AUTH_MODE=MOCK em desenvolvimento/teste
+  if (authMode === "MOCK") {
     let user = await prisma.user.findFirst();
     
     if (!user) {
@@ -27,7 +35,13 @@ export async function getMockUserId(): Promise<string> {
         data: {
           name: "Gabriela Furtado",
           email: "dev@kehl.study",
-          studyFocus: "Estudando para TRT4"
+          preferences: {
+            create: {
+              displayName: "Gabriela Furtado",
+              examGoal: "TRT4",
+              focusArea: "Geral",
+            }
+          }
         }
       });
     }
@@ -35,5 +49,13 @@ export async function getMockUserId(): Promise<string> {
     return user.id;
   }
 
-  throw new Error("Acesso não autorizado: Sessão não encontrada ou expirada.");
+  throw new Error("Configuração de AUTH_MODE inválida ou sessão expirada.");
+}
+
+/**
+ * Helper legível e compatível temporariamente para as rotas que ainda usam getMockUserId.
+ * @deprecated Use getCurrentUserId() em vez disso.
+ */
+export async function getMockUserId(): Promise<string> {
+  return getCurrentUserId();
 }

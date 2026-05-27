@@ -5,7 +5,7 @@ import { getMockUserId } from "@/lib/auth-mock";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 min
+
 
 export async function POST(
   req: NextRequest,

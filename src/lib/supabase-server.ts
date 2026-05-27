@@ -89,14 +89,16 @@ export function setSessionCookies(
  * Remove os cookies da sessão na resposta de logout
  */
 export function clearSessionCookies(response: NextResponse) {
-  response.cookies.set("sb-access-token", "", {
+  const isProd = process.env.NODE_ENV === "production";
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: "lax" as const,
     path: "/",
     maxAge: 0,
-  });
-  response.cookies.set("sb-refresh-token", "", {
-    path: "/",
-    maxAge: 0,
-  });
+  };
+  response.cookies.set("sb-access-token", "", cookieOptions);
+  response.cookies.set("sb-refresh-token", "", cookieOptions);
 }
 
 /**
@@ -176,8 +178,7 @@ export async function syncSupabaseUserWithPrismaUser(supabaseUser: { id: string;
           authUserId,
           email,
           name: supabaseUser.user_metadata?.full_name || email?.split("@")[0] || "Estudante",
-          lastLoginAt: new Date(),
-          studyFocus: "Geral"
+          lastLoginAt: new Date()
         }
       });
       console.info(`[REGISTRATION] Novo usuário criado no Prisma para authUserId: ${authUserId}, email: ${email}`);
@@ -194,7 +195,7 @@ export async function syncSupabaseUserWithPrismaUser(supabaseUser: { id: string;
       data: {
         userId: user.id,
         displayName: user.name || "Estudante",
-        focusArea: user.studyFocus || "Geral",
+        focusArea: "Geral",
         examGoal: "TRT4",
         deadline: new Date("2026-11-30T23:59:59"),
         dailyGoalMinutes: 120,

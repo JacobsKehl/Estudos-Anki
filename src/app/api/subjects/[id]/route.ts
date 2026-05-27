@@ -11,11 +11,11 @@ export async function PATCH(
     const { id } = await params;
     const userId = await getMockUserId();
     const body = await req.json();
-    const { name, description, priority, examWeight } = body;
+    const { name, description, priority, examWeight, studyPriority } = body;
 
     const subject = await prisma.studySubject.update({
       where: { id, userId },
-      data: { name, description, priority, examWeight }
+      data: { name, description, priority, examWeight, studyPriority }
     });
 
     return NextResponse.json(subject);
@@ -50,7 +50,7 @@ export async function DELETE(
 
     if (hasData) {
       return NextResponse.json({
-        error: "Esta matéria tem dados vinculados que impedem a exclusão direta.",
+        error: "Esta matéria já possui materiais, blocos ou histórico de estudo. Para preservar seu progresso, ela não pode ser excluída definitivamente. Você pode arquivá-la ou removê-la do cronograma.",
         impact: {
           materials: materialsCount,
           blocks: blocksCount,
@@ -58,7 +58,7 @@ export async function DELETE(
           scheduleItems: scheduleItemsCount,
         },
         suggestion: "archive",
-        message: `Encontramos ${materialsCount} material(is), ${blocksCount} bloco(s), ${flashcardsCount} flashcard(s) e ${scheduleItemsCount} item(ns) no cronograma. Use 'Arquivar' para ocultar sem perder o histórico.`
+        message: "Esta matéria já possui materiais, blocos ou histórico de estudo. Para preservar seu progresso, ela não pode ser excluída definitivamente. Você pode arquivá-la ou removê-la do cronograma."
       }, { status: 409 });
     }
 

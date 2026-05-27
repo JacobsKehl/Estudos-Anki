@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function GET(
   req: NextRequest,
@@ -9,17 +10,21 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const material = await prisma.studyMaterial.findUnique({
-      where: { id },
+    const userId = await getMockUserId();
+
+    // Validar propriedade do material (ownership)
+    const material = await prisma.studyMaterial.findFirst({
+      where: { id, userId },
     });
 
     if (!material) {
-      return NextResponse.json({ error: "Material não encontrado." }, { status: 404 });
+      return NextResponse.json({ error: "Material não encontrado ou acesso não autorizado." }, { status: 404 });
     }
 
     return NextResponse.json(material);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[GET /api/materials/[id]] error:", error);
+    return NextResponse.json({ error: "Erro ao buscar material." }, { status: 500 });
   }
 }
 
@@ -30,13 +35,15 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    // 1. Find the material to get the file path
-    const material = await prisma.studyMaterial.findUnique({
-      where: { id },
+    const userId = await getMockUserId();
+
+    // 1. Validar propriedade do material (ownership)
+    const material = await prisma.studyMaterial.findFirst({
+      where: { id, userId },
     });
 
     if (!material) {
-      return NextResponse.json({ error: "Material não encontrado." }, { status: 404 });
+      return NextResponse.json({ error: "Material não encontrado ou acesso não autorizado." }, { status: 404 });
     }
 
     // 2. Delete file from storage if it exists (Cloud only for Web)
@@ -50,21 +57,21 @@ export async function DELETE(
       }
     }
 
-    // 3. Delete from DB with manual cascading
+    // 3. Delete from DB with manual cascading restricting to user session
     await prisma.$transaction([
       // Delete extracted content
       prisma.extractedContent.deleteMany({
-        where: { materialId: id },
+        where: { materialId: id, userId },
       }),
       // Delete study blocks
       prisma.studyBlock.deleteMany({
-        where: { materialId: id },
+        where: { materialId: id, userId },
       }),
       // Delete schedule items
       prisma.studyScheduleItem.deleteMany({
-        where: { materialId: id },
+        where: { materialId: id, userId },
       }),
-      // Finalmente deletar o material
+      // Finalmente deletar o material (validado)
       prisma.studyMaterial.delete({
         where: { id },
       }),
@@ -72,10 +79,9 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Material excluído com sucesso." });
   } catch (error: unknown) {
-    console.error("Delete error:", error);
-    const err = error as Error;
+    console.error("[DELETE /api/materials/[id]] error:", error);
     return NextResponse.json(
-      { error: "Erro ao excluir material.", details: err.message },
+      { error: "Erro ao excluir material." },
       { status: 500 }
     );
   }

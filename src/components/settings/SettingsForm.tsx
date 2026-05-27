@@ -167,7 +167,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
       const response = await fetch("/api/diagnostics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, confirm: "RUN_DIAGNOSTICS_FIX" }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
@@ -815,7 +815,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
                         variant="outline"
                         onClick={handleResetFlashcards}
                         disabled={isResetting}
-                        className="rounded-xl h-10 text-xs px-4 border-red-200/50 hover:bg-red-50 hover:text-red-600 dark:border-red-900/30 dark:hover:bg-red-950/20 text-red-500 font-bold active:scale-[0.98] transition-all"
+                        className="rounded-xl h-10 text-xs px-4 border-rose-200/50 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-900/30 dark:hover:bg-rose-950/20 text-rose-500 font-bold active:scale-[0.98] transition-all"
                       >
                         {isResetting ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />

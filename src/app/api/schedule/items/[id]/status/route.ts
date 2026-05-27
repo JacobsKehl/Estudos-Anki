@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { completeStudyBlock, reopenStudyBlock } from "@/lib/study/completion";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function PATCH(
   req: NextRequest,
@@ -10,6 +11,7 @@ export async function PATCH(
   const { id } = await params;
 
   try {
+    const userId = await getMockUserId();
     const body = await req.json();
     const { status } = body;
 
@@ -17,13 +19,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Status é obrigatório" }, { status: 400 });
     }
 
-    // Find the item first to check actionType and studyBlockId
-    const item = await (prisma as any).studyScheduleItem.findUnique({
-      where: { id },
+    // Buscar o item validando ID e propriedade do usuário (ownership)
+    const item = await (prisma as any).studyScheduleItem.findFirst({
+      where: { id, userId },
     });
 
     if (!item) {
-      return NextResponse.json({ error: "Item do cronograma não encontrado" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Item não encontrado ou acesso não autorizado." },
+        { status: 404 }
+      );
     }
 
     let updatedItem;
@@ -35,12 +40,12 @@ export async function PATCH(
         await reopenStudyBlock(item.userId, item.studyBlockId, status);
       }
       
-      updatedItem = await (prisma as any).studyScheduleItem.findUnique({
-        where: { id },
+      updatedItem = await (prisma as any).studyScheduleItem.findFirst({
+        where: { id, userId },
         include: { studyBlock: true }
       });
     } else {
-      // 1. Update the schedule item
+      // 1. Atualizar o item do cronograma que já foi validado pelo ownership
       updatedItem = await (prisma as any).studyScheduleItem.update({
         where: { id },
         data: { 
@@ -52,7 +57,7 @@ export async function PATCH(
         }
       });
 
-      // 2. Sync status to the original StudyBlock (only for completed items)
+      // 2. Sincronizar o status com o StudyBlock original (apenas para itens teóricos completados)
       if (updatedItem.studyBlockId) {
         if (status === "COMPLETED") {
           await (prisma as any).studyBlock.update({
@@ -66,6 +71,7 @@ export async function PATCH(
     return NextResponse.json(updatedItem);
   } catch (error: unknown) {
     const err = error as Error;
+    console.error("[SCHEDULE ITEM STATUS PATCH]", err);
     return NextResponse.json(
       { error: "Erro ao atualizar item do cronograma", details: err.message },
       { status: 500 }

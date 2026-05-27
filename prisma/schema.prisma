@@ -32,16 +32,7 @@ model User {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   
-  // Real preference fields (DEPRECATED - moving to UserPreferences)
-  dailyGoalMinutes       Int                 @default(120)
-  studyFocus             String              @default("Ciência da Computação & Inteligência Artificial")
-  flashcardDifficulty    String              @default("NORMAL_PLUS")
-  emailReminderEnabled   Boolean             @default(true)
-  emailReminderTime      String              @default("08:00")
-  dailyReminderEmail     String              @default("gabriela.furtado.p@gmail.com")
-  displayDensity         String              @default("comfortable")
-  animations             String              @default("normal")
-  theme                  String              @default("light")
+
 
   preferences            UserPreferences?
 
@@ -71,6 +62,7 @@ model UserPreferences {
   visualDensity               String   @default("comfortable")
   reducedMotion               Boolean  @default(false)
   focusArea                   String   @default("Geral")
+  theme                       String   @default("light")
   displayName                 String   @default("Estudante")
   examGoal                    String   @default("TRT4")
   deadline                    DateTime?
@@ -193,9 +185,9 @@ model Flashcard {
   contentId    String?
   content      ExtractedContent? @relation(fields: [contentId], references: [id])
   materialId   String?
-  material     StudyMaterial?    @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  material     StudyMaterial?    @relation(fields: [materialId], references: [id], onDelete: SetNull)
   studyBlockId String?
-  studyBlock   StudyBlock?       @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  studyBlock   StudyBlock?       @relation(fields: [studyBlockId], references: [id], onDelete: SetNull)
 
   question     String
   answer       String
@@ -220,6 +212,9 @@ model Flashcard {
   reviews         FlashcardReview[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+
+  @@index([userId, nextReviewAt])
+  @@index([userId, reviewState])
 }
 
 model FlashcardReview {
@@ -304,6 +299,8 @@ model StudyBlock {
   flashcards    Flashcard[]
   scheduleItems StudyScheduleItem[]
   supportMaterials StudyBlockSupport[]
+
+  @@index([userId, status])
 }
 
 model StudyBlockSupport {
@@ -360,4 +357,7 @@ model StudyScheduleItem {
   completedAt      DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+
+  @@index([userId, scheduledDate, status])
+  @@index([userId, scheduleId, status])
 }

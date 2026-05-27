@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getMockUserId();
     const { ids, mode } = await req.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -16,6 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     const baseUrl = req.nextUrl.origin;
+    const cookieHeader = req.headers.get("cookie") || "";
     
     let processedCount = 0;
     let blocksCreated = 0;
@@ -23,20 +26,36 @@ export async function POST(req: NextRequest) {
     let errorCount = 0;
     const failedMaterials: { id: string; title: string; error: string }[] = [];
 
-    // Buscar os títulos de todos os materiais em lote para reportar nomes amigáveis em caso de erro
+    // Buscar apenas materiais que pertencem ao usuário autenticado (Anti-IDOR)
     const materials = await prisma.studyMaterial.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, userId },
       select: { id: true, fileName: true }
     });
 
+    const authorizedIds = materials.map(m => m.id);
+
     for (const id of ids) {
       const material = materials.find(m => m.id === id);
-      const title = material?.fileName || "Material Desconhecido";
+      if (!material) {
+        errorCount++;
+        failedMaterials.push({
+          id,
+          title: "Material não autorizado",
+          error: "Material não encontrado ou acesso não autorizado."
+        });
+        continue;
+      }
+
+      const title = material.fileName || "Material Desconhecido";
 
       try {
+        // Encaminhar o cabeçalho 'Cookie' para que a rota interna saiba que o usuário está autenticado
         const res = await fetch(`${baseUrl}/api/materials/${id}/organize`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Cookie": cookieHeader
+          },
           body: JSON.stringify({ mode })
         });
 
@@ -51,7 +70,7 @@ export async function POST(req: NextRequest) {
           failedMaterials.push({
             id,
             title,
-            error: data.error || "Erro desconhecido ao processar arquivo"
+            error: data.error || "Erro ao processar arquivo"
           });
         }
       } catch (err: any) {
@@ -64,10 +83,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Estimar quantidade de matérias vinculadas (matérias distintas das IDs selecionadas no banco)
+    // Estimar quantidade de matérias vinculadas (matérias distintas das IDs selecionadas no banco pertencentes ao usuário)
     const distinctSubjects = await prisma.studyMaterial.groupBy({
       by: ['subjectId'],
-      where: { id: { in: ids }, subjectId: { not: null } }
+      where: { id: { in: authorizedIds }, userId, subjectId: { not: null } }
     });
 
     return NextResponse.json({
@@ -83,7 +102,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("[BULK ACTION ERROR]", error);
     return NextResponse.json(
-      { error: "Erro crítico ao executar ação em lote.", details: error.message },
+      { error: "Erro crítico ao executar ação em lote." },
       { status: 500 }
     );
   }

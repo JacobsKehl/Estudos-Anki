@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMockUserId } from "@/lib/auth-mock";
+import { checkRateLimit, rateLimitErrorResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await getMockUserId();
+
+    // Rate Limiting: 3 tentativas por hora por usuário
+    const rateLimitKey = `reset-flashcards:${userId}`;
+    const rateCheck = await checkRateLimit(rateLimitKey, 3, 3600);
+    if (!rateCheck.success) {
+      return rateLimitErrorResponse(rateCheck.reset);
+    }
     
     // Parse request body
     let body;

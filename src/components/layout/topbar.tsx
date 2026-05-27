@@ -4,7 +4,7 @@ import * as React from "react";
 import { Search, Sun, Moon } from "lucide-react";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { useStudyPreferences } from "@/hooks/useStudyPreferences";
-import Link from "next/link";
+import { UserMenuDropdown } from "@/components/layout/UserMenuDropdown";
 
 export function Topbar() {
   const [open, setOpen] = React.useState(false);
@@ -78,20 +78,7 @@ export function Topbar() {
             )}
           </button>
           
-          <Link href="/profile" className="transition-transform hover:scale-105 active:scale-95 block">
-            {preferences.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={preferences.avatarUrl}
-                alt={preferences.displayName || "Avatar"}
-                className="h-8 w-8 rounded-xl object-cover shadow-sm border border-accent/10"
-              />
-            ) : (
-              <div className="h-8 w-8 rounded-xl bg-sage-light text-accent flex items-center justify-center font-bold text-xs shadow-sm border border-accent/10">
-                {initials}
-              </div>
-            )}
-          </Link>
+          {mounted && <UserMenuDropdown initials={initials} />}
         </div>
       </header>
 

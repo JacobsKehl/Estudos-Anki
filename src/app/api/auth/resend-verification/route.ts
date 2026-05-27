@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, createSupabaseClient, getSupabaseConfig } from "@/lib/supabase-server";
+import { checkRateLimit, getClientIp, rateLimitErrorResponse } from "@/lib/rate-limit";
 
 // Cooldown em memória para simulação em desenvolvimento (mapa de email -> timestamp)
 const localCooldownMap = new Map<string, number>();
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const user = await getSessionUser();
     let email: string | undefined;
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     } else {
       // Se não estiver logado (fluxo público), tenta obter do payload
       try {
-        const body = await request.json();
+        const body = await request.json().catch(() => ({}));
         email = body.email;
       } catch {
         // Ignora corpo ausente
@@ -27,19 +28,14 @@ export async function POST(request: Request) {
     }
 
     const emailKey = email.toLowerCase().trim();
-    const now = Date.now();
 
-    // Validar cooldown no backend (mínimo de 60 segundos entre disparos)
-    const lastSent = localCooldownMap.get(emailKey);
-    if (lastSent && (now - lastSent) < 60000) {
-      const remaining = Math.ceil((60000 - (now - lastSent)) / 1000);
-      return NextResponse.json({ 
-        error: `Por favor, aguarde mais ${remaining} segundos antes de reenviar.` 
-      }, { status: 429 });
+    // Rate Limiting: 1 tentativa por 60 segundos por IP + e-mail
+    const ip = getClientIp(request);
+    const rateLimitKey = `resend-verification:${ip}:${emailKey}`;
+    const rateCheck = await checkRateLimit(rateLimitKey, 1, 60);
+    if (!rateCheck.success) {
+      return rateLimitErrorResponse(rateCheck.reset);
     }
-
-    // Registrar envio no cooldown
-    localCooldownMap.set(emailKey, now);
 
     const { isConfigured } = getSupabaseConfig();
 

@@ -16,35 +16,36 @@ export async function GET() {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
     }
 
-    // Auto-migration: if preferences do not exist, create them from User fields
+    // Auto-migration: if preferences do not exist, create them
     if (!user.preferences) {
       const createdPrefs = await prisma.userPreferences.create({
         data: {
           userId: user.id,
-          dailyGoalMinutes: user.dailyGoalMinutes,
+          dailyGoalMinutes: 120,
           studyResetTime: "00:00",
           studyDaysOfWeek: "1,2,3,4,5",
           defaultBlockDurationMinutes: 30,
           maxNewCardsPerDay: 20,
-          flashcardDifficulty: user.flashcardDifficulty,
-          emailReminderEnabled: user.emailReminderEnabled,
-          emailReminderTime: user.emailReminderTime,
-          visualDensity: user.displayDensity === "compact" ? "compact" : "comfortable",
-          reducedMotion: user.animations === "reduced",
-          focusArea: user.studyFocus,
+          flashcardDifficulty: "NORMAL_PLUS",
+          emailReminderEnabled: true,
+          emailReminderTime: "08:00",
+          visualDensity: "comfortable",
+          reducedMotion: false,
+          focusArea: "Geral",
           displayName: user.name || "Estudante",
           examGoal: "TRT4",
           deadline: new Date("2026-11-30T23:59:59"),
           avatarUrl: null,
+          theme: "light",
         },
       });
       return NextResponse.json({
         ...createdPrefs,
         name: user.name || "Estudante",
-        studyFocus: user.studyFocus,
-        displayDensity: user.displayDensity,
-        animations: user.animations,
-        theme: user.theme,
+        studyFocus: "Geral",
+        displayDensity: "comfortable",
+        animations: "normal",
+        theme: "light",
       });
     }
 
@@ -55,7 +56,7 @@ export async function GET() {
       studyFocus: user.preferences.focusArea,
       displayDensity: user.preferences.visualDensity,
       animations: user.preferences.reducedMotion ? "reduced" : "normal",
-      theme: user.theme,
+      theme: user.preferences.theme,
     });
   } catch (error) {
     console.error("Erro ao obter preferências:", error);
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
       data.deadline = body.deadline ? new Date(body.deadline) : null;
     }
     if (body.avatarUrl !== undefined) data.avatarUrl = body.avatarUrl;
+    if (body.theme !== undefined) data.theme = body.theme;
 
     let updatedPrefs;
     if (!user.preferences) {
@@ -132,26 +134,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Synchronize legacy fields on User table
+    // Synchronize name on User table if provided
     const userUpdateData: any = {};
     if (body.name !== undefined) userUpdateData.name = body.name;
     if (body.displayName !== undefined) userUpdateData.name = body.displayName;
-    
-    if (body.studyFocus !== undefined) userUpdateData.studyFocus = body.studyFocus;
-    if (body.focusArea !== undefined) userUpdateData.studyFocus = body.focusArea;
-
-    if (body.dailyGoalMinutes !== undefined) userUpdateData.dailyGoalMinutes = parseInt(body.dailyGoalMinutes, 10);
-    if (body.flashcardDifficulty !== undefined) userUpdateData.flashcardDifficulty = body.flashcardDifficulty;
-    if (body.emailReminderEnabled !== undefined) userUpdateData.emailReminderEnabled = Boolean(body.emailReminderEnabled);
-    if (body.emailReminderTime !== undefined) userUpdateData.emailReminderTime = body.emailReminderTime;
-
-    if (body.theme !== undefined) userUpdateData.theme = body.theme;
-
-    if (body.visualDensity !== undefined) userUpdateData.displayDensity = body.visualDensity;
-    if (body.displayDensity !== undefined) userUpdateData.displayDensity = body.displayDensity;
-
-    if (body.reducedMotion !== undefined) userUpdateData.animations = body.reducedMotion ? "reduced" : "normal";
-    if (body.animations !== undefined) userUpdateData.animations = body.animations;
 
     if (Object.keys(userUpdateData).length > 0) {
       await prisma.user.update({
@@ -166,7 +152,7 @@ export async function POST(request: Request) {
       studyFocus: updatedPrefs.focusArea,
       displayDensity: updatedPrefs.visualDensity,
       animations: updatedPrefs.reducedMotion ? "reduced" : "normal",
-      theme: body.theme || user.theme,
+      theme: updatedPrefs.theme,
     });
   } catch (error) {
     console.error("Erro ao salvar preferências:", error);

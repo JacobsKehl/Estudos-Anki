@@ -1,15 +1,26 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseClient, getSupabaseConfig } from "@/lib/supabase-server";
+import { checkRateLimit, getClientIp, rateLimitErrorResponse } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const email = body.email;
 
     if (!email) {
       return NextResponse.json({ error: "E-mail é obrigatório" }, { status: 400 });
     }
 
     const emailKey = email.toLowerCase().trim();
+
+    // Rate Limiting: 3 tentativas por 15 minutos por IP + e-mail normalizado
+    const ip = getClientIp(request);
+    const rateLimitKey = `forgot-password:${ip}:${emailKey}`;
+    const rateCheck = await checkRateLimit(rateLimitKey, 3, 900);
+    if (!rateCheck.success) {
+      return rateLimitErrorResponse(rateCheck.reset);
+    }
+
     const { isConfigured } = getSupabaseConfig();
     
     // Capturar a origem da requisição para redirecionar de volta após login no Supabase

@@ -61,11 +61,11 @@ export async function POST(
     // 4. Read user's preferred difficulty from DB (defaults to NORMAL_PLUS)
     let difficulty: FlashcardDifficulty = "NORMAL_PLUS";
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: mockUserId },
+      const userPrefs = await prisma.userPreferences.findUnique({
+        where: { userId: mockUserId },
         select: { flashcardDifficulty: true }
       });
-      const dbDifficulty = user?.flashcardDifficulty;
+      const dbDifficulty = userPrefs?.flashcardDifficulty;
       if (dbDifficulty === "EASY" || dbDifficulty === "NORMAL_PLUS" || dbDifficulty === "HARD") {
         difficulty = dbDifficulty;
       }

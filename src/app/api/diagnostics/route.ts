@@ -4,9 +4,37 @@ import { getMockUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Auxiliar para obter o usuário admin autenticado.
+ * Lança um erro caso o usuário não seja autenticado ou não tenha o e-mail cadastrado como admin.
+ */
+async function getAdminUser() {
+  const userId = await getMockUserId();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new Error("Usuário não encontrado.");
+  }
+
+  const adminEmail = process.env.ADMIN_EMAIL || "dev@kehl.study";
+  if (!user.email || user.email !== adminEmail) {
+    throw new Error("Acesso negado: Apenas administradores autorizados.");
+  }
+
+  return user;
+}
+
 export async function GET(req: NextRequest) {
+  // Retorna 404 se diagnósticos estiverem desabilitados, para não expor a existência da rota em produção
+  if (process.env.ENABLE_DIAGNOSTICS !== "true") {
+    return new NextResponse(null, { status: 404 });
+  }
+
   try {
-    const userId = await getMockUserId();
+    const adminUser = await getAdminUser();
+    const userId = adminUser.id;
 
     // 1. Detect Duplicate Study Blocks
     // Fetch all study blocks for this user
@@ -98,17 +126,34 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("[DIAGNOSTICS GET]", error);
+    const isAccessDenied = error.message && error.message.includes("Acesso negado");
     return NextResponse.json(
-      { error: "Erro ao executar diagnóstico.", details: error.message },
-      { status: 500 }
+      { error: isAccessDenied ? error.message : "Erro ao executar diagnóstico." },
+      { status: isAccessDenied ? 403 : 500 }
     );
   }
 }
 
 export async function POST(req: NextRequest) {
+  // Retorna 404 se diagnósticos estiverem desabilitados, para não expor a existência da rota em produção
+  if (process.env.ENABLE_DIAGNOSTICS !== "true") {
+    return new NextResponse(null, { status: 404 });
+  }
+
   try {
-    const userId = await getMockUserId();
+    const adminUser = await getAdminUser();
+    const userId = adminUser.id;
+
     const body = await req.json().catch(() => ({}));
+    
+    // Confirmação textual forte obrigatória para ações destrutivas/modificações no banco
+    if (body.confirm !== "RUN_DIAGNOSTICS_FIX") {
+      return NextResponse.json(
+        { error: "Ação destrutiva exige confirmação textual explícita 'RUN_DIAGNOSTICS_FIX' no corpo da requisição." },
+        { status: 400 }
+      );
+    }
+
     const action = body.action || "fix_all"; // fix_duplicates | fix_orphans | fix_all
 
     let fixedDuplicatesCount = 0;
@@ -235,9 +280,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("[DIAGNOSTICS POST]", error);
+    const isAccessDenied = error.message && error.message.includes("Acesso negado");
     return NextResponse.json(
-      { error: "Erro ao executar correção de dados.", details: error.message },
-      { status: 500 }
+      { error: isAccessDenied ? error.message : "Erro ao executar correção de dados." },
+      { status: isAccessDenied ? 403 : 500 }
     );
   }
 }

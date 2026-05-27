@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { suggestStudyBlocks } from "@/lib/ai/study-blocks";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export async function POST(
   req: NextRequest,
@@ -10,8 +11,11 @@ export async function POST(
   const { id } = await params;
 
   try {
-    const material = await prisma.studyMaterial.findUnique({
-      where: { id },
+    const userId = await getMockUserId();
+
+    // Validar propriedade do material
+    const material = await prisma.studyMaterial.findFirst({
+      where: { id, userId },
       include: {
         extractedContent: {
           orderBy: { pageNumber: "asc" } as any,
@@ -20,7 +24,7 @@ export async function POST(
     });
 
     if (!material) {
-      return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Material não encontrado ou acesso não autorizado." }, { status: 404 });
     }
 
     if (material.processingStatus !== "PROCESSED") {
@@ -36,6 +40,6 @@ export async function POST(
     return NextResponse.json({ suggestions });
   } catch (error: any) {
     console.error("Erro na rota de sugestão de blocos:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao gerar sugestão de blocos." }, { status: 500 });
   }
 }

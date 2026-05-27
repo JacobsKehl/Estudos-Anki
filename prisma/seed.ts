@@ -7,7 +7,7 @@ async function main() {
   
   console.log('Seed: Criando usuário mock...');
   
-  await prisma.user.upsert({
+  const user = await prisma.user.upsert({
     where: { id: userId },
     update: {},
     create: {
@@ -15,6 +15,27 @@ async function main() {
       name: "Henrique Kehl",
       email: "henrique@kehl.com",
     },
+  });
+
+  await prisma.userPreferences.upsert({
+    where: { userId },
+    update: {},
+    create: {
+      userId,
+      dailyGoalMinutes: 120,
+      studyResetTime: "00:00",
+      studyDaysOfWeek: "1,2,3,4,5",
+      defaultBlockDurationMinutes: 30,
+      maxNewCardsPerDay: 20,
+      flashcardDifficulty: "NORMAL_PLUS",
+      emailReminderEnabled: true,
+      emailReminderTime: "08:00",
+      visualDensity: "comfortable",
+      reducedMotion: false,
+      focusArea: "Geral",
+      displayName: "Henrique Kehl",
+      examGoal: "TRT4",
+    }
   });
 
   console.log('Seed concluído com sucesso!');

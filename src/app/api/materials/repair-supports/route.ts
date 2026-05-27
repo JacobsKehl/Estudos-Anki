@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { detectQuestionsOrGabaritoHeuristic } from "@/lib/ai/organizer";
+import { getMockUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 min
+
 
 export async function GET(req: NextRequest) {
   return repairMaterials(req);
@@ -15,11 +16,13 @@ export async function POST(req: NextRequest) {
 
 async function repairMaterials(req: NextRequest) {
   try {
-    console.log("[Repair Supports] Iniciando varredura de materiais...");
+    const userId = await getMockUserId();
+    console.log(`[Repair Supports] Iniciando varredura de materiais para usuário: ${userId}`);
 
-    // 1. Buscar todos os materiais organizados que não são rotulados como apoio
+    // 1. Buscar apenas os materiais do próprio usuário organizados que não são rotulados como apoio
     const materials = await prisma.studyMaterial.findMany({
       where: {
+        userId,
         organizationStatus: "ORGANIZED",
         materialRole: { not: "SUPPORT_MATERIAL" }
       },
@@ -35,9 +38,9 @@ async function repairMaterials(req: NextRequest) {
     };
 
     for (const material of materials) {
-      // 2. Buscar todo o texto extraído para esse material
+      // 2. Buscar todo o texto extraído do usuário para esse material
       const extractedPages = await prisma.extractedContent.findMany({
-        where: { materialId: material.id },
+        where: { materialId: material.id, userId },
         orderBy: { pageNumber: "asc" }
       });
 
@@ -52,9 +55,9 @@ async function repairMaterials(req: NextRequest) {
         const detectedType = check.isAnswerKey ? "ANSWER_KEY" : "QUESTIONS";
         console.log(`[Repair Supports] Detectado material de apoio: ${material.fileName} (${detectedType}, conf: ${check.confidence})`);
 
-        // 4. Buscar os blocos falsos criados a partir deste material
+        // 4. Buscar os blocos falsos do usuário criados a partir deste material
         const falseBlocks = await prisma.studyBlock.findMany({
-          where: { materialId: material.id }
+          where: { materialId: material.id, userId }
         });
 
         let supportTopicId: string | null = null;
@@ -66,9 +69,10 @@ async function repairMaterials(req: NextRequest) {
             supportTopicId = fb.officialTopicId;
           }
 
-          // Buscar bloco teórico real da mesma matéria e tópico (de um material diferente)
+          // Buscar bloco teórico real da mesma matéria e tópico (de um material diferente do usuário)
           let targetMainBlock = await prisma.studyBlock.findFirst({
             where: {
+              userId,
               subjectId: material.subjectId as string,
               officialTopicId: fb.officialTopicId || undefined,
               materialId: { not: material.id }
@@ -79,6 +83,7 @@ async function repairMaterials(req: NextRequest) {
           if (!targetMainBlock) {
             targetMainBlock = await prisma.studyBlock.findFirst({
               where: {
+                userId,
                 subjectId: material.subjectId as string,
                 materialId: { not: material.id }
               }
@@ -88,7 +93,7 @@ async function repairMaterials(req: NextRequest) {
           if (targetMainBlock) {
             // Re-vincular os flashcards criados para o bloco falso ao bloco verdadeiro
             await prisma.flashcard.updateMany({
-              where: { studyBlockId: fb.id },
+              where: { studyBlockId: fb.id, userId },
               data: { studyBlockId: targetMainBlock.id }
             });
 
@@ -108,17 +113,17 @@ async function repairMaterials(req: NextRequest) {
           }
         }
 
-        // 6. Deletar os blocos principais falsos (as dependências do banco/schedules serão limpas via cascade ou deletadas)
+        // 6. Deletar os blocos principais falsos
         if (falseBlocks.length > 0) {
           const falseBlockIds = falseBlocks.map(b => b.id);
           
           // Deletar itens do cronograma vinculados a estes blocos para não poluir
           await prisma.studyScheduleItem.deleteMany({
-            where: { studyBlockId: { in: falseBlockIds } }
+            where: { studyBlockId: { in: falseBlockIds }, userId }
           });
 
           await prisma.studyBlock.deleteMany({
-            where: { id: { in: falseBlockIds } }
+            where: { id: { in: falseBlockIds }, userId }
           });
         }
 
@@ -151,7 +156,7 @@ async function repairMaterials(req: NextRequest) {
   } catch (error: any) {
     console.error("[Repair Supports Error]", error);
     return NextResponse.json(
-      { success: false, error: "Erro crítico ao executar varredura e reparo.", details: error.message },
+      { success: false, error: "Erro crítico ao executar varredura e reparo." },
       { status: 500 }
     );
   }
