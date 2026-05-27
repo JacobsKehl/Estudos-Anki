@@ -17,9 +17,9 @@ prisma/dev.db-journal
 
 # Arquivos de Variáveis de Ambiente (Segredos e Chaves)
 .env
-.env.local
-.env.*.local
-*.env
-
-
+.env.*
+!.env.example
+.env.vercel
+.env.vercel.production
+.env*.vercel
 .vercel
