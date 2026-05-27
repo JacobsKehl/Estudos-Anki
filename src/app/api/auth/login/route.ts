@@ -4,7 +4,7 @@ import { getSupabaseConfig, createSupabaseClient, setSessionCookies, syncSupabas
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, rememberMe } = await request.json();
 
     if (!email || !password) {
       return NextResponse.json({ error: "E-mail e senha são obrigatórios" }, { status: 400 });
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     // ─── CENÁRIO 1: Supabase não configurado (Simulação local de Dev) ───────────
     if (!isConfigured) {
-      console.info(`[MOCK LOGIN] Simulação de login para: ${email}`);
+      console.info(`[MOCK LOGIN] Simulação de login para: ${email} (Lembrar: ${!!rememberMe})`);
       
       const mockSupabaseUser = {
         id: `mock-auth-${email.split("@")[0]}`,
@@ -25,8 +25,9 @@ export async function POST(request: Request) {
       // Sincronizar usando o helper centralizado
       const internalUser = await syncSupabaseUserWithPrismaUser(mockSupabaseUser);
 
-      // Gerar dummy JWT com expiração de 1 hora para o middleware validar
-      const expTimestamp = Math.floor(Date.now() / 1000) + 3600;
+      // Gerar dummy JWT com expiração de 1 hora ou 30 dias para o middleware validar
+      const expSeconds = rememberMe ? 30 * 24 * 60 * 60 : 3600;
+      const expTimestamp = Math.floor(Date.now() / 1000) + expSeconds;
       const payloadObj = { email, exp: expTimestamp };
       const payloadB64 = btoa(JSON.stringify(payloadObj)).replace(/=/g, "");
       const dummyToken = `dummy.${payloadB64}.dummy`;
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
         mock: true
       });
       
-      setSessionCookies(response, dummyToken, "dummy-refresh-token", 3600);
+      setSessionCookies(response, dummyToken, "dummy-refresh-token", expSeconds, !!rememberMe);
       return response;
     }
 
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
       user: { id: internalUser.id, email: internalUser.email, name: internalUser.name }
     });
     
-    setSessionCookies(response, session.access_token, session.refresh_token, session.expires_in);
+    setSessionCookies(response, session.access_token, session.refresh_token, session.expires_in, !!rememberMe);
     return response;
 
   } catch (err: any) {

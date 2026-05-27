@@ -62,24 +62,26 @@ export function setSessionCookies(
   response: NextResponse, 
   accessToken: string, 
   refreshToken: string, 
-  expiresIn: number
+  expiresIn: number,
+  rememberMe: boolean = false
 ) {
   const isProd = process.env.NODE_ENV === "production";
   
-  response.cookies.set("sb-access-token", accessToken, {
+  const cookieOptions: any = {
     httpOnly: true,
     secure: isProd,
     sameSite: "lax",
     path: "/",
-    maxAge: expiresIn,
+  };
+
+  response.cookies.set("sb-access-token", accessToken, {
+    ...cookieOptions,
+    maxAge: rememberMe ? 30 * 24 * 60 * 60 : expiresIn,
   });
   
   response.cookies.set("sb-refresh-token", refreshToken, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60, // 30 dias de duração máxima
+    ...cookieOptions,
+    maxAge: rememberMe ? 30 * 24 * 60 * 60 : undefined,
   });
 }
 

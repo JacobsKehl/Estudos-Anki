@@ -44,12 +44,48 @@ function isTokenExpired(token: string): boolean {
   }
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
   // Obter cookies da sessão
   const accessToken = req.cookies.get("sb-access-token")?.value;
-  const isLoggedIn = accessToken && !isTokenExpired(accessToken);
+  const refreshToken = req.cookies.get("sb-refresh-token")?.value;
+  let isLoggedIn = accessToken && !isTokenExpired(accessToken);
+
+  let newAccessToken = null;
+  let newRefreshToken = null;
+  let newExpiresIn = null;
+  let hasRefreshed = false;
+
+  // Se o token estiver expirado/ausente, mas houver um refresh-token ativo, tenta renová-lo
+  if (!isLoggedIn && refreshToken) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const refreshResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+          method: "POST",
+          headers: {
+            "apikey": supabaseAnonKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ refresh_token: refreshToken })
+        });
+        
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json();
+          newAccessToken = refreshData.access_token;
+          newRefreshToken = refreshData.refresh_token;
+          newExpiresIn = refreshData.expires_in;
+          isLoggedIn = true;
+          hasRefreshed = true;
+        }
+      } catch (err) {
+        console.error("Erro ao renovar token no middleware:", err);
+      }
+    }
+  }
 
   // 1. Verificar se a rota atual é privada
   const isPrivateRoute = PRIVATE_ROUTES.some(route => 
@@ -64,22 +100,77 @@ export function middleware(req: NextRequest) {
       
       const response = NextResponse.redirect(loginUrl);
       // Limpa cookies inválidos de sessão se existirem
-      if (accessToken) {
+      if (accessToken || refreshToken) {
         response.cookies.set("sb-access-token", "", { path: "/", maxAge: 0 });
         response.cookies.set("sb-refresh-token", "", { path: "/", maxAge: 0 });
       }
       return response;
     }
-    return NextResponse.next();
+    
+    const response = NextResponse.next();
+    if (hasRefreshed && newAccessToken && newRefreshToken && newExpiresIn) {
+      const isProd = process.env.NODE_ENV === "production";
+      response.cookies.set("sb-access-token", newAccessToken, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60, // Mantém ativo por 30 dias no dispositivo atual
+      });
+      response.cookies.set("sb-refresh-token", newRefreshToken, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+    }
+    return response;
   }
 
   // 2. Redirecionar usuário logado tentando acessar login/forgot-password para a home
   const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some(route => pathname === route);
   if (isPublicAuthRoute && isLoggedIn) {
-    return NextResponse.redirect(new URL("/", req.url));
+    const response = NextResponse.redirect(new URL("/", req.url));
+    if (hasRefreshed && newAccessToken && newRefreshToken && newExpiresIn) {
+      const isProd = process.env.NODE_ENV === "production";
+      response.cookies.set("sb-access-token", newAccessToken, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+      response.cookies.set("sb-refresh-token", newRefreshToken, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+    }
+    return response;
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (hasRefreshed && newAccessToken && newRefreshToken && newExpiresIn) {
+    const isProd = process.env.NODE_ENV === "production";
+    response.cookies.set("sb-access-token", newAccessToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+    response.cookies.set("sb-refresh-token", newRefreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+  }
+  return response;
 }
 
 // Configurar o matcher para rodar o middleware apenas em páginas e APIs relevantes,

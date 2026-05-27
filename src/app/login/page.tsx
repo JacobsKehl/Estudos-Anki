@@ -17,6 +17,7 @@ export default function LoginPage() {
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
   // Mensagens vindas do redirect
@@ -44,7 +45,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, rememberMe })
       });
 
       const data = await response.json();
@@ -138,6 +139,20 @@ export default function LoginPage() {
                     className="pl-10 h-11 bg-muted/20 border-border/60 focus:border-accent"
                   />
                 </div>
+              </div>
+
+              {/* Permanecer conectado */}
+              <div className="flex items-center space-x-2.5 py-1 select-none">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4.5 h-4.5 rounded-[6px] border-border/70 text-accent focus:ring-accent bg-muted/15 cursor-pointer accent-accent"
+                />
+                <Label htmlFor="rememberMe" className="text-xs font-semibold text-muted-foreground cursor-pointer transition-colors hover:text-foreground">
+                  Permanecer conectada neste dispositivo
+                </Label>
               </div>
 
               <Button
