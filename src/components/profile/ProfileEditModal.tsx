@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User, Sliders, Mail, Calendar, Loader2 } from "lucide-react";
 import { StudyPreferences } from "@/hooks/useStudyPreferences";
+import { getUserCopy } from "@/lib/user-copy";
 
 interface ProfileEditModalProps {
   open: boolean;
@@ -27,6 +28,7 @@ export function ProfileEditModal({
   preferences,
   onSave
 }: ProfileEditModalProps) {
+  const copy = getUserCopy(preferences.languageTone);
   const [activeTab, setActiveTab] = useState<"identidade" | "rotina">("identidade");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -116,7 +118,7 @@ export function ProfileEditModal({
             Editar Perfil de Estudos
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            Ajuste suas informações básicas de estudante e metas de cronograma.
+            {copy.studentDetails}
           </p>
         </DialogHeader>
 
@@ -165,7 +167,7 @@ export function ProfileEditModal({
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     required
-                    placeholder="Ex: Gabriela Furtado"
+                    placeholder="Ex: Nome completo"
                     className="bg-card h-11 border-border/60 focus:border-accent"
                   />
                 </div>

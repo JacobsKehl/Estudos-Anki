@@ -174,7 +174,7 @@ export async function syncSupabaseUserWithPrismaUser(supabaseUser: { id: string;
             data: {
               authUserId,
               email: email || legacyUser.email,
-              name: legacyUser.name || "Gabriela Furtado",
+              name: legacyUser.name || "Estudante",
               lastLoginAt: new Date()
             }
           });
@@ -207,12 +207,17 @@ export async function syncSupabaseUserWithPrismaUser(supabaseUser: { id: string;
       data: {
         userId: user.id,
         displayName: user.name || "Estudante",
-        focusArea: "Geral",
-        examGoal: "TRT4",
-        deadline: new Date("2026-11-30T23:59:59"),
+        focusArea: "Estudos",
+        examGoal: "TRT",
+        deadline: null,
         dailyGoalMinutes: 120,
         studyResetTime: "00:00",
-        studyDaysOfWeek: "1,2,3,4,5,6,0"
+        studyDaysOfWeek: "0,1,2,3,4,5,6",
+        emailReminderEnabled: false,
+        theme: "light",
+        visualDensity: "comfortable",
+        flashcardDifficulty: "NORMAL",
+        languageTone: "MASCULINE_NEUTRAL"
       }
     });
     console.info(`[PREFERENCES] UserPreferences iniciais criadas para o usuário: ${user.id}`);

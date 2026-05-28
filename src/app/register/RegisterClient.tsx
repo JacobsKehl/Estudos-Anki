@@ -262,7 +262,7 @@ export function RegisterClient({ enableSignup }: RegisterClientProps) {
                     id="name"
                     type="text"
                     required
-                    placeholder="Ex: Gabriela Furtado"
+                    placeholder="Ex: Nome completo"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="pl-10 h-11 bg-muted/20 border-border/60 focus:border-accent"

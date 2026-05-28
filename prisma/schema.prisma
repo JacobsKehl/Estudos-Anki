@@ -67,6 +67,7 @@ model UserPreferences {
   examGoal                    String   @default("TRT4")
   deadline                    DateTime?
   avatarUrl                   String?
+  languageTone                String   @default("MASCULINE_NEUTRAL")
   
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt

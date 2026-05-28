@@ -25,30 +25,32 @@ export interface StudyPreferences {
   examGoal: string;
   deadline: string | null;
   avatarUrl: string | null;
+  languageTone: "FEMININE" | "MASCULINE_NEUTRAL";
 }
 
 const DEFAULT_PREFERENCES: StudyPreferences = {
-  name: "Gabriela Furtado",
-  displayName: "Gabriela",
-  studyFocus: "Estudando para TRT4",
-  focusArea: "Estudando para TRT4",
+  name: "Estudante",
+  displayName: "Estudante",
+  studyFocus: "Estudos",
+  focusArea: "Estudos",
   dailyGoalMinutes: 120,
   studyResetTime: "00:00",
-  studyDaysOfWeek: "1,2,3,4,5,6,0", // 7 dias por semana por padrão
+  studyDaysOfWeek: "0,1,2,3,4,5,6", // 7 dias por semana por padrão
   defaultBlockDurationMinutes: 30,
   maxNewCardsPerDay: 20,
-  flashcardDifficulty: "NORMAL_PLUS",
-  emailReminderEnabled: true,
+  flashcardDifficulty: "NORMAL",
+  emailReminderEnabled: false,
   emailReminderTime: "08:00",
-  dailyReminderEmail: "gabriela.furtado.p@gmail.com",
+  dailyReminderEmail: "",
   displayDensity: "comfortable",
   visualDensity: "comfortable",
   animations: "normal",
   reducedMotion: false,
-  theme: "system",
-  examGoal: "TRT4",
-  deadline: "2026-11-30",
+  theme: "light",
+  examGoal: "TRT",
+  deadline: null,
   avatarUrl: null,
+  languageTone: "MASCULINE_NEUTRAL",
 };
 
 interface StudyPreferencesContextType {
@@ -150,6 +152,7 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
           examGoal: dbPrefs.examGoal ?? preferences.examGoal,
           deadline: dbPrefs.deadline ? new Date(dbPrefs.deadline).toISOString().split('T')[0] : preferences.deadline,
           avatarUrl: dbPrefs.avatarUrl ?? preferences.avatarUrl,
+          languageTone: dbPrefs.languageTone ?? preferences.languageTone,
         };
         
         setPreferences(merged);

@@ -12,7 +12,9 @@ import {
   ChevronDown,
   Layout,
   Trash2,
-  UploadCloud
+  UploadCloud,
+  Sparkles,
+  UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RepairSupportsButton } from "@/components/materials/RepairSupportsButton";
@@ -22,9 +24,10 @@ import { toast } from "sonner";
 
 interface SettingsFormProps {
   unorganizedCount: number;
+  isAdmin?: boolean;
 }
 
-export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
+export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsFormProps) {
   const { preferences, updatePreferences, isLoading } = useStudyPreferences();
   
   // Local edit states synced with hook preferences on load
@@ -38,6 +41,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
   const [displayDensity, setDisplayDensity] = useState(preferences.displayDensity);
   const [animations, setAnimations] = useState(preferences.animations);
   const [theme, setTheme] = useState(preferences.theme);
+  const [languageTone, setLanguageTone] = useState(preferences.languageTone || "MASCULINE_NEUTRAL");
 
   // New preference states
   const [studyResetTime, setStudyResetTime] = useState(preferences.studyResetTime || "00:00");
@@ -70,6 +74,50 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
     failedRows: number;
     bySubject: Record<string, number>;
   } | null>(null);
+
+  // Admin Invitation State
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+
+  const handleSendInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) {
+      toast.error("E-mail é obrigatório.");
+      return;
+    }
+
+    setIsSendingInvite(true);
+    const toastId = toast.loading("Enviando convite...");
+
+    try {
+      const response = await fetch("/api/auth/invite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: inviteEmail,
+          name: inviteName,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || "Convite processado com sucesso!", { id: toastId });
+        setInviteEmail("");
+        setInviteName("");
+      } else {
+        toast.error(data.error || "Erro ao processar convite.", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Erro de conexão ao enviar convite.", { id: toastId });
+    } finally {
+      setIsSendingInvite(false);
+    }
+  };
 
   const handleResetFlashcards = async () => {
     if (resetConfirmText !== "APAGAR") {
@@ -199,6 +247,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
     setDisplayDensity(preferences.displayDensity);
     setAnimations(preferences.animations);
     setTheme(preferences.theme);
+    setLanguageTone(preferences.languageTone || "MASCULINE_NEUTRAL");
     setStudyResetTime(preferences.studyResetTime || "00:00");
     setStudyDaysOfWeek(preferences.studyDaysOfWeek || "1,2,3,4,5");
     setDefaultBlockDurationMinutes(preferences.defaultBlockDurationMinutes || 30);
@@ -231,6 +280,7 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
         studyDaysOfWeek,
         defaultBlockDurationMinutes,
         maxNewCardsPerDay,
+        languageTone,
       });
 
       if (success) {
@@ -315,6 +365,10 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
           <a href="#visual" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground">
             <Layout className="w-4 h-4 text-muted-foreground" />
             Densidade & Visual
+          </a>
+          <a href="#personalizacao" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground">
+            <Sparkles className="w-4 h-4 text-muted-foreground" />
+            Personalização
           </a>
           <a href="#email" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground">
             <Mail className="w-4 h-4 text-muted-foreground" />
@@ -572,6 +626,38 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
             </div>
           </div>
 
+          {/* PERSONALIZAÇÃO */}
+          <div id="personalizacao" className="bg-card border border-border/40 rounded-[2.5rem] p-8 space-y-6 shadow-sm scroll-mt-6">
+            <div className="flex items-center gap-3 border-b border-border/30 pb-4">
+              <div className="w-10 h-10 rounded-2xl bg-sage-light flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Personalização</h2>
+                <p className="text-xs text-muted-foreground">Ajuste como a plataforma se comunica com você.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Gênero de tratamento
+                </label>
+                <select
+                  value={languageTone}
+                  onChange={(e) => setLanguageTone(e.target.value as any)}
+                  className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all cursor-pointer"
+                >
+                  <option value="FEMININE">Feminino</option>
+                  <option value="MASCULINE_NEUTRAL">Masculino/neutro</option>
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Escolha como você prefere que a plataforma se comunique com você.
+                </p>
+              </div>
+            </div>
+          </div>
+          
           {/* EMAIL NOTIFICATIONS */}
           <div id="email" className="bg-card border border-border/40 rounded-[2.5rem] p-8 space-y-6 shadow-sm scroll-mt-6">
             <div className="flex items-center gap-3 border-b border-border/30 pb-4">
@@ -929,6 +1015,69 @@ export function SettingsForm({ unorganizedCount }: SettingsFormProps) {
             </div>
           </details>
         </div>
+
+        {/* SEÇÃO DE ADMINISTRAÇÃO / CONVITES */}
+        {isAdmin && (
+          <div className="bg-card border border-border/40 rounded-[2.5rem] p-8 space-y-6 shadow-sm">
+            <div className="flex items-center gap-3 border-b border-border/30 pb-4">
+              <div className="w-10 h-10 rounded-2xl bg-muted border border-border flex items-center justify-center shrink-0">
+                <UserPlus className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Administração</h2>
+                <p className="text-xs text-muted-foreground">Gerencie o acesso de convidados na plataforma.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSendInvite} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Nome de Exibição (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    placeholder="Ex: Nome completo"
+                    className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    E-mail de Cadastro (Obrigatório)
+                  </label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    placeholder="Ex: henrique.j.kehl@gmail.com"
+                    className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  type="submit"
+                  disabled={isSendingInvite}
+                  className="rounded-xl text-xs h-10 px-5 bg-accent border-accent text-accent-foreground hover:scale-[1.01] transition-transform font-bold active:scale-[0.98]"
+                >
+                  {isSendingInvite ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    "Enviar convite"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

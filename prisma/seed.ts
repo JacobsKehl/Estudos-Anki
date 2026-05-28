@@ -24,17 +24,18 @@ async function main() {
       userId,
       dailyGoalMinutes: 120,
       studyResetTime: "00:00",
-      studyDaysOfWeek: "1,2,3,4,5",
+      studyDaysOfWeek: "0,1,2,3,4,5,6",
       defaultBlockDurationMinutes: 30,
       maxNewCardsPerDay: 20,
-      flashcardDifficulty: "NORMAL_PLUS",
-      emailReminderEnabled: true,
+      flashcardDifficulty: "NORMAL",
+      emailReminderEnabled: false,
       emailReminderTime: "08:00",
       visualDensity: "comfortable",
       reducedMotion: false,
-      focusArea: "Geral",
+      focusArea: "Estudos",
       displayName: "Henrique Kehl",
-      examGoal: "TRT4",
+      examGoal: "TRT",
+      languageTone: "MASCULINE_NEUTRAL",
     }
   });
 

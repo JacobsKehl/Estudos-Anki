@@ -33,13 +33,14 @@ export async function getCurrentUserId(): Promise<string> {
     if (!user) {
       user = await prisma.user.create({
         data: {
-          name: "Gabriela Furtado",
+          name: "Estudante",
           email: "dev@kehl.study",
           preferences: {
             create: {
-              displayName: "Gabriela Furtado",
-              examGoal: "TRT4",
-              focusArea: "Geral",
+              displayName: "Estudante",
+              examGoal: "TRT",
+              focusArea: "Estudos",
+              languageTone: "MASCULINE_NEUTRAL",
             }
           }
         }

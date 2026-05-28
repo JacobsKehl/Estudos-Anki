@@ -4,6 +4,7 @@ import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
 import { getMockUserId } from "@/lib/auth-mock";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
+import { getUserCopy } from "@/lib/user-copy";
 
 export const dynamic = "force-dynamic";
 
@@ -50,8 +51,10 @@ function generateEmailHtml(
   yesterdayStats: { completed: number; pending: number; skipped: number },
   yesterdayItems: any[],
   appUrl: string,
-  nextTheoryItem?: any
+  nextTheoryItem?: any,
+  languageTone?: string
 ) {
+  const copy = getUserCopy(languageTone);
   const yesterdayCompletedList = yesterdayItems.filter((i: any) => i.status === "COMPLETED");
   const yesterdayPendingList = yesterdayItems.filter(
     (i: any) => i.status !== "COMPLETED" && i.status !== "SKIPPED"
@@ -202,7 +205,8 @@ function generateEmailHtml(
                 Bom dia, <strong>${studentName}</strong>! ☀️
               </p>
               <p style="font-size: 15px; color: #4a5568; line-height: 1.6; margin-bottom: 25px;">
-                Seu planejamento diário de estudos está pronto. Confira abaixo as suas metas de hoje e o resumo de ontem:
+                ${copy.todayReady}. ${copy.readyForMore}<br />
+                Confira abaixo as suas metas de hoje e o resumo de ontem:
               </p>
               
               <!-- Section: Estudos de Hoje -->
@@ -403,6 +407,7 @@ async function processUserReminder(
   // 5. Renderizar HTML
   const studentName = user.name || "Estudante";
   const appUrl = process.env.APP_BASE_URL || "https://kehlstudy.com";
+  const languageTone = user.preferences?.languageTone || "MASCULINE_NEUTRAL";
   const emailHtml = generateEmailHtml(
     studentName,
     todayRange.label,
@@ -415,7 +420,8 @@ async function processUserReminder(
     },
     yesterdayItems,
     appUrl,
-    nextTheoryItem
+    nextTheoryItem,
+    languageTone
   );
 
   // 6. Enviar e-mail

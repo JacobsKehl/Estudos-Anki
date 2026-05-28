@@ -9,8 +9,17 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const mockUserId = await getMockUserId();
   let unorganizedCount = 0;
+  let isAdmin = false;
 
   try {
+    const user = await prisma.user.findUnique({
+      where: { id: mockUserId },
+      select: { email: true }
+    });
+    const userEmail = user?.email || "";
+    isAdmin = userEmail === process.env.ADMIN_EMAIL ||
+              (process.env.NODE_ENV === "development" && process.env.SHOW_ADMIN_TOOLS_IN_DEV === "true");
+
     const materials = await prisma.studyMaterial.findMany({
       where: { userId: mockUserId },
       select: { organizationStatus: true }
@@ -28,7 +37,7 @@ export default async function SettingsPage() {
         description="Personalize seu perfil, ajuste o algoritmo de repetição espaçada e gerencie notificações e ferramentas."
       />
 
-      <SettingsForm unorganizedCount={unorganizedCount} />
+      <SettingsForm unorganizedCount={unorganizedCount} isAdmin={isAdmin} />
     </div>
   );
 }

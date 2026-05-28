@@ -66,7 +66,7 @@ export function LoginClient({ enableSignup }: LoginClientProps) {
         return;
       }
 
-      toast.success("Bem-vinda de volta ao Kehl Study!");
+      toast.success("Login realizado com sucesso! Bons estudos!");
       
       const redirectPath = searchParams.get("redirectedFrom") || "/";
       router.push(redirectPath);
@@ -128,7 +128,7 @@ export function LoginClient({ enableSignup }: LoginClientProps) {
           
           <CardContent className="p-8 md:p-10 space-y-6">
             <div className="text-center space-y-1">
-              <h2 className="text-xl font-bold font-serif text-brand-sage-dark">Bem-vinda ao Kehl Study</h2>
+              <h2 className="text-xl font-bold font-serif text-brand-sage-dark">Boas-vindas ao Kehl Study</h2>
               <p className="text-xs text-muted-foreground">Insira suas credenciais para continuar</p>
             </div>
 
@@ -254,7 +254,7 @@ export function LoginClient({ enableSignup }: LoginClientProps) {
         ) : (
           <div className="text-center">
             <p className="text-[11px] text-muted-foreground">
-              Acesso exclusivo para estudantes convidadas. <span className="font-bold text-brand-sage-dark">Cadastro restrito.</span>
+              Acesso exclusivo para estudantes convidados. <span className="font-bold text-brand-sage-dark">Cadastro restrito.</span>
             </p>
           </div>
         )}

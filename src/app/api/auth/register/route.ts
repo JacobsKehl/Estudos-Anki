@@ -90,7 +90,8 @@ export async function POST(request: NextRequest) {
           visualDensity: "comfortable",
           flashcardDifficulty: "NORMAL",
           studyResetTime: "00:00",
-          studyDaysOfWeek: "0,1,2,3,4,5,6"
+          studyDaysOfWeek: "0,1,2,3,4,5,6",
+          languageTone: "MASCULINE_NEUTRAL"
         }
       });
 
@@ -157,7 +158,8 @@ export async function POST(request: NextRequest) {
         visualDensity: "comfortable",
         flashcardDifficulty: "NORMAL",
         studyResetTime: "00:00",
-        studyDaysOfWeek: "0,1,2,3,4,5,6"
+        studyDaysOfWeek: "0,1,2,3,4,5,6",
+        languageTone: "MASCULINE_NEUTRAL"
       }
     });
 

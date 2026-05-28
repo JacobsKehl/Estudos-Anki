@@ -18,6 +18,8 @@ import {
 import { toast } from "sonner";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { useLogout } from "@/hooks/useLogout";
+import { useStudyPreferences } from "@/hooks/useStudyPreferences";
+import { getUserCopy } from "@/lib/user-copy";
 
 interface AccountSecurityCardProps {
   email: string;
@@ -34,10 +36,13 @@ export function AccountSecurityCard({
   createdAt,
   lastLoginAt
 }: AccountSecurityCardProps) {
-  const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
+  const { performLogout, isLoggingOut } = useLogout();
+  const [isChangePassOpen, setIsChangePassOpen] = useState(false);
+  const { preferences } = useStudyPreferences();
+  const copy = getUserCopy(preferences.languageTone);
   const [isResending, setIsResending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const { performLogout, isLoggingOut } = useLogout();
+  const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
 
   // Carregar/gerenciar cooldown persistido no localStorage
   useEffect(() => {
@@ -137,7 +142,7 @@ export function AccountSecurityCard({
               Conta & Segurança
             </h3>
             <p className="text-[10px] text-muted-foreground">
-              Gerencie suas credenciais e verifique os acessos da estudante.
+              {copy.accountSecurityDesc}
             </p>
           </div>
         </div>

@@ -23,20 +23,21 @@ export async function GET() {
           userId: user.id,
           dailyGoalMinutes: 120,
           studyResetTime: "00:00",
-          studyDaysOfWeek: "1,2,3,4,5",
+          studyDaysOfWeek: "0,1,2,3,4,5,6",
           defaultBlockDurationMinutes: 30,
           maxNewCardsPerDay: 20,
-          flashcardDifficulty: "NORMAL_PLUS",
-          emailReminderEnabled: true,
+          flashcardDifficulty: "NORMAL",
+          emailReminderEnabled: false,
           emailReminderTime: "08:00",
           visualDensity: "comfortable",
           reducedMotion: false,
-          focusArea: "Geral",
+          focusArea: "Estudos",
           displayName: user.name || "Estudante",
-          examGoal: "TRT4",
-          deadline: new Date("2026-11-30T23:59:59"),
+          examGoal: "TRT",
+          deadline: null,
           avatarUrl: null,
           theme: "light",
+          languageTone: "MASCULINE_NEUTRAL",
         },
       });
       return NextResponse.json({
@@ -118,6 +119,10 @@ export async function POST(request: Request) {
     }
     if (body.avatarUrl !== undefined) data.avatarUrl = body.avatarUrl;
     if (body.theme !== undefined) data.theme = body.theme;
+    if (body.languageTone !== undefined) {
+      const val = body.languageTone;
+      data.languageTone = (val === "FEMININE" || val === "MASCULINE_NEUTRAL") ? val : "MASCULINE_NEUTRAL";
+    }
 
     let updatedPrefs;
     if (!user.preferences) {

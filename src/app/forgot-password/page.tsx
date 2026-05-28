@@ -151,7 +151,7 @@ export default function ForgotPasswordPage() {
         {/* Footer info */}
         <div className="text-center">
           <p className="text-[11px] text-muted-foreground">
-            Acesso exclusivo para estudantes convidadas.
+            Acesso exclusivo para estudantes convidados.
           </p>
         </div>
 

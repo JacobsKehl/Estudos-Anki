@@ -36,8 +36,8 @@ export function UserMenuDropdown({ initials }: UserMenuDropdownProps) {
     setIsOpen(false);
   };
 
-  const displayName = preferences.displayName || preferences.name || "Gabriela Furtado";
-  const userEmail = preferences.dailyReminderEmail || "gabriela.furtado.p@gmail.com";
+  const displayName = preferences.displayName || preferences.name || "Estudante";
+  const userEmail = preferences.dailyReminderEmail || "estudante@kehl.study";
 
   return (
     <div className="relative select-none" ref={dropdownRef}>

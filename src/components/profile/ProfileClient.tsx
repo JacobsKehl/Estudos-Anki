@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { User } from "lucide-react";
 import { toast } from "sonner";
 import { AccountSecurityCard } from "./AccountSecurityCard";
+import { getUserCopy } from "@/lib/user-copy";
 
 interface ProfileClientProps {
   userEmail: string;
@@ -37,6 +38,7 @@ interface ProfileClientProps {
 export function ProfileClient({ userEmail, stats, authData }: ProfileClientProps) {
   const { preferences, updatePreferences } = useStudyPreferences();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const copy = getUserCopy(preferences.languageTone);
 
   // Calcular a viabilidade com base nas preferências atuais (sincronizadas no hook)
   const viability = React.useMemo(() => {
@@ -72,7 +74,7 @@ export function ProfileClient({ userEmail, stats, authData }: ProfileClientProps
       {/* Cabeçalho de Página */}
       <PageHeader 
         icon={User}
-        title="Central da Estudante"
+        title={copy.profileTitle}
         description="Visualize sua identidade, rotina de estudo e a viabilidade do seu cronograma rumo à aprovação."
       />
 
