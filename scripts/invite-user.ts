@@ -44,7 +44,7 @@ async function main() {
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.STORAGE_SUPABASE_SERVICE_ROLE_KEY;
 
     // Se estiver em produção ou se a service role key estiver presente, usar o Supabase real
     const isProd = process.env.NODE_ENV === "production";
