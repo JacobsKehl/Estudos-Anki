@@ -158,16 +158,28 @@ export async function syncSupabaseUserWithPrismaUser(supabaseUser: { id: string;
 
       if (existingUsers.length === 1) {
         const legacyUser = existingUsers[0];
-        user = await prisma.user.update({
-          where: { id: legacyUser.id },
-          data: {
-            authUserId,
-            email: email || legacyUser.email,
-            name: legacyUser.name || "Gabriela Furtado",
-            lastLoginAt: new Date()
-          }
-        });
-        console.info(`[MIGRATION] Usuário legado/mock ${legacyUser.id} (${legacyUser.email}) vinculado ao Supabase authUserId: ${authUserId}, email: ${email}`);
+        
+        // SEGURANÇA: Cadastro público/novo usuário nunca deve herdar ou alterar o usuário legado da Gabriela.
+        // Só fazemos o vínculo se o e-mail de login bater com o e-mail do usuário legado, ou se o usuário legado não tiver e-mail.
+        const isGabriela = legacyUser.name?.toLowerCase().includes("gabriela") || 
+                           legacyUser.email?.toLowerCase().includes("gabriela");
+                           
+        const emailMatches = email && legacyUser.email && email.toLowerCase() === legacyUser.email.toLowerCase();
+        
+        if (isGabriela && !emailMatches) {
+          console.warn(`[SECURITY] Tentativa de login com e-mail ${email} bloqueada de herdar/alterar o usuário legado da Gabriela.`);
+        } else if (!legacyUser.email || emailMatches) {
+          user = await prisma.user.update({
+            where: { id: legacyUser.id },
+            data: {
+              authUserId,
+              email: email || legacyUser.email,
+              name: legacyUser.name || "Gabriela Furtado",
+              lastLoginAt: new Date()
+            }
+          });
+          console.info(`[MIGRATION] Usuário legado/mock ${legacyUser.id} (${legacyUser.email}) vinculado ao Supabase authUserId: ${authUserId}, email: ${email}`);
+        }
       }
     }
 

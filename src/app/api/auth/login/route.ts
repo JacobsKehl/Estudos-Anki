@@ -62,6 +62,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (error || !data.user || !data.session) {
+      const errMsg = error?.message || "";
+      if (errMsg.toLowerCase().includes("email not confirmed")) {
+        return NextResponse.json({
+          error: "Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada ou solicite um novo link de confirmação.",
+          code: "email_not_confirmed",
+          email: email
+        }, { status: 400 });
+      }
       return NextResponse.json({ error: error?.message || "Credenciais inválidas" }, { status: 400 });
     }
 
