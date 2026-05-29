@@ -211,63 +211,68 @@ export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
       )}
 
       {!isDone && (
-        <div className="flex items-center gap-2 pl-[52px] pt-1">
-          {item.studyBlockId && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="rounded-lg font-semibold hover:bg-black/5 dark:hover:bg-white/5"
-              onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
-            >
-              Ver detalhes
-            </Button>
-          )}
-
-          {item.studyBlockId && (
-            <>
-              {hasFlashcards ? (
-                <Button
-                  size="sm"
-                  variant="soft"
-                  className="rounded-lg font-semibold flex items-center gap-1.5 transition-all"
-                  onClick={() => router.push(`/practice?blockId=${item.studyBlockId}`)}
-                >
-                  <BrainCircuit className="w-3.5 h-3.5" />
-                  Praticar Cards ({flashcardCount})
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="soft"
-                  className="rounded-lg font-semibold flex items-center gap-1.5 transition-all"
-                  onClick={handleGenerateCards}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5 mr-1.5 text-accent" />
-                  )}
-                  {isGenerating ? "Gerando..." : "Gerar Cards (IA)"}
-                </Button>
-              )}
-            </>
-          )}
-
-          <Button
-            variant="primary"
-            size="sm"
-            className="rounded-lg font-bold shadow-sm"
-            onClick={handleCompleteStep}
-            disabled={isCompleting}
-          >
-            {isCompleting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pl-0 md:pl-[52px] pt-1 w-full">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+            {item.studyBlockId && (
+              <Button
+                size="sm"
+                variant="primary"
+                className="w-full sm:w-auto rounded-lg font-bold shadow-sm flex items-center justify-center gap-1.5"
+                onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
+              >
+                <BookOpen className="w-4 h-4" />
+                Ver Conteúdo
+              </Button>
             )}
-            Concluir conteúdo
-          </Button>
+
+            {item.studyBlockId && (
+              <>
+                {hasFlashcards ? (
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    className="w-full sm:w-auto rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all"
+                    onClick={() => router.push(`/practice?blockId=${item.studyBlockId}`)}
+                  >
+                    <BrainCircuit className="w-3.5 h-3.5" />
+                    Praticar Cards ({flashcardCount})
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    className="w-full sm:w-auto rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all"
+                    onClick={handleGenerateCards}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-accent" />
+                    )}
+                    <span>{isGenerating ? "Gerando..." : "Gerar Cards (IA)"}</span>
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="w-full md:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full md:w-auto rounded-lg font-bold border-accent/50 text-accent hover:bg-accent/10 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+              onClick={handleCompleteStep}
+              disabled={isCompleting}
+            >
+              {isCompleting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Concluir
+            </Button>
+          </div>
         </div>
       )}
     </div>
