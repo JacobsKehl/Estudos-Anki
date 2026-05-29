@@ -67,28 +67,20 @@ export async function POST(request: NextRequest) {
     const authMode = process.env.AUTH_MODE || "SUPABASE";
     const adminClient = createSupabaseAdminClient();
 
-    const maskEmail = (e: string) => {
-      const [local, domain] = e.split("@");
-      if (!local || !domain) return "invalid-email";
-      if (local.length <= 2) return `${local[0]}***@${domain}`;
-      return `${local[0]}${"*".repeat(local.length - 2)}${local[local.length - 1]}@${domain}`;
-    };
-
     // ─── CENÁRIO 1: Produção ou Modo Real de Autenticação ──────────────────────
     if (isProd || authMode === "SUPABASE") {
       if (!adminClient) {
-        console.error(
-          JSON.stringify({
-            message: "[InviteUser] Failed to send invite",
-            metadata: {
-              environment: process.env.NODE_ENV,
-              hasServiceRoleKey: false,
-              hasInviteSecret: !!process.env.INVITE_SECRET,
-              emailDomain: email.split("@")[1] || "unknown",
-              errorCode: "SUPABASE_CLIENT_MISSING"
-            }
-          }, null, 2)
-        );
+        const isProdEnv = process.env.NODE_ENV === "production";
+        if (isProdEnv) {
+          console.error("[InviteUser] Failed to send invite", {
+            environment: "production",
+            hasServiceRoleKey: false,
+            hasInviteSecret: !!process.env.INVITE_SECRET,
+            errorCode: "MISSING_SERVICE_ROLE_KEY"
+          });
+        } else {
+          console.error("[INVITE ERROR] SUPABASE_SERVICE_ROLE_KEY está ausente no ambiente de desenvolvimento/produção.");
+        }
         return NextResponse.json(
           { error: "Não foi possível processar o convite no momento. Verifique a configuração administrativa e tente novamente." },
           { status: 500 }
@@ -104,31 +96,33 @@ export async function POST(request: NextRequest) {
       });
 
       if (inviteError) {
-        // Evitar expor se o e-mail já existe se a mensagem sugerir isso (retornar mensagem segura)
-        if (inviteError.message.toLowerCase().includes("already registered") || inviteError.status === 422) {
-          return NextResponse.json({
-            success: true,
-            message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
+        const isProdEnv = process.env.NODE_ENV === "production";
+        if (isProdEnv) {
+          const maskedEmail = email.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => {
+            return first + "*".repeat(Math.min(middle.length, 15)) + domain;
           });
+          console.error("[InviteUser] Failed to send invite", {
+            environment: "production",
+            hasServiceRoleKey: true,
+            hasInviteSecret: !!process.env.INVITE_SECRET,
+            emailDomain: email.split("@")[1] || "unknown",
+            errorCode: "SUPABASE_INVITE_FAILED",
+            maskedEmail
+          });
+          return NextResponse.json(
+            { error: "Não foi possível processar o convite no momento. Verifique a configuração administrativa e tente novamente." },
+            { status: 500 }
+          );
+        } else {
+          console.error("Erro ao convidar usuário no Supabase Auth:", inviteError.message);
+          if (inviteError.message.toLowerCase().includes("already registered") || inviteError.status === 422) {
+            return NextResponse.json({
+              success: true,
+              message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
+            });
+          }
+          return NextResponse.json({ error: inviteError.message }, { status: 400 });
         }
-
-        console.error(
-          JSON.stringify({
-            message: "[InviteUser] Failed to send invite",
-            metadata: {
-              environment: process.env.NODE_ENV,
-              hasServiceRoleKey: true,
-              hasInviteSecret: !!process.env.INVITE_SECRET,
-              emailDomain: email.split("@")[1] || "unknown",
-              errorCode: "SUPABASE_INVITE_FAILED"
-            }
-          }, null, 2)
-        );
-
-        return NextResponse.json(
-          { error: "Não foi possível processar o convite no momento. Verifique a configuração administrativa e tente novamente." },
-          { status: 500 }
-        );
       }
 
       const authUserId = inviteData.user?.id || null;
@@ -167,7 +161,15 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      console.info(`[INVITE] Usuário ${maskEmail(email)} convidado com sucesso via Supabase.`);
+      const isProdEnv = process.env.NODE_ENV === "production";
+      if (isProdEnv) {
+        const maskedEmail = email.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => {
+          return first + "*".repeat(Math.min(middle.length, 15)) + domain;
+        });
+        console.info(`[INVITE] Usuário ${maskedEmail} convidado com sucesso via Supabase.`);
+      } else {
+        console.info(`[INVITE] Usuário ${email} convidado com sucesso via Supabase.`);
+      }
       return NextResponse.json({
         success: true,
         message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
@@ -177,7 +179,7 @@ export async function POST(request: NextRequest) {
     // ─── CENÁRIO 2: Simulação de Desenvolvimento (AUTH_MODE=MOCK local) ────────
     console.info(`\n=== [SIMULAÇÃO DE CONVITE] ===`);
     console.info(`Nome: ${name || "Sem nome"}`);
-    console.info(`E-mail: ${maskEmail(email)}`);
+    console.info(`E-mail: ${email}`);
     console.info(`Link Simulado: ${request.nextUrl.origin}/login?email=${email}&mock_invite=true`);
     console.info(`==============================\n`);
 
@@ -216,26 +218,20 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (err: any) {
-    const parsedBody = await request.clone().json().catch(() => ({}));
-    const reqEmail = (parsedBody.email || "").toLowerCase().trim();
-    const emailDomain = reqEmail ? (reqEmail.split("@")[1] || "unknown") : "unknown";
-
-    console.error(
-      JSON.stringify({
-        message: "[InviteUser] Failed to send invite",
-        metadata: {
-          environment: process.env.NODE_ENV,
-          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-          hasInviteSecret: !!process.env.INVITE_SECRET,
-          emailDomain,
-          errorCode: "INTERNAL_SERVER_ERROR"
-        }
-      }, null, 2)
-    );
-
-    return NextResponse.json(
-      { error: "Não foi possível processar o convite no momento. Verifique a configuração administrativa e tente novamente." },
-      { status: 500 }
-    );
+    const isProd = process.env.NODE_ENV === "production";
+    if (isProd) {
+      console.error("[InviteUser] Failed to send invite due to internal server error", {
+        environment: "production",
+        hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        hasInviteSecret: !!process.env.INVITE_SECRET,
+        errorCode: "INTERNAL_SERVER_ERROR"
+      });
+      return NextResponse.json(
+        { error: "Não foi possível processar o convite no momento. Verifique a configuração administrativa e tente novamente." },
+        { status: 500 }
+      );
+    }
+    console.error("Erro na rota de convite:", err);
+    return NextResponse.json({ error: "Erro interno no servidor ao processar convite." }, { status: 500 });
   }
 }
