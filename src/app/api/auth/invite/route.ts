@@ -88,7 +88,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+      let appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+      
+      // FORÇAR DOMÍNIO REAL EM PRODUÇÃO: Se for ambiente de produção ou se a origem da requisição for o domínio real, força o uso de kehlstudy.com
+      const isProd = process.env.NODE_ENV === "production";
+      if (isProd || request.nextUrl.origin.includes("kehlstudy.com")) {
+        appUrl = "https://kehlstudy.com";
+      }
+      
       const redirectTo = `${appUrl}/auth/callback`;
 
       let authUserId: string | null = null;
