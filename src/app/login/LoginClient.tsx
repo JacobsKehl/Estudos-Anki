@@ -28,22 +28,27 @@ export function LoginClient({ enableSignup }: LoginClientProps) {
 
   // Interceptar convites implícitos (fragmento de hash com access_token) no cliente
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash) {
-      const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get("access_token");
-      const refreshToken = params.get("refresh_token");
-      const expiresIn = params.get("expires_in");
+    if (typeof window !== "undefined") {
+      const href = window.location.href;
+      const hashIndex = href.indexOf("#");
+      
+      if (hashIndex !== -1) {
+        const hash = href.substring(hashIndex + 1);
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+        const expiresIn = params.get("expires_in");
 
-      if (accessToken && refreshToken) {
-        setIsLoading(true);
-        const toastId = toast.loading("Configurando sua conta exclusiva... Bem-vindo!");
-        
-        // Encaminhar tokens de acesso na query de forma segura para o callback definir cookies e sincronizar
-        const callbackUrl = `/auth/callback?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken)}&expires_in=${expiresIn || "3600"}`;
-        
-        // Redirecionamento completo do navegador para atualizar os cookies de sessão de forma síncrona
-        window.location.href = callbackUrl;
+        if (accessToken && refreshToken) {
+          setIsLoading(true);
+          toast.loading("Configurando sua conta exclusiva... Bem-vindo!");
+          
+          // Encaminhar tokens de acesso na query de forma segura para o callback definir cookies e sincronizar
+          const callbackUrl = `/auth/callback?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken)}&expires_in=${expiresIn || "3600"}`;
+          
+          // Redirecionamento completo do navegador para atualizar os cookies de sessão de forma síncrona
+          window.location.href = callbackUrl;
+        }
       }
     }
   }, []);

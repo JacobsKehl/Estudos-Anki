@@ -30,7 +30,16 @@ function isTokenExpired(token: string): boolean {
     if (parts.length !== 3) return true;
     
     // Decodificar base64url no middleware usando atob
-    const payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    let payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    
+    // Adicionar preenchimento de segurança para compatibilidade com o padrão estrito do atob no Edge Runtime
+    const pad = payloadBase64.length % 4;
+    if (pad === 2) {
+      payloadBase64 += "==";
+    } else if (pad === 3) {
+      payloadBase64 += "=";
+    }
+    
     const payloadDecoded = atob(payloadBase64);
     const payload = JSON.parse(payloadDecoded);
     

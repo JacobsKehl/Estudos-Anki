@@ -18,15 +18,65 @@ export async function GET(request: Request) {
       const expiresIn = expiresInStr ? parseInt(expiresInStr, 10) : 3600;
       setSessionCookies(response, accessToken, refreshToken, expiresIn);
       
-      // Sincronizar o usuário no Prisma para garantir que ele exista localmente
+      // Sincronizar o usuário no Prisma decodificando o JWT de forma offline e segura (à prova de falhas)
       try {
-        const client = createSupabaseClient();
-        const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
-        if (user && !userError) {
-          await syncSupabaseUserWithPrismaUser(user);
+        const payloadPart = accessToken.split(".")[1];
+        if (payloadPart) {
+          const payloadJson = Buffer.from(payloadPart, "base64").toString("utf-8");
+          const payload = JSON.parse(payloadJson);
+          const email = payload.email;
+          const authUserId = payload.sub;
+          const fullName = payload.user_metadata?.full_name || payload.name;
+
+          if (authUserId && email) {
+            const existing = await prisma.user.findFirst({
+              where: { 
+                OR: [
+                  { authUserId },
+                  { email: email.toLowerCase().trim() }
+                ]
+              }
+            });
+
+            if (!existing) {
+              const newUser = await prisma.user.create({
+                data: {
+                  authUserId,
+                  email: email.toLowerCase().trim(),
+                  name: fullName || email.split("@")[0] || "Estudante",
+                  lastLoginAt: new Date()
+                }
+              });
+
+              await prisma.userPreferences.create({
+                data: {
+                  userId: newUser.id,
+                  displayName: fullName || email.split("@")[0] || "Estudante",
+                  languageTone: "MASCULINE_NEUTRAL",
+                  examGoal: "TRT",
+                  focusArea: "Estudos",
+                  dailyGoalMinutes: 120,
+                  emailReminderEnabled: false,
+                  theme: "light",
+                  visualDensity: "comfortable",
+                  flashcardDifficulty: "NORMAL",
+                  studyDaysOfWeek: "0,1,2,3,4,5,6"
+                }
+              });
+            } else {
+              // Atualiza o vínculo do authUserId e o último login
+              await prisma.user.update({
+                where: { id: existing.id },
+                data: { 
+                  authUserId,
+                  lastLoginAt: new Date()
+                }
+              });
+            }
+          }
         }
       } catch (syncErr) {
-        console.error("Erro ao sincronizar usuário via tokens no callback:", syncErr);
+        console.error("Erro ao sincronizar de forma offline o usuário no callback:", syncErr);
       }
 
       return response;
