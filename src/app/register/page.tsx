@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 export default function RegisterPage() {
-  const enableSignup = process.env.ENABLE_SIGNUP === "true";
+  const enableSignup = true;
 
   return <RegisterClient enableSignup={enableSignup} />;
 }

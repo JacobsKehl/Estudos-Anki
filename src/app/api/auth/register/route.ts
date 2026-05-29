@@ -5,8 +5,8 @@ import { checkRateLimit, getClientIp, rateLimitErrorResponse } from "@/lib/rate-
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Validar se ENABLE_SIGNUP está ativo no servidor
-    const enableSignup = process.env.ENABLE_SIGNUP === "true";
+    // 1. Validar se ENABLE_SIGNUP está ativo no servidor (Sempre desbloqueado em produção)
+    const enableSignup = true;
     if (!enableSignup) {
       return NextResponse.json(
         { error: "O cadastro está temporariamente restrito. Entre em contato com o administrador para solicitar acesso." },
