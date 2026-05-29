@@ -36,14 +36,14 @@ const ACTION_CONFIG: Record<ActionType, {
     icon: BookOpen,
     color: "text-accent",
     bgColor: "bg-sage-light/20 dark:bg-accent/5 border-sage-light/40 dark:border-accent/10",
-    badgeColor: "border border-[#849D6F]/25 bg-[#849D6F]/12 text-[#6F875B] dark:bg-[#849D6F]/20 dark:border-[#849D6F]/30 dark:text-[#d1e2c4]",
+    badgeColor: "border border-[#C8D8B8] bg-[#EEF3E8] text-[#4F6F45] dark:bg-[#4F6F45]/25 dark:border-[#C8D8B8]/20 dark:text-[#d1e2c4]",
   },
   REVIEW_BLOCK: {
     label: "Revisão de conteúdo",
     icon: RotateCw,
     color: "text-emerald-600",
     bgColor: "bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30",
-    badgeColor: "border border-emerald-600/25 bg-emerald-600/12 text-emerald-800 dark:bg-emerald-600/20 dark:border-emerald-600/30 dark:text-emerald-200",
+    badgeColor: "border border-emerald-200 bg-[#e6f4ea] text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/30 dark:text-emerald-200",
   },
 };
 
@@ -134,7 +134,7 @@ export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold text-sm">{item.subject?.name}</span>
-              <span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-semibold ${config.badgeColor}`}>
+              <span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-bold ${config.badgeColor}`}>
                 {config.label}
               </span>
               {isAdvanced && (
