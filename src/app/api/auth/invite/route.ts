@@ -255,6 +255,15 @@ export async function POST(request: NextRequest) {
           console.info(`[INVITE RESEND] Convite enviado via Resend para ${email}`);
 
         } catch (err: any) {
+          const isAlreadyRegistered = (err.message || "").toLowerCase().includes("already registered") || 
+                                     (err.message || "").toLowerCase().includes("already exists") || 
+                                     err.status === 422;
+          if (isAlreadyRegistered) {
+            return NextResponse.json({
+              success: true,
+              message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
+            });
+          }
           console.error("Falha no fluxo customizado do Resend, caindo para o fallback nativo do Supabase:", err.message);
           // Fallback nativo
           actionLink = null;
@@ -269,6 +278,16 @@ export async function POST(request: NextRequest) {
         });
 
         if (inviteError) {
+          const isAlreadyRegistered = (inviteError.message || "").toLowerCase().includes("already registered") || 
+                                     (inviteError.message || "").toLowerCase().includes("already exists") || 
+                                     inviteError.status === 422;
+          if (isAlreadyRegistered) {
+            return NextResponse.json({
+              success: true,
+              message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
+            });
+          }
+
           const isProdEnv = process.env.NODE_ENV === "production";
           if (isProdEnv) {
             const maskedEmail = email.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => {
@@ -288,12 +307,6 @@ export async function POST(request: NextRequest) {
             );
           } else {
             console.error("Erro ao convidar usuário no Supabase Auth:", inviteError.message);
-            if (inviteError.message.toLowerCase().includes("already registered") || inviteError.status === 422) {
-              return NextResponse.json({
-                success: true,
-                message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
-              });
-            }
             return NextResponse.json({ error: inviteError.message }, { status: 400 });
           }
         }
