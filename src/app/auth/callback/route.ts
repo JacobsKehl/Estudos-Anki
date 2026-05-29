@@ -6,9 +6,31 @@ export async function GET(request: Request) {
   try {
     const { searchParams, origin } = new URL(request.url);
     const code = searchParams.get("code");
+    const accessToken = searchParams.get("access_token");
+    const refreshToken = searchParams.get("refresh_token");
+    const expiresInStr = searchParams.get("expires_in");
     const next = searchParams.get("next") || "/";
 
     const response = NextResponse.redirect(new URL(next, origin));
+
+    // A. Se os tokens foram passados diretamente via query params (vindo da captura do hash pelo cliente)
+    if (accessToken && refreshToken) {
+      const expiresIn = expiresInStr ? parseInt(expiresInStr, 10) : 3600;
+      setSessionCookies(response, accessToken, refreshToken, expiresIn);
+      
+      // Sincronizar o usuário no Prisma para garantir que ele exista localmente
+      try {
+        const client = createSupabaseClient();
+        const { data: { user }, error: userError } = await client.auth.getUser(accessToken);
+        if (user && !userError) {
+          await syncSupabaseUserWithPrismaUser(user);
+        }
+      } catch (syncErr) {
+        console.error("Erro ao sincronizar usuário via tokens no callback:", syncErr);
+      }
+
+      return response;
+    }
 
     if (!code) {
       return response; // Sem código, apenas redireciona para a home
