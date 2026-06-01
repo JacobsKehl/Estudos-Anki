@@ -50,14 +50,14 @@ export async function POST(request: NextRequest) {
       return first + "*".repeat(Math.min(middle.length, 10)) + domain;
     });
 
-    // 4. Verificar se o e-mail já existe no Prisma local
+    // 4. Verificar se o e-mail já existe no Prisma local e se possui conta ativa (não mock)
     const existingUser = await prisma.user.findUnique({
       where: { email }
     });
 
-    if (existingUser) {
-      // Retornar resposta genérica de sucesso para evitar enumeração de e-mails
-      console.info(`[REGISTRATION SECURITY] Cadastro rejeitado silenciosamente: e-mail ${recipientMasked} já cadastrado no Prisma.`);
+    if (existingUser && !existingUser.authUserId?.startsWith("mock-auth-")) {
+      // Retornar resposta genérica de sucesso para evitar micro-ataques de enumeração de e-mails
+      console.info(`[REGISTRATION SECURITY] Cadastro rejeitado silenciosamente: e-mail ${recipientMasked} já cadastrado no Prisma com ID ativo.`);
       return NextResponse.json({
         success: true,
         message: "Cadastro recebido! Se o e-mail for novo, enviamos um link de confirmação para a sua caixa de entrada."
@@ -180,32 +180,44 @@ export async function POST(request: NextRequest) {
       actionLink = actionLink.replace("http://127.0.0.1:3000", appUrl);
     }
 
-    // 3. Criar os registros correspondentes no Prisma (Apenas após o Auth estar garantido)
-    const newUser = await prisma.user.create({
-      data: {
-        authUserId,
-        email,
-        name,
-        lastLoginAt: null
-      }
-    });
+    // 3. Criar ou atualizar os registros correspondentes no Prisma (Apenas após o Auth estar garantido)
+    let newUser;
+    if (existingUser) {
+      newUser = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          authUserId,
+          name // Atualiza o nome de exibição local
+        }
+      });
+      console.info(`[REGISTRATION] Conta local mock/convidada ${existingUser.id} vinculada ao novo authUserId real do Supabase: ${authUserId}`);
+    } else {
+      newUser = await prisma.user.create({
+        data: {
+          authUserId,
+          email,
+          name,
+          lastLoginAt: null
+        }
+      });
 
-    await prisma.userPreferences.create({
-      data: {
-        userId: newUser.id,
-        displayName: name,
-        examGoal: "TRT",
-        focusArea: "Estudos",
-        dailyGoalMinutes: 120,
-        emailReminderEnabled: false,
-        theme: "light",
-        visualDensity: "comfortable",
-        flashcardDifficulty: "NORMAL",
-        studyResetTime: "00:00",
-        studyDaysOfWeek: "0,1,2,3,4,5,6",
-        languageTone: "MASCULINE_NEUTRAL"
-      }
-    });
+      await prisma.userPreferences.create({
+        data: {
+          userId: newUser.id,
+          displayName: name,
+          examGoal: "TRT",
+          focusArea: "Estudos",
+          dailyGoalMinutes: 120,
+          emailReminderEnabled: false,
+          theme: "light",
+          visualDensity: "comfortable",
+          flashcardDifficulty: "NORMAL",
+          studyResetTime: "00:00",
+          studyDaysOfWeek: "0,1,2,3,4,5,6",
+          languageTone: "MASCULINE_NEUTRAL"
+        }
+      });
+    }
 
     // 4. Enviar o e-mail de ativação personalizado usando a API direta do Resend
     const resendApiKey = process.env.RESEND_API_KEY;
