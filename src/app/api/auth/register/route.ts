@@ -119,6 +119,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let authUserId: string | null = null;
+    let actionLink = "";
+
     // 1. Criar o usuário administrativamente no Supabase Auth (sem disparar nenhum e-mail)
     const { data: signUpData, error: signUpError } = await adminClient.auth.admin.createUser({
       email,
@@ -132,52 +135,84 @@ export async function POST(request: NextRequest) {
     if (signUpError) {
       console.error("Erro ao criar usuário administrativamente no Supabase:", signUpError.message);
       
-      // Se já existir no Supabase Auth, retornar sucesso genérico para evitar enumeração
+      // Se já existir no Supabase Auth, tentar gerar o link de signup caso esteja pendente de confirmação
       if (signUpError.message.toLowerCase().includes("already registered") || signUpError.status === 422) {
+        console.info(`[REGISTRATION] E-mail ${recipientMasked} já cadastrado no Supabase Auth. Tentando gerar link de ativação para conta pendente.`);
+        
+        let appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+        if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
+          appUrl = "https://kehlstudy.com";
+        }
+        const redirectTo = `${appUrl}/auth/callback`;
+
+        const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+          type: "signup",
+          email,
+          password: "", // String vazia para contas existentes
+          options: {
+            redirectTo
+          }
+        });
+
+        if (linkError) {
+          // Se falhar a geração de link (ex: porque a conta já está confirmada), retorna sucesso genérico de segurança
+          console.info(`[REGISTRATION SECURITY] Conta já está confirmada ou ativa no Supabase Auth. Retornando sucesso genérico silencioso.`);
+          return NextResponse.json({
+            success: true,
+            message: "Cadastro recebido! Se o e-mail for novo, enviamos um link de confirmação para a sua caixa de entrada."
+          });
+        }
+
+        authUserId = linkData.user?.id || null;
+        actionLink = linkData.properties?.action_link || "";
+        
+        // Garantir domínio correto no link se for gerado como localhost pelo Supabase
+        if (actionLink && actionLink.includes("localhost:3000")) {
+          actionLink = actionLink.replace("http://localhost:3000", appUrl);
+        } else if (actionLink && actionLink.includes("127.0.0.1:3000")) {
+          actionLink = actionLink.replace("http://127.0.0.1:3000", appUrl);
+        }
+      } else {
+        return NextResponse.json({ error: signUpError.message }, { status: 400 });
+      }
+    } else {
+      authUserId = signUpData.user?.id || null;
+      if (!authUserId) {
+        return NextResponse.json({ error: "Erro ao inicializar identidade de usuário no Supabase." }, { status: 400 });
+      }
+
+      // 2. Gerar o link seguro de ativação via Supabase Admin (Bypass de SMTP)
+      let appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+      if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
+        appUrl = "https://kehlstudy.com";
+      }
+      const redirectTo = `${appUrl}/auth/callback`;
+
+      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: "signup",
+        email,
+        password,
+        options: {
+          redirectTo
+        }
+      });
+
+      if (linkError) {
+        console.error("Erro ao gerar link seguro de ativação:", linkError.message);
+        // Se falhar a geração de link, mantemos o usuário no Auth mas retornamos erro amigável permitindo reenvio
         return NextResponse.json({
           success: true,
-          message: "Cadastro recebido! Se o e-mail for novo, enviamos um link de confirmação para a sua caixa de entrada."
+          message: "Sua conta foi criada, mas não conseguimos gerar o link de confirmação no momento. Tente reenviar o link em alguns minutos."
         });
       }
-      return NextResponse.json({ error: signUpError.message }, { status: 400 });
-    }
 
-    const authUserId = signUpData.user?.id;
-    if (!authUserId) {
-      return NextResponse.json({ error: "Erro ao inicializar identidade de usuário no Supabase." }, { status: 400 });
-    }
-
-    // 2. Gerar o link seguro de ativação via Supabase Admin (Bypass de SMTP)
-    let appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-    if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
-      appUrl = "https://kehlstudy.com";
-    }
-    const redirectTo = `${appUrl}/auth/callback`;
-
-    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: "signup",
-      email,
-      password,
-      options: {
-        redirectTo
+      actionLink = linkData.properties?.action_link || "";
+      // Garantir domínio correto no link se for gerado como localhost pelo Supabase
+      if (actionLink && actionLink.includes("localhost:3000")) {
+        actionLink = actionLink.replace("http://localhost:3000", appUrl);
+      } else if (actionLink && actionLink.includes("127.0.0.1:3000")) {
+        actionLink = actionLink.replace("http://127.0.0.1:3000", appUrl);
       }
-    });
-
-    if (linkError) {
-      console.error("Erro ao gerar link seguro de ativação:", linkError.message);
-      // Se falhar a geração de link, mantemos o usuário no Auth mas retornamos erro amigável permitindo reenvio
-      return NextResponse.json({
-        success: true,
-        message: "Sua conta foi criada, mas não conseguimos gerar o link de confirmação no momento. Tente reenviar o link em alguns minutos."
-      });
-    }
-
-    let actionLink = linkData.properties?.action_link || "";
-    // Garantir domínio correto no link se for gerado como localhost pelo Supabase
-    if (actionLink && actionLink.includes("localhost:3000")) {
-      actionLink = actionLink.replace("http://localhost:3000", appUrl);
-    } else if (actionLink && actionLink.includes("127.0.0.1:3000")) {
-      actionLink = actionLink.replace("http://127.0.0.1:3000", appUrl);
     }
 
     // 3. Criar ou atualizar os registros correspondentes no Prisma (Apenas após o Auth estar garantido)
