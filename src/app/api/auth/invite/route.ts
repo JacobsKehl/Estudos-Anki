@@ -271,55 +271,20 @@ export async function POST(request: NextRequest) {
               message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
             });
           }
-          console.error("Falha no fluxo customizado do Resend, caindo para o fallback nativo do Supabase:", err.message);
-          // Fallback nativo
-          actionLink = null;
+          console.error("Falha no fluxo customizado do Resend para convite:", err.message);
+          return NextResponse.json(
+            { error: `Erro ao processar e enviar o convite: ${err.message}` },
+            { status: 500 }
+          );
         }
+      } else {
+        console.error("[InviteUser] RESEND_API_KEY está ausente. Impossível enviar convite.");
+        return NextResponse.json(
+          { error: "Erro na infraestrutura de envio de e-mails (chave ausente)." },
+          { status: 500 }
+        );
       }
 
-      // Se falhou o Resend/generateLink ou se Resend não estava configurado, faz o fallback tradicional
-      if (!actionLink) {
-        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-          redirectTo,
-          data: name ? { full_name: name } : undefined
-        });
-
-        if (inviteError) {
-          const isAlreadyRegistered = (inviteError.message || "").toLowerCase().includes("already registered") || 
-                                     (inviteError.message || "").toLowerCase().includes("already exists") || 
-                                     inviteError.status === 422;
-          if (isAlreadyRegistered) {
-            return NextResponse.json({
-              success: true,
-              message: "Convite processado. Se o e-mail estiver apto, as instruções serão enviadas."
-            });
-          }
-
-          const isProdEnv = process.env.NODE_ENV === "production";
-          if (isProdEnv) {
-            const maskedEmail = email.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => {
-              return first + "*".repeat(Math.min(middle.length, 15)) + domain;
-            });
-            console.error("[InviteUser] Failed to send invite", {
-              environment: "production",
-              hasServiceRoleKey: true,
-              hasInviteSecret: !!process.env.INVITE_SECRET,
-              emailDomain: email.split("@")[1] || "unknown",
-              errorCode: "SUPABASE_INVITE_FAILED",
-              maskedEmail
-            });
-            return NextResponse.json(
-              { error: "Não foi possível processar o convite no momento. Verifique a configuração administrativa e tente novamente." },
-              { status: 500 }
-            );
-          } else {
-            console.error("Erro ao convidar usuário no Supabase Auth:", inviteError.message);
-            return NextResponse.json({ error: inviteError.message }, { status: 400 });
-          }
-        }
-
-        authUserId = inviteData.user?.id || null;
-      }
 
       // Se o usuário não existia no Prisma local, criamos os registros com defaults
       if (!existingUser) {

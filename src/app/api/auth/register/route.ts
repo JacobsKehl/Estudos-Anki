@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSupabaseConfig, createSupabaseClient } from "@/lib/supabase-server";
+import { getSupabaseConfig } from "@/lib/supabase-server";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { checkRateLimit, getClientIp, rateLimitErrorResponse } from "@/lib/rate-limit";
+import { Resend } from "resend";
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,6 +45,11 @@ export async function POST(request: NextRequest) {
       return rateLimitErrorResponse(rateCheck.reset);
     }
 
+    // Safe recipient masking for logs
+    const recipientMasked = email.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => {
+      return first + "*".repeat(Math.min(middle.length, 10)) + domain;
+    });
+
     // 4. Verificar se o e-mail já existe no Prisma local
     const existingUser = await prisma.user.findUnique({
       where: { email }
@@ -50,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       // Retornar resposta genérica de sucesso para evitar enumeração de e-mails
-      console.info(`[REGISTRATION SECURITY] Cadastro rejeitado silenciosamente: e-mail ${email} já cadastrado no Prisma.`);
+      console.info(`[REGISTRATION SECURITY] Cadastro rejeitado silenciosamente: e-mail ${recipientMasked} já cadastrado no Prisma.`);
       return NextResponse.json({
         success: true,
         message: "Cadastro recebido! Se o e-mail for novo, enviamos um link de confirmação para a sua caixa de entrada."
@@ -102,24 +109,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ─── CENÁRIO 2: Supabase ativo e configurado ────────────────────────────────
-    const client = createSupabaseClient();
-    
-    // Cadastrar no Supabase Auth
-    const { data: signUpData, error: signUpError } = await client.auth.signUp({
+    // ─── CENÁRIO 2: Supabase ativo e configurado (Bypass do SMTP do Supabase via Resend API) ───
+    const adminClient = createSupabaseAdminClient();
+    if (!adminClient) {
+      console.error("[REGISTRATION ERROR] SUPABASE_SERVICE_ROLE_KEY está ausente no ambiente.");
+      return NextResponse.json(
+        { error: "Erro na configuração administrativa de autenticação. Tente novamente mais tarde." },
+        { status: 500 }
+      );
+    }
+
+    // 1. Criar o usuário administrativamente no Supabase Auth (sem disparar nenhum e-mail)
+    const { data: signUpData, error: signUpError } = await adminClient.auth.admin.createUser({
       email,
       password,
-      options: {
-        emailRedirectTo: `${request.nextUrl.origin}/auth/callback`,
-        data: {
-          full_name: name
-        }
+      email_confirm: false, // Cria unconfirmed (pendente) para exigir ativação
+      user_metadata: {
+        full_name: name
       }
     });
 
     if (signUpError) {
-      console.error("Erro no cadastro do Supabase Auth:", signUpError.message);
-      // Se for erro de usuário já existente, retornar sucesso genérico para evitar enumeração
+      console.error("Erro ao criar usuário administrativamente no Supabase:", signUpError.message);
+      
+      // Se já existir no Supabase Auth, retornar sucesso genérico para evitar enumeração
       if (signUpError.message.toLowerCase().includes("already registered") || signUpError.status === 422) {
         return NextResponse.json({
           success: true,
@@ -129,13 +142,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: signUpError.message }, { status: 400 });
     }
 
-    if (!signUpData.user) {
-      return NextResponse.json({ error: "Erro ao criar identidade de usuário no Supabase." }, { status: 400 });
+    const authUserId = signUpData.user?.id;
+    if (!authUserId) {
+      return NextResponse.json({ error: "Erro ao inicializar identidade de usuário no Supabase." }, { status: 400 });
     }
 
-    const authUserId = signUpData.user.id;
+    // 2. Gerar o link seguro de ativação via Supabase Admin (Bypass de SMTP)
+    let appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+    if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
+      appUrl = "https://kehlstudy.com";
+    }
+    const redirectTo = `${appUrl}/auth/callback`;
 
-    // Criar o registro correspondente no Prisma
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+      type: "signup",
+      email,
+      password,
+      options: {
+        redirectTo
+      }
+    });
+
+    if (linkError) {
+      console.error("Erro ao gerar link seguro de ativação:", linkError.message);
+      // Se falhar a geração de link, mantemos o usuário no Auth mas retornamos erro amigável permitindo reenvio
+      return NextResponse.json({
+        success: true,
+        message: "Sua conta foi criada, mas não conseguimos gerar o link de confirmação no momento. Tente reenviar o link em alguns minutos."
+      });
+    }
+
+    let actionLink = linkData.properties?.action_link || "";
+    // Garantir domínio correto no link se for gerado como localhost pelo Supabase
+    if (actionLink && actionLink.includes("localhost:3000")) {
+      actionLink = actionLink.replace("http://localhost:3000", appUrl);
+    } else if (actionLink && actionLink.includes("127.0.0.1:3000")) {
+      actionLink = actionLink.replace("http://127.0.0.1:3000", appUrl);
+    }
+
+    // 3. Criar os registros correspondentes no Prisma (Apenas após o Auth estar garantido)
     const newUser = await prisma.user.create({
       data: {
         authUserId,
@@ -145,7 +190,6 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Criar as UserPreferences padrão
     await prisma.userPreferences.create({
       data: {
         userId: newUser.id,
@@ -163,7 +207,98 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.info(`[REGISTRATION] Novo usuário criado no Prisma para authUserId: ${authUserId}, email: ${email}`);
+    // 4. Enviar o e-mail de ativação personalizado usando a API direta do Resend
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const emailFrom = process.env.EMAIL_FROM || "Kehl Study <noreply@kehlstudy.com>";
+    
+    let resendMessageId: string | null = null;
+    let emailSendSuccess = false;
+
+    if (resendApiKey) {
+      try {
+        const resend = new Resend(resendApiKey);
+        const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Confirme seu cadastro no Kehl Study</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; }
+    .wrapper { width: 100%; padding: 40px 20px; box-sizing: border-box; }
+    .card { max-width: 580px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 24px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #0f172a; padding: 40px; text-align: center; }
+    .header h1 { color: #ffffff; font-size: 24px; font-weight: 800; margin: 0; }
+    .content { padding: 40px; color: #334155; }
+    .cta-container { text-align: center; margin: 32px 0; }
+    .btn { display: inline-block; background-color: #10b981; color: #ffffff !important; text-decoration: none; padding: 14px 32px; font-size: 14px; font-weight: 700; border-radius: 12px; }
+    .footer { background-color: #f1f5f9; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0; }
+    .footer p { color: #64748b; font-size: 12px; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="header">
+        <h1>🎓 Kehl Study</h1>
+      </div>
+      <div class="content">
+        <p style="font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 24px;">Olá, ${name}!</p>
+        <p>Bem-vindo ao Kehl Study! Para ativar a sua conta de estudos e começar a organizar seu aprendizado inteligente com SRS e Inteligência Artificial, confirme o seu e-mail clicando no botão abaixo:</p>
+        <div class="cta-container">
+          <a href="${actionLink}" class="btn" style="color: #ffffff;">Confirmar E-mail & Ativar Conta</a>
+        </div>
+        <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Se o botão não funcionar, você também pode colar o link abaixo em seu navegador:<br>
+        <span style="word-break: break-all; color: #10b981;">${actionLink}</span></p>
+      </div>
+      <div class="footer">
+        <p>© ${new Date().getFullYear()} Kehl Study. Todos os direitos reservados.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+        `;
+
+        const resendResponse = await resend.emails.send({
+          from: emailFrom,
+          to: email,
+          subject: "🎓 Ative sua conta no Kehl Study",
+          html: emailHtml
+        });
+
+        if (resendResponse.error) {
+          throw new Error(resendResponse.error.message);
+        }
+
+        resendMessageId = resendResponse.data?.id || null;
+        emailSendSuccess = true;
+
+      } catch (err: any) {
+        console.error("Falha ao enviar e-mail de ativação via Resend API direta:", err.message);
+      }
+    } else {
+      console.warn("RESEND_API_KEY ausente. E-mail de cadastro não pôde ser enviado.");
+    }
+
+    // 5. Logs estruturados seguros e resposta do usuário
+    console.log(JSON.stringify({
+      eventType: "signup_confirmation",
+      provider: "resend_direct",
+      recipientMasked,
+      success: emailSendSuccess,
+      messageId: resendMessageId,
+      errorCode: emailSendSuccess ? null : "RESEND_SEND_FAILED",
+      timestamp: new Date().toISOString()
+    }));
+
+    if (!emailSendSuccess) {
+      // Regra: Se falhar o envio do Resend, informar o usuário de forma amigável para ele poder reenviar
+      return NextResponse.json({
+        success: true,
+        message: "Sua conta foi criada, mas não conseguimos enviar o e-mail de confirmação agora. Tente reenviar o link em alguns minutos."
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -171,7 +306,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (err: any) {
-    console.error("Erro na rota de cadastro:", err);
+    console.error("Erro crítico na rota de cadastro:", err);
     return NextResponse.json({ error: "Erro interno no servidor ao processar cadastro." }, { status: 500 });
   }
 }

@@ -29,6 +29,7 @@ export async function GET() {
           flashcardDifficulty: "NORMAL",
           emailReminderEnabled: false,
           emailReminderTime: "08:00",
+          dailyReminderEmail: null,
           visualDensity: "comfortable",
           reducedMotion: false,
           focusArea: "Estudos",
@@ -88,6 +89,9 @@ export async function POST(request: Request) {
     if (body.flashcardDifficulty !== undefined) data.flashcardDifficulty = body.flashcardDifficulty;
     if (body.emailReminderEnabled !== undefined) data.emailReminderEnabled = Boolean(body.emailReminderEnabled);
     if (body.emailReminderTime !== undefined) data.emailReminderTime = body.emailReminderTime;
+    if (body.dailyReminderEmail !== undefined) {
+      data.dailyReminderEmail = body.dailyReminderEmail ? String(body.dailyReminderEmail).trim() : null;
+    }
     
     if (body.visualDensity !== undefined) {
       data.visualDensity = body.visualDensity;

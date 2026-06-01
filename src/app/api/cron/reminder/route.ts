@@ -5,41 +5,48 @@ import { getMockUserId } from "@/lib/auth-mock";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { getUserCopy } from "@/lib/user-copy";
+import { getTodayRangeSP } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
-// Helper para calcular o intervalo de um dia no fuso horário America/Sao_Paulo (UTC-3)
-function getDayRangeInSP(date: Date, offsetDays = 0) {
-  // Formatando a data do servidor para o fuso de São Paulo
+// Helper para verificar se o horário do lembrete coincide com a janela de 15 minutos (America/Sao_Paulo)
+function isTimeInGridWindow(reminderTimeStr: string, nowSP: Date): boolean {
+  const parts = reminderTimeStr.split(":");
+  if (parts.length !== 2) return false;
+  const remHour = parseInt(parts[0], 10);
+  const remMin = parseInt(parts[1], 10);
+  if (isNaN(remHour) || isNaN(remMin)) return false;
+  const remTotalMinutes = remHour * 60 + remMin;
+
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false
   });
-  const parts = fmt.formatToParts(date);
-  const partMap = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const partsSP = fmt.formatToParts(nowSP);
+  const partMap = Object.fromEntries(partsSP.map((p) => [p.type, p.value]));
+  const spHour = parseInt(partMap.hour, 10);
+  const spMin = parseInt(partMap.minute, 10);
 
-  const year = parseInt(partMap.year);
-  const month = parseInt(partMap.month) - 1; // 0-indexed
-  const day = parseInt(partMap.day);
+  // Arredonda spMin para o grid de 15 minutos mais próximo (0, 15, 30, 45, 60)
+  let gridMin = Math.round(spMin / 15) * 15;
+  let gridHour = spHour;
+  if (gridMin === 60) {
+    gridMin = 0;
+    gridHour = (gridHour + 1) % 24;
+  }
 
-  // Como São Paulo é UTC-3 (sem horário de verão atualmente),
-  // 00:00 em São Paulo corresponde a 03:00 UTC.
-  // Criamos o objeto de data em UTC representando 03:00 daquele dia calendarar
-  const start = new Date(Date.UTC(year, month, day, 3));
-  start.setUTCDate(start.getUTCDate() + offsetDays);
+  const gridTotalMinutes = gridHour * 60 + gridMin;
+  const startMinutes = gridTotalMinutes - 15;
 
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-
-  // String legível no padrão brasileiro
-  const formattedDay = start.getUTCDate().toString().padStart(2, "0");
-  const formattedMonth = (start.getUTCMonth() + 1).toString().padStart(2, "0");
-  const formattedYear = start.getUTCFullYear();
-  const label = `${formattedDay}/${formattedMonth}/${formattedYear}`;
-
-  return { start, end, label };
+  if (startMinutes < 0) {
+    const wrappedStart = 1440 + startMinutes;
+    return (remTotalMinutes > wrappedStart && remTotalMinutes <= 1440) || 
+           (remTotalMinutes >= 0 && remTotalMinutes <= gridTotalMinutes);
+  } else {
+    return remTotalMinutes > startMinutes && remTotalMinutes <= gridTotalMinutes;
+  }
 }
 
 // Template HTML Premium do e-mail
@@ -310,7 +317,7 @@ async function processUserReminder(
   yesterdayRange: any
 ) {
   // Resolve o e-mail sem fallbacks estáticos baseados em strings hardcoded.
-  const targetEmail = user.dailyReminderEmail || user.email;
+  const targetEmail = user.preferences?.dailyReminderEmail || user.email;
   if (!targetEmail) {
     return {
       success: false,
@@ -588,15 +595,18 @@ export async function GET(req: NextRequest) {
 
     // 4. Executar envios
     const now = new Date();
-    const yesterdayRange = getDayRangeInSP(now, -1);
-    const todayRange = getDayRangeInSP(now, 0);
+    const yesterdayRange = getTodayRangeSP(now, -1);
+    const todayRange = getTodayRangeSP(now, 0);
     const results = [];
+
+    // Bypass da verificação de horário para acionamento manual (query param, chave ou logado)
+    const bypassTimeCheck = isManualKeyValid || (userIdParam !== null) || !isSystemCall;
 
     for (const user of targetUsers) {
       try {
-        // Disparos manuais ignoram a flag de lembrete desativado se especificados via query param ou manual key
         const bypassReminderCheck = isManualKeyValid || (userIdParam !== null);
         const emailReminderEnabled = user.preferences?.emailReminderEnabled !== false;
+        
         if (!emailReminderEnabled && !bypassReminderCheck) {
           results.push({
             userId: user.id,
@@ -608,7 +618,29 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
+        // Validar fuso horário do lembrete (America/Sao_Paulo)
+        const reminderTime = user.preferences?.emailReminderTime || "08:00";
+        if (!bypassTimeCheck && !isTimeInGridWindow(reminderTime, now)) {
+          continue; // Pula silenciosamente sem computar no resultado ou erro
+        }
+
         const result = await processUserReminder(user, bypassReminderCheck, todayRange, yesterdayRange);
+        
+        const recipientMasked = result.recipient
+          ? result.recipient.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => first + "*".repeat(Math.min(middle.length, 10)) + domain)
+          : "unknown";
+
+        console.log(JSON.stringify({
+          eventType: "daily_reminder",
+          provider: result.provider,
+          recipientMasked,
+          userId: user.id,
+          success: result.success && result.emailSent,
+          messageId: result.messageId || null,
+          errorCode: result.success ? null : "SEND_FAILED",
+          timestamp: new Date().toISOString()
+        }));
+
         results.push({
           userId: user.id,
           email: user.email,
@@ -616,6 +648,22 @@ export async function GET(req: NextRequest) {
         });
       } catch (err: any) {
         console.error(`Erro ao processar lembrete para usuário ${user.id}:`, err);
+        
+        const recipientMasked = user.email
+          ? user.email.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => first + "*".repeat(Math.min(middle.length, 10)) + domain)
+          : "unknown";
+
+        console.log(JSON.stringify({
+          eventType: "daily_reminder",
+          provider: "none",
+          recipientMasked,
+          userId: user.id,
+          success: false,
+          messageId: null,
+          errorCode: err.message || "CRITICAL_ERROR",
+          timestamp: new Date().toISOString()
+        }));
+
         results.push({
           userId: user.id,
           email: user.email,
@@ -625,8 +673,27 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Filtrar resultados relevantes (os que foram realmente processados ou que falharam)
+    const activeResults = results.filter((r) => !r.skipped);
+    const failedResults = activeResults.filter((r) => !r.success);
+    const sentResults = activeResults.filter((r) => r.success);
+    
+    if (failedResults.length > 0) {
+      return NextResponse.json({
+        success: false,
+        sent: sentResults.length,
+        failed: failedResults.length,
+        errors: failedResults.map((f) => ({ userId: f.userId, error: f.error || f.reason })),
+        date: todayRange.label,
+        totalProcessed: targetUsers.length,
+        results
+      }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
+      sent: sentResults.length,
+      failed: 0,
       date: todayRange.label,
       totalProcessed: targetUsers.length,
       results
