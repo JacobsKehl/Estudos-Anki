@@ -278,7 +278,7 @@ export default async function Dashboard() {
   const completedMinutes = completedStudyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
   const totalMinutes = studyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
 
-  const isDayCompleted = studyTasks.length === 0 && reviewTasks.length === 0 && todayStats.total === 0;
+  const isDayCompleted = studyTasks.length === 0 && todayStats.total === 0;
 
   return (
     <div className="space-y-10 max-w-4xl mx-auto animate-in fade-in duration-700 slide-in-from-bottom-4 pb-24">
@@ -311,7 +311,31 @@ export default async function Dashboard() {
       )}
 
       {isDayCompleted ? (
-        <NextDayStudySession userId={userId} />
+        <div className="space-y-10">
+          <NextDayStudySession userId={userId} />
+          {reviewTasks.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-1 h-5 bg-accent rounded-full" />
+                    <RotateCw className="w-4 h-4 text-accent" />
+                    <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Revisões de Conteúdo</h2>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground/80 font-medium">
+                  Materiais de apoio relacionados aos cards ainda ativos.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {reviewTasks.map((item, idx) => (
+                  <TodayTaskCard key={item.id} item={item} index={idx + 1} variant="review" />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       ) : (
         <>
           {/* ── Hero: Próxima Ação ─────────────────────────────────────────────── */}
