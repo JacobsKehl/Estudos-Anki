@@ -20,7 +20,7 @@ import { TodayTaskCard } from "@/components/today/TodayTaskCard";
 import { getAdaptiveStudyQueue } from "@/lib/recommendations/adaptive-scheduler";
 import { PageHeader } from "@/components/ui/page-header";
 import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
-import { reorganizeActiveSchedule } from "@/lib/scheduler";
+import { reorganizeOverdueSchedule } from "@/lib/scheduler";
 import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
 import { NextDayStudySession } from "@/components/today/NextDayStudySession";
 import { getTodayRangeSP } from "@/lib/date-utils";
@@ -44,6 +44,7 @@ export default async function Dashboard() {
   let hasPastPending = null;
   let initialTodayItems: any[] = [];
   let activeSchedule = null;
+  let reorganizedToday = false;
 
   try {
     const [
@@ -139,6 +140,8 @@ export default async function Dashboard() {
   let todayItems: any[] = [];
 
   try {
+    // reorganizedToday will only be set to true if a rollover actually takes place and makes changes.
+
     let shouldReorganize = false;
     if (hasPastPending) {
       if (activeSchedule) {
@@ -156,7 +159,10 @@ export default async function Dashboard() {
 
     if (shouldReorganize) {
       console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado (primeiro carregamento do dia)...");
-      await reorganizeActiveSchedule(userId, 30);
+      const rolloverResult = await reorganizeOverdueSchedule(userId, false, false, now);
+      if (rolloverResult.success && rolloverResult.changes.length > 0) {
+        reorganizedToday = true;
+      }
       
       // Re-fetch since it has been reorganized
       todayItems = await (prisma as any).studyScheduleItem.findMany({
@@ -263,6 +269,22 @@ export default async function Dashboard() {
           </Button>
         </Link>
       </PageHeader>
+
+      {reorganizedToday && (
+        <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 dark:from-emerald-500/5 dark:to-emerald-950/10 border border-emerald-500/20 dark:border-emerald-500/10 rounded-2xl p-4 flex items-start gap-3.5 shadow-sm animate-in fade-in slide-in-from-top-3 duration-500">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 dark:bg-emerald-500/10 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
+              Cronograma Reorganizado
+            </h4>
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 leading-relaxed">
+              Suas pendências do passado foram realocadas automaticamente para hoje e o cronograma futuro foi reajustado de forma fluida para manter seu ritmo de estudos em dia!
+            </p>
+          </div>
+        </div>
+      )}
 
       {isDayCompleted ? (
         <NextDayStudySession userId={userId} />
