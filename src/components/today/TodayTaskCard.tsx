@@ -20,6 +20,7 @@ interface TodayTaskCardProps {
   item: any;
   index: number;
   isAdvanced?: boolean;
+  variant?: "study" | "review";
 }
 
 // ─── Action Config ──────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ const ACTION_CONFIG: Record<ActionType, {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
+export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: TodayTaskCardProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDone, setIsDone] = useState(item.status === "COMPLETED");
@@ -116,6 +117,79 @@ export function TodayTaskCard({ item, index, isAdvanced }: TodayTaskCardProps) {
       setIsCompleting(false);
     }
   };
+
+  if (variant === "review") {
+    return (
+      <div
+        className={`border rounded-2xl p-4 transition-all duration-300 ${
+          isDone
+            ? "opacity-60 bg-muted/10 border-border/40"
+            : "bg-white dark:bg-[#0f172a]/60 border-border/60 hover:border-accent/35 dark:border-border/10 dark:hover:border-accent/30 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            {/* Visual checkbox circle */}
+            <div
+              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                isDone
+                  ? "bg-emerald-500 border-emerald-500 text-white"
+                  : "border-muted-foreground/35 bg-white/70 dark:bg-black/10"
+              }`}
+            >
+              {isDone && <CheckCircle2 className="w-3.5 h-3.5" />}
+            </div>
+            
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-xs text-foreground/90">{item.subject?.name}</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 text-[9px] uppercase tracking-wider font-extrabold border border-emerald-500/10">
+                  Revisão de Conteúdo
+                </span>
+                {flashcardCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/80 font-bold bg-muted/60 dark:bg-muted/10 px-1.5 py-0.5 rounded">
+                    <Layers className="w-3 h-3 text-accent" />
+                    {flashcardCount} {flashcardCount === 1 ? "card ativo" : "cards ativos"}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-semibold text-foreground/80 leading-snug">
+                {item.studyBlock?.title}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:self-center self-end pl-8 sm:pl-0">
+            {item.studyBlockId && !isDone && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground font-bold"
+                onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
+              >
+                Ver conteúdo
+              </Button>
+            )}
+
+            {!isDone ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs font-bold border-accent/40 text-accent hover:bg-accent/10 active:scale-[0.98] transition-all flex items-center gap-1.5"
+                onClick={handleCompleteStep}
+                disabled={isCompleting}
+              >
+                {isCompleting && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
+                Concluir revisão
+              </Button>
+            ) : (
+              <span className="text-xs text-muted-foreground font-bold italic mr-2">Revisão Concluída</span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

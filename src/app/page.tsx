@@ -252,9 +252,10 @@ export default async function Dashboard() {
     console.error("Error loading today items:", error);
   }
 
-  // Strict filter: only THEORY and REVIEW_BLOCK (if it has active flashcards) belong in "Estudo do Dia"
-  const theoryTasks = todayItems.filter(item => {
-    if (item.actionType === "THEORY") return true;
+  // Separate tasks: only THEORY blocks represent the main study session, while REVIEW_BLOCK with active flashcards represents content reviews.
+  const studyTasks = todayItems.filter(item => item.actionType === "THEORY");
+
+  const reviewTasks = todayItems.filter(item => {
     if (item.actionType === "REVIEW_BLOCK") {
       const activeCards = item.studyBlock?.flashcards || [];
       return activeCards.length > 0;
@@ -262,18 +263,22 @@ export default async function Dashboard() {
     return false;
   });
   
-  const pendingTheoryTasks = theoryTasks.filter(item =>
+  const pendingStudyTasks = studyTasks.filter(item =>
     item.status === "PENDING" || item.status === "IN_PROGRESS"
   );
 
-  const completedTheoryTasks = theoryTasks.filter(item =>
+  const completedStudyTasks = studyTasks.filter(item =>
     item.status === "COMPLETED"
   );
 
-  const completedMinutes = completedTheoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? (i.actionType === "REVIEW_BLOCK" ? 0 : 60)), 0);
-  const totalMinutes = theoryTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? (i.actionType === "REVIEW_BLOCK" ? 0 : 60)), 0);
+  const pendingReviewTasks = reviewTasks.filter(item =>
+    item.status === "PENDING" || item.status === "IN_PROGRESS"
+  );
 
-  const isDayCompleted = theoryTasks.length === 0 && todayStats.total === 0;
+  const completedMinutes = completedStudyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
+  const totalMinutes = studyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
+
+  const isDayCompleted = studyTasks.length === 0 && reviewTasks.length === 0 && todayStats.total === 0;
 
   return (
     <div className="space-y-10 max-w-4xl mx-auto animate-in fade-in duration-700 slide-in-from-bottom-4 pb-24">
@@ -335,29 +340,33 @@ export default async function Dashboard() {
       {/* Daily progress against minutes target */}
       <DailyGoalAlert completedMinutes={completedMinutes} totalMinutes={totalMinutes} />
 
-      {/* ══ SEÇÃO 1: ESTUDO DO DIA ═══ teoria, blocos, PDF ═══════════════════ */}
+      {/* ══ SEÇÃO 1: ESTUDO DO DIA ═══ teoria, PDF ═══════════════════════════ */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b-2 border-sage-light/40">
-          <div className="flex items-center gap-2.5">
-            <div className="w-1 h-5 bg-accent rounded-full" />
-            <BookOpen className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Estudo do Dia</h2>
+        <div className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-1 h-5 bg-accent rounded-full" />
+              <BookOpen className="w-4 h-4 text-accent" />
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Estudo do Dia</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {totalMinutes > 0 && (
+                <Badge variant="outline" className="rounded-lg bg-sage-light/20 text-accent border-sage-light/40 font-bold px-2.5 py-0.5 text-[10px]">
+                  ~{totalMinutes}m
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground/60 font-medium">Teoria · PDF · Blocos</span>
-            {totalMinutes > 0 && (
-              <Badge variant="outline" className="rounded-lg bg-sage-light/20 text-accent border-sage-light/40 font-bold px-2.5 py-0.5 text-[10px]">
-                ~{totalMinutes}m
-              </Badge>
-            )}
-          </div>
+          <p className="text-[11px] text-muted-foreground/80 font-medium">
+            Conteúdos principais para avançar no cronograma.
+          </p>
         </div>
 
-        {theoryTasks.length === 0 ? (
+        {studyTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 px-6 space-y-3 border border-dashed border-border/50 rounded-2xl bg-muted/5">
             <Calendar className="w-7 h-7 text-muted-foreground/25" />
             <p className="text-muted-foreground text-sm text-center max-w-sm">
-              Nenhum conteúdo agendado para hoje.
+              Nenhum conteúdo teórico pendente para hoje.
             </p>
             <Button variant="outline" size="sm" className="rounded-xl h-8 text-xs" asChild>
               <Link href="/materials">Organizar materiais</Link>
@@ -365,22 +374,50 @@ export default async function Dashboard() {
           </div>
         ) : (
           <div className="space-y-3">
-            {theoryTasks.map((item, idx) => (
-              <TodayTaskCard key={item.id} item={item} index={idx + 1} />
+            {studyTasks.map((item, idx) => (
+              <TodayTaskCard key={item.id} item={item} index={idx + 1} variant="study" />
             ))}
           </div>
         )}
       </section>
 
-      {/* ══ SEÇÃO 2: CARDS DO DIA ═══ unified: today contents + spaced review ══ */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b-2 border-sage-light">
-          <div className="flex items-center gap-2.5">
-            <div className="w-1 h-5 bg-accent rounded-full" />
-            <Sparkles className="w-4 h-4 text-accent" />
-            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Cards do Dia</h2>
+      {/* ══ SEÇÃO 2: REVISÕES DE CONTEÚDO ═══ checklist compacto ═══════════════ */}
+      {reviewTasks.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-1 h-5 bg-accent rounded-full" />
+                <RotateCw className="w-4 h-4 text-accent" />
+                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Revisões de Conteúdo</h2>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground/80 font-medium">
+              Reforce conteúdos já estudados com cards ativos.
+            </p>
           </div>
-          <span className="text-[10px] text-muted-foreground/60 font-medium">Flashcards · Prática unificada</span>
+
+          <div className="space-y-3">
+            {reviewTasks.map((item, idx) => (
+              <TodayTaskCard key={item.id} item={item} index={idx + 1} variant="review" />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ══ SEÇÃO 3: CARDS DO DIA ═══ unified: today contents + spaced review ══ */}
+      <section className="space-y-4">
+        <div className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-1 h-5 bg-accent rounded-full" />
+              <Sparkles className="w-4 h-4 text-accent" />
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Cards do Dia</h2>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground/80 font-medium">
+            Flashcards novos e revisões espaçadas para praticar.
+          </p>
         </div>
 
         {todayStats.total === 0 ? (
@@ -464,8 +501,8 @@ export default async function Dashboard() {
         )}
       </section>
 
-      {/* Next Day Advancement section if today's theory tasks are completed */}
-      {theoryTasks.length > 0 && pendingTheoryTasks.length === 0 && (
+      {/* Next Day Advancement section if today's study and review tasks are completed */}
+      {(studyTasks.length > 0 || reviewTasks.length > 0) && pendingStudyTasks.length === 0 && pendingReviewTasks.length === 0 && (
         <div className="pt-6 border-t border-sage-light/60 dark:border-accent/15">
           <NextDayStudySession userId={userId} />
         </div>
