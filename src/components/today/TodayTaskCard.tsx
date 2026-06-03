@@ -121,69 +121,46 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
   if (variant === "review") {
     return (
       <div
-        className={`border rounded-2xl p-4 transition-all duration-300 ${
-          isDone
-            ? "opacity-60 bg-muted/10 border-border/40"
-            : "bg-white dark:bg-[#0f172a]/60 border-border/60 hover:border-accent/35 dark:border-border/10 dark:hover:border-accent/30 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
-        }`}
+        className="bg-[#F8FAF5] dark:bg-[#162215]/40 border border-[#D9E5D0] dark:border-accent/15 rounded-2xl p-4 hover:bg-[#F7FAF4] dark:hover:bg-accent/10 transition-all duration-300 shadow-[0_2px_8px_rgba(0,0,0,0.01)]"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            {/* Visual checkbox circle */}
-            <div
-              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all ${
-                isDone
-                  ? "bg-emerald-500 border-emerald-500 text-white"
-                  : "border-muted-foreground/35 bg-white/70 dark:bg-black/10"
-              }`}
-            >
-              {isDone && <CheckCircle2 className="w-3.5 h-3.5" />}
-            </div>
+            {/* Discrete decorative icon */}
+            <RotateCw className="w-4 h-4 text-accent/60 mt-0.5 shrink-0" />
             
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-xs text-foreground/90">{item.subject?.name}</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 text-[9px] uppercase tracking-wider font-extrabold border border-emerald-500/10">
+                <span className="font-bold text-xs text-[#25324A] dark:text-foreground/90">
+                  {item.subject?.name}
+                </span>
+                
+                <span className="px-2 py-0.5 rounded bg-[#EAF2E4] dark:bg-[#4F6F45]/20 text-[#4F6F45] dark:text-[#d1e2c4] border border-[#C8D8B8] dark:border-[#C8D8B8]/20 text-[9px] uppercase tracking-wider font-bold">
                   Revisão de Conteúdo
                 </span>
+
                 {flashcardCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/80 font-bold bg-muted/60 dark:bg-muted/10 px-1.5 py-0.5 rounded">
-                    <Layers className="w-3 h-3 text-accent" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#F1F5EC] dark:bg-muted/30 text-[#6F875B] dark:text-muted-foreground border border-[#DDE8D4] dark:border-muted/30 text-[9px] uppercase tracking-wider font-bold">
+                    <Layers className="w-2.5 h-2.5" />
                     {flashcardCount} {flashcardCount === 1 ? "card ativo" : "cards ativos"}
                   </span>
                 )}
               </div>
-              <p className="text-sm font-semibold text-foreground/80 leading-snug">
+              <p className="text-sm font-semibold text-[#25324A] dark:text-foreground/80 leading-snug">
                 {item.studyBlock?.title}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:self-center self-end pl-8 sm:pl-0">
-            {item.studyBlockId && !isDone && (
+          <div className="flex items-center sm:self-center self-end pl-7 sm:pl-0 shrink-0">
+            {item.studyBlockId && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground font-bold"
+                className="h-7 px-3 text-[11px] font-semibold border-[#D9E5D0] dark:border-accent/15 text-[#4F6F45] dark:text-accent hover:bg-[#EAF2E4]/50 dark:hover:bg-accent/10 transition-all rounded-lg"
                 onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
               >
                 Ver conteúdo
               </Button>
-            )}
-
-            {!isDone ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-3 text-xs font-bold border-accent/40 text-accent hover:bg-accent/10 active:scale-[0.98] transition-all flex items-center gap-1.5"
-                onClick={handleCompleteStep}
-                disabled={isCompleting}
-              >
-                {isCompleting && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                Concluir revisão
-              </Button>
-            ) : (
-              <span className="text-xs text-muted-foreground font-bold italic mr-2">Revisão Concluída</span>
             )}
           </div>
         </div>

@@ -393,7 +393,7 @@ export default async function Dashboard() {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground/80 font-medium">
-              Reforce conteúdos já estudados com cards ativos.
+              Materiais de apoio relacionados aos cards ainda ativos.
             </p>
           </div>
 
@@ -501,8 +501,8 @@ export default async function Dashboard() {
         )}
       </section>
 
-      {/* Next Day Advancement section if today's study and review tasks are completed */}
-      {(studyTasks.length > 0 || reviewTasks.length > 0) && pendingStudyTasks.length === 0 && pendingReviewTasks.length === 0 && (
+      {/* Next Day Advancement section if today's study tasks are completed */}
+      {studyTasks.length > 0 && pendingStudyTasks.length === 0 && (
         <div className="pt-6 border-t border-sage-light/60 dark:border-accent/15">
           <NextDayStudySession userId={userId} />
         </div>
