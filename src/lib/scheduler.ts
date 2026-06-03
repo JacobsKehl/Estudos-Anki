@@ -335,7 +335,18 @@ export async function reorganizeOverdueSchedule(
     include: {
       items: {
         include: {
-          subject: true
+          subject: true,
+          studyBlock: {
+            include: {
+              flashcards: {
+                where: {
+                  status: "APPROVED",
+                  reviewState: { in: ["NEW", "LEARNING", "REVIEW", "RELEARNING"] }
+                },
+                select: { id: true }
+              }
+            }
+          }
         }
       }
     }
@@ -353,6 +364,9 @@ export async function reorganizeOverdueSchedule(
       futureItemsShiftedCount: 0,
       completedItemsPreservedCount: 0,
       ignoredFlashcardsCount: 0,
+      theoryDatesCount: 0,
+      reviewOnlyDatesCount: 0,
+      mergedReviewBlocksCount: 0,
       changes: [],
       lastDateAfterReorganization: todayStr
     };
@@ -376,11 +390,16 @@ export async function reorganizeOverdueSchedule(
   // status IN ["PENDING", "IN_PROGRESS"]
   const eligibleTypes = ["THEORY", "REVIEW_BLOCK", "SUPPORT"];
   
-  const eligiblePendingItems = allItems.filter(
-    item => item.status !== "COMPLETED" &&
-            item.actionType &&
-            eligibleTypes.includes(item.actionType)
-  );
+  const eligiblePendingItems = allItems.filter(item => {
+    if (item.status === "COMPLETED") return false;
+    if (!item.actionType || !eligibleTypes.includes(item.actionType)) return false;
+
+    if (item.actionType === "REVIEW_BLOCK") {
+      const activeCards = item.studyBlock?.flashcards || [];
+      return activeCards.length > 0;
+    }
+    return true;
+  });
 
   // Separar em atrasados (< todayStart) e hoje/futuros (>= todayStart)
   const overdueItems = eligiblePendingItems.filter(

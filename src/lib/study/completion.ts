@@ -87,35 +87,48 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
 
     // 3. Schedule next review items in the schedule (D+1)
     if (block.subjectId && activeSchedule) {
-      // Prevent duplication of pending D+1 reviews
-      const existingPendingReview = await (tx as any).studyScheduleItem.findFirst({
+      // SÓ criar REVIEW_BLOCK se existirem flashcards ativos/revisáveis para o bloco
+      const activeCardsCount = await tx.flashcard.count({
         where: {
-          userId,
-          scheduleId: activeSchedule.id,
           studyBlockId: block.id,
-          actionType: "REVIEW_BLOCK",
-          status: "PENDING",
+          status: "APPROVED",
+          reviewState: { in: ["NEW", "LEARNING", "REVIEW", "RELEARNING"] }
         }
       });
 
-      if (!existingPendingReview) {
-        await (tx as any).studyScheduleItem.create({
-          data: {
+      if (activeCardsCount > 0) {
+        // Prevent duplication of pending D+1 reviews
+        const existingPendingReview = await (tx as any).studyScheduleItem.findFirst({
+          where: {
             userId,
             scheduleId: activeSchedule.id,
-            subjectId: block.subjectId,
-            materialId: block.materialId,
             studyBlockId: block.id,
             actionType: "REVIEW_BLOCK",
-            reason: `Revisão D+1: ${block.title}`,
-            scheduledDate: addDays(now, 1),
-            dayNumber: 1, // Will be calculated by schedule logic if needed
-            priorityScore: 80, // High priority for reviews
             status: "PENDING",
           }
         });
+
+        if (!existingPendingReview) {
+          await (tx as any).studyScheduleItem.create({
+            data: {
+              userId,
+              scheduleId: activeSchedule.id,
+              subjectId: block.subjectId,
+              materialId: block.materialId,
+              studyBlockId: block.id,
+              actionType: "REVIEW_BLOCK",
+              reason: `Revisão D+1: ${block.title}`,
+              scheduledDate: addDays(now, 1),
+              dayNumber: 1, // Will be calculated by schedule logic if needed
+              priorityScore: 80, // High priority for reviews
+              status: "PENDING",
+            }
+          });
+        } else {
+          console.info(`[completeStudyBlock] Já existe revisão D+1 pendente para o bloco ${block.id}. Pulando duplicação.`);
+        }
       } else {
-        console.info(`[completeStudyBlock] Já existe revisão D+1 pendente para o bloco ${block.id}. Pulando duplicação.`);
+        console.info(`[completeStudyBlock] Bloco ${block.id} não possui flashcards ativos/revisáveis. Não agendando REVIEW_BLOCK.`);
       }
     }
 

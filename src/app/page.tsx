@@ -88,6 +88,13 @@ export default async function Dashboard() {
               },
               _count: {
                 select: { flashcards: true }
+              },
+              flashcards: {
+                where: {
+                  status: "APPROVED",
+                  reviewState: { in: ["NEW", "LEARNING", "REVIEW", "RELEARNING"] }
+                },
+                select: { id: true }
               }
             } 
           },
@@ -181,6 +188,13 @@ export default async function Dashboard() {
               },
               _count: {
                 select: { flashcards: true }
+              },
+              flashcards: {
+                where: {
+                  status: "APPROVED",
+                  reviewState: { in: ["NEW", "LEARNING", "REVIEW", "RELEARNING"] }
+                },
+                select: { id: true }
               }
             } 
           },
@@ -238,10 +252,15 @@ export default async function Dashboard() {
     console.error("Error loading today items:", error);
   }
 
-  // Strict filter: only THEORY and REVIEW_BLOCK belong in "Estudo do Dia"
-  const theoryTasks = todayItems.filter(item =>
-    item.actionType === "THEORY" || item.actionType === "REVIEW_BLOCK"
-  );
+  // Strict filter: only THEORY and REVIEW_BLOCK (if it has active flashcards) belong in "Estudo do Dia"
+  const theoryTasks = todayItems.filter(item => {
+    if (item.actionType === "THEORY") return true;
+    if (item.actionType === "REVIEW_BLOCK") {
+      const activeCards = item.studyBlock?.flashcards || [];
+      return activeCards.length > 0;
+    }
+    return false;
+  });
   
   const pendingTheoryTasks = theoryTasks.filter(item =>
     item.status === "PENDING" || item.status === "IN_PROGRESS"
