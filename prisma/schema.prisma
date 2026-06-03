@@ -60,6 +60,7 @@ model UserPreferences {
   emailReminderEnabled        Boolean  @default(true)
   emailReminderTime           String   @default("08:00")
   dailyReminderEmail          String?
+  lastDailyReminderSentAt     DateTime?
   visualDensity               String   @default("comfortable")
   reducedMotion               Boolean  @default(false)
   focusArea                   String   @default("Geral")

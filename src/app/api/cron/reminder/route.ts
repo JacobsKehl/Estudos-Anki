@@ -9,7 +9,7 @@ import { getTodayRangeSP } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
-// Helper para verificar se o horário do lembrete coincide com a janela de 15 minutos (America/Sao_Paulo)
+// Helper para verificar se o horário do lembrete coincide com a janela de 20 minutos (America/Sao_Paulo)
 function isTimeInGridWindow(reminderTimeStr: string, nowSP: Date): boolean {
   const parts = reminderTimeStr.split(":");
   if (parts.length !== 2) return false;
@@ -28,25 +28,15 @@ function isTimeInGridWindow(reminderTimeStr: string, nowSP: Date): boolean {
   const partMap = Object.fromEntries(partsSP.map((p) => [p.type, p.value]));
   const spHour = parseInt(partMap.hour, 10);
   const spMin = parseInt(partMap.minute, 10);
+  const spTotalMinutes = spHour * 60 + spMin;
 
-  // Arredonda spMin para o grid de 15 minutos mais próximo (0, 15, 30, 45, 60)
-  let gridMin = Math.round(spMin / 15) * 15;
-  let gridHour = spHour;
-  if (gridMin === 60) {
-    gridMin = 0;
-    gridHour = (gridHour + 1) % 24;
+  let diff = spTotalMinutes - remTotalMinutes;
+  if (diff < 0) {
+    diff += 1440;
   }
 
-  const gridTotalMinutes = gridHour * 60 + gridMin;
-  const startMinutes = gridTotalMinutes - 15;
-
-  if (startMinutes < 0) {
-    const wrappedStart = 1440 + startMinutes;
-    return (remTotalMinutes > wrappedStart && remTotalMinutes <= 1440) || 
-           (remTotalMinutes >= 0 && remTotalMinutes <= gridTotalMinutes);
-  } else {
-    return remTotalMinutes > startMinutes && remTotalMinutes <= gridTotalMinutes;
-  }
+  // Tolerância de 20 minutos a partir do horário programado
+  return diff >= 0 && diff <= 20;
 }
 
 // Template HTML Premium do e-mail
@@ -492,6 +482,17 @@ async function processUserReminder(
     throw new Error("Nenhum provedor de e-mail configurado em produção.");
   }
 
+  if (emailSent) {
+    try {
+      await prisma.userPreferences.update({
+        where: { userId: user.id },
+        data: { lastDailyReminderSentAt: new Date() }
+      });
+    } catch (dbErr) {
+      console.error(`[CRON] Falha ao atualizar lastDailyReminderSentAt para ${user.id}:`, dbErr);
+    }
+  }
+
   return {
     success: true,
     emailSent,
@@ -506,14 +507,18 @@ async function processUserReminder(
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    const secret = process.env.CRON_SECRET;
+    const secret = process.env.CRON_SECRET || process.env.APP_CRON_SECRET;
     const manualKey = process.env.MANUAL_TRIGGER_KEY;
     const queryKey = req.nextUrl.searchParams.get("manual_key");
     const userIdParam = req.nextUrl.searchParams.get("userId");
 
     const isCronSecretValid = secret && authHeader === `Bearer ${secret}`;
     const isManualKeyValid = manualKey && queryKey === manualKey;
-    const isSystemCall = isCronSecretValid || isManualKeyValid;
+    
+    // Suporte ao header da Vercel (fallback seguro com log)
+    const isVercelCronHeaderValid = req.headers.get("x-vercel-cron") === "1";
+    
+    const isSystemCall = isCronSecretValid || isManualKeyValid || isVercelCronHeaderValid;
 
     let sessionUserId: string | null = null;
     let sessionUser: any = null;
@@ -540,6 +545,38 @@ export async function GET(req: NextRequest) {
     if (!isSystemCall && !sessionUser) {
       return NextResponse.json({ error: "Acesso não autorizado." }, { status: 401 });
     }
+
+    // Calcular fuso horário e logs iniciais
+    const now = new Date();
+    const fmtSP = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+    const partsSP = fmtSP.formatToParts(now);
+    const partMap = Object.fromEntries(partsSP.map((p) => [p.type, p.value]));
+    const currentLocalTime = `${partMap.hour}:${partMap.minute}`;
+    const dateStrSP = `${partMap.year}-${partMap.month}-${partMap.day}`;
+
+    const weekdayMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+    const weekdayName = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", weekday: "long" }).format(now);
+    const spWeekday = weekdayMap[weekdayName as keyof typeof weekdayMap];
+
+    console.log(JSON.stringify({
+      eventType: "cron_started",
+      timestamp: now.toISOString(),
+      timezone: "America/Sao_Paulo",
+      currentLocalTime,
+      hasAuthHeader: !!authHeader,
+      hasVercelCronHeader: isVercelCronHeaderValid,
+      isCronSecretValid,
+      isVercelCronHeaderValid
+    }));
 
     let targetUsers: any[] = [];
 
@@ -594,7 +631,6 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. Executar envios
-    const now = new Date();
     const yesterdayRange = getTodayRangeSP(now, -1);
     const todayRange = getTodayRangeSP(now, 0);
     const results = [];
@@ -603,11 +639,34 @@ export async function GET(req: NextRequest) {
     const bypassTimeCheck = isManualKeyValid || (userIdParam !== null) || !isSystemCall;
 
     for (const user of targetUsers) {
+      const recipient = user.preferences?.dailyReminderEmail || user.email;
+      const recipientMasked = recipient
+        ? recipient.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => first + "*".repeat(Math.min(middle.length, 10)) + domain)
+        : "unknown";
+
       try {
         const bypassReminderCheck = isManualKeyValid || (userIdParam !== null);
         const emailReminderEnabled = user.preferences?.emailReminderEnabled !== false;
-        
+        const reminderTime = user.preferences?.emailReminderTime || "08:00";
+        const matchedTimeWindow = isTimeInGridWindow(reminderTime, now);
+
+        console.log(JSON.stringify({
+          eventType: "user_evaluated",
+          userId: user.id,
+          recipientMasked,
+          emailReminderEnabled,
+          emailReminderTime: reminderTime,
+          matchedTimeWindow
+        }));
+
         if (!emailReminderEnabled && !bypassReminderCheck) {
+          console.log(JSON.stringify({
+            eventType: "user_skipped",
+            userId: user.id,
+            recipientMasked,
+            skipReason: "email_reminder_disabled"
+          }));
+
           results.push({
             userId: user.id,
             email: user.email,
@@ -619,27 +678,79 @@ export async function GET(req: NextRequest) {
         }
 
         // Validar fuso horário do lembrete (America/Sao_Paulo)
-        const reminderTime = user.preferences?.emailReminderTime || "08:00";
-        if (!bypassTimeCheck && !isTimeInGridWindow(reminderTime, now)) {
-          continue; // Pula silenciosamente sem computar no resultado ou erro
+        if (!bypassTimeCheck && !matchedTimeWindow) {
+          continue; // Pula silenciosamente sem logs de skip de usuário fora do fuso
+        }
+
+        // Verificar se hoje é dia de estudo conforme studyDaysOfWeek
+        const studyDays = user.preferences?.studyDaysOfWeek ? user.preferences.studyDaysOfWeek.split(",").map(Number) : [1,2,3,4,5];
+        const isStudyDay = studyDays.includes(spWeekday);
+        if (!isStudyDay && !bypassReminderCheck) {
+          console.log(JSON.stringify({
+            eventType: "user_skipped",
+            userId: user.id,
+            recipientMasked,
+            skipReason: "not_study_day"
+          }));
+
+          results.push({
+            userId: user.id,
+            email: user.email,
+            success: false,
+            skipped: true,
+            reason: `Hoje não é um dia de estudo configurado (${user.preferences?.studyDaysOfWeek}).`
+          });
+          continue;
+        }
+
+        // Controle de duplicidade diária em America/Sao_Paulo
+        let alreadySentToday = false;
+        if (user.preferences?.lastDailyReminderSentAt) {
+          const sentDateParts = fmtSP.formatToParts(new Date(user.preferences.lastDailyReminderSentAt));
+          const sentDateMap = Object.fromEntries(sentDateParts.map((p) => [p.type, p.value]));
+          const sentDateStrSP = `${sentDateMap.year}-${sentDateMap.month}-${sentDateMap.day}`;
+          if (sentDateStrSP === dateStrSP) {
+            alreadySentToday = true;
+          }
+        }
+
+        if (alreadySentToday && !bypassReminderCheck) {
+          console.log(JSON.stringify({
+            eventType: "user_skipped",
+            userId: user.id,
+            recipientMasked,
+            skipReason: "already_sent_today"
+          }));
+
+          results.push({
+            userId: user.id,
+            email: user.email,
+            success: false,
+            skipped: true,
+            reason: "Lembrete já enviado hoje para este usuário.",
+            skipReason: "already_sent_today"
+          });
+          continue;
         }
 
         const result = await processUserReminder(user, bypassReminderCheck, todayRange, yesterdayRange);
-        
-        const recipientMasked = result.recipient
-          ? result.recipient.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => first + "*".repeat(Math.min(middle.length, 10)) + domain)
-          : "unknown";
 
-        console.log(JSON.stringify({
-          eventType: "daily_reminder",
-          provider: result.provider,
-          recipientMasked,
-          userId: user.id,
-          success: result.success && result.emailSent,
-          messageId: result.messageId || null,
-          errorCode: result.success ? null : "SEND_FAILED",
-          timestamp: new Date().toISOString()
-        }));
+        if (result.success && result.emailSent) {
+          console.log(JSON.stringify({
+            eventType: "daily_reminder_sent",
+            userId: user.id,
+            recipientMasked,
+            provider: result.provider,
+            messageId: result.messageId || null
+          }));
+        } else {
+          console.log(JSON.stringify({
+            eventType: "daily_reminder_failed",
+            userId: user.id,
+            recipientMasked,
+            error: result.reason || "unknown_failure"
+          }));
+        }
 
         results.push({
           userId: user.id,
@@ -647,21 +758,11 @@ export async function GET(req: NextRequest) {
           ...result
         });
       } catch (err: any) {
-        console.error(`Erro ao processar lembrete para usuário ${user.id}:`, err);
-        
-        const recipientMasked = user.email
-          ? user.email.replace(/^(.)(.*)(@.*)$/, (_: string, first: string, middle: string, domain: string) => first + "*".repeat(Math.min(middle.length, 10)) + domain)
-          : "unknown";
-
         console.log(JSON.stringify({
-          eventType: "daily_reminder",
-          provider: "none",
-          recipientMasked,
+          eventType: "daily_reminder_failed",
           userId: user.id,
-          success: false,
-          messageId: null,
-          errorCode: err.message || "CRITICAL_ERROR",
-          timestamp: new Date().toISOString()
+          recipientMasked,
+          error: err.message || "CRITICAL_ERROR"
         }));
 
         results.push({
