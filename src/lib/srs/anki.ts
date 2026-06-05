@@ -27,6 +27,7 @@ const MIN_EASE_FACTOR = 1.3;
 const DEFAULT_EASE_FACTOR = 2.5;
 const GRADUATING_INTERVAL = 1;
 const EASY_INTERVAL = 4;
+const MAX_INTERVAL_DAYS = 30;
 
 /**
  * Calculates the next review date and state for a flashcard based on a user rating.
@@ -157,12 +158,12 @@ export function calculateNextReview(input: SRSInput, rating: FlashcardRating): S
 
     if (rating === 2) { // HARD (Difícil)
       newEase = Math.max(MIN_EASE_FACTOR, currentEase - 0.15);
-      newInterval = Math.max(1, Math.round(intervalDays * 1.2));
+      newInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, Math.round(intervalDays * 1.2)));
     } else if (rating === 3) { // GOOD (Bom)
-      newInterval = Math.max(1, Math.round(intervalDays * currentEase));
+      newInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, Math.round(intervalDays * currentEase)));
     } else if (rating === 4) { // EASY (Fácil)
       newEase = currentEase + 0.15;
-      newInterval = Math.max(1, Math.round(intervalDays * currentEase * 1.3));
+      newInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, Math.round(intervalDays * currentEase * 1.3)));
     }
 
     return {
@@ -188,17 +189,18 @@ export function calculateNextReview(input: SRSInput, rating: FlashcardRating): S
       };
     }
     if (rating === 3) { // GOOD (Bom)
+      const nextInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, intervalDays));
       return {
         state: "REVIEW",
         learningStep: 0,
         easeFactor: currentEase,
-        intervalDays: Math.max(1, intervalDays), // Keep previous interval or min 1
+        intervalDays: nextInterval,
         lapseCount,
         nextReviewAt: addDaysAtStartOfDay(now, 1),
       };
     }
     if (rating === 4) { // EASY (Fácil)
-      const boostedInterval = Math.max(1, Math.round(Math.max(intervalDays, 1) * 1.3));
+      const boostedInterval = Math.min(MAX_INTERVAL_DAYS, Math.max(1, Math.round(Math.max(intervalDays, 1) * 1.3)));
       return {
         state: "REVIEW",
         learningStep: 0,

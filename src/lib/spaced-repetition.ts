@@ -50,6 +50,8 @@ export function calculateNextReview(
       intervalDays = Math.round(intervalDays * 1.3); // Boost interval
     }
 
+    intervalDays = Math.min(30, intervalDays);
+
     repetitionCount += 1;
     reviewStatus = intervalDays >= 21 ? "GRADUATED" : "REVIEW";
   }
