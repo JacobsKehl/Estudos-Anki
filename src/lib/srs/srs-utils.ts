@@ -73,7 +73,20 @@ export async function getUnifiedTodayCards(userId: string) {
       status: "APPROVED",
       reviewState: { notIn: ["SUSPENDED", "ARCHIVED"] },
       OR: [
-        { studyBlockId: { in: todayBlockIds } }, // Today's content
+        {
+          studyBlockId: { in: todayBlockIds },
+          OR: [
+            {
+              reviewState: "NEW",
+              OR: [
+                { lastReviewedAt: null },
+                { repetitionCount: 0 },
+                { repetitionCount: null }
+              ]
+            },
+            { nextReviewAt: { lte: now } }
+          ]
+        },
         { 
           nextReviewAt: { lte: now },
           reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] } // Overdue SRS
