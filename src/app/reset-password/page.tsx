@@ -20,6 +20,27 @@ export default function ResetPasswordPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Capturar tokens da URL e salvar no localStorage como backup client-side
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const accessToken = url.searchParams.get("access_token");
+    const refreshToken = url.searchParams.get("refresh_token");
+
+    if (accessToken && refreshToken) {
+      localStorage.setItem("sb-access-token", accessToken);
+      localStorage.setItem("sb-refresh-token", refreshToken);
+
+      // Limpar a URL para segurança e estética (removendo tokens da barra de endereço)
+      url.searchParams.delete("access_token");
+      url.searchParams.delete("refresh_token");
+      window.history.replaceState({}, document.title, url.pathname + url.search);
+      
+      toast.info("Conexão segura estabelecida.");
+    }
+  }, []);
+
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
@@ -38,11 +59,16 @@ export default function ResetPasswordPage() {
 
     try {
       // O endpoint change-password atualiza a senha da sessão ativa.
-      // Como o callback acabou de nos autenticar e gravou os cookies, 
-      // podemos chamar diretamente passando apenas a newPassword (sem currentPassword).
+      // Caso os cookies HttpOnly sejam bloqueados, enviamos o token no header Authorization
+      const localToken = typeof window !== "undefined" ? localStorage.getItem("sb-access-token") : null;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (localToken) {
+        headers["Authorization"] = `Bearer ${localToken}`;
+      }
+
       const response = await fetch("/api/auth/change-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ newPassword: password })
       });
 

@@ -33,21 +33,27 @@ export async function getSessionUser() {
   try {
     const { isConfigured } = getSupabaseConfig();
     if (!isConfigured) {
+      console.info("[GET SESSION USER] Supabase não configurado.");
       return null;
     }
 
     const cookieStore = await cookies();
     const accessToken = cookieStore.get("sb-access-token")?.value;
     
-    if (!accessToken) return null;
+    if (!accessToken) {
+      console.warn("[GET SESSION USER] Cookie sb-access-token não encontrado ou vazio.");
+      return null;
+    }
     
     const client = createSupabaseClient();
     const { data: { user }, error } = await client.auth.getUser(accessToken);
     
     if (error || !user) {
+      console.error("[GET SESSION USER] Erro ao obter usuário via token do Supabase:", error?.message || "Sem usuário");
       return null;
     }
     
+    console.info("[GET SESSION USER] Usuário autenticado obtido com sucesso:", user.email);
     return user;
   } catch (err) {
     console.error("Erro ao obter usuário da sessão:", err);

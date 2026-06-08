@@ -10,12 +10,20 @@ export async function GET(request: Request) {
     const refreshToken = searchParams.get("refresh_token");
     const expiresInStr = searchParams.get("expires_in");
     const next = searchParams.get("next") || "/";
-
-    const response = NextResponse.redirect(new URL(next, origin));
+    let response = NextResponse.redirect(new URL(next, origin));
 
     // A. Se os tokens foram passados diretamente via query params (vindo da captura do hash pelo cliente)
     if (accessToken && refreshToken) {
       const expiresIn = expiresInStr ? parseInt(expiresInStr, 10) : 3600;
+      
+      // Criar a resposta de redirecionamento.
+      // Se for para reset-password, passar tokens na URL como backup client-side
+      let redirectUrl = new URL(next, origin);
+      if (next.startsWith("/reset-password")) {
+        redirectUrl.searchParams.set("access_token", accessToken);
+        redirectUrl.searchParams.set("refresh_token", refreshToken);
+      }
+      response = NextResponse.redirect(redirectUrl);
       setSessionCookies(response, accessToken, refreshToken, expiresIn);
       
       // Sincronizar o usuário no Prisma decodificando o JWT de forma offline e segura (à prova de falhas)
@@ -135,7 +143,15 @@ export async function GET(request: Request) {
     // Sincronização segura no Prisma usando o helper centralizado
     await syncSupabaseUserWithPrismaUser(supabaseUser);
 
-    // Salvar cookies na resposta e redirecionar (removendo tokens da URL automaticamente)
+    // Criar a resposta de redirecionamento.
+    let redirectUrl = new URL(next, origin);
+    if (next.startsWith("/reset-password")) {
+      redirectUrl.searchParams.set("access_token", session.access_token);
+      redirectUrl.searchParams.set("refresh_token", session.refresh_token);
+    }
+    response = NextResponse.redirect(redirectUrl);
+
+    // Salvar cookies na resposta e redirecionar
     setSessionCookies(response, session.access_token, session.refresh_token, session.expires_in);
     return response;
 

@@ -35,6 +35,10 @@ export default function AuthCallbackHandlerPage() {
       const expiresIn = hashParams.get("expires_in") || "3600";
 
       if (accessToken && refreshToken) {
+        // Backup client-side dos tokens em localStorage caso cookies sejam bloqueados/rejeitados
+        localStorage.setItem("sb-access-token", accessToken);
+        localStorage.setItem("sb-refresh-token", refreshToken);
+
         // Encaminhar para o callback server-side com tokens como query params
         const callbackUrl = `/auth/callback?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken)}&expires_in=${encodeURIComponent(expiresIn)}&next=${encodeURIComponent(next)}`;
         window.location.href = callbackUrl;

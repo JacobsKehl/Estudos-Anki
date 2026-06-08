@@ -5,8 +5,28 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    // 1. Validar se o usuário está autenticado na sessão
-    const user = await getSessionUser();
+    // 1. Validar se o usuário está autenticado na sessão (por cookies)
+    let user = await getSessionUser();
+
+    // Fallback: Se não encontrou por cookies (ex: bloqueados pelo navegador), tentar pelo header Authorization
+    if (!user) {
+      const authHeader = request.headers.get("Authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        const { isConfigured } = getSupabaseConfig();
+        if (isConfigured) {
+          const client = createSupabaseClient();
+          const { data: { user: supabaseUser }, error } = await client.auth.getUser(token);
+          if (!error && supabaseUser) {
+            user = supabaseUser;
+            console.info("[CHANGE PASSWORD] Usuário autenticado via header Authorization backup:", user.email);
+          } else if (error) {
+            console.error("[CHANGE PASSWORD] Falha ao validar token do header Authorization:", error.message);
+          }
+        }
+      }
+    }
+
     if (!user || !user.email) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
