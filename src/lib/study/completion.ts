@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getTodayRangeSP } from "@/lib/date-utils";
 
 /**
  * Completes a study block and synchronizes it with the schedule.
@@ -31,15 +32,74 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
     });
 
     let scheduleItem;
+    const todayRange = getTodayRangeSP(now);
     
     if (scheduleItemId) {
-      scheduleItem = await tx.studyScheduleItem.update({
-        where: { id: scheduleItemId },
-        data: {
-          status: "COMPLETED",
-          completedAt: now,
-        },
+      const targetItem = await (tx as any).studyScheduleItem.findUnique({
+        where: { id: scheduleItemId }
       });
+
+      if (targetItem) {
+        const isAntecipado = targetItem.scheduledDate >= todayRange.end;
+        if (isAntecipado && targetItem.actionType === "THEORY" && activeSchedule) {
+          // A. Registrar que estudou hoje (conclusão antecipada)
+          await (tx as any).studyScheduleItem.create({
+            data: {
+              userId,
+              scheduleId: activeSchedule.id,
+              subjectId: block.subjectId,
+              materialId: block.materialId,
+              studyBlockId: blockId,
+              actionType: "THEORY",
+              priorityScore: targetItem.priorityScore || 90,
+              reason: "Estudo Antecipado",
+              dayNumber: targetItem.dayNumber || 1,
+              scheduledDate: now,
+              completedAt: now,
+              status: "COMPLETED",
+            }
+          });
+
+          // B. Buscar o próximo bloco de estudo pendente
+          const nextPendingBlock = await tx.studyBlock.findFirst({
+            where: {
+              userId,
+              subjectId: block.subjectId,
+              status: "NOT_STARTED",
+              material: {
+                materialRole: { not: "SUPPORT_MATERIAL" }
+              }
+            },
+            orderBy: [
+              { pageStart: "asc" },
+              { id: "asc" }
+            ]
+          });
+
+          if (nextPendingBlock) {
+            scheduleItem = await tx.studyScheduleItem.update({
+              where: { id: targetItem.id },
+              data: {
+                studyBlockId: nextPendingBlock.id,
+                materialId: nextPendingBlock.materialId
+              }
+            });
+          } else {
+            await tx.studyScheduleItem.delete({
+              where: { id: targetItem.id }
+            });
+            scheduleItem = null;
+          }
+        } else {
+          scheduleItem = await tx.studyScheduleItem.update({
+            where: { id: scheduleItemId },
+            data: {
+              status: "COMPLETED",
+              completedAt: now,
+            },
+          });
+        }
+      }
     } else if (activeSchedule) {
       // Find matching pending or in-progress schedule item for this block in the active schedule
       const match = await (tx as any).studyScheduleItem.findFirst({
@@ -54,13 +114,65 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
       });
 
       if (match) {
-        scheduleItem = await tx.studyScheduleItem.update({
-          where: { id: match.id },
-          data: {
-            status: "COMPLETED",
-            completedAt: now,
-          },
-        });
+        const isAntecipado = match.scheduledDate >= todayRange.end;
+        if (isAntecipado) {
+          // A. Registrar que estudou hoje (conclusão antecipada)
+          await (tx as any).studyScheduleItem.create({
+            data: {
+              userId,
+              scheduleId: activeSchedule.id,
+              subjectId: block.subjectId,
+              materialId: block.materialId,
+              studyBlockId: blockId,
+              actionType: "THEORY",
+              priorityScore: match.priorityScore || 90,
+              reason: "Estudo Antecipado",
+              dayNumber: match.dayNumber || 1,
+              scheduledDate: now,
+              completedAt: now,
+              status: "COMPLETED",
+            }
+          });
+
+          // B. Buscar o próximo bloco de estudo pendente
+          const nextPendingBlock = await tx.studyBlock.findFirst({
+            where: {
+              userId,
+              subjectId: block.subjectId,
+              status: "NOT_STARTED",
+              material: {
+                materialRole: { not: "SUPPORT_MATERIAL" }
+              }
+            },
+            orderBy: [
+              { pageStart: "asc" },
+              { id: "asc" }
+            ]
+          });
+
+          if (nextPendingBlock) {
+            scheduleItem = await tx.studyScheduleItem.update({
+              where: { id: match.id },
+              data: {
+                studyBlockId: nextPendingBlock.id,
+                materialId: nextPendingBlock.materialId
+              }
+            });
+          } else {
+            await tx.studyScheduleItem.delete({
+              where: { id: match.id }
+            });
+            scheduleItem = null;
+          }
+        } else {
+          scheduleItem = await tx.studyScheduleItem.update({
+            where: { id: match.id },
+            data: {
+              status: "COMPLETED",
+              completedAt: now,
+            },
+          });
+        }
       } else {
         console.info(`[completeStudyBlock] Nenhum StudyScheduleItem pendente/em progresso do tipo THEORY encontrado para o bloco ${blockId} no cronograma ativo.`);
         
