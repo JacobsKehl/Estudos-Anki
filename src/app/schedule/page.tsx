@@ -31,6 +31,8 @@ export default async function SchedulePage() {
   let deficitHours = 0;
   let suggestedDailyGoal = 120;
   let dailyTheoryMinutes = 90;
+  let deadlineStr = "";
+  let isDefaultDeadline = false;
 
   try {
     const userPrefs = await prisma.userPreferences.findUnique({
@@ -49,10 +51,20 @@ export default async function SchedulePage() {
     secondarySubjects = subjects.filter(s => s.studyPriority === "SECONDARY");
     excludedSubjects = subjects.filter(s => s.studyPriority === "EXCLUDED");
 
-    // Calcular dias restantes até 30/11/2026
+    // Obter deadline das preferências do usuário ou usar fallback de 30 dias
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const deadline = new Date("2026-11-30T23:59:59");
+    
+    let deadline = userPrefs?.deadline ? new Date(userPrefs.deadline) : null;
+    
+    if (!deadline) {
+      deadline = new Date(today);
+      deadline.setDate(today.getDate() + 30);
+      deadline.setHours(23, 59, 59, 999);
+      isDefaultDeadline = true;
+    }
+
+    deadlineStr = `${String(deadline.getDate()).padStart(2, "0")}/${String(deadline.getMonth() + 1).padStart(2, "0")}/${deadline.getFullYear()}`;
     
     if (today < deadline) {
       const diffTime = deadline.getTime() - today.getTime();
@@ -262,12 +274,12 @@ export default async function SchedulePage() {
             
             {isViable ? (
               <p className="text-sm text-muted-foreground leading-relaxed">
-                🎉 <strong>Seu plano de estudos é viável!</strong> Todo o conteúdo das matérias ativas cabe no prazo estabelecido (até 30/11/2026) com a sua meta diária atual de <strong>{dailyGoalMinutes} min/dia</strong>.
+                🎉 <strong>Seu plano de estudos é viável!</strong> Todo o conteúdo das matérias ativas cabe no prazo estabelecido (até {deadlineStr}{isDefaultDeadline ? " - estimativa padrão" : ""}) com a sua meta diária atual de <strong>{dailyGoalMinutes} min/dia</strong>.
               </p>
             ) : (
               <div className="space-y-2 text-sm text-muted-foreground leading-relaxed">
                 <p>
-                  ⚠️ <strong>Atenção:</strong> o conteúdo principal não cabe integralmente até <strong>30/11/2026</strong> com a carga diária atual.
+                  ⚠️ <strong>Atenção:</strong> o conteúdo principal não cabe integralmente até <strong>{deadlineStr}</strong> com a carga diária atual.
                 </p>
                 <p>
                   Com a meta atual de <strong>{dailyGoalMinutes} min/dia</strong>, faltam aproximadamente <strong className="text-amber-800 font-bold">{deficitHours} horas</strong> para cobrir todo o conteúdo teórico.
@@ -280,7 +292,7 @@ export default async function SchedulePage() {
           </div>
           
           <div className="flex items-center justify-between text-xs text-muted-foreground/60 border-t border-border/40 pt-4">
-            <span>Prazo Final: <strong>30/11/2026</strong></span>
+            <span>Prazo Final: <strong>{deadlineStr}{isDefaultDeadline ? " (estimativa)" : ""}</strong></span>
             <span>Dias Restantes: <strong>{remainingDays} dias</strong></span>
           </div>
         </div>

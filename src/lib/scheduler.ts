@@ -118,18 +118,47 @@ export async function getOrComputeBlockMinutes(block: any, subjectName: string):
 
 // ─── Smart Schedule Generator ─────────────────────────────────────────────────
 
-export async function generateSmartSchedule(userId: string, options: SmartScheduleOptions = {}) {
+export interface ScheduleGenerationResult {
+  schedule: any;
+  itemsCount: number;
+  warning?: {
+    message: string;
+    unallocatedBlocksCount: number;
+    exceededMinutes: number;
+    suggestion: string;
+  } | null;
+}
+
+export async function generateSmartSchedule(
+  userId: string,
+  options: SmartScheduleOptions = {}
+): Promise<ScheduleGenerationResult> {
+  // Buscar preferências de dias de estudo do usuário
+  const userPrefs = await prisma.userPreferences.findUnique({
+    where: { userId }
+  });
+
+  const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
+
+  if (mode === "LEGACY_TRT4") {
+    return generateLegacyTrt4Schedule(userId, options, userPrefs);
+  } else {
+    return generateDynamicSchedule(userId, options, userPrefs);
+  }
+}
+
+async function generateLegacyTrt4Schedule(
+  userId: string,
+  options: SmartScheduleOptions,
+  userPrefs: any
+): Promise<ScheduleGenerationResult> {
   const {
     title = "Meu Cronograma de Estudos",
     dailyMinutes = 120,
   } = options;
 
-  // Buscar preferências de dias de estudo do usuário
-  const userPrefs = await prisma.userPreferences.findUnique({
-    where: { userId }
-  });
   const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
-  const studyDays = studyDaysStr.split(",").map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n));
+  const studyDays = studyDaysStr.split(",").map((d: any) => parseInt(d.trim(), 10)).filter((n: any) => !isNaN(n));
 
   const startDate = options.startDate ?? new Date();
   startDate.setHours(0, 0, 0, 0);
@@ -167,7 +196,6 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
 
   // 4. Distribuir tarefas
   const scheduleItemsData: any[] = [];
-  const now = new Date();
   
   const dbCompletedBlocks = await (prisma as any).studyBlock.findMany({
     where: { userId, status: "COMPLETED" },
@@ -317,6 +345,271 @@ export async function generateSmartSchedule(userId: string, options: SmartSchedu
   }
 
   return { schedule, itemsCount: scheduleItemsData.length };
+}
+
+async function generateDynamicSchedule(
+  userId: string,
+  options: SmartScheduleOptions,
+  userPrefs: any
+): Promise<ScheduleGenerationResult> {
+  const {
+    title = "Meu Cronograma de Estudos",
+    dailyMinutes = 120,
+  } = options;
+
+  const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
+  const studyDays = studyDaysStr.split(",").map((d: any) => parseInt(d.trim(), 10)).filter((n: any) => !isNaN(n));
+
+  const startDate = options.startDate ?? new Date();
+  startDate.setHours(0, 0, 0, 0);
+
+  // 1. Obter matérias do usuário (Ignorando EXCLUDED)
+  const userSubjects = await prisma.studySubject.findMany({
+    where: { userId },
+  });
+  const eligibleSubjects = userSubjects.filter(s => s.studyPriority !== "EXCLUDED");
+
+  // 2. Buscar todos os blocos pendentes das matérias elegíveis
+  const allPendingBlocks = await (prisma as any).studyBlock.findMany({
+    where: {
+      userId,
+      status: { not: "COMPLETED" },
+      subjectId: { in: eligibleSubjects.map(s => s.id) },
+      material: {
+        materialRole: {
+          not: "SUPPORT_MATERIAL"
+        }
+      }
+    },
+    include: {
+      material: true,
+      subject: true
+    }
+  });
+
+  // Agrupar blocos pendentes por matéria e filtrar apenas matérias que POSSUEM blocos pendentes
+  const blocksBySubject: Record<string, typeof allPendingBlocks> = {};
+  const subjectsWithBlocks = eligibleSubjects.filter(s => {
+    const pending = allPendingBlocks.filter((b: any) => b.subjectId === s.id);
+    if (pending.length > 0) {
+      // Ordenação natural
+      pending.sort((a: any, b: any) => {
+        const fileA = a.material?.fileName || "";
+        const fileB = b.material?.fileName || "";
+        const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
+        if (fileCompare !== 0) return fileCompare;
+        return a.orderIndex - b.orderIndex;
+      });
+      blocksBySubject[s.id] = pending;
+      return true;
+    } else {
+      console.log(`Matéria ignorada na geração: sem blocos pendentes - ${s.name}`);
+      return false;
+    }
+  });
+
+  // Se não houver matérias com blocos pendentes, criar o cronograma vazio
+  if (subjectsWithBlocks.length === 0) {
+    await (prisma as any).studySchedule.updateMany({
+      where: { userId, status: "ACTIVE" },
+      data: { status: "ARCHIVED" },
+    });
+    const schedule = await (prisma as any).studySchedule.create({
+      data: {
+        userId,
+        title,
+        dailyStudyMinutes: dailyMinutes,
+        startDate,
+        status: "ACTIVE",
+      },
+    });
+    return { schedule, itemsCount: 0 };
+  }
+
+  // 3. Arquivar cronogramas ativos anteriores
+  await (prisma as any).studySchedule.updateMany({
+    where: { userId, status: "ACTIVE" },
+    data: { status: "ARCHIVED" },
+  });
+
+  // 4. Criar o novo cronograma
+  const schedule = await (prisma as any).studySchedule.create({
+    data: {
+      userId,
+      title,
+      dailyStudyMinutes: dailyMinutes,
+      startDate,
+      status: "ACTIVE",
+    },
+  });
+
+  // 5. Mapeamento de Pesos
+  const PRIORITY_WEIGHTS: Record<string, number> = {
+    PRIMARY: 3,
+    ACTIVE: 2,
+    SECONDARY: 1,
+  };
+
+  // 6. Preparar controle de distribuição
+  const scheduledMinutesBySubject: Record<string, number> = {};
+  for (const s of subjectsWithBlocks) {
+    scheduledMinutesBySubject[s.id] = 0;
+  }
+
+  // 7. Definir Deadline de Estudos
+  let deadline = new Date("2026-11-30T23:59:59");
+  if (userPrefs?.deadline) {
+    deadline = new Date(userPrefs.deadline);
+  } else if (options.daysAhead) {
+    deadline = addDays(startDate, options.daysAhead);
+  } else {
+    // 30 dias por padrão
+    deadline = addDays(startDate, 30);
+  }
+  deadline.setHours(23, 59, 59, 999);
+
+  // 8. Distribuir tarefas
+  const scheduleItemsData: any[] = [];
+  let currentDate = new Date(startDate);
+  let nextStudyDayNumber = 1;
+
+  while (currentDate.getTime() <= deadline.getTime()) {
+    const isStudy = isStudyDay(currentDate, studyDays);
+
+    if (isStudy) {
+      const candidateDate = new Date(currentDate);
+      const dayNumber = nextStudyDayNumber;
+      nextStudyDayNumber++;
+
+      // A. Lembrete SRS diário (30 min)
+      scheduleItemsData.push({
+        userId,
+        scheduleId: schedule.id,
+        subjectId: subjectsWithBlocks[0]?.id || "default",
+        actionType: "REVIEW_FLASHCARDS",
+        priorityScore: 100,
+        reason: "Sessão diária de Revisão de Cards (SRS)",
+        dayNumber,
+        scheduledDate: candidateDate,
+        estimatedMinutes: 30,
+        status: "PENDING",
+      });
+
+      // B. Selecionar as 2 matérias do dia com base no menor quociente: minutosEstudados / peso
+      const getCandidates = () => {
+        return subjectsWithBlocks
+          .filter(s => (blocksBySubject[s.id]?.length || 0) > 0)
+          .map(s => {
+            const priorityKey = s.studyPriority as keyof typeof PRIORITY_WEIGHTS;
+            const weight = PRIORITY_WEIGHTS[priorityKey] || 1;
+            const mins = scheduledMinutesBySubject[s.id] || 0;
+            return { subject: s, ratio: mins / weight, weight };
+          })
+          .sort((a, b) => a.ratio - b.ratio || b.weight - a.weight);
+      };
+
+      const candidates = getCandidates();
+      
+      // Se não houver candidatos com blocos pendentes, paramos a geração antecipadamente
+      if (candidates.length === 0) {
+        break;
+      }
+
+      // Escolher até 2 matérias
+      const subjectsToSchedule = candidates.slice(0, 2).map(c => c.subject);
+
+      const theoryMinutes = dailyMinutes - 30;
+      const targetPerSubject = theoryMinutes / subjectsToSchedule.length;
+      let remainingTheoryMinutes = theoryMinutes;
+      let scheduledTodayCount = 0;
+
+      for (let i = 0; i < subjectsToSchedule.length; i++) {
+        if (remainingTheoryMinutes <= 0) break;
+
+        const subject = subjectsToSchedule[i];
+        const targetForThisSubject = i === subjectsToSchedule.length - 1 
+          ? remainingTheoryMinutes 
+          : Math.min(targetPerSubject, remainingTheoryMinutes);
+
+        let scheduledMinsForSubject = 0;
+
+        while (scheduledMinsForSubject < targetForThisSubject && remainingTheoryMinutes > 0) {
+          const nextBlock = blocksBySubject[subject.id]?.[0];
+          if (!nextBlock) break;
+
+          const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
+
+          // Regra de limite: se já agendamos algum bloco hoje, o próximo bloco deve caber no tempo restante
+          if (scheduledTodayCount > 0 && blockMins > remainingTheoryMinutes) {
+            break;
+          }
+
+          // Agendar
+          scheduleItemsData.push({
+            userId,
+            scheduleId: schedule.id,
+            subjectId: subject.id,
+            studyBlockId: nextBlock.id,
+            actionType: "THEORY",
+            priorityScore: 90,
+            reason: `Roteiro: Teoria de ${subject.name}`,
+            dayNumber,
+            scheduledDate: candidateDate,
+            estimatedMinutes: blockMins,
+            status: "PENDING",
+          });
+
+          blocksBySubject[subject.id].shift();
+
+          scheduledMinsForSubject += blockMins;
+          scheduledMinutesBySubject[subject.id] = (scheduledMinutesBySubject[subject.id] || 0) + blockMins;
+          remainingTheoryMinutes -= blockMins;
+          scheduledTodayCount++;
+        }
+      }
+    }
+
+    currentDate = addDays(currentDate, 1);
+  }
+
+  // 9. Salvar em batch
+  if (scheduleItemsData.length > 0) {
+    await (prisma as any).studyScheduleItem.createMany({
+      data: scheduleItemsData,
+    });
+  }
+
+  // 10. Processar avisos de deadline insuficiente
+  const unallocatedBlocks: any[] = [];
+  let exceededMinutes = 0;
+
+  for (const subjectId in blocksBySubject) {
+    const remaining = blocksBySubject[subjectId];
+    if (remaining.length > 0) {
+      for (const block of remaining) {
+        unallocatedBlocks.push({
+          id: block.id,
+          title: block.title,
+          subjectName: block.subject?.name
+        });
+        const mins = await getOrComputeBlockMinutes(block, block.subject?.name || "");
+        exceededMinutes += mins;
+      }
+    }
+  }
+
+  const warning = unallocatedBlocks.length > 0 ? {
+    message: "O volume de conteúdo excede a disponibilidade até o prazo informado.",
+    unallocatedBlocksCount: unallocatedBlocks.length,
+    exceededMinutes,
+    suggestion: "Considere aumentar sua meta diária de estudos, ampliar o prazo final (deadline) ou reduzir a prioridade de algumas matérias."
+  } : null;
+
+  return { 
+    schedule, 
+    itemsCount: scheduleItemsData.length,
+    warning
+  };
 }
 
 export async function reorganizeOverdueSchedule(

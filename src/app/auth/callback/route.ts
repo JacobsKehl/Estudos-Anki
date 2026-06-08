@@ -53,14 +53,15 @@ export async function GET(request: Request) {
                   userId: newUser.id,
                   displayName: fullName || email.split("@")[0] || "Estudante",
                   languageTone: "MASCULINE_NEUTRAL",
-                  examGoal: "TRT",
-                  focusArea: "Estudos",
+                  examGoal: "Estudos",
+                  focusArea: "Geral",
                   dailyGoalMinutes: 120,
                   emailReminderEnabled: false,
                   theme: "light",
                   visualDensity: "comfortable",
                   flashcardDifficulty: "NORMAL",
-                  studyDaysOfWeek: "0,1,2,3,4,5,6"
+                  studyDaysOfWeek: "0,1,2,3,4,5,6",
+                  scheduleGenerationMode: "DYNAMIC"
                 }
               });
             } else {

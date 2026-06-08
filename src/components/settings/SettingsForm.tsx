@@ -478,12 +478,12 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
                   onChange={(e) => setFlashcardDifficulty(e.target.value)}
                   className="w-full h-11 px-4 rounded-xl border border-border/50 bg-background text-sm focus:outline-none focus:ring-4 focus:ring-accent/15 focus:border-accent transition-all cursor-pointer"
                 >
-                  <option value="NORMAL_PLUS">Mais desafiadora (TRT/Concursos - Foco em Exceções, Prazos & Consequências)</option>
+                  <option value="NORMAL_PLUS">Mais desafiadora (Foco em Exceções, Prazos, Conceitos Avançados & Casos Complexos)</option>
                   <option value="MEDIUM">Normal (Equilibrado com microcopy enxuto)</option>
                   <option value="EASY">Básica (Fixação de conceitos diretos)</option>
                 </select>
                 <p className="text-[11px] text-muted-foreground">
-                  A opção <strong>Mais desafiadora</strong> instrui o gerador a construir clozes inteligentes sobre requisitos legais, regras rígidas, exceções e prazos de concursos reais, com respostas extremamente concisas.
+                  A opção <strong>Mais desafiadora</strong> instrui o gerador a construir clozes inteligentes sobre requisitos complexos, regras rígidas, exceções, prazos e detalhes técnicos minuciosos, com respostas extremamente concisas.
                 </p>
               </div>
 

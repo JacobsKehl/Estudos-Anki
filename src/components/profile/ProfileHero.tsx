@@ -114,7 +114,7 @@ export function ProfileHero({
               </div>
               <div className="text-left">
                 <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider block">Objetivo / Prova</span>
-                <span className="text-xs font-bold text-foreground line-clamp-1">{examGoal || "TRT4"}</span>
+                <span className="text-xs font-bold text-foreground line-clamp-1">{examGoal || "Estudos"}</span>
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { buildFlashcardPrompt, FlashcardDifficulty } from "./prompts/flashcard-generation";
+import { buildFlashcardPrompt, FlashcardDifficulty, FlashcardPromptOptions } from "./prompts/flashcard-generation";
 import { callGeminiWithRetry } from "./utils/retry";
 
 export interface GeneratedFlashcard {
@@ -9,12 +9,40 @@ export interface GeneratedFlashcard {
   difficulty: "EASY" | "MEDIUM" | "HARD";
 }
 
+export interface GenerateFlashcardsOptions {
+  text: string;
+  difficulty?: FlashcardDifficulty;
+  subjectName?: string | null;
+  blockTitle?: string | null;
+  materialTitle?: string | null;
+  examGoal?: string | null;
+  focusArea?: string | null;
+}
+
 export async function generateFlashcards(
-  text: string,
-  difficulty: FlashcardDifficulty = "NORMAL_PLUS"
+  optionsOrText: string | GenerateFlashcardsOptions,
+  legacyDifficulty: FlashcardDifficulty = "NORMAL_PLUS"
 ): Promise<GeneratedFlashcard[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
+
+  let options: FlashcardPromptOptions;
+  if (typeof optionsOrText === "string") {
+    options = {
+      blockText: optionsOrText,
+      difficulty: legacyDifficulty
+    };
+  } else {
+    options = {
+      blockText: optionsOrText.text,
+      difficulty: optionsOrText.difficulty || legacyDifficulty,
+      subjectName: optionsOrText.subjectName,
+      blockTitle: optionsOrText.blockTitle,
+      materialTitle: optionsOrText.materialTitle,
+      examGoal: optionsOrText.examGoal,
+      focusArea: optionsOrText.focusArea
+    };
+  }
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ 
@@ -24,7 +52,7 @@ export async function generateFlashcards(
     }
   });
 
-  const prompt = buildFlashcardPrompt(text, difficulty);
+  const prompt = buildFlashcardPrompt(options);
 
   try {
     const result = await callGeminiWithRetry(() => model.generateContent(prompt));
@@ -43,7 +71,7 @@ export async function generateFlashcards(
     const cleanJson = responseText.substring(startIndex, endIndex + 1);
     const cards: GeneratedFlashcard[] = JSON.parse(cleanJson);
 
-    // Validações básicas e normalização
+    // Validações básicas e normalização (sempre Pergunta/Resposta)
     return cards
       .filter(card => card.question && card.answer)
       .map(card => ({

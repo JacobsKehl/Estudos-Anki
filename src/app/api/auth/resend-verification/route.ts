@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
       appUrl = "https://kehlstudy.com";
     }
-    const redirectTo = `${appUrl}/auth/callback`;
+    const redirectTo = `${appUrl}/auth/callback-handler`;
 
     let resendMessageId: string | null = null;
     let emailSendSuccess = false;

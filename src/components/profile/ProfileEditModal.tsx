@@ -38,6 +38,9 @@ export function ProfileEditModal({
   const [examGoal, setExamGoal] = useState(preferences.examGoal);
   const [deadline, setDeadline] = useState(preferences.deadline || "");
   const [avatarUrl, setAvatarUrl] = useState(preferences.avatarUrl || "");
+  const [languageTone, setLanguageTone] = useState(preferences.languageTone || "MASCULINE_NEUTRAL");
+  const [dailyReminderEmail, setDailyReminderEmail] = useState(preferences.dailyReminderEmail || "");
+  const [scheduleGenerationMode, setScheduleGenerationMode] = useState(preferences.scheduleGenerationMode || "DYNAMIC");
 
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState(preferences.dailyGoalMinutes);
   const [studyResetTime, setStudyResetTime] = useState(preferences.studyResetTime || "00:00");
@@ -76,6 +79,9 @@ export function ProfileEditModal({
       setStudyDaysOfWeek(preferences.studyDaysOfWeek || "1,2,3,4,5");
       setEmailReminderEnabled(preferences.emailReminderEnabled);
       setEmailReminderTime(preferences.emailReminderTime || "08:00");
+      setLanguageTone(preferences.languageTone || "MASCULINE_NEUTRAL");
+      setDailyReminderEmail(preferences.dailyReminderEmail || "");
+      setScheduleGenerationMode(preferences.scheduleGenerationMode || "DYNAMIC");
       setActiveTab("identidade"); // Inicia na primeira aba
     }
   }, [open, preferences]);
@@ -97,7 +103,10 @@ export function ProfileEditModal({
         studyResetTime,
         studyDaysOfWeek,
         emailReminderEnabled,
-        emailReminderTime
+        emailReminderTime,
+        languageTone,
+        dailyReminderEmail: dailyReminderEmail || "",
+        scheduleGenerationMode: scheduleGenerationMode as any
       });
 
       if (success) {
@@ -211,7 +220,7 @@ export function ProfileEditModal({
                     value={examGoal}
                     onChange={(e) => setExamGoal(e.target.value)}
                     required
-                    placeholder="Ex: TRT4"
+                    placeholder="Ex: Certificação Security+"
                     className="bg-card h-11 border-border/60 focus:border-accent"
                   />
                 </div>
@@ -228,6 +237,21 @@ export function ProfileEditModal({
                     onChange={(e) => setDeadline(e.target.value)}
                     className="bg-card h-11 border-border/60 focus:border-accent cursor-pointer"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="languageTone" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Tom de Linguagem
+                  </Label>
+                  <select
+                    id="languageTone"
+                    value={languageTone}
+                    onChange={(e) => setLanguageTone(e.target.value as any)}
+                    className="bg-card w-full h-11 px-3 rounded-xl border border-border/60 focus:border-accent text-sm"
+                  >
+                    <option value="MASCULINE_NEUTRAL">Masculino/Neutro</option>
+                    <option value="FEMININE">Feminino</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -313,6 +337,21 @@ export function ProfileEditModal({
                   />
                 </div>
 
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="scheduleGenerationMode" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Modo do cronograma
+                  </Label>
+                  <select
+                    id="scheduleGenerationMode"
+                    value={scheduleGenerationMode}
+                    onChange={(e) => setScheduleGenerationMode(e.target.value as any)}
+                    className="bg-card w-full h-11 px-3 rounded-xl border border-border/60 focus:border-accent text-sm"
+                  >
+                    <option value="DYNAMIC">Dinâmico — recomendado para objetivos personalizados</option>
+                    <option value="LEGACY_TRT4">Legado TRT4 — fluxo original da Gabriela</option>
+                  </select>
+                </div>
+
                 {/* Switch de lembrete diário */}
                 <div className="flex items-center justify-between p-4 rounded-2xl border border-border/50 bg-card md:col-span-2">
                   <div className="space-y-0.5">
@@ -335,6 +374,22 @@ export function ProfileEditModal({
                   </label>
                 </div>
 
+                {/* Campo de e-mail de lembrete condicional */}
+                {emailReminderEnabled && (
+                  <div className="space-y-2 md:col-span-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Label htmlFor="dailyReminderEmail" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      E-mail para lembrete
+                    </Label>
+                    <Input
+                      id="dailyReminderEmail"
+                      type="email"
+                      value={dailyReminderEmail}
+                      onChange={(e) => setDailyReminderEmail(e.target.value)}
+                      placeholder="Ex: seu-email@dominio.com"
+                      className="bg-card h-11 border-border/60 focus:border-accent"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionUser, createSupabaseClient, getSupabaseConfig } from "@/lib/supabase-server";
+import { getSessionUser, getSupabaseConfig, createSupabaseClient } from "@/lib/supabase-server";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
@@ -22,7 +23,6 @@ export async function POST(request: Request) {
       // DEV MODE: Simulação local
       console.info(`[MOCK PASSWORD CHANGE] Senha alterada para o usuário: ${user.email}`);
       
-      // Opcional: Atualizar updatedAt no Prisma
       await prisma.user.update({
         where: { email: user.email },
         data: { updatedAt: new Date() }
@@ -31,10 +31,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: "Senha atualizada com sucesso (Simulado)" });
     }
 
-    const client = createSupabaseClient();
-
     // 2. Se a senha atual foi informada, validar por segurança extra (reautenticação)
     if (currentPassword) {
+      const client = createSupabaseClient();
       const { error: reauthError } = await client.auth.signInWithPassword({
         email: user.email,
         password: currentPassword
@@ -45,13 +44,21 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Atualizar a senha no Supabase Auth
-    const { error: updateError } = await client.auth.updateUser({
+    // 3. Atualizar a senha no Supabase Auth usando o admin client (service role)
+    //    O admin client é necessário porque o client anônimo não possui sessão ativa
+    //    e client.auth.updateUser() requer uma sessão para funcionar.
+    const adminClient = createSupabaseAdminClient();
+    if (!adminClient) {
+      console.error("[CHANGE PASSWORD ERROR] SUPABASE_SERVICE_ROLE_KEY ausente.");
+      return NextResponse.json({ error: "Erro de configuração administrativa." }, { status: 500 });
+    }
+
+    const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
       password: newPassword
     });
 
     if (updateError) {
-      console.error("Erro ao atualizar senha no Supabase:", updateError);
+      console.error("Erro ao atualizar senha no Supabase via admin:", updateError);
       return NextResponse.json({ error: updateError.message }, { status: 400 });
     }
 
@@ -68,3 +75,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erro interno ao processar alteração de senha" }, { status: 500 });
   }
 }
+

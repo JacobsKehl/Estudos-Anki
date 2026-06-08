@@ -6,6 +6,7 @@ import { ProcessMaterialButton } from "@/components/materials/ProcessMaterialBut
 import { ArrowLeft, BookOpen, FileText, AlertCircle, Blocks } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { getMockUserId } from "@/lib/auth-mock";
 import { BlockGenerator } from "@/components/materials/BlockGenerator";
 import { StudyBlockItem } from "@/components/subjects/StudyBlockItem";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default async function MaterialDetailsPage({ params }: { params: { id: string } }) {
   const { id } = await params;
+  const userId = await getMockUserId();
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let material: any = null;
@@ -34,7 +36,7 @@ export default async function MaterialDetailsPage({ params }: { params: { id: st
     console.error("DB Error", error);
   }
 
-  if (!material) {
+  if (!material || material.userId !== userId) {
     return notFound();
   }
 
@@ -88,9 +90,16 @@ export default async function MaterialDetailsPage({ params }: { params: { id: st
           
           <div className="space-y-4">
             {material.studyBlocks.length === 0 ? (
-              <div className="py-12 text-center bg-muted/10 rounded-3xl border-2 border-dashed border-border/60">
-                <p className="text-muted-foreground">Nenhum bloco criado para este material.</p>
-
+              <div className="py-12 px-6 text-center bg-muted/10 rounded-3xl border-2 border-dashed border-border/60 flex flex-col items-center gap-4">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground font-semibold">Nenhum bloco de estudo criado para este material.</p>
+                  <p className="text-xs text-muted-foreground/80 max-w-sm">
+                    Gere sugestões de blocos teóricos com IA baseadas no seu objetivo de estudos.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <BlockGenerator materialId={material.id} hasExistingBlocks={false} mode="inline" />
+                </div>
               </div>
             ) : (
               material.studyBlocks.map((block: any) => (
@@ -150,6 +159,20 @@ export default async function MaterialDetailsPage({ params }: { params: { id: st
               </div>
             </CardContent>
           </Card>
+
+          {hasExistingBlocks && (
+            <Card className="rounded-[2rem] border-border/40 shadow-sm overflow-hidden p-6 space-y-4">
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Assistente de Blocos</h4>
+                <p className="text-[10px] text-muted-foreground leading-normal">
+                  Gere novos blocos caso tenha atualizado o material ou queira revisar a divisão sugerida.
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <BlockGenerator materialId={material.id} hasExistingBlocks={true} mode="dialog" />
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
         data: {
           userId: newUser.id,
           displayName: name,
-          examGoal: "TRT",
-          focusArea: "Estudos",
+          examGoal: "Estudos",
+          focusArea: "Geral",
           dailyGoalMinutes: 120,
           emailReminderEnabled: false,
           theme: "light",
@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
           flashcardDifficulty: "NORMAL",
           studyResetTime: "00:00",
           studyDaysOfWeek: "0,1,2,3,4,5,6",
-          languageTone: "MASCULINE_NEUTRAL"
+          languageTone: "MASCULINE_NEUTRAL",
+          scheduleGenerationMode: "DYNAMIC"
         }
       });
 
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
         if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
           appUrl = "https://kehlstudy.com";
         }
-        const redirectTo = `${appUrl}/auth/callback`;
+        const redirectTo = `${appUrl}/auth/callback-handler`;
 
         const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
           type: "signup",
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
       if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
         appUrl = "https://kehlstudy.com";
       }
-      const redirectTo = `${appUrl}/auth/callback`;
+      const redirectTo = `${appUrl}/auth/callback-handler`;
 
       const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
         type: "signup",
@@ -240,8 +241,8 @@ export async function POST(request: NextRequest) {
         data: {
           userId: newUser.id,
           displayName: name,
-          examGoal: "TRT",
-          focusArea: "Estudos",
+          examGoal: "Estudos",
+          focusArea: "Geral",
           dailyGoalMinutes: 120,
           emailReminderEnabled: false,
           theme: "light",
@@ -249,7 +250,8 @@ export async function POST(request: NextRequest) {
           flashcardDifficulty: "NORMAL",
           studyResetTime: "00:00",
           studyDaysOfWeek: "0,1,2,3,4,5,6",
-          languageTone: "MASCULINE_NEUTRAL"
+          languageTone: "MASCULINE_NEUTRAL",
+          scheduleGenerationMode: "DYNAMIC"
         }
       });
     }

@@ -5,6 +5,7 @@ import { Calendar, Plus, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function GenerateScheduleCTA() {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,17 +18,31 @@ export function GenerateScheduleCTA() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: "Plano de Estudos Principal",
-          dailyMinutes: 60
+          title: "Plano de Estudos Principal"
         }),
       });
 
-      if (!response.ok) throw new Error("Falha ao gerar");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Falha ao gerar");
+      }
+
+      if (data.warning) {
+        toast.warning(
+          data.warning.message || "O volume de conteúdo excede a disponibilidade até o prazo informado.",
+          {
+            duration: 10000,
+          }
+        );
+      } else {
+        toast.success(data.message || "Cronograma gerado com sucesso!");
+      }
 
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Erro ao gerar cronograma. Certifique-se de que você tem blocos de estudo criados.");
+      toast.error(error.message || "Erro ao gerar cronograma. Certifique-se de que você tem blocos de estudo criados.");
     } finally {
       setIsLoading(false);
     }

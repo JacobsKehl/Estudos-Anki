@@ -8,6 +8,12 @@ import { getSessionUser, syncSupabaseUserWithPrismaUser } from "./supabase-serve
  */
 export async function getCurrentUserId(): Promise<string> {
   const isProd = process.env.NODE_ENV === "production";
+
+  // Allow test override in development/test environments
+  if (process.env.TEST_USER_ID && !isProd) {
+    return process.env.TEST_USER_ID;
+  }
+
   const authMode = process.env.AUTH_MODE || "SUPABASE";
 
   // Em produção, AUTH_MODE=MOCK é expressamente proibido e seguro.
@@ -38,8 +44,8 @@ export async function getCurrentUserId(): Promise<string> {
           preferences: {
             create: {
               displayName: "Estudante",
-              examGoal: "TRT",
-              focusArea: "Estudos",
+              examGoal: "Estudos",
+              focusArea: "Geral",
               languageTone: "MASCULINE_NEUTRAL",
             }
           }

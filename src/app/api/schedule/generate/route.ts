@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
     const { title, dailyMinutes, daysAhead } = body;
 
     const result = await generateSmartSchedule(user.id, {
-      title: title || "Meu Cronograma de Estudos",
-      dailyMinutes: dailyMinutes || 120,
-      daysAhead: daysAhead || 30,
+      title: title || undefined,
+      dailyMinutes: dailyMinutes || undefined,
+      daysAhead: daysAhead || undefined,
     });
 
     if (!result) {
@@ -28,8 +28,17 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    if (result.warning) {
+      return NextResponse.json({
+        message: `${result.warning.message} Cronograma criado com ${result.itemsCount} tarefa(s).`,
+        scheduleId: result.schedule.id,
+        itemsCount: result.itemsCount,
+        warning: result.warning
+      });
+    }
+
     return NextResponse.json({
-      message: `Cronograma criado com ${result.itemsCount} tarefa(s) nos próximos ${daysAhead ?? 30} dias.`,
+      message: `Cronograma criado com ${result.itemsCount} tarefa(s).`,
       scheduleId: result.schedule.id,
       itemsCount: result.itemsCount,
     });

@@ -42,8 +42,8 @@ export async function POST(
   const mockUserId = await getMockUserId();
 
   try {
-    const material = await prisma.studyMaterial.findUnique({ where: { id } });
-    if (!material) return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
+    const material = await prisma.studyMaterial.findFirst({ where: { id, userId: mockUserId } });
+    if (!material) return NextResponse.json({ error: "Material não encontrado ou acesso não autorizado." }, { status: 404 });
 
     // Sempre usar Supabase para o processamento
 

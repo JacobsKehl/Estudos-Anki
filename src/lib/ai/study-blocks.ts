@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { STUDY_BLOCK_GENERATION_PROMPT } from "./prompts/study-block-generation";
+import { STUDY_BLOCK_GENERATION_PROMPT, buildStudyBlockPrompt } from "./prompts/study-block-generation";
 import { callGeminiWithRetry } from "./utils/retry";
 
 export interface SuggestedBlock {
@@ -11,7 +11,12 @@ export interface SuggestedBlock {
   confidence: number;
 }
 
-export async function suggestStudyBlocks(materialId: string, pages: { pageNumber: number, text: string }[]): Promise<SuggestedBlock[]> {
+export async function suggestStudyBlocks(
+  materialId: string, 
+  pages: { pageNumber: number, text: string }[],
+  examGoal?: string | null,
+  focusArea?: string | null
+): Promise<SuggestedBlock[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
@@ -28,7 +33,7 @@ export async function suggestStudyBlocks(materialId: string, pages: { pageNumber
     .map(p => `PÁGINA ${p.pageNumber}:\n${p.text.substring(0, 1000)}...`) // Limitando texto por página para não estourar tokens
     .join("\n\n---\n\n");
 
-  const prompt = STUDY_BLOCK_GENERATION_PROMPT.replace("{{pages}}", pagesText);
+  const prompt = buildStudyBlockPrompt(pagesText, examGoal, focusArea);
 
   try {
     const result = await callGeminiWithRetry(() => model.generateContent(prompt));

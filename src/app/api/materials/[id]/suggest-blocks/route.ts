@@ -35,7 +35,15 @@ export async function POST(
       return NextResponse.json({ error: "Nenhum conteúdo extraído encontrado para este material." }, { status: 400 });
     }
 
-    const suggestions = await suggestStudyBlocks(id, material.extractedContent);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { preferences: true }
+    });
+
+    const examGoal = user?.preferences?.examGoal || null;
+    const focusArea = user?.preferences?.focusArea || null;
+
+    const suggestions = await suggestStudyBlocks(id, material.extractedContent, examGoal, focusArea);
 
     return NextResponse.json({ suggestions });
   } catch (error: any) {

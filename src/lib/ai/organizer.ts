@@ -43,12 +43,17 @@ function isRecoverableGeminiError(error: any): boolean {
 }
 
 // Trigger automatic Vercel redeploy to activate new GEMINI_API_KEY environment variables
-export async function identifySubject(firstPagesContent: string, fileName?: string): Promise<SubjectIdentification> {
+export async function identifySubject(
+  firstPagesContent: string,
+  fileName?: string,
+  examGoal?: string | null,
+  focusArea?: string | null
+): Promise<SubjectIdentification> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const prompt = buildSubjectPrompt(firstPagesContent, fileName);
+  const prompt = buildSubjectPrompt(firstPagesContent, fileName, examGoal, focusArea);
   let lastError: any = null;
 
   for (const modelName of GEMINI_MODEL_CANDIDATES) {
@@ -1213,7 +1218,9 @@ export async function detectStructure(
   summaryContent: string,
   totalPages: number,
   subjectName: string,
-  pageTexts?: { pageNumber: number; text: string }[]
+  pageTexts?: { pageNumber: number; text: string }[],
+  examGoal?: string | null,
+  focusArea?: string | null
 ): Promise<DetectedStructureResult> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
@@ -1241,7 +1248,7 @@ export async function detectStructure(
 
   // Serializar o mapa estrutural completo do documento para guiar a IA de forma precisa
   const tocJsonText = JSON.stringify(docStructureMap, null, 2);
-  const initialPrompt = buildStructurePrompt(summaryContent, subjectName, officialTopicsListText, tocJsonText) +
+  const initialPrompt = buildStructurePrompt(summaryContent, subjectName, officialTopicsListText, tocJsonText, examGoal, focusArea) +
     `\n\nTotal de páginas do PDF: ${totalPages}`;
   
   let lastError: any = null;

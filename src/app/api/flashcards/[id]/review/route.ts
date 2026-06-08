@@ -19,13 +19,12 @@ export async function POST(
       return NextResponse.json({ error: "Rating inválido (deve ser entre 1 e 4)" }, { status: 400 });
     }
 
-    // 1. Get current flashcard data
-    const flashcard = await (prisma as any).flashcard.findUnique({
-      where: { id },
+    const flashcard = await (prisma as any).flashcard.findFirst({
+      where: { id, userId: mockUserId },
     });
 
     if (!flashcard) {
-      return NextResponse.json({ error: "Flashcard não encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Flashcard não encontrado ou acesso não autorizado." }, { status: 404 });
     }
 
     // 2. Calculate next review data using the new Anki SRS logic

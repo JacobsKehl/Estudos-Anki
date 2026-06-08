@@ -76,7 +76,8 @@ export async function POST(
     // 1. Buscar o material e o usuário real
     const userId = await getMockUserId();
     const user = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      include: { preferences: true }
     });
     if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
@@ -207,7 +208,14 @@ export async function POST(
 
         if (blockText.trim().length >= 50) {
           try {
-            const cards = await generateFlashcards(blockText.substring(0, 6000));
+            const cards = await generateFlashcards({
+              text: blockText.substring(0, 6000),
+              subjectName: block.officialTopicName || material.detectedSubjectName || "Geral",
+              blockTitle: block.title,
+              materialTitle: material.fileName || "Material",
+              examGoal: user.preferences?.examGoal,
+              focusArea: user.preferences?.focusArea
+            });
             if (cards && cards.length > 0) {
               const limitedCards = cards.slice(0, 15);
               const flashcardsData = limitedCards.map(card => ({
@@ -365,7 +373,12 @@ export async function POST(
       .map(p => p.text)
       .join("\n\n");
 
-    const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName);
+    const idResult = await identifySubject(
+      sampleText.substring(0, 3000),
+      material.fileName || undefined,
+      user.preferences?.examGoal,
+      user.preferences?.focusArea
+    );
     const detectedSubject = idResult.subjectName;
 
     let subject = await prisma.studySubject.findFirst({
@@ -407,7 +420,14 @@ export async function POST(
       .map(p => p.text)
       .join("\n");
 
-    const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
+    const structResult = await detectStructure(
+      fullTextForStructure,
+      numPages,
+      detectedSubject,
+      nonEmptyPages,
+      user.preferences?.examGoal,
+      user.preferences?.focusArea
+    );
     const materialRole = structResult.materialRole || "UNKNOWN";
     const detectedBlocks = structResult.blocks || [];
 
@@ -607,7 +627,14 @@ export async function POST(
 
           if (blockText.trim().length >= 50) {
             try {
-              const cards = await generateFlashcards(blockText.substring(0, 6000));
+              const cards = await generateFlashcards({
+                text: blockText.substring(0, 6000),
+                subjectName: studyBlock.officialTopicName || material.detectedSubjectName || "Geral",
+                blockTitle: studyBlock.title,
+                materialTitle: material.fileName || "Material",
+                examGoal: user.preferences?.examGoal,
+                focusArea: user.preferences?.focusArea
+              });
               if (cards && cards.length > 0) {
                 const limitedCards = cards.slice(0, 20); // strictly respect the new 20 limit!
 

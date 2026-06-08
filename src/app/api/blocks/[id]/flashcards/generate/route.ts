@@ -13,9 +13,9 @@ export async function POST(
   const mockUserId = await getMockUserId();
 
   try {
-    // 1. Fetch the study block
-    const block = await (prisma as any).studyBlock.findUnique({
-      where: { id },
+    // 1. Fetch the study block and validate ownership
+    const block = await (prisma as any).studyBlock.findFirst({
+      where: { id, userId: mockUserId },
       include: {
         material: true,
         subject: true
@@ -58,23 +58,39 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // 4. Read user's preferred difficulty from DB (defaults to NORMAL_PLUS)
+    // 4. Read user's preferred difficulty and context from DB (defaults to NORMAL_PLUS)
     let difficulty: FlashcardDifficulty = "NORMAL_PLUS";
+    let examGoal: string | null = null;
+    let focusArea: string | null = null;
     try {
       const userPrefs = await prisma.userPreferences.findUnique({
         where: { userId: mockUserId },
-        select: { flashcardDifficulty: true }
+        select: { 
+          flashcardDifficulty: true,
+          examGoal: true,
+          focusArea: true
+        }
       });
       const dbDifficulty = userPrefs?.flashcardDifficulty;
       if (dbDifficulty === "EASY" || dbDifficulty === "NORMAL_PLUS" || dbDifficulty === "HARD") {
         difficulty = dbDifficulty;
       }
+      examGoal = userPrefs?.examGoal || null;
+      focusArea = userPrefs?.focusArea || null;
     } catch {
       // If reading fails, proceed with default
     }
 
-    // 5. Generate flashcards with Gemini using user's preferred difficulty
-    const generatedCards = await generateFlashcards(fullText, difficulty);
+    // 5. Generate flashcards with Gemini using user's preferred difficulty and context
+    const generatedCards = await generateFlashcards({
+      text: fullText,
+      difficulty,
+      subjectName: block.subject?.name,
+      blockTitle: block.title,
+      materialTitle: block.material?.fileName || "Material",
+      examGoal,
+      focusArea
+    });
 
     if (!generatedCards || generatedCards.length === 0) {
       return NextResponse.json({

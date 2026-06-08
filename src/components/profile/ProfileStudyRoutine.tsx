@@ -42,7 +42,7 @@ export function ProfileStudyRoutine({
   // Converter dificuldade em texto legível
   const readableDifficulty = React.useMemo(() => {
     switch (flashcardDifficulty) {
-      case "NORMAL_PLUS": return "Desafiador (TRT/Concursos)";
+      case "NORMAL_PLUS": return "Desafiador (Casos Complexos)";
       case "MEDIUM": return "Normal (Equilibrado)";
       case "EASY": return "Básico (Conceitual)";
       default: return flashcardDifficulty;

@@ -207,8 +207,8 @@ export async function syncSupabaseUserWithPrismaUser(supabaseUser: { id: string;
       data: {
         userId: user.id,
         displayName: user.name || "Estudante",
-        focusArea: "Estudos",
-        examGoal: "TRT",
+        focusArea: "Geral",
+        examGoal: "Estudos",
         deadline: null,
         dailyGoalMinutes: 120,
         studyResetTime: "00:00",
@@ -217,7 +217,8 @@ export async function syncSupabaseUserWithPrismaUser(supabaseUser: { id: string;
         theme: "light",
         visualDensity: "comfortable",
         flashcardDifficulty: "NORMAL",
-        languageTone: "MASCULINE_NEUTRAL"
+        languageTone: "MASCULINE_NEUTRAL",
+        scheduleGenerationMode: "DYNAMIC"
       }
     });
     console.info(`[PREFERENCES] UserPreferences iniciais criadas para o usuário: ${user.id}`);

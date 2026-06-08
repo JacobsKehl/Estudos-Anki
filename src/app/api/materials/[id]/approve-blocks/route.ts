@@ -17,8 +17,8 @@ export async function POST(
       return NextResponse.json({ error: "Dados de blocos inválidos" }, { status: 400 });
     }
 
-    const material = await prisma.studyMaterial.findUnique({
-      where: { id },
+    const material = await prisma.studyMaterial.findFirst({
+      where: { id, userId: mockUserId },
       include: {
         _count: {
           select: { studyBlocks: true }
@@ -27,7 +27,7 @@ export async function POST(
     });
 
     if (!material || !material.subjectId) {
-      return NextResponse.json({ error: "Material não encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Material não encontrado ou acesso não autorizado." }, { status: 404 });
     }
 
     // Validação de segurança: páginas devem estar dentro do limite do material

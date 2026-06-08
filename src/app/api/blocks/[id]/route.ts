@@ -14,6 +14,18 @@ export async function PATCH(
 
     const mockUserId = await getMockUserId();
 
+    // Validar propriedade do bloco (ownership)
+    const blockExists = await prisma.studyBlock.findFirst({
+      where: { id, userId: mockUserId }
+    });
+
+    if (!blockExists) {
+      return NextResponse.json(
+        { error: "Bloco de estudos não encontrado ou acesso não autorizado." },
+        { status: 404 }
+      );
+    }
+
     let updatedBlock;
     if (status !== undefined) {
       if (status === "COMPLETED") {
@@ -50,6 +62,19 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const mockUserId = await getMockUserId();
+
+    // Validar propriedade do bloco (ownership)
+    const blockExists = await prisma.studyBlock.findFirst({
+      where: { id, userId: mockUserId }
+    });
+
+    if (!blockExists) {
+      return NextResponse.json(
+        { error: "Bloco de estudos não encontrado ou acesso não autorizado." },
+        { status: 404 }
+      );
+    }
     
     await prisma.studyBlock.delete({
       where: { id },

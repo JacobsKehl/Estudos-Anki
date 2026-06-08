@@ -110,7 +110,7 @@ const SUBJECT_KEYWORDS: Record<string, string[]> = {
 function detectSubjectForImportedFlashcard(front: string, back: string): string {
   const combinedText = `${front} ${back}`.toLowerCase();
   
-  let bestSubject = "Revisão Geral TRT";
+  let bestSubject = "Revisão Geral";
   let maxScore = 0;
   
   // Calculate scores for each subject based on word boundary matches
@@ -177,19 +177,19 @@ export async function POST(req: NextRequest) {
 
     // Garantir que a matéria de fallback exista
     const fallbackSubjectIdFromRequest = formData.get("fallbackSubjectId") as string | null;
-    let fallbackSubjectId = fallbackSubjectIdFromRequest || subjectMap["Revisão Geral TRT"];
+    let fallbackSubjectId = fallbackSubjectIdFromRequest || subjectMap["Revisão Geral"];
     
     if (!fallbackSubjectId) {
       const createdFallback = await prisma.studySubject.create({
         data: {
-          name: "Revisão Geral TRT",
+          name: "Revisão Geral",
           userId,
           examWeight: 1.0,
           priority: 1
         }
       });
       fallbackSubjectId = createdFallback.id;
-      subjectMap["Revisão Geral TRT"] = fallbackSubjectId;
+      subjectMap["Revisão Geral"] = fallbackSubjectId;
     }
 
     // 3. Fetch existing flashcards for deduplication
@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
       "Direito Civil": 0,
       "Direito Processual Civil": 0,
       "Língua Portuguesa": 0,
-      "Revisão Geral TRT": 0
+      "Revisão Geral": 0
     };
 
     const cardsToCreate: any[] = [];
@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
       
       // Resolve subject ID
       let subjectId = null;
-      if (detectedSubjectName === "Revisão Geral TRT" && fallbackSubjectIdFromRequest) {
+      if (detectedSubjectName === "Revisão Geral" && fallbackSubjectIdFromRequest) {
         subjectId = fallbackSubjectIdFromRequest;
       } else {
         subjectId = subjectMap[detectedSubjectName];

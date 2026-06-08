@@ -94,6 +94,14 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   const log = (msg: string) => console.log(`[ORGANIZE] ${material.fileName}: ${msg}`);
   const result = { blocks: 0, flashcards: 0, subjectCreated: false };
 
+  // Buscar preferências do usuário
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { preferences: true }
+  });
+  const examGoal = user?.preferences?.examGoal;
+  const focusArea = user?.preferences?.focusArea;
+
   // ── Etapa 1: Extraindo texto por página ──────────────────────────────────
   log(`[Organize] PDF iniciado: ${material.fileName}`);
 
@@ -158,7 +166,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
 
   if (!subjectId || isReorganizing) {
     log("Identificando matéria com IA...");
-    const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName);
+    const idResult = await identifySubject(sampleText.substring(0, 3000), material.fileName, examGoal, focusArea);
     detectedSubject = idResult.subjectName;
     log(`Matéria detectada: "${detectedSubject}" (Confiança: ${idResult.confidence}, Motivo: ${idResult.reason})`);
 
@@ -231,7 +239,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     .join("\n");
 
   log("Detectando estrutura de blocos com IA...");
-  const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages);
+  const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages, examGoal, focusArea);
   const detectedBlocks = structResult.blocks || [];
   const materialRole = structResult.materialRole || "UNKNOWN";
 

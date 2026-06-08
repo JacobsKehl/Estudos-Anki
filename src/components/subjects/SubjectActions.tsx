@@ -20,12 +20,14 @@ import {
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { SUBJECT_PRIORITY_LABELS, SUBJECT_PRIORITY_DESCRIPTIONS } from "@/lib/constants/priority-constants";
 
 interface SubjectActionsProps {
   subject: {
     id: string;
     name: string;
     description: string | null;
+    studyPriority?: string;
   };
   allSubjects?: { id: string; name: string }[];
 }
@@ -42,6 +44,7 @@ export function SubjectActions({ subject, allSubjects = [] }: SubjectActionsProp
   // Edit State
   const [name, setName] = React.useState(subject.name);
   const [description, setDescription] = React.useState(subject.description || "");
+  const [studyPriority, setStudyPriority] = React.useState(subject.studyPriority || "PRIMARY");
 
   // Delete impact state
   const [deleteImpact, setDeleteImpact] = React.useState<{
@@ -70,10 +73,23 @@ export function SubjectActions({ subject, allSubjects = [] }: SubjectActionsProp
       const res = await fetch(`/api/subjects/${subject.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, studyPriority }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Matéria atualizada com sucesso");
+
+      const oldPriority = subject.studyPriority || "PRIMARY";
+      const newPriority = studyPriority;
+
+      let message = "Matéria atualizada com sucesso";
+      if (oldPriority === "EXCLUDED" && newPriority !== "EXCLUDED") {
+        message = "Matéria reativada. Ela será considerada na próxima geração do cronograma.";
+      } else if (newPriority === "EXCLUDED" && oldPriority !== "EXCLUDED") {
+        message = "Matéria removida do cronograma. Seus materiais, blocos e flashcards foram preservados.";
+      } else if (oldPriority !== newPriority) {
+        message = "Prioridade atualizada com sucesso.";
+      }
+
+      toast.success(message);
       setIsEditDialogOpen(false);
       router.refresh();
     } catch {
@@ -204,6 +220,25 @@ export function SubjectActions({ subject, allSubjects = [] }: SubjectActionsProp
                   onChange={e => setDescription(e.target.value)}
                   className="flex min-h-[100px] w-full rounded-2xl border border-border/40 bg-muted/20 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 transition-all resize-none"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase text-muted-foreground tracking-widest ml-1">Prioridade no Cronograma</label>
+                <select
+                  value={studyPriority}
+                  onChange={e => setStudyPriority(e.target.value)}
+                  className="flex h-12 w-full rounded-2xl border border-border/40 bg-muted/20 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 transition-all"
+                >
+                  <option value="PRIMARY">{SUBJECT_PRIORITY_LABELS.PRIMARY} (Alta)</option>
+                  <option value="ACTIVE">{SUBJECT_PRIORITY_LABELS.ACTIVE} (Média)</option>
+                  <option value="SECONDARY">{SUBJECT_PRIORITY_LABELS.SECONDARY} (Baixa)</option>
+                  <option value="EXCLUDED">{SUBJECT_PRIORITY_LABELS.EXCLUDED}</option>
+                </select>
+                <p className="text-[11px] text-muted-foreground leading-normal mt-1 ml-1">
+                  {studyPriority === "PRIMARY" && SUBJECT_PRIORITY_DESCRIPTIONS.PRIMARY}
+                  {studyPriority === "ACTIVE" && SUBJECT_PRIORITY_DESCRIPTIONS.ACTIVE}
+                  {studyPriority === "SECONDARY" && SUBJECT_PRIORITY_DESCRIPTIONS.SECONDARY}
+                  {studyPriority === "EXCLUDED" && SUBJECT_PRIORITY_DESCRIPTIONS.EXCLUDED}
+                </p>
               </div>
               <DialogFooter className="pt-4 flex gap-3">
                 <Button type="button" variant="ghost" className="rounded-xl flex-1 h-11" onClick={() => setIsEditDialogOpen(false)}>

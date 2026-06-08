@@ -13,8 +13,32 @@ export async function PATCH(
     const body = await req.json();
     const { name, description, priority, examWeight, studyPriority } = body;
 
+    // 1. Validar ownership de forma segura (retorna 404 se não for o dono ou não existir)
+    const existingSubject = await prisma.studySubject.findFirst({
+      where: { id, userId }
+    });
+
+    if (!existingSubject) {
+      return NextResponse.json({ error: "Matéria não encontrada" }, { status: 404 });
+    }
+
+    // 2. Validar enum studyPriority se estiver presente no body
+    if (studyPriority !== undefined) {
+      const validPriorities = ["PRIMARY", "ACTIVE", "SECONDARY", "EXCLUDED"];
+      if (!validPriorities.includes(studyPriority)) {
+        return NextResponse.json(
+          { error: "Prioridade inválida. Escolha uma das opções: Alta, Média, Baixa ou Excluída." },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 3. Atualizar de forma segura garantindo id e userId na cláusula where
     const subject = await prisma.studySubject.update({
-      where: { id, userId },
+      where: { 
+        id,
+        userId // Filtrar estritamente pelo id e userId do usuário logado
+      },
       data: { name, description, priority, examWeight, studyPriority }
     });
 
@@ -33,7 +57,7 @@ export async function DELETE(
     const userId = await getMockUserId();
 
     // Verify subject belongs to user
-    const subject = await prisma.studySubject.findUnique({ where: { id, userId } });
+    const subject = await prisma.studySubject.findFirst({ where: { id, userId } });
     if (!subject) {
       return NextResponse.json({ error: "Matéria não encontrada" }, { status: 404 });
     }
@@ -63,7 +87,7 @@ export async function DELETE(
     }
 
     // Safe to delete — no dependencies
-    await prisma.studySubject.delete({ where: { id, userId } });
+    await prisma.studySubject.delete({ where: { id } });
     return NextResponse.json({ message: "Matéria excluída com sucesso" });
 
   } catch (error: any) {

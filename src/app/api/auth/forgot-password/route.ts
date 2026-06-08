@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (process.env.NODE_ENV === "production" || request.nextUrl.origin.includes("kehlstudy.com")) {
       appUrl = "https://kehlstudy.com";
     }
-    const redirectTo = `${appUrl}/auth/callback?next=/reset-password`;
+    const redirectTo = `${appUrl}/auth/callback-handler?next=/reset-password`;
 
     if (!isConfigured) {
       // DEV MODE: Simulação local

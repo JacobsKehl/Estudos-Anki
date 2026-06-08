@@ -13,6 +13,7 @@ interface SubjectCardProps {
     name: string;
     description: string | null;
     progress: number;
+    studyPriority?: string;
     metrics?: {
       totalBlocks: number;
       completedBlocks: number;
@@ -26,6 +27,7 @@ interface SubjectCardProps {
     };
     createdAt: string | Date;
   };
+  scheduleGenerationMode?: string | null;
 }
 
 const HEALTH_CONFIG = {
@@ -35,28 +37,44 @@ const HEALTH_CONFIG = {
   CRITICAL: { label: "Crítica", class: "bg-rose-50 text-rose-600 border border-rose-100" },
 };
 
-export function SubjectCard({ subject }: SubjectCardProps) {
+const PRIORITY_CONFIG = {
+  PRIMARY: { label: "Prioridade Alta", class: "bg-accent/15 text-accent border border-accent/20" },
+  ACTIVE: { label: "Prioridade Média", class: "bg-sage-light/30 text-accent/80 border border-sage-light/40" },
+  SECONDARY: { label: "Prioridade Baixa", class: "bg-muted/70 text-muted-foreground border border-border/40" },
+  EXCLUDED: { label: "Fora do cronograma", class: "bg-muted/50 text-muted-foreground/60 border border-border/20" },
+};
+
+export function SubjectCard({ subject, scheduleGenerationMode }: SubjectCardProps) {
   const router = useRouter();
   const health = subject.metrics?.health || 'GOOD';
   const config = HEALTH_CONFIG[health];
+
+  const priority = (subject.studyPriority as keyof typeof PRIORITY_CONFIG) || "PRIMARY";
+  const priorityConfig = PRIORITY_CONFIG[priority];
 
   // Regra TRT4: verificar se está no ciclo
   const strategySub = TRT4_STRATEGY.subjects.find(s => s.name === subject.name);
   const now = new Date();
   const createdAt = new Date(subject.createdAt);
   const daysSinceCreated = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
-  const isWaitingCycle = strategySub?.cycleStartAfterDays && daysSinceCreated < strategySub.cycleStartAfterDays;
+  
+  // Só aplica "Aguardando Ciclo" para Gabriela / LEGACY_TRT4
+  const isWaitingCycle = scheduleGenerationMode === "LEGACY_TRT4" && 
+                         strategySub?.cycleStartAfterDays && 
+                         daysSinceCreated < strategySub.cycleStartAfterDays;
 
   return (
     <div 
       onClick={() => router.push(`/subjects/${subject.id}`)}
-      className="group bg-card p-6 rounded-[2rem] border border-border/50 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/5 transition-all duration-500 flex flex-col gap-5 h-full cursor-pointer"
+      className={`group bg-card p-6 rounded-[2rem] border border-border/50 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/5 transition-all duration-500 flex flex-col gap-5 h-full cursor-pointer ${
+        priority === "EXCLUDED" ? "opacity-85 border-dashed" : ""
+      }`}
     >
       <div className="flex justify-between items-start">
         <div className="w-12 h-12 rounded-2xl bg-sage-light/30 text-accent flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
           <BookOpen className="w-6 h-6" />
         </div>
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
           {isWaitingCycle ? (
             <Badge className="bg-slate-100 text-slate-500 border-none px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm">
               <Clock className="w-3 h-3 mr-1" />
@@ -67,6 +85,9 @@ export function SubjectCard({ subject }: SubjectCardProps) {
               {config.label}
             </Badge>
           )}
+          <Badge className={`border-none px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-sm ${priorityConfig.class}`}>
+            {priorityConfig.label}
+          </Badge>
           <SubjectActions subject={subject} />
         </div>
       </div>

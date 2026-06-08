@@ -6,7 +6,6 @@ import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export const dynamic = "force-dynamic";
 
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -15,8 +14,16 @@ export async function POST(
   const mockUserId = await getMockUserId();
 
   try {
-    // 1. Fetch all blocks for this subject that don't have many flashcards yet
-    // Or just all blocks. Let's get all blocks first.
+    const userPrefs = await prisma.userPreferences.findUnique({
+      where: { userId: mockUserId },
+      select: { examGoal: true, focusArea: true }
+    });
+    const subject = await prisma.studySubject.findUnique({
+      where: { id: subjectId },
+      select: { name: true }
+    });
+
+    // 1. Fetch all blocks for this subject
     const blocks = await (prisma as any).studyBlock.findMany({
       where: { subjectId },
       include: {
@@ -52,7 +59,15 @@ export async function POST(
       if (!fullText || fullText.trim().length < 50) continue;
 
       try {
-        const generatedCards = await generateFlashcards(fullText);
+        const generatedCards = await generateFlashcards({
+          text: fullText,
+          subjectName: subject?.name || "Geral",
+          blockTitle: block.title,
+          materialTitle: "Material",
+          examGoal: userPrefs?.examGoal,
+          focusArea: userPrefs?.focusArea
+        });
+
         if (generatedCards && generatedCards.length > 0) {
           const limitedCards = generatedCards.slice(0, 20);
           const saved = await prisma.$transaction(

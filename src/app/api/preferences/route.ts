@@ -32,9 +32,9 @@ export async function GET() {
           dailyReminderEmail: null,
           visualDensity: "comfortable",
           reducedMotion: false,
-          focusArea: "Estudos",
+          focusArea: "Geral",
           displayName: user.name || "Estudante",
-          examGoal: "TRT",
+          examGoal: "Estudos",
           deadline: null,
           avatarUrl: null,
           theme: "light",
@@ -120,6 +120,10 @@ export async function POST(request: Request) {
     if (body.examGoal !== undefined) data.examGoal = body.examGoal;
     if (body.deadline !== undefined) {
       data.deadline = body.deadline ? new Date(body.deadline) : null;
+    }
+    if (body.scheduleGenerationMode !== undefined) {
+      const mode = body.scheduleGenerationMode;
+      data.scheduleGenerationMode = (mode === "LEGACY_TRT4" || mode === "DYNAMIC") ? mode : "DYNAMIC";
     }
     if (body.avatarUrl !== undefined) data.avatarUrl = body.avatarUrl;
     if (body.theme !== undefined) data.theme = body.theme;

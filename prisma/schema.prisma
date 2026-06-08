@@ -70,6 +70,7 @@ model UserPreferences {
   deadline                    DateTime?
   avatarUrl                   String?
   languageTone                String   @default("MASCULINE_NEUTRAL")
+  scheduleGenerationMode      String?  @default("DYNAMIC")
   
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt

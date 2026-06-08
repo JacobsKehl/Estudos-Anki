@@ -42,7 +42,7 @@ export default async function BlockPage({
     }
   });
 
-  if (!block) {
+  if (!block || block.userId !== mockUserId) {
     notFound();
   }
 

@@ -26,13 +26,14 @@ export interface StudyPreferences {
   deadline: string | null;
   avatarUrl: string | null;
   languageTone: "FEMININE" | "MASCULINE_NEUTRAL";
+  scheduleGenerationMode: "DYNAMIC" | "LEGACY_TRT4";
 }
 
 const DEFAULT_PREFERENCES: StudyPreferences = {
   name: "Estudante",
   displayName: "Estudante",
-  studyFocus: "Estudos",
-  focusArea: "Estudos",
+  studyFocus: "Geral",
+  focusArea: "Geral",
   dailyGoalMinutes: 120,
   studyResetTime: "00:00",
   studyDaysOfWeek: "0,1,2,3,4,5,6", // 7 dias por semana por padrão
@@ -47,10 +48,11 @@ const DEFAULT_PREFERENCES: StudyPreferences = {
   animations: "normal",
   reducedMotion: false,
   theme: "light",
-  examGoal: "TRT",
+  examGoal: "Estudos",
   deadline: null,
   avatarUrl: null,
   languageTone: "MASCULINE_NEUTRAL",
+  scheduleGenerationMode: "DYNAMIC",
 };
 
 interface StudyPreferencesContextType {
@@ -153,6 +155,7 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
           deadline: dbPrefs.deadline ? new Date(dbPrefs.deadline).toISOString().split('T')[0] : preferences.deadline,
           avatarUrl: dbPrefs.avatarUrl ?? preferences.avatarUrl,
           languageTone: dbPrefs.languageTone ?? preferences.languageTone,
+          scheduleGenerationMode: dbPrefs.scheduleGenerationMode ?? preferences.scheduleGenerationMode,
         };
         
         setPreferences(merged);
