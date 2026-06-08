@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       
       // Criar a resposta de redirecionamento.
       // Se for para reset-password, passar tokens na URL como backup client-side
-      let redirectUrl = new URL(next, origin);
+      const redirectUrl = new URL(next, origin);
       if (next.startsWith("/reset-password")) {
         redirectUrl.searchParams.set("access_token", accessToken);
         redirectUrl.searchParams.set("refresh_token", refreshToken);
@@ -144,7 +144,7 @@ export async function GET(request: Request) {
     await syncSupabaseUserWithPrismaUser(supabaseUser);
 
     // Criar a resposta de redirecionamento.
-    let redirectUrl = new URL(next, origin);
+    const redirectUrl = new URL(next, origin);
     if (next.startsWith("/reset-password")) {
       redirectUrl.searchParams.set("access_token", session.access_token);
       redirectUrl.searchParams.set("refresh_token", session.refresh_token);

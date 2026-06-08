@@ -34,7 +34,9 @@ export async function getCurrentUserId(): Promise<string> {
 
   // Fallback controlado para simulação local com AUTH_MODE=MOCK em desenvolvimento/teste
   if (authMode === "MOCK") {
-    let user = await prisma.user.findFirst();
+    let user = await prisma.user.findFirst({
+      where: { email: "dev@kehl.study" }
+    });
     
     if (!user) {
       user = await prisma.user.create({
