@@ -34,6 +34,76 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
     let scheduleItem;
     const todayRange = getTodayRangeSP(now);
     
+    // Local helper to find replacement block for early completed theory tasks
+    const findReplacementBlock = async (tx: any) => {
+      if (!activeSchedule) return null;
+
+      // 1. Obter matérias elegíveis do usuário (não EXCLUDED)
+      const eligibleSubjects = await tx.studySubject.findMany({
+        where: {
+          userId,
+          studyPriority: { not: "EXCLUDED" }
+        }
+      });
+      const eligibleSubjectIds = eligibleSubjects.map((s: any) => s.id);
+
+      // 2. IDs de blocos já agendados como PENDING ou IN_PROGRESS no cronograma ativo
+      const scheduledBlockItems = await tx.studyScheduleItem.findMany({
+        where: {
+          userId,
+          scheduleId: activeSchedule.id,
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+          studyBlockId: { not: null }
+        },
+        select: { studyBlockId: true }
+      });
+      const scheduledBlockIds = scheduledBlockItems.map((item: any) => item.studyBlockId).filter(Boolean);
+
+      // 3. Buscar todos os blocos candidatos NOT_STARTED pertencentes a matérias elegíveis,
+      // excluindo os já agendados e o bloco recém-concluído (blockId).
+      const candidateBlocks = await tx.studyBlock.findMany({
+        where: {
+          userId,
+          subjectId: { in: eligibleSubjectIds },
+          status: "NOT_STARTED",
+          id: { notIn: [...scheduledBlockIds, blockId] },
+          material: {
+            materialRole: { not: "SUPPORT_MATERIAL" }
+          }
+        },
+        include: {
+          subject: true
+        }
+      });
+
+      const priorityWeights: Record<string, number> = {
+        PRIMARY: 3,
+        ACTIVE: 2,
+        SECONDARY: 1,
+        EXCLUDED: 0
+      };
+
+      const sameSubjectCandidates = candidateBlocks.filter((b: any) => b.subjectId === block.subjectId);
+      const otherSubjectCandidates = candidateBlocks.filter((b: any) => b.subjectId !== block.subjectId);
+
+      const sortBlocks = (a: any, b: any) => {
+        if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex;
+        if (a.pageStart !== b.pageStart) return a.pageStart - b.pageStart;
+        return a.id.localeCompare(b.id);
+      };
+
+      sameSubjectCandidates.sort(sortBlocks);
+
+      otherSubjectCandidates.sort((a: any, b: any) => {
+        const weightA = priorityWeights[a.subject?.studyPriority] || 0;
+        const weightB = priorityWeights[b.subject?.studyPriority] || 0;
+        if (weightA !== weightB) return weightB - weightA; // Descending weight
+        return sortBlocks(a, b);
+      });
+
+      return sameSubjectCandidates[0] || otherSubjectCandidates[0] || null;
+    };
+    
     if (scheduleItemId) {
       const targetItem = await (tx as any).studyScheduleItem.findUnique({
         where: { id: scheduleItemId }
@@ -60,28 +130,18 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
             }
           });
 
-          // B. Buscar o próximo bloco de estudo pendente
-          const nextPendingBlock = await tx.studyBlock.findFirst({
-            where: {
-              userId,
-              subjectId: block.subjectId,
-              status: "NOT_STARTED",
-              material: {
-                materialRole: { not: "SUPPORT_MATERIAL" }
-              }
-            },
-            orderBy: [
-              { pageStart: "asc" },
-              { id: "asc" }
-            ]
-          });
+          // B. Buscar o próximo bloco de estudo substituto elegível
+          const replacementBlock = await findReplacementBlock(tx);
 
-          if (nextPendingBlock) {
+          if (replacementBlock) {
             scheduleItem = await tx.studyScheduleItem.update({
               where: { id: targetItem.id },
               data: {
-                studyBlockId: nextPendingBlock.id,
-                materialId: nextPendingBlock.materialId
+                studyBlockId: replacementBlock.id,
+                materialId: replacementBlock.materialId,
+                subjectId: replacementBlock.subjectId,
+                status: "PENDING",
+                completedAt: null
               }
             });
           } else {
@@ -134,28 +194,18 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
             }
           });
 
-          // B. Buscar o próximo bloco de estudo pendente
-          const nextPendingBlock = await tx.studyBlock.findFirst({
-            where: {
-              userId,
-              subjectId: block.subjectId,
-              status: "NOT_STARTED",
-              material: {
-                materialRole: { not: "SUPPORT_MATERIAL" }
-              }
-            },
-            orderBy: [
-              { pageStart: "asc" },
-              { id: "asc" }
-            ]
-          });
+          // B. Buscar o próximo bloco de estudo substituto elegível
+          const replacementBlock = await findReplacementBlock(tx);
 
-          if (nextPendingBlock) {
+          if (replacementBlock) {
             scheduleItem = await tx.studyScheduleItem.update({
               where: { id: match.id },
               data: {
-                studyBlockId: nextPendingBlock.id,
-                materialId: nextPendingBlock.materialId
+                studyBlockId: replacementBlock.id,
+                materialId: replacementBlock.materialId,
+                subjectId: replacementBlock.subjectId,
+                status: "PENDING",
+                completedAt: null
               }
             });
           } else {

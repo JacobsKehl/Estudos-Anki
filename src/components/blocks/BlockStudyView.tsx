@@ -798,8 +798,28 @@ export function BlockStudyView({ block, content, stats, returnTo, from }: BlockS
                 </>
               )}
             </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-2xl gap-2 font-bold h-12 text-xs border-accent/20 text-accent/90 hover:bg-accent/5 hover:text-accent hover:border-accent/30 transition-all flex items-center justify-center"
+              onClick={handleCurationComplete}
+              disabled={isGeneratingCards || isUpdatingStatus}
+            >
+              {isUpdatingStatus ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Concluindo...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Concluir sem Gerar Cards
+                </>
+              )}
+            </Button>
             <p className="text-[10px] text-center text-muted-foreground font-medium leading-relaxed">
-              Ao concluir a leitura, o cronômetro será pausado e a IA gerará novos cards em estado de curadoria.
+              Ao concluir a leitura, o cronômetro será pausado. A IA pode gerar novos cards ou você pode concluir sem cards.
             </p>
           </div>
 
