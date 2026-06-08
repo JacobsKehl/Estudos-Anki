@@ -56,12 +56,41 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser && !existingUser.authUserId?.startsWith("mock-auth-")) {
-      // Retornar resposta genérica de sucesso para evitar micro-ataques de enumeração de e-mails
-      console.info(`[REGISTRATION SECURITY] Cadastro rejeitado silenciosamente: e-mail ${recipientMasked} já cadastrado no Prisma com ID ativo.`);
-      return NextResponse.json({
-        success: true,
-        message: "Cadastro recebido! Se o e-mail for novo, enviamos um link de confirmação para a sua caixa de entrada."
-      });
+      // Verificar se o usuário realmente existe no Supabase Auth.
+      // Se não existir (ex: foi excluído manualmente do Supabase), permitimos o cadastro
+      // para reassociar a conta e não deixar o usuário bloqueado.
+      let userExistsInSupabase = false;
+      const { isConfigured } = getSupabaseConfig();
+
+      if (isConfigured) {
+        const adminClient = createSupabaseAdminClient();
+        if (adminClient && existingUser.authUserId) {
+          try {
+            const { data: authUser, error: authError } = await adminClient.auth.admin.getUserById(existingUser.authUserId);
+            if (authUser?.user && !authError) {
+              userExistsInSupabase = true;
+            } else {
+              console.warn(`[REGISTRATION] Usuário do Prisma possui authUserId ${existingUser.authUserId}, mas ele não foi encontrado no Supabase Auth.`);
+            }
+          } catch (e: any) {
+            console.error("[REGISTRATION] Erro ao verificar usuário no Supabase Auth:", e.message);
+          }
+        }
+      } else {
+        // Sem Supabase configurado (mock local), consideramos que existe
+        userExistsInSupabase = true;
+      }
+
+      if (userExistsInSupabase) {
+        // Retornar resposta genérica de sucesso para evitar micro-ataques de enumeração de e-mails
+        console.info(`[REGISTRATION SECURITY] Cadastro rejeitado silenciosamente: e-mail ${recipientMasked} já cadastrado no Prisma com ID ativo.`);
+        return NextResponse.json({
+          success: true,
+          message: "Cadastro recebido! Se o e-mail for novo, enviamos um link de confirmação para a sua caixa de entrada."
+        });
+      } else {
+        console.info(`[REGISTRATION] Usuário órfão detectado: e-mail ${recipientMasked} existe no Prisma mas não no Supabase. Permitindo recriação e reassociação.`);
+      }
     }
 
     const { isConfigured } = getSupabaseConfig();
