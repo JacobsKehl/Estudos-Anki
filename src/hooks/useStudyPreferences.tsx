@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export interface StudyPreferences {
+  userId: string;
   name: string;
   displayName: string;
   studyFocus: string;
@@ -30,6 +31,7 @@ export interface StudyPreferences {
 }
 
 const DEFAULT_PREFERENCES: StudyPreferences = {
+  userId: "",
   name: "Estudante",
   displayName: "Estudante",
   studyFocus: "Geral",
@@ -133,6 +135,7 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
         
         // Merge DB preferences into current state, preserving db schema keys
         const merged: StudyPreferences = {
+          userId: dbPrefs.userId || dbPrefs.id || preferences.userId || "",
           name: dbPrefs.name ?? dbPrefs.displayName ?? preferences.name,
           displayName: dbPrefs.displayName ?? dbPrefs.name ?? preferences.displayName,
           studyFocus: dbPrefs.studyFocus ?? dbPrefs.focusArea ?? preferences.studyFocus,

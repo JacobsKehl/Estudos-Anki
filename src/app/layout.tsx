@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Topbar } from "@/components/layout/topbar";
-import { MobileNav } from "@/components/layout/mobile-nav";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Toaster } from "sonner";
+import { StudyPreferencesProvider } from "@/hooks/useStudyPreferences";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,10 +33,6 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
 };
-
-import { Toaster } from "sonner";
-import { StudyPreferencesProvider } from "@/hooks/useStudyPreferences";
-import { StudyTimer } from "@/components/study/study-timer";
 
 export default function RootLayout({
   children,
@@ -75,17 +71,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-background font-sans text-foreground">
         <StudyPreferencesProvider>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <div className="flex flex-1 flex-col md:pl-64 pb-16 md:pb-0">
-              <Topbar />
-              <main className="flex-1 p-4 md:p-8">
-                {children}
-              </main>
-            </div>
-            <MobileNav />
-            <StudyTimer />
-          </div>
+          <DashboardLayout>
+            {children}
+          </DashboardLayout>
           <Toaster position="top-center" richColors />
         </StudyPreferencesProvider>
       </body>

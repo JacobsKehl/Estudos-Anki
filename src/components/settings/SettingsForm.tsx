@@ -296,11 +296,11 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
 
   const handleTriggerEmailTest = async () => {
     setIsSendingEmail(true);
-    const toastId = toast.loading(`Preparando e-mail de lembrete diário para Henrique...`);
+    const toastId = toast.loading(`Preparando e-mail de lembrete diário para ${name || "seu perfil"}...`);
 
     try {
-      // Disparar endpoint de cron enviando manual_key
-      const response = await fetch("/api/cron/reminder?manual_key=kehl2025manual");
+      // Disparar endpoint de cron enviando manual_key e o userId específico
+      const response = await fetch(`/api/cron/reminder?manual_key=kehl2025manual&userId=${preferences.userId || ""}`);
       const data = await response.json();
 
       if (!response.ok) {

@@ -354,16 +354,35 @@ async function processUserReminder(
       subject: true,
       studyBlock: {
         include: {
-          material: true
+          material: true,
+          flashcards: {
+            where: {
+              status: "APPROVED",
+              reviewState: { in: ["NEW", "LEARNING", "REVIEW", "RELEARNING"] }
+            },
+            select: { id: true }
+          }
         }
       },
       material: true
     },
   });
 
-  const todayTasks = todayItems.filter(
-    (i: any) => i.actionType !== "REVIEW_FLASHCARDS" && i.actionType !== "PRACTICE_CARDS"
-  );
+  const todayTasks = todayItems.filter((item: any) => {
+    // 1. Filtrar apenas tarefas ativas/pendentes/em progresso
+    const isActive = item.status === "PENDING" || item.status === "IN_PROGRESS";
+    if (!isActive) return false;
+
+    // 2. Apenas THEORY ou REVIEW_BLOCK com flashcards ativos
+    if (item.actionType === "THEORY") {
+      return true;
+    }
+    if (item.actionType === "REVIEW_BLOCK") {
+      const activeCards = item.studyBlock?.flashcards || [];
+      return activeCards.length > 0;
+    }
+    return false;
+  });
 
   // 3. Buscar a próxima teoria pendente (sugestão de adiantamento)
   const nextTheoryItem = await (prisma as any).studyScheduleItem.findFirst({
