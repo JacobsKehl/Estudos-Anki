@@ -176,6 +176,51 @@ const WEAK_CORRIGIBLE_TITLES = [
   "RECURSO", "PROVA"
 ];
 
+/**
+ * Choose the grammatically correct Portuguese preposition for a subject name.
+ * E.g. "em Segurança da Informação", "no Processo Civil", "de Cibersegurança".
+ */
+function choosePreposition(subjectClean: string): string {
+  const lower = subjectClean.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  // Subjects that start with a definite article or imply "no/na"
+  const useNo = [
+    "processo civil", "processo do trabalho", "processual civil", "processual do trabalho",
+    "trabalho", "administrativo", "constitucional", "civil", "penal",
+    "previdenciario", "tributario", "ambiental", "empresarial", "eleitoral"
+  ];
+  if (useNo.some(s => lower === s || lower.startsWith(s + " "))) {
+    return "no";
+  }
+
+  // Feminine subjects → "na"
+  const useNa = [
+    "informatica", "lingua portuguesa", "matematica",
+    "legislacao", "discursiva"
+  ];
+  if (useNa.some(s => lower === s || lower.startsWith(s + " "))) {
+    return "na";
+  }
+
+  // Technical subjects → "em" (e.g. Segurança da Informação, Cibersegurança, Gestão de Riscos)
+  const useEm = [
+    "seguranca", "ciberseguranca", "gestao", "governanca",
+    "auditoria", "compliance", "privacidade", "inteligencia",
+    "redes", "cloud", "devops", "banco de dados", "engenharia"
+  ];
+  if (useEm.some(s => lower === s || lower.startsWith(s + " ") || lower.includes(s))) {
+    return "em";
+  }
+
+  // Subjects starting with vowel → "em" sounds more natural
+  if (/^[aeiou]/.test(lower)) {
+    return "em";
+  }
+
+  // Default: "em" is the safest generic preposition
+  return "em";
+}
+
 export function enhanceBlockTitle(b: DetectedBlock, subjectName: string): string {
   const originalTitle = b.title.trim();
   const titleNorm = originalTitle.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -201,7 +246,8 @@ export function enhanceBlockTitle(b: DetectedBlock, subjectName: string): string
   let newTitle = coreConcept;
 
   if (!newTitle.toLowerCase().includes(subjectClean.toLowerCase())) {
-    newTitle = `${coreConcept} no ${subjectClean}`;
+    const preposition = choosePreposition(subjectClean);
+    newTitle = `${coreConcept} ${preposition} ${subjectClean}`;
   }
 
   if (detailText && detailText.length > 0) {
@@ -215,20 +261,21 @@ export function enhanceBlockTitle(b: DetectedBlock, subjectName: string): string
   newTitle = newTitle.replace(/[.\s—-]+$/, "").trim();
 
   // Mapeamentos específicos aprovados pelo usuário
+  const prep = choosePreposition(subjectClean);
   if (titleNorm === "COMPETENCIA") {
-    return `Competência no ${subjectClean} — critérios de fixação, espécies e conflitos`;
+    return `Competência ${prep} ${subjectClean} — critérios de fixação, espécies e conflitos`;
   }
   if (titleNorm === "PROVAS") {
-    return `Provas no ${subjectClean} — teoria geral e meios de prova`;
+    return `Provas ${prep} ${subjectClean} — teoria geral e meios de prova`;
   }
   if (titleNorm === "RECURSOS") {
-    return `Recursos no ${subjectClean} — teoria geral e recursos em espécie`;
+    return `Recursos ${prep} ${subjectClean} — teoria geral e recursos em espécie`;
   }
   if (titleNorm === "EXECUCAO") {
-    return `Processo de Execução no ${subjectClean} — fundamentos, espécies e atos executivos`;
+    return `Processo de Execução ${prep} ${subjectClean} — fundamentos, espécies e atos executivos`;
   }
   if (titleNorm === "ATOS PROCESSUAIS") {
-    return `Atos Processuais no ${subjectClean} — forma, prazos e comunicação dos atos`;
+    return `Atos Processuais ${prep} ${subjectClean} — forma, prazos e comunicação dos atos`;
   }
 
   return newTitle;
@@ -1609,6 +1656,19 @@ export async function detectStructure(
             }
           }
 
+          // Validação de blocos gigantes individuais (>50 páginas em PDFs >40 páginas)
+          if (errors.length === 0 && !isSupportOnlyMaterial && totalPages > 40) {
+            const MAX_BLOCK_PAGE_SPAN = 50;
+            for (const mb of mainBlocksList) {
+              const span = mb.pageEnd - mb.pageStart + 1;
+              if (span > MAX_BLOCK_PAGE_SPAN) {
+                console.warn(`[AI Validation] Bloco gigante individual detectado: "${mb.title}" cobre ${span} páginas (${mb.pageStart}-${mb.pageEnd}). Limite: ${MAX_BLOCK_PAGE_SPAN}.`);
+                errors.push(`VALIDATION_FAILED: O bloco "${mb.title}" cobre ${span} páginas (${mb.pageStart}-${mb.pageEnd}), o que excede o máximo recomendado de ${MAX_BLOCK_PAGE_SPAN} páginas por bloco em PDFs com ${totalPages} páginas. Divida este bloco em unidades temáticas menores baseadas na estrutura do sumário.`);
+                break;
+              }
+            }
+          }
+
           // Garantir pelo menos um bloco principal se for MAIN_MATERIAL ou MIXED_MATERIAL
           if (errors.length === 0) {
             const mainBlocksCount = mainBlocksList.length;
@@ -1719,6 +1779,15 @@ export async function detectStructure(
           
         } catch (error: any) {
           console.error("Erro ao detectar estrutura:", error);
+
+          // If it was a JSON parse error, enrich the retry prompt with corrective instructions
+          if (jsonParseError && attempts < 1) {
+            console.warn(`[AI Retry] Erro de JSON detectado. Adicionando instruções corretivas ao prompt para retry...`);
+            currentPrompt = initialPrompt + `\n\nATENÇÃO CRÍTICA: A resposta anterior continha JSON inválido que não pôde ser parseado. O erro foi: "${jsonParseError}". POR FAVOR, na próxima resposta:\n1. Retorne APENAS um objeto JSON válido, sem nenhum texto antes ou depois.\n2. Não use comentários dentro do JSON.\n3. Certifique-se de que todas as strings estejam entre aspas duplas.\n4. Certifique-se de que não haja vírgulas antes de } ou ].\n5. Não inclua markdown (como \`\`\`json).\n6. Verifique que todos os colchetes e chaves estejam balanceados.`;
+            jsonParseError = null; // Reset to allow retry
+            attempts++;
+            continue;
+          }
           
           // Se a API falhou/timeout ou deu erro de JSON, mas temos sumário confiável, resgatar deterministicamente!
           if (tocDetected && tocConfidence >= 0.65 && hasMainTheory) {
