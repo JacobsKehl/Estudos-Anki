@@ -4,8 +4,8 @@
  */
 export async function callGeminiWithRetry<T>(
   apiCall: () => Promise<T>,
-  maxAttempts: number = 4,
-  baseDelayMs: number = 1500
+  maxAttempts: number = 5,
+  baseDelayMs: number = 2000
 ): Promise<T> {
   let lastError: any;
 
@@ -14,25 +14,32 @@ export async function callGeminiWithRetry<T>(
       return await apiCall();
     } catch (err: any) {
       lastError = err;
-      const is503 = err.status === 503 || (err.message && err.message.includes("503"));
-      const is429 = err.status === 429 || (err.message && err.message.includes("429"));
-      const isTemporary = is503 || is429 || err.message?.includes("fetch failed") || err.message?.includes("Service Unavailable");
+      const errMsg = err.message || "";
+      const is503 = err.status === 503 || errMsg.includes("503") || errMsg.includes("Service Unavailable");
+      const is429 = err.status === 429 || errMsg.includes("429") || errMsg.includes("Rate Limit") || errMsg.includes("Too Many Requests");
+      const isTemporary = is503 || is429 || errMsg.includes("fetch failed");
 
       if (!isTemporary || attempt === maxAttempts) {
-        console.error(`[Gemini Retry] Permanent or final attempt failure on attempt ${attempt}:`, err.message || err);
+        console.error(`[Gemini Retry] Permanent or final attempt failure on attempt ${attempt}:`, errMsg || err);
         throw err;
       }
 
-      // Exponential backoff: delay = baseDelay * 2^(attempt-1) + jitter
-      const jitter = Math.random() * 500;
-      const delay = baseDelayMs * Math.pow(2, attempt - 1) + jitter;
+      // Se for limite de requisições (429), usamos um tempo de espera muito maior para liberar a janela de 1 minuto
+      let delay = baseDelayMs * Math.pow(2, attempt - 1);
+      if (is429) {
+        // Multiplicador agressivo: tentativa 1 = 5s, 2 = 10s, 3 = 20s, 4 = 40s
+        delay = 5000 * Math.pow(2, attempt - 1);
+      }
+
+      const jitter = Math.random() * 800;
+      const finalDelay = delay + jitter;
 
       console.warn(
-        `[Gemini Retry] Attempt ${attempt} failed with ${is503 ? "503 Service Unavailable" : is429 ? "429 Rate Limit" : "temporary network error"}. ` +
-        `Retrying in ${Math.round(delay)}ms...`
+        `[Gemini Retry] Attempt ${attempt} failed with ${is503 ? "503 Service Unavailable" : is429 ? "429 Rate Limit (Too Many Requests)" : "temporary network error"}. ` +
+        `Retrying in ${Math.round(finalDelay)}ms...`
       );
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, finalDelay));
     }
   }
 

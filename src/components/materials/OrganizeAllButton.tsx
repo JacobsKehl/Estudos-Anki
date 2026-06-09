@@ -250,6 +250,11 @@ export function OrganizeAllButton({ unorganizedCount, force = false }: OrganizeA
           { id: toastId, duration: 4000 }
         );
       }
+
+      // Pequeno cooldown de 2 segundos entre arquivos para mitigar picos de requisições no Gemini
+      if (i < localTotalToProcess - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
 
     // 3. Resumo Final Detalhado e Geração Consolidada de Cronograma
