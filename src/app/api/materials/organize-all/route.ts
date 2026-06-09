@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { getMockUserId } from "@/lib/auth-mock";
 import { checkRateLimit, rateLimitErrorResponse } from "@/lib/rate-limit";
-import { identifySubject, detectStructure, findBestOfficialTopic } from "@/lib/ai/organizer";
+import { identifySubject, detectStructure, findBestOfficialTopic, getStructureSampleText } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
 import { generateSmartSchedule } from "@/lib/scheduler";
@@ -233,10 +233,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
 
   // ── Etapa 4: Detectar estrutura (blocos) ────────────────────────────────
 
-  const fullTextForStructure = nonEmptyPages
-    .slice(0, 15)
-    .map(p => p.text)
-    .join("\n");
+  const fullTextForStructure = getStructureSampleText(nonEmptyPages, numPages);
 
   log("Detectando estrutura de blocos com IA...");
   const structResult = await detectStructure(fullTextForStructure, numPages, detectedSubject, nonEmptyPages, examGoal, focusArea);

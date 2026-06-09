@@ -1,11 +1,31 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const userId = "cmpvqi7bp0000kz043wp09yja"; // ID do Henrique
+    const { searchParams } = new URL(req.url);
+    const materialId = searchParams.get("materialId");
+
+    if (materialId) {
+      const pages = await prisma.extractedContent.findMany({
+        where: { materialId },
+        orderBy: { pageNumber: "asc" }
+      });
+      return NextResponse.json({
+        success: true,
+        materialId,
+        pagesCount: pages.length,
+        pages: pages.map(p => ({
+          pageNumber: p.pageNumber,
+          textLength: p.text.length,
+          text: p.text
+        }))
+      });
+    }
+
     
     // 1. Fetch user & preferences
     const user = await prisma.user.findUnique({
@@ -62,6 +82,7 @@ export async function GET() {
         processingError: m.processingError,
         totalPages: m.totalPages,
         subjectId: m.subjectId,
+        detectedStructure: m.detectedStructure,
         createdAt: m.createdAt
       })),
       blocksCount: blocks.length,
@@ -72,6 +93,7 @@ export async function GET() {
         pageStart: b.pageStart,
         pageEnd: b.pageEnd,
         officialTopicName: b.officialTopicName,
+        materialId: b.materialId,
         createdAt: b.createdAt
       })),
       schedulesCount: schedules.length,

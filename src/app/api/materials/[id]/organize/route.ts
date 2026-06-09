@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { getMockUserId } from "@/lib/auth-mock";
-import { identifySubject, detectStructure, findBestOfficialTopic } from "@/lib/ai/organizer";
+import { identifySubject, detectStructure, findBestOfficialTopic, getStructureSampleText } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
 
@@ -449,10 +449,7 @@ export async function POST(
     });
 
     // 4. Detectar estrutura com IA
-    const fullTextForStructure = nonEmptyPages
-      .slice(0, 15)
-      .map(p => p.text)
-      .join("\n");
+    const fullTextForStructure = getStructureSampleText(nonEmptyPages, numPages);
 
     const structResult = await detectStructure(
       fullTextForStructure,

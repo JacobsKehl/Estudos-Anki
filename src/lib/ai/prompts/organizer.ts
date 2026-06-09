@@ -118,8 +118,9 @@ A divisão deve respeitar rigorosamente:
 
 REGRAS DE CLASSIFICAÇÃO E DIVISÃO:
 1. Nunca colapse todo o PDF em 1 único bloco se o sumário mostra várias seções teóricas independentes.
-2. Nunca divida mecanicamente o conteúdo por intervalos fixos de páginas (ex: de 10 em 10 páginas de forma contínua).
-3. Não existe mínimo matemático de blocos por PDF. Mas há obrigação absoluta de respeitar a estrutura temática do sumário.
+2. Em PDFs longos, evite criar blocos gigantes que cubram dezenas ou centenas de páginas, salvo se o conteúdo realmente for indivisível. Para PDFs grandes, o resultado esperado deve ser dividido em blocos correspondentes a capítulos, módulos, seções, temas, unidades ou tópicos principais. NÃO retorne blocos gigantes injustificados cobrindo quase todo o documento (como páginas 10 a 236).
+3. Nunca divida mecanicamente o conteúdo por intervalos fixos de páginas (ex: de 10 em 10 páginas de forma contínua).
+4. Não existe mínimo matemático de blocos por PDF. Mas há obrigação absoluta de respeitar a estrutura temática do sumário.
 4. Classifique o material globalmente no campo "materialRole" como:
    - "MAIN_MATERIAL": Predominantemente teoria. Crie MAIN_BLOCKS a partir das seções teóricas.
    - "SUPPORT_MATERIAL": Predominantemente resumos, mapas mentais, bizus, questões, gabaritos, checklists ou revisão rápida. Crie apenas SUPPORT_BLOCKS, não force nenhum MAIN_BLOCK.

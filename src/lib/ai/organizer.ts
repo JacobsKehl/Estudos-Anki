@@ -313,6 +313,19 @@ export interface TOCEntry {
 }
 
 export function parseTOCLine(line: string, totalPages: number): { heading: string; pageStart: number } | null {
+  const lowerLine = line.toLowerCase().trim();
+  const FORBIDDEN_FOOTER_KEYWORDS = ["slide", "slides", "página", "pagina", "page", "footer", "rodapé"];
+  
+  // Ignorar linhas que iniciam com termos típicos de rodapé ou marcadores de slide
+  const isForbiddenFooter = FORBIDDEN_FOOTER_KEYWORDS.some(kw => {
+    const regex = new RegExp(`^[^a-zA-Z\\u00C0-\\u00FF]*${kw}\\b`, 'i');
+    return regex.test(lowerLine);
+  });
+  
+  if (isForbiddenFooter) {
+    return null;
+  }
+
   // Pattern 1: dots, hyphens, underscores, or 2+ spaces followed by a page number
   const pattern1 = line.match(/^\s*(.+?)(?:\.{2,}|-{2,}|_{2,}|\s{2,})\s*(\d+)\s*$/);
   if (pattern1) {
@@ -324,12 +337,36 @@ export function parseTOCLine(line: string, totalPages: number): { heading: strin
   }
 
   // Pattern 2: starts with a section index (e.g. "4.1.", "1)", "Aula 01 -") and ends with a number
-  // E.g. "4.1. Título da seção 15" or "Aula 01 - Introdução 3"
   const pattern2 = line.match(/^\s*((\d+(\.\d+)*|Aula\s+\d+|Capítulo\s+\d+|Seção\s+\d+|[a-zA-Z\u00C0-\u00FF\d\)\-\s]+?)\s+([a-zA-Z\u00C0-\u00FF\d\)\-\s,\/]+?))\s+(\d+)\s*$/);
   if (pattern2) {
     const heading = pattern2[1].trim();
     const pageStart = parseInt(pattern2[5], 10);
     if (pageStart >= 1 && pageStart <= totalPages && heading.length >= 3) {
+      return { heading, pageStart };
+    }
+  }
+
+  // Pattern 3: simple heading followed by a single space and a page number
+  // E.g. "Introdução 5" or "Gestão de Riscos 23"
+  const pattern3 = line.match(/^\s*([a-zA-Z\u00C0-\u00FF][a-zA-Z\u00C0-\u00FF\d\)\-\s,\/]{2,})\s+(\d+)\s*$/);
+  if (pattern3) {
+    const heading = pattern3[1].trim();
+    const pageStart = parseInt(pattern3[2], 10);
+    const headingLower = heading.toLowerCase().trim();
+    
+    // Validação extra para Pattern 3: o título não pode ser apenas palavra-chave proibida ou rótulo genérico
+    const isGenericLabel = FORBIDDEN_FOOTER_KEYWORDS.some(kw => {
+      if (headingLower === kw) return true;
+      const regex = new RegExp(`^${kw}\\s*\\d*$`, 'i');
+      return regex.test(headingLower);
+    });
+
+    if (
+      pageStart >= 1 && 
+      pageStart <= totalPages && 
+      heading.length >= 4 && 
+      !isGenericLabel
+    ) {
       return { heading, pageStart };
     }
   }
@@ -342,12 +379,23 @@ export function extractTOCFromText(text: string, totalPages: number): TOCEntry[]
 
   const lines = text.split(/\r?\n/);
   const candidates: { heading: string; pageStart: number; lineIndex: number }[] = [];
+  const FORBIDDEN_KEYWORDS = ["slide", "slides", "página", "pagina", "page", "footer", "rodapé"];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    if (line.toLowerCase().startsWith("página") || line.toLowerCase().startsWith("pagina")) continue;
+    const lowerLine = line.toLowerCase();
+
+    // Ignorar linhas marcadoras de página do sampler
+    if (line.startsWith("===") || line.startsWith("---")) continue;
+
+    // Ignorar linhas que iniciam com termos típicos de rodapé ou cabeçalhos repetitivos
+    const isForbiddenFooter = FORBIDDEN_KEYWORDS.some(kw => {
+      const regex = new RegExp(`^[^a-zA-Z\\u00C0-\\u00FF]*${kw}\\b`, 'i');
+      return regex.test(lowerLine);
+    });
+    if (isForbiddenFooter) continue;
 
     const parsed = parseTOCLine(line, totalPages);
     if (parsed) {
@@ -356,7 +404,13 @@ export function extractTOCFromText(text: string, totalPages: number): TOCEntry[]
         .replace(/[\s\.\-\*_]+$/, "")
         .trim();
 
-      if (/[a-zA-Z\u00C0-\u00FF]/.test(heading) && heading.length >= 3) {
+      // Validação: títulos curtos demais compostos por quase nada ou rótulo + número
+      const headingLower = heading.toLowerCase();
+      const isTooShortOrGeneric = heading.length < 3 || 
+                                  FORBIDDEN_KEYWORDS.includes(headingLower) ||
+                                  /^(slide|página|pagina|page|capítulo|capitulo|aula)\s*\d+$/i.test(headingLower);
+
+      if (/[a-zA-Z\u00C0-\u00FF]/.test(heading) && !isTooShortOrGeneric) {
         candidates.push({
           heading,
           pageStart: parsed.pageStart,
@@ -437,6 +491,7 @@ export interface DocumentStructureMap {
   documentType: "THEORY_ONLY" | "THEORY_WITH_QUESTIONS" | "QUESTIONS_ONLY" | "ANSWER_KEY_ONLY" | "UNKNOWN";
   tocDetected: boolean;
   tocConfidence: number;
+  tocRejectionReason?: string;
   sections: DocumentSection[];
 }
 
@@ -520,6 +575,67 @@ export function classifyTOCHeadingForMap(heading: string): DocumentSection["sect
   return "MAIN_THEORY";
 }
 
+export function validateTOC(tocEntries: TOCEntry[], totalPages: number): { isValid: boolean; reason: string } {
+  if (!tocEntries || tocEntries.length === 0) {
+    return { isValid: false, reason: "Nenhuma entrada de sumário extraída." };
+  }
+
+  // 1. Quantidade mínima de entradas
+  let minEntries = 2;
+  if (totalPages > 100) {
+    minEntries = 4;
+  } else if (totalPages > 50) {
+    minEntries = 3;
+  }
+  if (tocEntries.length < minEntries) {
+    return { isValid: false, reason: `Entradas de sumário (${tocEntries.length}) insuficientes para o tamanho do PDF (${totalPages} pág). Mínimo esperado: ${minEntries}.` };
+  }
+
+  // 2. Páginas dentro do intervalo do PDF
+  for (const entry of tocEntries) {
+    if (entry.pageStart < 1 || entry.pageStart > totalPages || entry.pageEnd < entry.pageStart || entry.pageEnd > totalPages) {
+      return { isValid: false, reason: `Entrada fora dos limites do PDF: "${entry.heading}" (páginas ${entry.pageStart} a ${entry.pageEnd} de um total de ${totalPages}).` };
+    }
+  }
+
+  // 3. Páginas em ordem crescente
+  for (let i = 0; i < tocEntries.length - 1; i++) {
+    if (tocEntries[i].pageStart > tocEntries[i + 1].pageStart) {
+      return { isValid: false, reason: `Entradas de sumário fora de ordem crescente: "${tocEntries[i].heading}" (${tocEntries[i].pageStart}) > "${tocEntries[i + 1].heading}" (${tocEntries[i + 1].pageStart}).` };
+    }
+  }
+
+  // 4. Títulos com conteúdo semântico real e ausência de padrões repetitivos como "Slide X"
+  const FORBIDDEN_KEYWORDS = ["slide", "slides", "página", "pagina", "page", "footer", "rodapé"];
+  let slideLikeCount = 0;
+  for (const entry of tocEntries) {
+    const headingLower = entry.heading.toLowerCase().trim();
+    if (
+      headingLower.length < 3 ||
+      FORBIDDEN_KEYWORDS.includes(headingLower) ||
+      /^(slide|página|pagina|page|capítulo|capitulo|aula)\s*\d+$/i.test(headingLower)
+    ) {
+      return { isValid: false, reason: `Título de sumário inválido ou genérico detectado: "${entry.heading}".` };
+    }
+
+    if (headingLower.includes("slide") || headingLower.includes("page") || headingLower.includes("página")) {
+      slideLikeCount++;
+    }
+  }
+
+  if (slideLikeCount / tocEntries.length > 0.5) {
+    return { isValid: false, reason: `Excesso de entradas contendo slide/page/página (${slideLikeCount}/${tocEntries.length}) indicando provável falso sumário.` };
+  }
+
+  // 5. Distância razoável ou distribuição
+  const pagesSet = new Set(tocEntries.map(e => e.pageStart));
+  if (pagesSet.size < Math.min(3, tocEntries.length)) {
+    return { isValid: false, reason: `Entradas concentradas em pouquíssimas páginas físicas (${pagesSet.size} páginas únicas para ${tocEntries.length} entradas).` };
+  }
+
+  return { isValid: true, reason: "" };
+}
+
 export function buildDocumentStructureMap(
   pageTexts: { pageNumber: number; text: string }[],
   totalPages: number,
@@ -528,9 +644,11 @@ export function buildDocumentStructureMap(
 ): DocumentStructureMap {
   console.log(`[buildDocumentStructureMap] Iniciando análise documental para ${totalPages} páginas.`);
 
-  // Passo 1: Extrair sumário programático
+  // Passo 1: Extrair sumário programático e validar quantidade mínima de entradas coerentes
   const tocEntries = extractTOCFromText(summaryContent, totalPages);
-  const tocDetected = tocEntries.length > 0;
+  
+  const tocValidation = validateTOC(tocEntries, totalPages);
+  const tocDetected = tocValidation.isValid;
   const tocConfidence = tocDetected ? 0.95 : 0.0;
 
   const initialSections: DocumentSection[] = [];
@@ -701,6 +819,7 @@ export function buildDocumentStructureMap(
     documentType,
     tocDetected,
     tocConfidence,
+    tocRejectionReason: tocValidation.reason,
     sections: processedSections
   };
 
@@ -1234,6 +1353,25 @@ export async function detectStructure(
   const tocConfidence = docStructureMap.tocConfidence;
   const sourceStrategy = tocDetected ? "TOC_BASED" : "CONTENT_BASED";
 
+  // Identificar páginas amostradas no summaryContent
+  const pageMatches = summaryContent.match(/=== Página \d+/g) || [];
+  const sampledPagesCount = pageMatches.length;
+
+  console.log(`[DiagnosticLog] totalPages: ${totalPages}`);
+  console.log(`[DiagnosticLog] sampledPagesCount: ${sampledPagesCount}`);
+  console.log(`[DiagnosticLog] sampleTextLength: ${summaryContent.length}`);
+  console.log(`[DiagnosticLog] tocEntriesFound: ${tocEntries.length}`);
+  console.log(`[DiagnosticLog] tocAccepted: ${tocDetected}`);
+  console.log(`[DiagnosticLog] tocRejectionReason: "${tocDetected ? 'N/A' : docStructureMap.tocRejectionReason || 'Falta de entradas válidas'}"`);
+
+  function logBlocksStats(blocks: DetectedBlock[]) {
+    const structureBlocksCount = blocks.length;
+    const spans = blocks.map(b => b.pageEnd - b.pageStart + 1);
+    const largestBlockPageSpan = spans.length > 0 ? Math.max(...spans) : 0;
+    console.log(`[DiagnosticLog] structureBlocksCount: ${structureBlocksCount}`);
+    console.log(`[DiagnosticLog] largestBlockPageSpan: ${largestBlockPageSpan}`);
+  }
+
   const mainTheorySections = docStructureMap.sections.filter(s => s.sectionType === "MAIN_THEORY");
   const hasMainTheory = mainTheorySections.length >= 1;
 
@@ -1518,6 +1656,7 @@ export async function detectStructure(
             let finalBlocks = tryMergeShortBlocks(rescueBlocks);
             finalBlocks = calculateEstimatedMinutes(finalBlocks);
 
+            logBlocksStats(finalBlocks);
             return {
               materialRole: role === "SUPPORT_MATERIAL" ? "SUPPORT_MATERIAL" : "MIXED_MATERIAL",
               sourceStrategy: "TOC_BASED",
@@ -1562,6 +1701,7 @@ export async function detectStructure(
               console.log(`🤖 [AI Fallback] Modelo principal falhou no mapeamento de estrutura. Fallback usado com sucesso: ${modelName}.`);
             }
 
+            logBlocksStats(finalBlocks);
             return {
               materialRole: role,
               sourceStrategy: parsedResult.sourceStrategy || sourceStrategy,
@@ -1609,6 +1749,7 @@ export async function detectStructure(
             let finalBlocks = tryMergeShortBlocks(rescueBlocks);
             finalBlocks = calculateEstimatedMinutes(finalBlocks);
 
+            logBlocksStats(finalBlocks);
             return {
               materialRole: "MIXED_MATERIAL",
               sourceStrategy: "TOC_BASED",
@@ -1880,4 +2021,62 @@ export function detectMechanicalCuttingHeuristic(blocks: DetectedBlock[]): boole
   }
 
   return false;
+}
+
+export function getStructureSampleText(
+  pages: { pageNumber: number; text: string }[],
+  totalPages: number
+): string {
+  if (totalPages <= 15) {
+    return pages.map(p => `=== Página ${p.pageNumber} ===\n${p.text || ""}`).join("\n\n").trim();
+  }
+
+  const maxLimit = 40000;
+  let snippetSize = 800;
+  let step = 15;
+  
+  function buildSample(stepSize: number, currentSnippetSize: number, firstPageLimit?: number): string {
+    let result = "";
+    for (const p of pages) {
+      const num = p.pageNumber;
+      const text = p.text || "";
+      
+      if (num <= 12) {
+        if (firstPageLimit !== undefined) {
+          const truncated = text.slice(0, firstPageLimit);
+          result += `=== Página ${num} ===\n${truncated}${text.length > firstPageLimit ? "..." : ""}\n\n`;
+        } else {
+          result += `=== Página ${num} ===\n${text}\n\n`;
+        }
+      } else {
+        if (num % stepSize === 0) {
+          const snippet = text.slice(0, currentSnippetSize);
+          result += `=== Página ${num} — amostra ===\n${snippet}${text.length > currentSnippetSize ? "..." : ""}\n\n`;
+        }
+      }
+    }
+    return result.trim();
+  }
+  
+  let sampleText = buildSample(step, snippetSize);
+  
+  if (sampleText.length > maxLimit) {
+    snippetSize = 400;
+    sampleText = buildSample(step, snippetSize);
+  }
+  
+  if (sampleText.length > maxLimit) {
+    step = 30;
+    sampleText = buildSample(step, snippetSize);
+  }
+  
+  if (sampleText.length > maxLimit) {
+    sampleText = buildSample(step, snippetSize, 2000);
+  }
+  
+  if (sampleText.length > 45000) {
+    sampleText = sampleText.slice(0, 45000) + "\n... [Amostra truncada devido ao limite de tamanho]";
+  }
+  
+  return sampleText;
 }
