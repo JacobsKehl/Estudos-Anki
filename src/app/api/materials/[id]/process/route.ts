@@ -94,6 +94,23 @@ export async function POST(
 
     if (finalPages.length === 0) throw new Error("Não foi possível extrair texto deste documento.");
 
+    let subjectId = material.subjectId;
+    if (!subjectId) {
+      let subject = await prisma.studySubject.findFirst({
+        where: { userId: mockUserId, name: "Geral" }
+      });
+      if (!subject) {
+        subject = await prisma.studySubject.create({
+          data: { name: "Geral", userId: mockUserId, priority: 1 }
+        });
+      }
+      subjectId = subject.id;
+      await prisma.studyMaterial.update({
+        where: { id },
+        data: { subjectId }
+      });
+    }
+
     // Sincroniza com o Banco
     await prisma.$transaction([
       prisma.extractedContent.deleteMany({ where: { materialId: id } }),
@@ -101,7 +118,7 @@ export async function POST(
         data: {
           materialId: id,
           userId: mockUserId,
-          subjectId: material.subjectId,
+          subjectId: subjectId as string,
           pageNumber: page.pageNumber,
           text: page.text,
           orderIndex: page.pageNumber,

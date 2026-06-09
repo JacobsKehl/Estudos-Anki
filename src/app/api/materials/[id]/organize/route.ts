@@ -179,11 +179,43 @@ export async function POST(
         const { pages } = await extractAllPages(material.sourcePath!);
         const nonEmptyPages = pages.filter(p => p.text.length > 10);
         
+        let subjectId = material.subjectId;
+        if (!subjectId) {
+          const firstBlock = await prisma.studyBlock.findFirst({
+            where: { materialId: material.id }
+          });
+          if (firstBlock) {
+            subjectId = firstBlock.subjectId;
+          }
+        }
+        if (!subjectId) {
+          const sampleText = nonEmptyPages.slice(0, 5).map(p => p.text).join("\n\n");
+          const idResult = await identifySubject(
+            sampleText.substring(0, 3000),
+            material.fileName || undefined,
+            user.preferences?.examGoal,
+            user.preferences?.focusArea
+          );
+          let subject = await prisma.studySubject.findFirst({
+            where: { userId, name: { contains: idResult.subjectName } }
+          });
+          if (!subject) {
+            subject = await prisma.studySubject.create({
+              data: { name: idResult.subjectName, userId, priority: 1 }
+            });
+          }
+          subjectId = subject.id;
+          await prisma.studyMaterial.update({
+            where: { id: material.id },
+            data: { subjectId }
+          });
+        }
+
         await prisma.extractedContent.deleteMany({ where: { materialId: material.id } });
         
         const contentRecords = nonEmptyPages.map((p, idx) => ({
           userId,
-          subjectId: material.subjectId || "",
+          subjectId: subjectId as string,
           materialId: material.id,
           pageNumber: p.pageNumber,
           text: p.text,
@@ -352,18 +384,6 @@ export async function POST(
           error: "Não foi possível extrair texto deste PDF. Ele pode ser uma imagem escaneada ou estar protegido."
         }, { status: 400 });
       }
-
-      // Salvar as páginas extraídas no banco de dados para evitar re-processamento no futuro
-      const contentRecords = nonEmptyPages.map((p, idx) => ({
-        userId,
-        subjectId: "", // Será atualizado após a identificação da matéria
-        materialId: material.id,
-        pageNumber: p.pageNumber,
-        text: p.text,
-        orderIndex: idx,
-        estimatedStudyMinutes: 0, 
-      }));
-      await prisma.extractedContent.createMany({ data: contentRecords });
     }
 
     // 3. Identificar matéria
@@ -397,6 +417,20 @@ export async function POST(
     }
 
     subjectId = subject.id;
+
+    // Se as páginas foram extraídas do zero, salve-as agora usando o subjectId correto
+    if (existingExtracted.length === 0) {
+      const contentRecords = nonEmptyPages.map((p, idx) => ({
+        userId,
+        subjectId: subjectId as string,
+        materialId: material.id,
+        pageNumber: p.pageNumber,
+        text: p.text,
+        orderIndex: idx,
+        estimatedStudyMinutes: 0, 
+      }));
+      await prisma.extractedContent.createMany({ data: contentRecords });
+    }
     
     // Atualiza o material com a matéria identificada
     await prisma.studyMaterial.update({
