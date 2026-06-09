@@ -95,7 +95,17 @@ export async function POST(
     if (finalPages.length === 0) throw new Error("Não foi possível extrair texto deste documento.");
 
     let subjectId = material.subjectId;
-    if (!subjectId) {
+    let subjectExists = false;
+    if (subjectId) {
+      const subject = await prisma.studySubject.findUnique({
+        where: { id: subjectId }
+      });
+      if (subject) {
+        subjectExists = true;
+      }
+    }
+
+    if (!subjectId || !subjectExists) {
       let subject = await prisma.studySubject.findFirst({
         where: { userId: mockUserId, name: "Geral" }
       });

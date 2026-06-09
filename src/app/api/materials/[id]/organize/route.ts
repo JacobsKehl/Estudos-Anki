@@ -318,23 +318,6 @@ export async function POST(
       }
     });
 
-    // Se a matéria ficou sem nenhum outro material associado, removemos ela também para evitar órfãs
-    if (existingSubjectId) {
-      const otherMaterialsCount = await prisma.studyMaterial.count({
-        where: { subjectId: existingSubjectId, id: { not: material.id } }
-      });
-      if (otherMaterialsCount === 0) {
-        try {
-          await prisma.studyScheduleItem.deleteMany({ where: { subjectId: existingSubjectId } });
-          await prisma.studySchedule.deleteMany({ where: { studySubjectId: existingSubjectId } });
-          await prisma.studySubject.delete({ where: { id: existingSubjectId } });
-          console.log(`[Reorganize] Matéria órfã ${existingSubjectId} removida com sucesso.`);
-        } catch (subErr) {
-          console.error("[Reorganize] Erro ao deletar matéria órfã:", subErr);
-        }
-      }
-    }
-
     // 2. Extrair ou reutilizar as páginas extraídas (otimização extrema contra timeouts)
     let nonEmptyPages: PageContent[] = [];
     let numPages = material.totalPages || 0;
