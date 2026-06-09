@@ -333,198 +333,214 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
 
   log(`[Organize] Blocos processados/detectados: ${detectedBlocks.length}. Material Role: ${materialRole}`);
 
-  if (materialRole === "SUPPORT_MATERIAL") {
-    // Para material de apoio puro, não criamos StudyBlock principais.
-    // Identificamos os tópicos suportados e criamos StudyBlockSupport se o bloco teórico correspondente já existir.
-    for (const blockDef of detectedBlocks) {
-      if (!blockDef.officialTopicId) continue;
-
-      const existingBlock = await prisma.studyBlock.findFirst({
-        where: { userId, subjectId: subjectId as string, officialTopicId: blockDef.officialTopicId }
+  await prisma.$transaction(async (tx) => {
+    // 1. Limpeza e reset se for force ou reorganização
+    if (isReorganizing) {
+      log(`[Reorganize Tx] Limpando dados antigos para ${material.fileName} de forma transacional.`);
+      await tx.flashcard.deleteMany({
+        where: { materialId: material.id }
       });
-
-      if (existingBlock) {
-        log(`Vinculando apoio ao bloco principal encontrado: ${existingBlock.title}`);
-        await prisma.studyBlockSupport.create({
-          data: {
-            studyBlockId: existingBlock.id,
-            materialId: material.id,
-            pageStart: blockDef.pageStart,
-            pageEnd: blockDef.pageEnd,
-            supportType: blockDef.supportType || "QUESTIONS",
-            confidence: blockDef.confidence || 0.8
-          }
-        });
-      } else {
-        // Bloco ainda não existe, marca o material para vincular no futuro
-        log(`Bloco principal não encontrado para o tópico ${blockDef.officialTopicId}. Deixando pendente.`);
-        await prisma.studyMaterial.update({
-          where: { id: material.id },
-          data: { supportForTopicId: blockDef.officialTopicId }
-        });
-        // Se houver múltiplos tópicos em um só material de apoio, salvamos a pendência do primeiro.
-        break; 
-      }
+      await tx.studyBlock.deleteMany({
+        where: { materialId: material.id }
+      });
+      await tx.studyScheduleItem.deleteMany({
+        where: { materialId: material.id }
+      });
     }
-  } else {
-    // MAIN_MATERIAL ou MIXED_MATERIAL
-    const mainBlocksCreated: Record<string, string> = {}; // Mapeia officialTopicId -> studyBlock.id criado nesta leva
-    
-    // Primeiro passo: criar todos os blocos principais teóricos (MAIN_BLOCK)
-    for (let i = 0; i < detectedBlocks.length; i++) {
-      const blockDef = detectedBlocks[i];
-      if (blockDef.type === "SUPPORT_BLOCK") continue; // Processados no segundo passo
 
-      const pageStart = blockDef.pageStart || 1;
-      const pageEnd = blockDef.pageEnd || pageStart;
+    // 2. Criar novos blocos
+    if (materialRole === "SUPPORT_MATERIAL") {
+      // Para material de apoio puro, não criamos StudyBlock principais.
+      // Identificamos os tópicos suportados e criamos StudyBlockSupport se o bloco teórico correspondente já existir.
+      for (const blockDef of detectedBlocks) {
+        if (!blockDef.officialTopicId) continue;
 
-      // Criar o bloco
-      const studyBlock = await prisma.studyBlock.create({
-        data: {
-          userId,
-          subjectId: subjectId as string,
-          materialId: material.id,
-          title: blockDef.title || `Parte ${i + 1}`,
-          description: blockDef.description || "",
-          pageStart,
-          pageEnd,
-          orderIndex: i,
-          estimatedStudyMinutes: blockDef.estimatedStudyMinutes || 60,
-          createdBy: blockDef.createdBy || "AI",
-          confidence: blockDef.confidence ?? 1.0,
-          sourceHeading: blockDef.sourceHeading,
-          officialTopicId: blockDef.officialTopicId,
-          officialTopicName: blockDef.officialTopicName,
-          topicCode: blockDef.topicCode,
-          status: "NOT_STARTED",
-          nextActionType: "THEORY",
-        }
-      });
-
-      result.blocks++;
-      if (blockDef.officialTopicId) {
-        mainBlocksCreated[blockDef.officialTopicId] = studyBlock.id;
-      }
-
-      // Vínculo retroativo: busca StudyMaterials (SUPPORT) pendentes para este tópico
-      if (blockDef.officialTopicId) {
-        const pendingSupports = await prisma.studyMaterial.findMany({
-          where: {
-            userId,
-            subjectId: subjectId as string,
-            materialRole: "SUPPORT_MATERIAL",
-            supportForTopicId: blockDef.officialTopicId
-          }
+        const existingBlock = await tx.studyBlock.findFirst({
+          where: { userId, subjectId: subjectId as string, officialTopicId: blockDef.officialTopicId }
         });
 
-        for (const ps of pendingSupports) {
-          log(`[Relink Support] Vinculando material de apoio pendente (${ps.fileName}) ao novo bloco ${studyBlock.title}`);
-          await prisma.studyBlockSupport.create({
+        if (existingBlock) {
+          log(`Vinculando apoio ao bloco principal encontrado: ${existingBlock.title}`);
+          await tx.studyBlockSupport.create({
             data: {
-              studyBlockId: studyBlock.id,
-              materialId: ps.id,
-              supportType: "QUESTIONS", // Default para questões pendentes
-              confidence: 1.0
+              studyBlockId: existingBlock.id,
+              materialId: material.id,
+              pageStart: blockDef.pageStart,
+              pageEnd: blockDef.pageEnd,
+              supportType: blockDef.supportType || "QUESTIONS",
+              confidence: blockDef.confidence || 0.8
             }
           });
-          // Limpar a pendência para evitar links futuros desnecessários
-          await prisma.studyMaterial.update({
-            where: { id: ps.id },
-            data: { supportForTopicId: null }
+        } else {
+          // Bloco ainda não existe, marca o material para vincular no futuro
+          log(`Bloco principal não encontrado para o tópico ${blockDef.officialTopicId}. Deixando pendente.`);
+          await tx.studyMaterial.update({
+            where: { id: material.id },
+            data: { supportForTopicId: blockDef.officialTopicId }
           });
+          // Se houver múltiplos tópicos em um só material de apoio, salvamos a pendência do primeiro.
+          break; 
         }
       }
+    } else {
+      // MAIN_MATERIAL ou MIXED_MATERIAL
+      const mainBlocksCreated: Record<string, string> = {}; // Mapeia officialTopicId -> studyBlock.id criado nesta leva
+      
+      // Primeiro passo: criar todos os blocos principais teóricos (MAIN_BLOCK)
+      for (let i = 0; i < detectedBlocks.length; i++) {
+        const blockDef = detectedBlocks[i];
+        if (blockDef.type === "SUPPORT_BLOCK") continue; // Processados no segundo passo
 
-      // ── REORGANIZAÇÃO: Re-vincular cards órfãos ──────────────────────────
-      if (isReorganizing) {
-        log(`[Relink] Buscando cards para o novo bloco: ${studyBlock.title} (p.${pageStart}-${pageEnd})`);
-        const relinkResult = await prisma.flashcard.updateMany({
-          where: {
-            materialId: material.id,
-            studyBlockId: null,
-            sourcePageStart: { gte: pageStart, lte: pageEnd }
-          },
+        const pageStart = blockDef.pageStart || 1;
+        const pageEnd = blockDef.pageEnd || pageStart;
+
+        // Criar o bloco
+        const studyBlock = await tx.studyBlock.create({
           data: {
-            studyBlockId: studyBlock.id
-          }
-        });
-        if (relinkResult.count > 0) {
-          log(`[Relink] ${relinkResult.count} cards re-vinculados a este bloco.`);
-          result.flashcards += relinkResult.count;
-        }
-      }
-    }
-
-    // Segundo passo: criar blocos de apoio (SUPPORT_BLOCK) contidos no próprio PDF e vinculá-los aos blocos teóricos correspondentes
-    for (let i = 0; i < detectedBlocks.length; i++) {
-      const blockDef = detectedBlocks[i];
-      if (blockDef.type !== "SUPPORT_BLOCK") continue;
-
-      const pageStart = blockDef.pageStart || 1;
-      const pageEnd = blockDef.pageEnd || pageStart;
-
-      // Tenta achar bloco teórico criado na mesma leva
-      let targetBlockId: string | null = null;
-      if (blockDef.officialTopicId && mainBlocksCreated[blockDef.officialTopicId]) {
-        targetBlockId = mainBlocksCreated[blockDef.officialTopicId];
-      } else {
-        // Tenta buscar no banco um bloco teórico já existente para o mesmo tópico
-        const existingMainBlock = await prisma.studyBlock.findFirst({
-          where: {
             userId,
             subjectId: subjectId as string,
-            officialTopicId: blockDef.officialTopicId || undefined
+            materialId: material.id,
+            title: blockDef.title || `Parte ${i + 1}`,
+            description: blockDef.description || "",
+            pageStart,
+            pageEnd,
+            orderIndex: i,
+            estimatedStudyMinutes: blockDef.estimatedStudyMinutes || 60,
+            createdBy: blockDef.createdBy || "AI",
+            confidence: blockDef.confidence ?? 1.0,
+            sourceHeading: blockDef.sourceHeading,
+            officialTopicId: blockDef.officialTopicId,
+            officialTopicName: blockDef.officialTopicName,
+            topicCode: blockDef.topicCode,
+            status: "NOT_STARTED",
+            nextActionType: "THEORY",
           }
         });
-        if (existingMainBlock) {
-          targetBlockId = existingMainBlock.id;
+
+        result.blocks++;
+        if (blockDef.officialTopicId) {
+          mainBlocksCreated[blockDef.officialTopicId] = studyBlock.id;
+        }
+
+        // Vínculo retroativo: busca StudyMaterials (SUPPORT) pendentes para este tópico
+        if (blockDef.officialTopicId) {
+          const pendingSupports = await tx.studyMaterial.findMany({
+            where: {
+              userId,
+              subjectId: subjectId as string,
+              materialRole: "SUPPORT_MATERIAL",
+              supportForTopicId: blockDef.officialTopicId
+            }
+          });
+
+          for (const ps of pendingSupports) {
+            log(`[Relink Support] Vinculando material de apoio pendente (${ps.fileName}) ao novo bloco ${studyBlock.title}`);
+            await tx.studyBlockSupport.create({
+              data: {
+                studyBlockId: studyBlock.id,
+                materialId: ps.id,
+                supportType: "QUESTIONS", // Default para questões pendentes
+                confidence: 1.0
+              }
+            });
+            // Limpar a pendência para evitar links futuros desnecessários
+            await tx.studyMaterial.update({
+              where: { id: ps.id },
+              data: { supportForTopicId: null }
+            });
+          }
+        }
+
+        // ── REORGANIZAÇÃO: Re-vincular cards órfãos ──────────────────────────
+        if (isReorganizing) {
+          log(`[Relink] Buscando cards para o novo bloco: ${studyBlock.title} (p.${pageStart}-${pageEnd})`);
+          const relinkResult = await tx.flashcard.updateMany({
+            where: {
+              materialId: material.id,
+              studyBlockId: null,
+              sourcePageStart: { gte: pageStart, lte: pageEnd }
+            },
+            data: {
+              studyBlockId: studyBlock.id
+            }
+          });
+          if (relinkResult.count > 0) {
+            log(`[Relink] ${relinkResult.count} cards re-vinculados a este bloco.`);
+            result.flashcards += relinkResult.count;
+          }
         }
       }
 
-      if (targetBlockId) {
-        log(`[Mixed Support] Criando apoio p.${pageStart}-${pageEnd} do tipo ${blockDef.supportType || "OTHER"} no bloco ${targetBlockId}`);
-        await prisma.studyBlockSupport.create({
-          data: {
-            studyBlockId: targetBlockId,
-            materialId: material.id,
-            pageStart,
-            pageEnd,
-            supportType: blockDef.supportType || "OTHER",
-            confidence: blockDef.confidence || 0.8
+      // Segundo passo: criar blocos de apoio (SUPPORT_BLOCK) contidos no próprio PDF e vinculá-los aos blocos teóricos correspondentes
+      for (let i = 0; i < detectedBlocks.length; i++) {
+        const blockDef = detectedBlocks[i];
+        if (blockDef.type !== "SUPPORT_BLOCK") continue;
+
+        const pageStart = blockDef.pageStart || 1;
+        const pageEnd = blockDef.pageEnd || pageStart;
+
+        // Tenta achar bloco teórico criado na mesma leva
+        let targetBlockId: string | null = null;
+        if (blockDef.officialTopicId && mainBlocksCreated[blockDef.officialTopicId]) {
+          targetBlockId = mainBlocksCreated[blockDef.officialTopicId];
+        } else {
+          // Tenta buscar no banco um bloco teórico já existente para o mesmo tópico
+          const existingMainBlock = await tx.studyBlock.findFirst({
+            where: {
+              userId,
+              subjectId: subjectId as string,
+              officialTopicId: blockDef.officialTopicId || undefined
+            }
+          });
+          if (existingMainBlock) {
+            targetBlockId = existingMainBlock.id;
           }
-        });
-      } else {
-        log(`[Mixed Support] Bloco teórico principal não encontrado para o apoio do tópico ${blockDef.officialTopicId || "GERAL"}.`);
-        // Fallback: Vincula ao primeiro bloco teórico do assunto para não perder o apoio
-        const firstBlockOfSubject = await prisma.studyBlock.findFirst({
-          where: { userId, subjectId: subjectId as string }
-        });
-        if (firstBlockOfSubject) {
-          log(`[Mixed Support Fallback] Vinculando ao primeiro bloco do assunto: ${firstBlockOfSubject.title}`);
-          await prisma.studyBlockSupport.create({
+        }
+
+        if (targetBlockId) {
+          log(`[Mixed Support] Criando apoio p.${pageStart}-${pageEnd} do tipo ${blockDef.supportType || "OTHER"} no bloco ${targetBlockId}`);
+          await tx.studyBlockSupport.create({
             data: {
-              studyBlockId: firstBlockOfSubject.id,
+              studyBlockId: targetBlockId,
               materialId: material.id,
               pageStart,
               pageEnd,
               supportType: blockDef.supportType || "OTHER",
-              confidence: 0.5
+              confidence: blockDef.confidence || 0.8
             }
           });
+        } else {
+          log(`[Mixed Support] Bloco teórico principal não encontrado para o apoio do tópico ${blockDef.officialTopicId || "GERAL"}.`);
+          // Fallback: Vincula ao primeiro bloco teórico do assunto para não perder o apoio
+          const firstBlockOfSubject = await tx.studyBlock.findFirst({
+            where: { userId, subjectId: subjectId as string }
+          });
+          if (firstBlockOfSubject) {
+            log(`[Mixed Support Fallback] Vinculando ao primeiro bloco do assunto: ${firstBlockOfSubject.title}`);
+            await tx.studyBlockSupport.create({
+              data: {
+                studyBlockId: firstBlockOfSubject.id,
+                materialId: material.id,
+                pageStart,
+                pageEnd,
+                supportType: blockDef.supportType || "OTHER",
+                confidence: 0.5
+              }
+            });
+          }
         }
       }
     }
-  }
 
-  // ── Etapa 6: Finalizar ───────────────────────────────────────────────────
-
-  await prisma.studyMaterial.update({
-    where: { id: material.id },
-    data: {
-      organizationStatus: "ORGANIZED",
-      detectedStructure: JSON.stringify(structResult),
-      totalPages: numPages
-    }
+    // 3. Finalizar status do material
+    await tx.studyMaterial.update({
+      where: { id: material.id },
+      data: {
+        organizationStatus: "ORGANIZED",
+        detectedStructure: JSON.stringify(structResult),
+        totalPages: numPages
+      }
+    });
   });
 
   log(`✅ Concluído: ${result.blocks} blocos.`);
@@ -686,15 +702,7 @@ export async function POST(req: NextRequest) {
     // 3. Processar cada material
     for (const material of materialsToProcess) {
       try {
-        if (force) {
-          console.log(`[REORGANIZE] Apagando cards antigos e limpando blocos para: ${material.fileName}`);
-          
-          await prisma.flashcard.deleteMany({
-            where: { materialId: material.id }
-          });
 
-          await prisma.studyBlock.deleteMany({ where: { materialId: material.id } });
-        }
 
         const result = await processMaterial(material, userId, force);
         summary.success++;

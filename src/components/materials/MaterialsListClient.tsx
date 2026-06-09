@@ -635,6 +635,9 @@ export function MaterialsListClient({ initialMaterials }: MaterialsListClientPro
 function getFriendlyErrorMessage(err: string | null | undefined): string {
   if (!err) return "Erro desconhecido ao processar arquivo.";
   const lower = err.toLowerCase();
+  if (lower.includes("ai_unavailable") || lower.includes("indisponível") || lower.includes("unavailable")) {
+    return "O serviço de IA está temporariamente indisponível ou com limite de uso atingido. Tente novamente em alguns minutos.";
+  }
   if (lower.includes("validation_failed") || lower.includes("validação pedagógica") || lower.includes("pedagogical")) {
     return "A divisão rejeitou blocos muito curtos, excesso de blocos de apoio sem teoria principal, ou títulos vazios.";
   }

@@ -23,6 +23,7 @@ type MaterialItem = {
   hasExistingBlocks: boolean;
   blocksCount: number;
   flashcardsCount: number;
+  detectedStructure?: string | null;
 };
 
 export const dynamic = "force-dynamic";
@@ -57,7 +58,8 @@ export default async function MaterialsPage() {
       uploadedAt: m.createdAt.toISOString(),
       hasExistingBlocks: m._count.studyBlocks > 0,
       blocksCount: m._count.studyBlocks,
-      flashcardsCount: m._count.flashcards
+      flashcardsCount: m._count.flashcards,
+      detectedStructure: m.detectedStructure
     }));
 
   } catch (error) {

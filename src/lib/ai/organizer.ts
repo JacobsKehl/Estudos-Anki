@@ -148,6 +148,8 @@ export interface DetectedStructureResult {
   sourceStrategy?: string;
   tocDetected?: boolean;
   tocConfidence?: number;
+  fallbackUsed?: boolean;
+  fallbackReason?: string;
 }
 
 const FORBIDDEN_GENERIC_PATTERNS = [
@@ -1438,8 +1440,9 @@ export async function detectStructure(
   
   let lastError: any = null;
 
-  for (const modelName of GEMINI_MODEL_CANDIDATES) {
-    console.log(`[AI Structure] Tentando mapear estrutura usando o modelo: ${modelName}`);
+  try {
+    for (const modelName of GEMINI_MODEL_CANDIDATES) {
+      console.log(`[AI Structure] Tentando mapear estrutura usando o modelo: ${modelName}`);
     try {
       const model = genAI.getGenerativeModel({ 
         model: modelName,
@@ -1775,7 +1778,12 @@ export async function detectStructure(
           accumulatedErrors = errors;
           attempts++;
           console.warn(`[AI] Tentativa ${attempts} falhou nos critérios de qualidade: ${errors.join(" ")}`);
-          currentPrompt = initialPrompt + `\n\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros de qualidade: ${errors.join(" ")}\nPOR FAVOR, refaça o mapeamento de blocos respeitando rigorosamente a explicação teórica principal. Evite títulos genéricos como 'Parte X'.`;
+          let retryMessage = `\n\nREJEITADO: A divisão anterior foi rejeitada pelos seguintes erros de qualidade:\n${errors.map(e => `- ${e}`).join("\n")}`;
+          if (errors.some(e => e.includes("excede o máximo") || e.includes("bloco gigante") || e.includes("50 páginas"))) {
+            retryMessage += `\n\nATENÇÃO CRÍTICA: Você gerou um ou mais blocos gigantes contendo mais de 50 páginas. Isso é inaceitável. Subdivida esse bloco gigante em múltiplos blocos temáticos menores (ex: de no máximo 20 a 30 páginas cada) baseados em subseções ou tópicos reais do sumário.`;
+          }
+          retryMessage += `\n\nPOR FAVOR, refaça o mapeamento de blocos respeitando rigorosamente a explicação teórica principal. Evite títulos genéricos como 'Parte X'.`;
+          currentPrompt = initialPrompt + retryMessage;
           
         } catch (error: any) {
           console.error("Erro ao detectar estrutura:", error);
@@ -1870,8 +1878,45 @@ export async function detectStructure(
       }
     }
   }
-
   throw new Error(`AI_UNAVAILABLE: Todos os modelos do Gemini falharam temporariamente com erros de indisponibilidade. Último erro: ${lastError?.message}`);
+} catch (error: any) {
+    if (totalPages > 40) {
+      console.log(`[Emergency Fallback] Interceptado erro em detectStructure: "${error.message}". Acionando divisão sequencial de emergência.`);
+      const fallbackBlocks: DetectedBlock[] = [];
+      const PAGE_LIMIT = 25;
+      const numBlocks = Math.ceil(totalPages / PAGE_LIMIT);
+      for (let i = 0; i < numBlocks; i++) {
+        const pageStart = i * PAGE_LIMIT + 1;
+        const pageEnd = Math.min((i + 1) * PAGE_LIMIT, totalPages);
+        fallbackBlocks.push({
+          type: "MAIN_BLOCK",
+          title: `Estudo Sequencial — Páginas ${pageStart}–${pageEnd}`,
+          description: `Divisão sequencial provisória para permitir o estudo das páginas ${pageStart} a ${pageEnd} do material.`,
+          pageStart,
+          pageEnd,
+          sourceHeading: `Páginas ${pageStart}–${pageEnd}`,
+          estimatedStudyMinutes: (pageEnd - pageStart + 1) * 3,
+          confidence: 0.1,
+          createdBy: "EMERGENCY_SEQUENTIAL_FALLBACK",
+          officialTopicId: null,
+          officialTopicName: "Tópico não identificado",
+          topicCode: "GERAL",
+          justification: `Fallback sequencial de emergência ativado por falha na estruturação automática por IA. Motivo original da falha: ${error.message}`
+        });
+      }
+      return {
+        materialRole: "MIXED_MATERIAL",
+        sourceStrategy: "EMERGENCY_SEQUENTIAL_FALLBACK",
+        tocDetected: false,
+        tocConfidence: 0,
+        blocks: fallbackBlocks,
+        aiModelUsed: "None-EmergencyFallback",
+        fallbackUsed: true,
+        fallbackReason: error.message || "AI_STRUCTURE_VALIDATION_FAILED"
+      };
+    }
+    throw error;
+  }
 }
 
 function tryMergeShortBlocks(blocks: DetectedBlock[]): DetectedBlock[] {

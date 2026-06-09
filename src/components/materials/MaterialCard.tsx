@@ -32,6 +32,7 @@ interface MaterialCardProps {
     uploadedAt: string;
     hasExistingBlocks?: boolean;
     blocksCount?: number;
+    detectedStructure?: string | null;
   };
   isSelected?: boolean;
   onSelect?: (id: string) => void;
@@ -170,6 +171,14 @@ export function MaterialCard({
 
     switch (material.organizationStatus) {
       case "ORGANIZED":
+        const isFallback = material.detectedStructure?.includes("EMERGENCY_SEQUENTIAL_FALLBACK");
+        if (isFallback) {
+          return {
+            label: "Divisão Sequencial",
+            variant: "outline" as const,
+            subLabel: "Divisão provisória (sem sumário)"
+          };
+        }
         const isGeneric = material.blocksCount === 1;
         return { 
           label: isGeneric ? "Revisar Divisão" : "Organizado", 
@@ -373,6 +382,21 @@ export function MaterialCard({
                     </div>
                   );
                 })()}
+                {material.organizationStatus === "ORGANIZED" && material.detectedStructure?.includes("EMERGENCY_SEQUENTIAL_FALLBACK") && (
+                  <div className="mt-3 p-3 rounded-2xl flex flex-col gap-1.5 text-[10px] font-medium animate-in fade-in slide-in-from-top-1 bg-amber-500/[0.04] border border-amber-500/20 text-amber-700">
+                    <div className="flex gap-2 items-start">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                      <div className="space-y-0.5">
+                        <span className="block font-black text-foreground">
+                          Divisão Sequencial de Emergência
+                        </span>
+                        <p className="leading-relaxed">
+                          Não conseguimos identificar uma divisão temática confiável para este PDF. Criamos uma divisão sequencial provisória para permitir o estudo. Você pode reorganizar novamente mais tarde.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {false && material.processingError && (
                   <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg flex gap-2 text-[10px] text-red-600 font-medium animate-in fade-in slide-in-from-top-1">
                     <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
@@ -723,6 +747,9 @@ export function MaterialCard({
 function getFriendlyErrorMessage(err: string | null | undefined): string {
   if (!err) return "Erro desconhecido ao processar arquivo.";
   const lower = err.toLowerCase();
+  if (lower.includes("ai_unavailable") || lower.includes("indisponível") || lower.includes("unavailable")) {
+    return "O serviço de IA está temporariamente indisponível ou com limite de uso atingido. Tente novamente em alguns minutos.";
+  }
   if (lower.includes("validation_failed") || lower.includes("validação pedagógica") || lower.includes("pedagogical")) {
     return "A divisão rejeitou blocos muito curtos, excesso de blocos de apoio sem teoria principal, ou títulos vazios.";
   }
