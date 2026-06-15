@@ -621,6 +621,34 @@ export async function reorganizeOverdueSchedule(
   const todayRange = getTodayRangeSP(now);
   const todayStart = todayRange.start; // 00:00 SP time in UTC
   const todayStr = todayRange.dateString; // "YYYY-MM-DD"
+
+  // Buscar matérias EXCLUDED do usuário para purga
+  const excludedSubjects = await prisma.studySubject.findMany({
+    where: { userId, studyPriority: "EXCLUDED" },
+    select: { id: true }
+  });
+  const excludedSubjectIds = excludedSubjects.map(s => s.id);
+
+  let excludedItemsPurgedCount = 0;
+  if (excludedSubjectIds.length > 0) {
+    excludedItemsPurgedCount = await (prisma as any).studyScheduleItem.count({
+      where: {
+        userId,
+        subjectId: { in: excludedSubjectIds },
+        status: { in: ["PENDING", "IN_PROGRESS"] }
+      }
+    });
+
+    if (!dryRun) {
+      await (prisma as any).studyScheduleItem.deleteMany({
+        where: {
+          userId,
+          subjectId: { in: excludedSubjectIds },
+          status: { in: ["PENDING", "IN_PROGRESS"] }
+        }
+      });
+    }
+  }
   
   // 1. Encontrar o cronograma ativo atual
   const activeSchedule = await prisma.studySchedule.findFirst({
@@ -661,11 +689,15 @@ export async function reorganizeOverdueSchedule(
       reviewOnlyDatesCount: 0,
       mergedReviewBlocksCount: 0,
       changes: [],
-      lastDateAfterReorganization: todayStr
+      lastDateAfterReorganization: todayStr,
+      excludedItemsPurgedCount
     };
   }
 
-  const allItems = activeSchedule.items;
+  // Se dryRun for true, ignoramos itens pendentes/em andamento de matérias EXCLUDED em memória
+  const allItems = activeSchedule.items.filter(
+    (item: any) => !(excludedSubjectIds.includes(item.subjectId) && (item.status === "PENDING" || item.status === "IN_PROGRESS"))
+  );
 
   // Filtros de contabilidade geral para o relatório
   const completedItemsPreservedCount = allItems.filter(item => item.status === "COMPLETED").length;
@@ -730,7 +762,8 @@ export async function reorganizeOverdueSchedule(
       reviewOnlyDatesCount: 0,
       mergedReviewBlocksCount: 0,
       changes: [],
-      lastDateAfterReorganization: maxDateStr
+      lastDateAfterReorganization: maxDateStr,
+      excludedItemsPurgedCount
     };
   }
 
@@ -934,7 +967,8 @@ export async function reorganizeOverdueSchedule(
     reviewOnlyDatesCount: reviewOnlyDates.length,
     mergedReviewBlocksCount,
     changes: changesReport,
-    lastDateAfterReorganization: lastDateStr
+    lastDateAfterReorganization: lastDateStr,
+    excludedItemsPurgedCount
   };
 }
 

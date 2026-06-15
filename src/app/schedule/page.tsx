@@ -205,7 +205,10 @@ export default async function SchedulePage() {
     (item: any) => item.actionType !== "REVIEW_FLASHCARDS" && item.actionType !== "PRACTICE_CARDS"
   );
 
-  const activeItems = allItems.filter((item: any) => item.status !== "COMPLETED");
+  // Proteção defensiva: não exibir tarefas pendentes/em andamento de matérias excluídas (EXCLUDED)
+  const activeItems = allItems.filter(
+    (item: any) => item.status !== "COMPLETED" && item.subject?.studyPriority !== "EXCLUDED"
+  );
   const completedItems = allItems.filter((item: any) => item.status === "COMPLETED");
 
   const groupedActive = activeItems.reduce((acc: any, item: any) => {

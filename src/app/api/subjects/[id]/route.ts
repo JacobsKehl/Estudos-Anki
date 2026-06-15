@@ -33,13 +33,27 @@ export async function PATCH(
       }
     }
 
-    // 3. Atualizar de forma segura garantindo id e userId na cláusula where
-    const subject = await prisma.studySubject.update({
-      where: { 
-        id,
-        userId // Filtrar estritamente pelo id e userId do usuário logado
-      },
-      data: { name, description, priority, examWeight, studyPriority }
+    // 3. Atualizar de forma segura dentro de uma transação Prisma, garantindo remoção de pendências se marcado como EXCLUDED
+    const subject = await prisma.$transaction(async (tx) => {
+      const updatedSubject = await tx.studySubject.update({
+        where: { 
+          id,
+          userId // Filtrar estritamente pelo id e userId do usuário logado
+        },
+        data: { name, description, priority, examWeight, studyPriority }
+      });
+
+      if (studyPriority === "EXCLUDED") {
+        await tx.studyScheduleItem.deleteMany({
+          where: {
+            userId,
+            subjectId: id,
+            status: { in: ["PENDING", "IN_PROGRESS"] }
+          }
+        });
+      }
+
+      return updatedSubject;
     });
 
     return NextResponse.json(subject);
