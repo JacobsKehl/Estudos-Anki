@@ -17,7 +17,10 @@ import {
   Sparkles,
   Trophy,
   Calendar,
-  Info
+  Info,
+  Zap,
+  RefreshCw,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +66,17 @@ const getSchemaSupportDescription = (supportType: string) => {
   }
 };
 
+interface ContinueSuggestion {
+  type: "OVERDUE" | "SAME_SUBJECT" | "TODAY_CYCLE" | "NEXT_ELIGIBLE" | "SECOND_PASS";
+  scheduleItemId?: string;
+  studyBlockId?: string;
+  subjectName: string;
+  blockTitle: string;
+  estimatedMinutes?: number;
+  reason: string;
+  scheduledDate?: string;
+}
+
 interface BlockStudyViewProps {
   block: any;
   content: any[];
@@ -74,6 +88,7 @@ interface BlockStudyViewProps {
   returnTo: string | null;
   from: string | null;
   scheduleItemId?: string | null;
+  secondPass?: boolean;
 }
 
 // Helper functions moved outside of render to prevent ESLint static-components warnings and fix missing dependency warnings
@@ -99,7 +114,7 @@ const getReturnIcon = (path: string) => {
   return ArrowLeft;
 };
 
-export function BlockStudyView({ block, content, stats, returnTo, from, scheduleItemId }: BlockStudyViewProps) {
+export function BlockStudyView({ block, content, stats, returnTo, from, scheduleItemId, secondPass = false }: BlockStudyViewProps) {
   const router = useRouter();
 
   // Get return target with validation (no external URL allowed to avoid open redirect)
@@ -131,6 +146,7 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
   
   // Step State Flow: "reading" -> "curating" -> "summary"
   const [step, setStep] = React.useState<"reading" | "curating" | "summary">(() => {
+    if (secondPass) return "reading"; // Second pass always starts in reading mode
     if (block.status === "COMPLETED") {
       return "summary";
     }
@@ -140,6 +156,7 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
     }
     return "reading";
   });
+  const [isSecondPass] = React.useState(secondPass);
 
   const [curatorCards, setCuratorCards] = React.useState<any[]>(block.flashcards || []);
   const [timeSpent, setTimeSpent] = React.useState(0);
@@ -149,6 +166,8 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
   const [startedAt, setStartedAt] = React.useState<Date | null>(null);
   const [isIdleAlertOpen, setIsIdleAlertOpen] = React.useState(false);
   const lastActivityRef = React.useRef(0);
+  const [suggestions, setSuggestions] = React.useState<ContinueSuggestion[]>([]);
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = React.useState(false);
 
   // Initialize lastActivityRef on mount (avoids impure Date.now() call during render)
   React.useEffect(() => {
@@ -253,6 +272,75 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
       return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Fetch continuation suggestions when entering summary step
+  React.useEffect(() => {
+    if (step !== "summary" || isSecondPass) return;
+    
+    const fetchSuggestions = async () => {
+      setIsFetchingSuggestions(true);
+      try {
+        const res = await fetch(`/api/schedule/continue-suggestions?completedBlockId=${block.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestions(data.suggestions || []);
+        }
+      } catch (e) {
+        console.error("Erro ao buscar sugestões de continuação:", e);
+      } finally {
+        setIsFetchingSuggestions(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [step, block.id, isSecondPass]);
+
+  // Second pass completion handler
+  const handleCompleteSecondPass = async () => {
+    setIsUpdatingStatus(true);
+    setIsTimerRunning(false);
+    const toastId = toast.loading("Registrando segunda leitura...");
+    
+    try {
+      const res = await fetch("/api/study-session-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studyBlockId: block.id,
+          actionType: "SECOND_PASS",
+          startedAt: startedAt?.toISOString() || null,
+          completedAt: new Date().toISOString(),
+          actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60)),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao registrar segunda leitura");
+      }
+
+      toast.success("Segunda leitura registrada com sucesso!", { id: toastId });
+      router.push("/");
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Erro ao registrar segunda leitura.", { id: toastId });
+      setIsTimerRunning(true);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Helper to get suggestion icon and style
+  const getSuggestionDisplay = (type: string) => {
+    switch (type) {
+      case "OVERDUE": return { icon: AlertCircle, color: "text-red-500", bg: "bg-red-50 border-red-100 hover:border-red-200", label: "Atrasada" };
+      case "SAME_SUBJECT": return { icon: BookOpen, color: "text-blue-500", bg: "bg-blue-50 border-blue-100 hover:border-blue-200", label: "Mesma matéria" };
+      case "TODAY_CYCLE": return { icon: Calendar, color: "text-amber-500", bg: "bg-amber-50 border-amber-100 hover:border-amber-200", label: "Tarefa do dia" };
+      case "NEXT_ELIGIBLE": return { icon: Layers, color: "text-emerald-500", bg: "bg-emerald-50 border-emerald-100 hover:border-emerald-200", label: "Ciclo principal" };
+      case "SECOND_PASS": return { icon: RefreshCw, color: "text-violet-500", bg: "bg-violet-50 border-violet-100 hover:border-violet-200", label: "Releitura" };
+      default: return { icon: Play, color: "text-muted-foreground", bg: "bg-muted/30 border-border/20", label: "" };
+    }
   };
 
   // State 1: Action - complete reading, trigger flashcard generation, and auto-approve / complete block
@@ -500,6 +588,81 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
             </div>
           </div>
 
+          {/* Continue Studying Suggestions */}
+          {!isSecondPass && (isFetchingSuggestions || suggestions.length > 0) && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-bold text-foreground">
+                  {timeSpent > 0 && block.estimatedStudyMinutes && Math.round(timeSpent / 60) < block.estimatedStudyMinutes
+                    ? "Você terminou mais rápido! Quer aproveitar o saldo de tempo?"
+                    : "Deseja continuar estudando?"}
+                </h3>
+              </div>
+
+              {isFetchingSuggestions ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {suggestions.filter(s => s.type !== "SECOND_PASS").map((suggestion, idx) => {
+                    const display = getSuggestionDisplay(suggestion.type);
+                    const SuggestionIcon = display.icon;
+
+                    // Build navigation URL
+                    const href = suggestion.type === "OVERDUE" || suggestion.type === "TODAY_CYCLE"
+                      ? `/blocks/${suggestion.studyBlockId}?scheduleItemId=${suggestion.scheduleItemId}&returnTo=/`
+                      : `/blocks/${suggestion.studyBlockId}?returnTo=/`;
+
+                    return (
+                      <Link
+                        key={`suggestion-${idx}`}
+                        href={href}
+                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${display.bg}`}
+                      >
+                        <div className={`p-2 rounded-xl ${display.color}`}>
+                          <SuggestionIcon className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-foreground">{suggestion.subjectName}</span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/60">{display.label}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{suggestion.blockTitle} · {suggestion.reason}</span>
+                        </div>
+                        {suggestion.estimatedMinutes && (
+                          <span className="text-xs font-semibold text-muted-foreground tabular-nums">{suggestion.estimatedMinutes} min</span>
+                        )}
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                      </Link>
+                    );
+                  })}
+
+                  {/* Second Pass option */}
+                  {suggestions.some(s => s.type === "SECOND_PASS") && (
+                    <Link
+                      href={`/blocks/${block.id}?secondPass=true&returnTo=/`}
+                      className="flex items-center gap-4 p-4 rounded-2xl border transition-all bg-violet-50 border-violet-100 hover:border-violet-200"
+                    >
+                      <div className="p-2 rounded-xl text-violet-500">
+                        <RefreshCw className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-foreground">Reler este bloco</span>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/60">Releitura</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Segunda leitura (não altera cronograma)</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="pt-4 border-t border-border/30 flex flex-col sm:flex-row items-center justify-center gap-4">
             {approvedCount > 0 ? (
@@ -574,9 +737,20 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
               {block.subject.name}
             </Link>
             <ChevronRight className="w-4 h-4 opacity-30" />
-            <span className="text-foreground/60">Bloco de Estudo</span>
+            <span className="text-foreground/60">{isSecondPass ? "Segunda Leitura" : "Bloco de Estudo"}</span>
           </div>
         </div>
+
+        {/* Second Pass Banner */}
+        {isSecondPass && (
+          <div className="flex items-center gap-3 p-4 rounded-2xl bg-violet-50 border border-violet-100 animate-in slide-in-from-top-2 duration-300">
+            <RefreshCw className="w-5 h-5 text-violet-500 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-violet-800">Modo de segunda leitura</p>
+              <p className="text-xs text-violet-600">O cronograma e os flashcards não serão alterados. Apenas o tempo será registrado.</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 bg-card p-8 rounded-[2.5rem] border border-border/40 shadow-sm">
           <div className="space-y-4">
@@ -846,51 +1020,80 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
           <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm">
             <h3 className="font-bold text-lg flex items-center gap-2">
               <BrainCircuit className="w-5 h-5 text-accent" />
-              Memorização
+              {isSecondPass ? "Segunda Leitura" : "Memorização"}
             </h3>
             
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-accent/15 transition-all hover:scale-[1.02] active:scale-95 py-6 text-sm"
-              onClick={handleCompleteReading}
-              disabled={isGeneratingCards}
-            >
-              {isGeneratingCards ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Gerando Cards...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 fill-current animate-pulse" />
-                  Concluir & Gerar Cards
-                </>
-              )}
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full rounded-2xl gap-2 font-bold h-12 text-xs border-accent/20 text-accent/90 hover:bg-accent/5 hover:text-accent hover:border-accent/30 transition-all flex items-center justify-center"
-              onClick={handleCurationComplete}
-              disabled={isGeneratingCards || isUpdatingStatus}
-            >
-              {isUpdatingStatus ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Concluindo...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Concluir sem Gerar Cards
-                </>
-              )}
-            </Button>
-            <p className="text-[10px] text-center text-muted-foreground font-medium leading-relaxed">
-              Ao concluir a leitura, o cronômetro será pausado. A IA pode gerar novos cards ou você pode concluir sem cards.
-            </p>
+            {isSecondPass ? (
+              <>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-accent/15 transition-all hover:scale-[1.02] active:scale-95 py-6 text-sm"
+                  onClick={handleCompleteSecondPass}
+                  disabled={isUpdatingStatus}
+                >
+                  {isUpdatingStatus ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Registrando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Concluir Segunda Leitura
+                    </>
+                  )}
+                </Button>
+                <p className="text-[10px] text-center text-muted-foreground font-medium leading-relaxed">
+                  A segunda leitura será registrada sem alterar o cronograma ou gerar novos flashcards.
+                </p>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full rounded-2xl gap-2 font-bold shadow-md shadow-accent/15 transition-all hover:scale-[1.02] active:scale-95 py-6 text-sm"
+                  onClick={handleCompleteReading}
+                  disabled={isGeneratingCards}
+                >
+                  {isGeneratingCards ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Gerando Cards...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 fill-current animate-pulse" />
+                      Concluir & Gerar Cards
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full rounded-2xl gap-2 font-bold h-12 text-xs border-accent/20 text-accent/90 hover:bg-accent/5 hover:text-accent hover:border-accent/30 transition-all flex items-center justify-center"
+                  onClick={handleCurationComplete}
+                  disabled={isGeneratingCards || isUpdatingStatus}
+                >
+                  {isUpdatingStatus ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Concluindo...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Concluir sem Gerar Cards
+                    </>
+                  )}
+                </Button>
+                <p className="text-[10px] text-center text-muted-foreground font-medium leading-relaxed">
+                  Ao concluir a leitura, o cronômetro será pausado. A IA pode gerar novos cards ou você pode concluir sem cards.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-3 shadow-sm">
