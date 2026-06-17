@@ -900,7 +900,7 @@ export async function reorganizeOverdueSchedule(
   const minRescheduledDayNumber = Math.min(
     ...theoryQueue.map(item => item.dayNumber).filter((n): n is number => n !== null && n !== undefined)
   );
-  let currentDayNumber = minRescheduledDayNumber !== Infinity && minRescheduledDayNumber > 0 ? minRescheduledDayNumber : 1;
+  const currentDayNumber = minRescheduledDayNumber !== Infinity && minRescheduledDayNumber > 0 ? minRescheduledDayNumber : 1;
 
   const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number }> = [];
   const newItemsToCreate: any[] = [];

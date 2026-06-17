@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Criar flashcard para blockA1 para tornar o REVIEW_BLOCK elegível
-    await prisma.studyCard.create({
+    await prisma.flashcard.create({
       data: {
         id: "card-carry-1",
         userId: testUserId,
@@ -264,7 +264,7 @@ async function cleanUpUser(userId: string) {
   try {
     await prisma.studyScheduleItem.deleteMany({ where: { userId } });
     await prisma.studySchedule.deleteMany({ where: { userId } });
-    await prisma.studyCard.deleteMany({ where: { userId } });
+    await prisma.flashcard.deleteMany({ where: { userId } });
     await prisma.studyBlock.deleteMany({ where: { userId } });
     await prisma.studyMaterial.deleteMany({ where: { userId } });
     await prisma.studySubject.deleteMany({ where: { userId } });
