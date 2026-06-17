@@ -622,9 +622,9 @@ export async function reorganizeOverdueSchedule(
   const todayStart = todayRange.start; // 00:00 SP time in UTC
   const todayStr = todayRange.dateString; // "YYYY-MM-DD"
 
-  // Buscar matérias EXCLUDED do usuário para purga
+  // Buscar matérias EXCLUDED ou SECONDARY do usuário para purga
   const excludedSubjects = await prisma.studySubject.findMany({
-    where: { userId, studyPriority: "EXCLUDED" },
+    where: { userId, studyPriority: { in: ["EXCLUDED", "SECONDARY"] } },
     select: { id: true }
   });
   const excludedSubjectIds = excludedSubjects.map(s => s.id);

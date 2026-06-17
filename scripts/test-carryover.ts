@@ -65,6 +65,20 @@ async function runTests() {
       data: { id: "block-carry-b2", title: "Civil 2", pageStart: 11, pageEnd: 20, userId: testUserId, subjectId: subjectB.id, materialId: matB.id, estimatedStudyMinutes: 45 }
     });
 
+    // Criar flashcard para blockA1 para tornar o REVIEW_BLOCK elegível
+    await prisma.studyCard.create({
+      data: {
+        id: "card-carry-1",
+        userId: testUserId,
+        subjectId: subjectA.id,
+        studyBlockId: blockA1.id,
+        question: "Pergunta de teste",
+        answer: "Resposta de teste",
+        status: "APPROVED",
+        reviewState: "NEW"
+      }
+    });
+
     // Criar cronograma ativo
     const schedule = await prisma.studySchedule.create({
       data: {
@@ -239,6 +253,7 @@ async function cleanUpUser(userId: string) {
   try {
     await prisma.studyScheduleItem.deleteMany({ where: { userId } });
     await prisma.studySchedule.deleteMany({ where: { userId } });
+    await prisma.studyCard.deleteMany({ where: { userId } });
     await prisma.studyBlock.deleteMany({ where: { userId } });
     await prisma.studyMaterial.deleteMany({ where: { userId } });
     await prisma.studySubject.deleteMany({ where: { userId } });
