@@ -54,6 +54,9 @@ export async function GET(req: NextRequest) {
     const matA = await prisma.studyMaterial.create({
       data: { id: "mat-p1-a", fileName: "const.pdf", userId: testUserId, subjectId: subjectA.id, materialRole: "MAIN_MATERIAL" }
     });
+    const matSec = await prisma.studyMaterial.create({
+      data: { id: "mat-p1-sec", fileName: "discursiva.pdf", userId: testUserId, subjectId: subjectSecondary.id, materialRole: "MAIN_MATERIAL" }
+    });
 
     // Criar blocos
     const blockA1 = await prisma.studyBlock.create({
@@ -64,6 +67,9 @@ export async function GET(req: NextRequest) {
     });
     const blockA3 = await prisma.studyBlock.create({
       data: { id: "block-p1-a3", title: "Constitucional 3", pageStart: 21, pageEnd: 30, userId: testUserId, subjectId: subjectA.id, materialId: matA.id, estimatedStudyMinutes: 30 }
+    });
+    const blockSec = await prisma.studyBlock.create({
+      data: { id: "block-p1-sec", title: "Discursiva 1", pageStart: 1, pageEnd: 10, userId: testUserId, subjectId: subjectSecondary.id, materialId: matSec.id, estimatedStudyMinutes: 30 }
     });
 
     // Criar cronograma ativo
@@ -119,6 +125,7 @@ export async function GET(req: NextRequest) {
         userId: testUserId,
         scheduleId: schedule.id,
         subjectId: subjectSecondary.id,
+        studyBlockId: blockSec.id,
         actionType: "THEORY",
         status: "PENDING",
         scheduledDate: todayRange.start,
@@ -199,7 +206,7 @@ export async function GET(req: NextRequest) {
     let c6Passed = false;
     try {
       // Tentar concluir item de matéria secundária
-      await completeStudyBlock(testUserId, "some-block", itemSec.id);
+      await completeStudyBlock(testUserId, blockSec.id, itemSec.id);
     } catch (e: any) {
       c6Passed = e.message === "INVALID_SUBJECT_PRIORITY";
     }
