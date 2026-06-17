@@ -138,6 +138,22 @@ export async function GET(req: NextRequest) {
       }
     });
 
+    // itemTodayCycle: today cycle scheduled block (blockA3)
+    const itemTodayCycle = await prisma.studyScheduleItem.create({
+      data: {
+        id: "item-p2-today-cycle",
+        userId: testUserId,
+        scheduleId: schedule.id,
+        subjectId: subjectA.id,
+        studyBlockId: blockA3.id,
+        actionType: "THEORY",
+        status: "PENDING",
+        scheduledDate: todayRange.start,
+        dayNumber: 2,
+        estimatedMinutes: 30
+      }
+    });
+
     // itemSecondary: secondary item
     const itemSecondary = await prisma.studyScheduleItem.create({
       data: {
@@ -191,9 +207,9 @@ export async function GET(req: NextRequest) {
     // Cenário 4: Validando NEXT_ELIGIBLE quando SAME_SUBJECT e TODAY_CYCLE não estão disponíveis
     log("Cenário 4: Validando sugestão de outro bloco elegível do ciclo (NEXT_ELIGIBLE)...");
     // Para testar o NEXT_ELIGIBLE, vamos simular que completamos blockA1 e não temos SAME_SUBJECT nem TODAY_CYCLE.
-    // Vamos deletar blockA4 (para não ter SAME_SUBJECT) e deletar itemToday (para não ter TODAY_CYCLE).
-    await prisma.studyBlock.delete({ where: { id: blockA4.id } });
-    await prisma.studyScheduleItem.delete({ where: { id: itemToday.id } });
+    // Vamos deletar blockA3 e blockA4 (para não ter SAME_SUBJECT) e deletar itemToday e itemTodayCycle (para não ter TODAY_CYCLE).
+    await prisma.studyBlock.deleteMany({ where: { id: { in: [blockA3.id, blockA4.id] } } });
+    await prisma.studyScheduleItem.deleteMany({ where: { id: { in: [itemToday.id, itemTodayCycle.id] } } });
 
     const suggestions2 = await getSuggestionsForTest(testUserId, blockA1.id);
     log(`[DEBUG] suggestions2: ${JSON.stringify(suggestions2)}`);
