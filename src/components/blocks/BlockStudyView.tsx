@@ -12,6 +12,7 @@ import {
   BrainCircuit,
   Loader2,
   Play,
+  Pause,
   Layers,
   RotateCcw,
   Sparkles,
@@ -160,7 +161,7 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
 
   const [curatorCards, setCuratorCards] = React.useState<any[]>(block.flashcards || []);
   const [timeSpent, setTimeSpent] = React.useState(0);
-  const [isTimerRunning, setIsTimerRunning] = React.useState(step === "reading");
+  const [isTimerRunning, setIsTimerRunning] = React.useState(false);
   const [isGeneratingCards, setIsGeneratingCards] = React.useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   const [startedAt, setStartedAt] = React.useState<Date | null>(null);
@@ -298,6 +299,10 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
 
   // Second pass completion handler
   const handleCompleteSecondPass = async () => {
+    if (startedAt === null) {
+      const proceed = window.confirm("Você quer concluir sem registrar tempo real de estudo?");
+      if (!proceed) return;
+    }
     setIsUpdatingStatus(true);
     setIsTimerRunning(false);
     const toastId = toast.loading("Registrando segunda leitura...");
@@ -309,9 +314,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         body: JSON.stringify({
           studyBlockId: block.id,
           actionType: "SECOND_PASS",
-          startedAt: startedAt?.toISOString() || null,
-          completedAt: new Date().toISOString(),
-          actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60)),
+          startedAt: startedAt ? startedAt.toISOString() : null,
+          completedAt: startedAt ? new Date().toISOString() : null,
+          actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null,
         }),
       });
 
@@ -325,7 +330,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Erro ao registrar segunda leitura.", { id: toastId });
-      setIsTimerRunning(true);
+      if (startedAt !== null) {
+        setIsTimerRunning(true);
+      }
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -345,6 +352,10 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
 
   // State 1: Action - complete reading, trigger flashcard generation, and auto-approve / complete block
   const handleCompleteReading = async () => {
+    if (startedAt === null) {
+      const proceed = window.confirm("Você quer concluir sem registrar tempo real de estudo?");
+      if (!proceed) return;
+    }
     setIsGeneratingCards(true);
     setIsTimerRunning(false);
     const toastId = toast.loading("Gerando flashcards com IA baseados na leitura...");
@@ -367,9 +378,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
             body: JSON.stringify({ 
               step: "THEORY",
               scheduleItemId,
-              startedAt: startedAt?.toISOString() || null,
-              completedAt: new Date().toISOString(),
-              actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60))
+              startedAt: startedAt ? startedAt.toISOString() : null,
+              completedAt: startedAt ? new Date().toISOString() : null,
+              actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null
             }),
           });
 
@@ -395,9 +406,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         body: JSON.stringify({ 
           step: "THEORY",
           scheduleItemId,
-          startedAt: startedAt?.toISOString() || null,
-          completedAt: new Date().toISOString(),
-          actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60))
+          startedAt: startedAt ? startedAt.toISOString() : null,
+          completedAt: startedAt ? new Date().toISOString() : null,
+          actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null
         }),
       });
 
@@ -416,7 +427,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Erro ao processar conclusão. Tente novamente.", { id: toastId });
-      setIsTimerRunning(true); // Resume timer on failure
+      if (startedAt !== null) {
+        setIsTimerRunning(true); // Resume timer on failure
+      }
     } finally {
       setIsGeneratingCards(false);
     }
@@ -424,6 +437,10 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
 
   // State 2: Action - Curation complete, lock block as COMPLETED
   const handleCurationComplete = async () => {
+    if (startedAt === null) {
+      const proceed = window.confirm("Você quer concluir sem registrar tempo real de estudo?");
+      if (!proceed) return;
+    }
     setIsUpdatingStatus(true);
     const toastId = toast.loading("Registrando conclusão do bloco de estudo...");
     
@@ -434,9 +451,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         body: JSON.stringify({ 
           step: "THEORY",
           scheduleItemId,
-          startedAt: startedAt?.toISOString() || null,
-          completedAt: new Date().toISOString(),
-          actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60))
+          startedAt: startedAt ? startedAt.toISOString() : null,
+          completedAt: startedAt ? new Date().toISOString() : null,
+          actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null
         }),
       });
       
@@ -473,7 +490,8 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
       // Reset local flow states
       setStep("reading");
       setTimeSpent(0);
-      setIsTimerRunning(true);
+      setIsTimerRunning(false);
+      setStartedAt(null);
       
       // Update local flashcards state with latest fetched state
       const updatedBlock = await res.json();
@@ -1110,8 +1128,47 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
                 </span>
               )}
             </div>
+            {step === "reading" && (
+              <div className="pt-1">
+                {startedAt === null ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full rounded-xl gap-2 font-bold shadow-sm h-10"
+                    onClick={() => setIsTimerRunning(true)}
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    Iniciar Leitura
+                  </Button>
+                ) : isTimerRunning ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full rounded-xl gap-2 font-bold border-amber-200 text-amber-700 hover:bg-amber-50 h-10"
+                    onClick={() => setIsTimerRunning(false)}
+                  >
+                    <Pause className="w-3.5 h-3.5 text-amber-750" />
+                    Pausar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full rounded-xl gap-2 font-bold shadow-sm h-10"
+                    onClick={() => setIsTimerRunning(true)}
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    Retomar
+                  </Button>
+                )}
+              </div>
+            )}
             <p className="text-[10px] text-muted-foreground leading-relaxed">
-              O cronômetro está rodando. Se pausar seus estudos por inatividade, o tempo será pausado.
+              {startedAt === null
+                ? "O cronômetro está pausado. Clique em 'Iniciar Leitura' para registrar seu tempo real."
+                : isTimerRunning
+                ? "O cronômetro está rodando. O tempo será pausado automaticamente se você se afastar por 15 minutos."
+                : "O cronômetro está pausado. Clique em 'Retomar' para continuar contando seu tempo líquido."}
             </p>
           </div>
 
