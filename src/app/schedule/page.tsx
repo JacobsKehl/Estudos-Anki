@@ -443,7 +443,7 @@ export default async function SchedulePage() {
                                   Materiais de Apoio
                                 </span>
                                 <Link
-                                  href={`/blocks/${item.studyBlock.id}?returnTo=/schedule`}
+                                  href={`/blocks/${item.studyBlock.id}?scheduleItemId=${item.id}&returnTo=/schedule`}
                                   className="text-accent hover:underline font-bold"
                                 >
                                   Visualizar

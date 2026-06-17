@@ -157,7 +157,7 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
                 variant="outline"
                 size="sm"
                 className="h-7 px-3 text-[11px] font-semibold border-[#D9E5D0] dark:border-accent/15 text-[#4F6F45] dark:text-accent hover:bg-[#EAF2E4]/50 dark:hover:bg-accent/10 transition-all rounded-lg"
-                onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
+                onClick={() => router.push(`/blocks/${item.studyBlockId}?scheduleItemId=${item.id}&returnTo=/`)}
               >
                 Ver conteúdo
               </Button>
@@ -240,7 +240,7 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
               variant="link"
               size="sm"
               className="h-auto p-0 text-[10px] text-accent hover:text-accent/80 font-bold"
-              onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
+              onClick={() => router.push(`/blocks/${item.studyBlockId}?scheduleItemId=${item.id}&returnTo=/`)}
             >
               [Ver apoios]
             </Button>
@@ -269,7 +269,7 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
                 size="sm"
                 variant="primary"
                 className="w-full sm:w-auto rounded-lg font-bold shadow-sm flex items-center justify-center gap-1.5"
-                onClick={() => router.push(`/blocks/${item.studyBlockId}?returnTo=/`)}
+                onClick={() => router.push(`/blocks/${item.studyBlockId}?scheduleItemId=${item.id}&returnTo=/`)}
               >
                 <BookOpen className="w-4 h-4" />
                 Ver Conteúdo

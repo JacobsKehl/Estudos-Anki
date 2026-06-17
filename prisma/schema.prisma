@@ -44,6 +44,7 @@ model User {
   studyBlocks            StudyBlock[]
   studySchedules         StudySchedule[]
   studyScheduleItems     StudyScheduleItem[]
+  studySessionLogs       StudySessionLog[]
 }
 
 model UserPreferences {
@@ -303,6 +304,7 @@ model StudyBlock {
   flashcards    Flashcard[]
   scheduleItems StudyScheduleItem[]
   supportMaterials StudyBlockSupport[]
+  studySessionLogs StudySessionLog[]
 
   @@index([userId, status])
 }
@@ -357,11 +359,53 @@ model StudyScheduleItem {
   dayNumber        Int
   scheduledDate    DateTime?
   estimatedMinutes Int?
-  status           String         @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SKIPPED
+  startedAt        DateTime?
   completedAt      DateTime?
+  actualDurationMinutes Int?
+  status           String         @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SKIPPED
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
+  studySessionLogs StudySessionLog[]
+
   @@index([userId, scheduledDate, status])
   @@index([userId, scheduleId, status])
+}
+
+enum StudySessionActionType {
+  THEORY
+  SECOND_PASS
+  REINFORCEMENT
+  EXTRA_STUDY
+  REVIEW_BLOCK
+  REVIEW_FLASHCARDS
+}
+
+enum StudySessionSource {
+  TIMER
+  MANUAL
+  SYSTEM
+}
+
+model StudySessionLog {
+  id                  String                 @id @default(cuid())
+  userId              String
+  user                User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studyBlockId        String?
+  studyBlock          StudyBlock?            @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  studyScheduleItemId String?
+  studyScheduleItem   StudyScheduleItem?     @relation(fields: [studyScheduleItemId], references: [id], onDelete: SetNull)
+  
+  actionType          StudySessionActionType
+  durationMinutes     Int
+  startedAt           DateTime?
+  completedAt         DateTime?
+  studiedAt           DateTime               @default(now())
+  source              StudySessionSource     @default(TIMER)
+  
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([userId, studiedAt])
+  @@index([userId, studyBlockId])
 }

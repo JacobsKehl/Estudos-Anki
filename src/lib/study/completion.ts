@@ -1,11 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { StudySessionActionType, StudySessionSource } from "@prisma/client";
 
 /**
  * Completes a study block and synchronizes it with the schedule.
  * Also schedules spaced review sessions for the block.
  */
-export async function completeStudyBlock(userId: string, blockId: string, scheduleItemId?: string) {
+export async function completeStudyBlock(
+  userId: string,
+  blockId: string,
+  scheduleItemId?: string,
+  startedAt?: Date | null,
+  completedAt?: Date | null,
+  actualDurationMinutes?: number | null
+) {
   const now = new Date();
 
   return await prisma.$transaction(async (tx) => {
@@ -25,6 +33,64 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
         review30dScheduledAt: addDays(now, 30),
       },
     });
+
+    // Validar propriedade (ownership), status e prioridade da matéria do scheduleItemId
+    if (scheduleItemId) {
+      const targetItem = await (tx as any).studyScheduleItem.findFirst({
+        where: { id: scheduleItemId, userId },
+        include: { subject: true }
+      });
+
+      if (!targetItem) {
+        throw new Error("UNAUTHORIZED_OR_NOT_FOUND");
+      }
+      if (targetItem.studyBlockId !== blockId) {
+        throw new Error("INVALID_BLOCK_ID");
+      }
+      if (targetItem.status !== "PENDING" && targetItem.status !== "IN_PROGRESS") {
+        throw new Error("INVALID_STATUS");
+      }
+      if (targetItem.subject?.studyPriority === "EXCLUDED" || targetItem.subject?.studyPriority === "SECONDARY") {
+        throw new Error("INVALID_SUBJECT_PRIORITY");
+      }
+    }
+
+    // Validar e calcular tempo líquido de estudo e clamping
+    let validatedStartedAt: Date | null = null;
+    let validatedCompletedAt: Date | null = null;
+    let validatedDuration: number | null = null;
+    let logSource: StudySessionSource = StudySessionSource.MANUAL;
+
+    if (startedAt && completedAt && actualDurationMinutes !== undefined && actualDurationMinutes !== null) {
+      const start = new Date(startedAt);
+      const end = new Date(completedAt);
+      
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start.getTime() < end.getTime()) {
+        validatedStartedAt = start;
+        validatedCompletedAt = end;
+        logSource = StudySessionSource.TIMER;
+
+        const physicalDiffMin = Math.round((end.getTime() - start.getTime()) / 60000);
+        let rawDuration = actualDurationMinutes;
+        
+        if (rawDuration <= 0) {
+          rawDuration = 1;
+        }
+
+        if (rawDuration > physicalDiffMin + 1) {
+          console.warn(`[TIMER VALIDATION] Durabilidade real ${rawDuration}min excede a janela física ${physicalDiffMin}min. Clamping para janela física.`);
+          rawDuration = Math.max(1, physicalDiffMin);
+        }
+
+        const estimated = block.estimatedStudyMinutes || 30;
+        if (rawDuration > 2 * estimated) {
+          console.warn(`[TIMER VALIDATION] Tempo real ${rawDuration}min excede 2x estimativa ${estimated}min. Clamping para ${2 * estimated}min.`);
+          rawDuration = 2 * estimated;
+        }
+
+        validatedDuration = rawDuration;
+      }
+    }
 
     // 2. Synchronize with Schedule Item
     const activeSchedule = await (tx as any).studySchedule.findFirst({
@@ -113,7 +179,7 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
         const isAntecipado = targetItem.scheduledDate >= todayRange.end;
         if (isAntecipado && targetItem.actionType === "THEORY" && activeSchedule) {
           // A. Registrar que estudou hoje (conclusão antecipada)
-          await (tx as any).studyScheduleItem.create({
+          scheduleItem = await (tx as any).studyScheduleItem.create({
             data: {
               userId,
               scheduleId: activeSchedule.id,
@@ -126,6 +192,8 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
               dayNumber: targetItem.dayNumber || 1,
               scheduledDate: now,
               completedAt: now,
+              startedAt: validatedStartedAt,
+              actualDurationMinutes: validatedDuration,
               status: "COMPLETED",
             }
           });
@@ -134,21 +202,22 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
           const replacementBlock = await findReplacementBlock(tx);
 
           if (replacementBlock) {
-            scheduleItem = await tx.studyScheduleItem.update({
+            await tx.studyScheduleItem.update({
               where: { id: targetItem.id },
               data: {
                 studyBlockId: replacementBlock.id,
                 materialId: replacementBlock.materialId,
                 subjectId: replacementBlock.subjectId,
                 status: "PENDING",
-                completedAt: null
+                completedAt: null,
+                startedAt: null,
+                actualDurationMinutes: null
               }
             });
           } else {
             await tx.studyScheduleItem.delete({
               where: { id: targetItem.id }
             });
-            scheduleItem = null;
           }
         } else {
           scheduleItem = await tx.studyScheduleItem.update({
@@ -156,6 +225,8 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
             data: {
               status: "COMPLETED",
               completedAt: now,
+              startedAt: validatedStartedAt,
+              actualDurationMinutes: validatedDuration,
             },
           });
         }
@@ -170,14 +241,19 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
           actionType: "THEORY",
           status: { in: ["PENDING", "IN_PROGRESS"] },
         },
-        orderBy: { scheduledDate: "asc" }
+        orderBy: { scheduledDate: "asc" },
+        include: { subject: true }
       });
 
       if (match) {
+        if (match.subject?.studyPriority === "EXCLUDED" || match.subject?.studyPriority === "SECONDARY") {
+          throw new Error("INVALID_SUBJECT_PRIORITY");
+        }
+
         const isAntecipado = match.scheduledDate >= todayRange.end;
         if (isAntecipado) {
           // A. Registrar que estudou hoje (conclusão antecipada)
-          await (tx as any).studyScheduleItem.create({
+          scheduleItem = await (tx as any).studyScheduleItem.create({
             data: {
               userId,
               scheduleId: activeSchedule.id,
@@ -190,6 +266,8 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
               dayNumber: match.dayNumber || 1,
               scheduledDate: now,
               completedAt: now,
+              startedAt: validatedStartedAt,
+              actualDurationMinutes: validatedDuration,
               status: "COMPLETED",
             }
           });
@@ -198,21 +276,22 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
           const replacementBlock = await findReplacementBlock(tx);
 
           if (replacementBlock) {
-            scheduleItem = await tx.studyScheduleItem.update({
+            await tx.studyScheduleItem.update({
               where: { id: match.id },
               data: {
                 studyBlockId: replacementBlock.id,
                 materialId: replacementBlock.materialId,
                 subjectId: replacementBlock.subjectId,
                 status: "PENDING",
-                completedAt: null
+                completedAt: null,
+                startedAt: null,
+                actualDurationMinutes: null
               }
             });
           } else {
             await tx.studyScheduleItem.delete({
               where: { id: match.id }
             });
-            scheduleItem = null;
           }
         } else {
           scheduleItem = await tx.studyScheduleItem.update({
@@ -220,6 +299,8 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
             data: {
               status: "COMPLETED",
               completedAt: now,
+              startedAt: validatedStartedAt,
+              actualDurationMinutes: validatedDuration,
             },
           });
         }
@@ -241,6 +322,8 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
             dayNumber: 1,
             scheduledDate: now,
             completedAt: now,
+            startedAt: validatedStartedAt,
+            actualDurationMinutes: validatedDuration,
             status: "COMPLETED",
           }
         });
@@ -293,6 +376,21 @@ export async function completeStudyBlock(userId: string, blockId: string, schedu
         console.info(`[completeStudyBlock] Bloco ${block.id} não possui flashcards ativos/revisáveis. Não agendando REVIEW_BLOCK.`);
       }
     }
+
+    // Criar registro de log da sessão
+    const sessionDuration = validatedDuration !== null ? validatedDuration : (block.estimatedStudyMinutes || 30);
+    await tx.studySessionLog.create({
+      data: {
+        userId,
+        studyBlockId: blockId,
+        studyScheduleItemId: scheduleItem?.id || null,
+        actionType: StudySessionActionType.THEORY,
+        durationMinutes: sessionDuration,
+        startedAt: validatedStartedAt,
+        completedAt: validatedCompletedAt || now,
+        source: logSource,
+      }
+    });
 
     return {
       block,

@@ -71,8 +71,9 @@ interface BlockStudyViewProps {
     pending: number;
     approved: number;
   };
-  returnTo?: string | null;
-  from?: string | null;
+  returnTo: string | null;
+  from: string | null;
+  scheduleItemId?: string | null;
 }
 
 // Helper functions moved outside of render to prevent ESLint static-components warnings and fix missing dependency warnings
@@ -98,7 +99,7 @@ const getReturnIcon = (path: string) => {
   return ArrowLeft;
 };
 
-export function BlockStudyView({ block, content, stats, returnTo, from }: BlockStudyViewProps) {
+export function BlockStudyView({ block, content, stats, returnTo, from, scheduleItemId }: BlockStudyViewProps) {
   const router = useRouter();
 
   // Get return target with validation (no external URL allowed to avoid open redirect)
@@ -145,6 +146,57 @@ export function BlockStudyView({ block, content, stats, returnTo, from }: BlockS
   const [isTimerRunning, setIsTimerRunning] = React.useState(step === "reading");
   const [isGeneratingCards, setIsGeneratingCards] = React.useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+  const [startedAt, setStartedAt] = React.useState<Date | null>(null);
+  const [isIdleAlertOpen, setIsIdleAlertOpen] = React.useState(false);
+  const lastActivityRef = React.useRef(0);
+
+  // Initialize lastActivityRef on mount (avoids impure Date.now() call during render)
+  React.useEffect(() => {
+    lastActivityRef.current = Date.now();
+  }, []);
+
+  // Capture startedAt when timer starts
+  React.useEffect(() => {
+    if (isTimerRunning && !startedAt && step === "reading") {
+      setStartedAt(new Date());
+    }
+  }, [isTimerRunning, startedAt, step]);
+
+  // Idle Detection effect
+  React.useEffect(() => {
+    if (!isTimerRunning || step !== "reading") return;
+
+    const handleActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("click", handleActivity);
+    window.addEventListener("scroll", handleActivity);
+
+    const checkIdleInterval = setInterval(() => {
+      const idleTime = Date.now() - lastActivityRef.current;
+      if (idleTime > 15 * 60 * 1000) { // 15 minutos
+        setIsTimerRunning(false);
+        setIsIdleAlertOpen(true);
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("click", handleActivity);
+      window.removeEventListener("scroll", handleActivity);
+      clearInterval(checkIdleInterval);
+    };
+  }, [isTimerRunning, step]);
+
+  const handleResumeFromIdle = () => {
+    lastActivityRef.current = Date.now();
+    setIsIdleAlertOpen(false);
+    setIsTimerRunning(true);
+  };
 
   const [activeTab, setActiveTab] = React.useState<"pdf" | "text" | "apoios">("pdf");
   const hasApoios = block.supportMaterials && block.supportMaterials.length > 0;
@@ -224,7 +276,13 @@ export function BlockStudyView({ block, content, stats, returnTo, from }: BlockS
           const completeRes = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ step: "THEORY" }),
+            body: JSON.stringify({ 
+              step: "THEORY",
+              scheduleItemId,
+              startedAt: startedAt?.toISOString() || null,
+              completedAt: new Date().toISOString(),
+              actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60))
+            }),
           });
 
           if (completeRes.ok) {
@@ -246,7 +304,13 @@ export function BlockStudyView({ block, content, stats, returnTo, from }: BlockS
       const completeRes = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "THEORY" }),
+        body: JSON.stringify({ 
+          step: "THEORY",
+          scheduleItemId,
+          startedAt: startedAt?.toISOString() || null,
+          completedAt: new Date().toISOString(),
+          actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60))
+        }),
       });
 
       if (!completeRes.ok) {
@@ -279,7 +343,13 @@ export function BlockStudyView({ block, content, stats, returnTo, from }: BlockS
       const res = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "THEORY" }), // Triggers completion & scheduling
+        body: JSON.stringify({ 
+          step: "THEORY",
+          scheduleItemId,
+          startedAt: startedAt?.toISOString() || null,
+          completedAt: new Date().toISOString(),
+          actualDurationMinutes: Math.max(1, Math.round(timeSpent / 60))
+        }),
       });
       
       if (!res.ok) throw new Error("Erro ao concluir bloco");
@@ -823,6 +893,25 @@ export function BlockStudyView({ block, content, stats, returnTo, from }: BlockS
             </p>
           </div>
 
+          <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-3 shadow-sm">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+              <Clock className="w-4 h-4 text-accent" />
+              Tempo de Estudo
+            </h4>
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-black text-foreground tabular-nums">{formatTimer(timeSpent)}</span>
+              {isTimerRunning && (
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              O cronômetro está rodando. Se pausar seus estudos por inatividade, o tempo será pausado.
+            </p>
+          </div>
+
           <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm">
             <h3 className="font-bold text-sm flex items-center gap-2 text-muted-foreground uppercase tracking-widest">
               Navegação
@@ -854,6 +943,30 @@ export function BlockStudyView({ block, content, stats, returnTo, from }: BlockS
           </div>
         </aside>
       </div>
+
+      {isIdleAlertOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-[2rem] border border-border/40 p-8 shadow-xl max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mx-auto">
+              <Clock className="w-8 h-8 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-foreground">Você ainda está estudando?</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Pausamos o cronômetro por inatividade para manter seu tempo de estudo real preciso. Clique abaixo para continuar.
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full rounded-2xl font-bold shadow-md shadow-accent/15 transition-all hover:scale-[1.02]"
+              onClick={handleResumeFromIdle}
+            >
+              Continuar Estudando
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

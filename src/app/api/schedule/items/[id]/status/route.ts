@@ -50,14 +50,37 @@ export async function PATCH(
         where: { id },
         data: { 
           status,
-          ...(status === "COMPLETED" ? { completedAt: new Date() } : { completedAt: null })
+          ...(status === "COMPLETED" ? { completedAt: new Date(), actualDurationMinutes: null } : { completedAt: null, startedAt: null, actualDurationMinutes: null })
         },
         include: {
           studyBlock: true
         }
       });
 
-      // 2. Sincronizar o status com o StudyBlock original (apenas para itens teóricos completados)
+      // 2. Criar log complementar se for concluído manualmente
+      if (status === "COMPLETED") {
+        let logActionType = "REVIEW_BLOCK";
+        if (updatedItem.actionType === "REVIEW_FLASHCARDS") {
+          logActionType = "REVIEW_FLASHCARDS";
+        } else if (updatedItem.actionType === "THEORY") {
+          logActionType = "THEORY";
+        }
+
+        await (prisma as any).studySessionLog.create({
+          data: {
+            userId: updatedItem.userId,
+            studyBlockId: updatedItem.studyBlockId || null,
+            studyScheduleItemId: updatedItem.id,
+            actionType: logActionType,
+            durationMinutes: updatedItem.estimatedMinutes || 30,
+            source: "MANUAL",
+            studiedAt: new Date(),
+            completedAt: new Date()
+          }
+        });
+      }
+
+      // 3. Sincronizar o status com o StudyBlock original (apenas para itens teóricos completados)
       if (updatedItem.studyBlockId) {
         if (status === "COMPLETED") {
           await (prisma as any).studyBlock.update({
@@ -72,6 +95,18 @@ export async function PATCH(
   } catch (error: unknown) {
     const err = error as Error;
     console.error("[SCHEDULE ITEM STATUS PATCH]", err);
+    if (err.message === "UNAUTHORIZED_OR_NOT_FOUND") {
+      return NextResponse.json({ error: "Item não encontrado ou acesso não autorizado" }, { status: 404 });
+    }
+    if (err.message === "INVALID_BLOCK_ID") {
+      return NextResponse.json({ error: "Item não pertence a este bloco de estudo" }, { status: 400 });
+    }
+    if (err.message === "INVALID_STATUS") {
+      return NextResponse.json({ error: "Item de cronograma não está pendente ou em andamento" }, { status: 400 });
+    }
+    if (err.message === "INVALID_SUBJECT_PRIORITY") {
+      return NextResponse.json({ error: "Matéria inativa ou excluída do cronograma" }, { status: 403 });
+    }
     return NextResponse.json(
       { error: "Erro ao atualizar item do cronograma", details: err.message },
       { status: 500 }

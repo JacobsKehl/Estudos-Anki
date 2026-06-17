@@ -11,10 +11,10 @@ export default async function BlockPage({
   searchParams
 }: { 
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string; from?: string }>;
+  searchParams: Promise<{ returnTo?: string; from?: string; scheduleItemId?: string }>;
 }) {
   const { id } = await params;
-  const { returnTo, from } = await searchParams;
+  const { returnTo, from, scheduleItemId } = await searchParams;
   const mockUserId = await getMockUserId();
 
   const block = await (prisma as any).studyBlock.findUnique({
@@ -75,6 +75,7 @@ export default async function BlockPage({
       }}
       returnTo={returnTo || null}
       from={from || null}
+      scheduleItemId={scheduleItemId || null}
     />
   );
 }
