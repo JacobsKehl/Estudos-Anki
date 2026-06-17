@@ -726,16 +726,8 @@ export async function reorganizeOverdueSchedule(
     return true;
   });
 
-  // Separar em atrasados (< todayStart) e hoje/futuros (>= todayStart)
-  const overdueItems = eligiblePendingItems.filter(
-    item => item.scheduledDate && item.scheduledDate < todayStart
-  );
-
-  const overdueItemsCount = overdueItems.length;
-
   // IDEMPOTÊNCIA: Se não houver nenhum item pendente elegível no cronograma, não há nada a fazer!
   if (eligiblePendingItems.length === 0) {
-    // Retorna no-op bem-sucedido
     let maxDateStr = todayStr;
     const validDates = allItems
       .map(item => item.scheduledDate)
@@ -767,13 +759,11 @@ export async function reorganizeOverdueSchedule(
     };
   }
 
-  // Se houver pendências passadas, precisamos reorganizar.
   // A data inicial a partir da qual as coisas serão agendadas:
   const allocationStartDate = preserveToday 
     ? getTodayRangeSP(now, 1).start 
     : todayStart;
 
-  // Se preserveToday for true, contamos quantos itens de hoje (hojeStart <= scheduledDate < tomorrowStart) foram preservados
   const tomorrowStart = getTodayRangeSP(now, 1).start;
   const preservedTodayCount = preserveToday
     ? allItems.filter(
@@ -783,52 +773,12 @@ export async function reorganizeOverdueSchedule(
       ).length
     : 0;
 
-  // Itens que serão realocados:
-  const itemsToReschedule = eligiblePendingItems.filter(
-    item => item.scheduledDate && (
-      item.scheduledDate < todayStart ||
-      item.scheduledDate >= allocationStartDate
-    )
-  );
-
-  const futureItemsShiftedCount = itemsToReschedule.filter(
-    item => item.scheduledDate && item.scheduledDate >= allocationStartDate
-  ).length;
-
-  // Agrupar itemsToReschedule pela sua scheduledDate original
-  // E ordenar as datas originais em ordem ascendente para manter a sequência do cronograma
-  const itemsByOriginalDate = new Map<string, typeof eligiblePendingItems>();
-  
-  for (const item of itemsToReschedule) {
-    if (!item.scheduledDate) continue;
-    const dateStr = getTodayRangeSP(item.scheduledDate).dateString;
-    const list = itemsByOriginalDate.get(dateStr) || [];
-    list.push(item);
-    itemsByOriginalDate.set(dateStr, list);
-  }
-
-  const sortedOriginalDates = Array.from(itemsByOriginalDate.keys()).sort();
-
   // Buscar dias de estudo nas preferências do usuário
   const userPrefs = await prisma.userPreferences.findUnique({
     where: { userId }
   });
   const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
   const studyDays = studyDaysStr.split(",").map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n));
-
-  // Separar datas originais em dias de teoria e dias apenas de revisão
-  const theoryDates: string[] = [];
-  const reviewOnlyDates: string[] = [];
-
-  for (const dateStr of sortedOriginalDates) {
-    const items = itemsByOriginalDate.get(dateStr) || [];
-    const hasTheory = items.some(item => item.actionType === "THEORY");
-    if (hasTheory) {
-      theoryDates.push(dateStr);
-    } else {
-      reviewOnlyDates.push(dateStr);
-    }
-  }
 
   // Encontrar o primeiro dia útil de estudos disponível para alocação (hoje ou amanhã dependendo de preserveToday)
   let firstStudyDate: Date = new Date();
@@ -843,42 +793,117 @@ export async function reorganizeOverdueSchedule(
     checkOffset++;
   }
 
-  // Mapear cada data original para a sua nova data útil de estudos disponível
-  const dateMapping = new Map<string, Date>();
-  
-  // 1. Mapear dias de teoria de forma sequencial
-  let daysOffset = preserveToday ? 1 : 0;
-  for (const origDateStr of theoryDates) {
-    let found = false;
-    let allocatedDate: Date = new Date();
-    while (!found) {
-      const range = getTodayRangeSP(now, daysOffset);
-      const dateToCheck = range.start;
-      if (isStudyDay(dateToCheck, studyDays)) {
-        allocatedDate = dateToCheck;
-        found = true;
+  // --- ALGORITMO DE FILA DE CARRYOVER COM META DE TEORIA (90 MIN) ---
+
+  // 1. Obter matérias elegíveis do usuário (Ignorando EXCLUDED e SECONDARY)
+  const userSubjects = await prisma.studySubject.findMany({
+    where: { userId }
+  });
+  const eligibleSubjects = userSubjects.filter(
+    s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
+  );
+  const eligibleSubjectIds = eligibleSubjects.map(s => s.id);
+
+  // Filtrar itens apenas das matérias elegíveis
+  const activeEligiblePendingItems = eligiblePendingItems.filter(
+    item => eligibleSubjectIds.includes(item.subjectId)
+  );
+
+  // Separar THEORY de outros tipos (como REVIEW_BLOCK)
+  const eligiblePendingTheory = activeEligiblePendingItems.filter(item => item.actionType === "THEORY");
+  const eligiblePendingOther = activeEligiblePendingItems.filter(item => item.actionType !== "THEORY");
+
+  // THEORY: Pendentes atrasados (< todayStart) e futuros (>= allocationStartDate)
+  const overdueTheory = eligiblePendingTheory.filter(
+    item => item.scheduledDate && item.scheduledDate < todayStart
+  );
+  const futureTheory = eligiblePendingTheory.filter(
+    item => item.scheduledDate && item.scheduledDate >= allocationStartDate
+  );
+
+  // Ordenar de forma determinística
+  const sortItems = (list: typeof eligiblePendingTheory) => {
+    list.sort((a, b) => {
+      if (a.scheduledDate!.getTime() !== b.scheduledDate!.getTime()) {
+        return a.scheduledDate!.getTime() - b.scheduledDate!.getTime();
       }
-      daysOffset++;
+      return (a.dayNumber || 0) - (b.dayNumber || 0);
+    });
+  };
+  sortItems(overdueTheory);
+  sortItems(futureTheory);
+
+  // Fila principal de teoria: dívida/atrasados primeiro
+  const theoryQueue = [...overdueTheory, ...futureTheory];
+
+  // Outros tipos (REVIEW_BLOCK / SUPPORT):
+  // Atrasados: movidos para firstStudyDate (não consomem slot de teoria, não bloqueiam)
+  const overdueOther = eligiblePendingOther.filter(
+    item => item.scheduledDate && item.scheduledDate < todayStart
+  );
+  // Futuros: permanecem nas datas planejadas originalmente (não shiftados agressivamente)
+  const futureOther = eligiblePendingOther.filter(
+    item => item.scheduledDate && item.scheduledDate >= allocationStartDate
+  );
+
+  // Configurar conjunto de blocos agendados para evitar duplicações
+  const scheduledBlockIds = new Set<string>(
+    allItems.filter(item => item.status === "COMPLETED" && item.studyBlockId).map(item => item.studyBlockId!)
+  );
+  for (const item of theoryQueue) {
+    if (item.studyBlockId) {
+      scheduledBlockIds.add(item.studyBlockId);
     }
-    dateMapping.set(origDateStr, allocatedDate);
   }
 
-  // 2. Mapear dias de apenas revisão/suporte para o primeiro dia útil de estudos (Today/Tomorrow), sem consumir slots extras
-  for (const origDateStr of reviewOnlyDates) {
-    dateMapping.set(origDateStr, firstStudyDate);
-  }
-
-  // Contar quantos itens de revisão foram mesclados no primeiro dia
-  let mergedReviewBlocksCount = 0;
-  for (const item of itemsToReschedule) {
-    if (!item.scheduledDate) continue;
-    const origDateStr = getTodayRangeSP(item.scheduledDate).dateString;
-    if (reviewOnlyDates.includes(origDateStr) && item.actionType === "REVIEW_BLOCK") {
-      mergedReviewBlocksCount++;
+  // Buscar todos os blocos pendentes das matérias elegíveis no banco de dados para gap-filling
+  const dbPendingBlocks = await (prisma as any).studyBlock.findMany({
+    where: {
+      userId,
+      status: { not: "COMPLETED" },
+      subjectId: { in: eligibleSubjectIds },
+      material: {
+        materialRole: {
+          not: "SUPPORT_MATERIAL"
+        }
+      }
+    },
+    include: {
+      material: true,
+      subject: true
     }
+  });
+
+  dbPendingBlocks.sort((a: any, b: any) => {
+    const fileA = a.material?.fileName || "";
+    const fileB = b.material?.fileName || "";
+    const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
+    if (fileCompare !== 0) return fileCompare;
+    return a.orderIndex - b.orderIndex;
+  });
+
+  // Blocos novos que podem ser agendados
+  const availableNewBlocks = dbPendingBlocks.filter((block: any) => !scheduledBlockIds.has(block.id));
+  const blocksBySubject: Record<string, typeof dbPendingBlocks> = {};
+  for (const block of availableNewBlocks) {
+    if (!blocksBySubject[block.subjectId]) {
+      blocksBySubject[block.subjectId] = [];
+    }
+    blocksBySubject[block.subjectId].push(block);
   }
 
-  // Gerar a lista de alterações e preparar as atualizações do banco
+  // Identificar a data limite original do cronograma
+  const allDates = allItems.map(item => item.scheduledDate).filter((d): d is Date => !!d);
+  const maxOriginalDate = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(now, 30);
+
+  // Determinar o dayNumber inicial de realocação
+  const minRescheduledDayNumber = Math.min(
+    ...theoryQueue.map(item => item.dayNumber).filter((n): n is number => n !== null && n !== undefined)
+  );
+  let currentDayNumber = minRescheduledDayNumber !== Infinity && minRescheduledDayNumber > 0 ? minRescheduledDayNumber : 1;
+
+  const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number }> = [];
+  const newItemsToCreate: any[] = [];
   const changesReport: Array<{
     itemId: string;
     actionType: string;
@@ -887,71 +912,173 @@ export async function reorganizeOverdueSchedule(
     newDate: string;
   }> = [];
 
-  const updatesList: Array<{ id: string; scheduledDate: Date }> = [];
+  const assignedDates = new Set<string>();
+  const dailyMinutes = activeSchedule.dailyStudyMinutes || 120;
+  const targetTheoryMinutes = dailyMinutes - 30; // 90 min
 
-  for (const item of itemsToReschedule) {
-    if (!item.scheduledDate) continue;
-    const origDateStr = getTodayRangeSP(item.scheduledDate).dateString;
-    const newAllocatedDate = dateMapping.get(origDateStr);
+  let currentDate = new Date(firstStudyDate);
+  let dayNumber = currentDayNumber;
+  let nextItemIndex = 1;
+
+  // Realocação de outros itens atrasados (REVIEW_BLOCK / SUPPORT)
+  for (const item of overdueOther) {
+    const origDateStr = getTodayRangeSP(item.scheduledDate!).dateString;
+    const destDateStr = getTodayRangeSP(firstStudyDate).dateString;
     
-    if (newAllocatedDate) {
-      const newDateStr = getTodayRangeSP(newAllocatedDate).dateString;
+    updatesList.push({
+      id: item.id,
+      scheduledDate: new Date(firstStudyDate),
+      dayNumber: currentDayNumber
+    });
+
+    if (origDateStr !== destDateStr) {
+      changesReport.push({
+        itemId: item.id,
+        actionType: item.actionType || "UNKNOWN",
+        subjectName: item.subject?.name || "Sem Matéria",
+        originalDate: origDateStr,
+        newDate: destDateStr
+      });
+    }
+  }
+
+  // Loop principal de preenchimento dos dias úteis
+  while (theoryQueue.length > 0 || currentDate.getTime() <= maxOriginalDate.getTime()) {
+    if (!isStudyDay(currentDate, studyDays)) {
+      currentDate = addDays(currentDate, 1);
+      continue;
+    }
+
+    const dateStr = getTodayRangeSP(currentDate).dateString;
+    assignedDates.add(dateStr);
+
+    // 1. Somar teoria já agendada e preservada neste dia (se houver, ex: preserveToday)
+    let theoryMinutesOnDay = 0;
+    const preservedTheoryOnDay = allItems.filter(item => 
+      item.scheduledDate && 
+      getTodayRangeSP(item.scheduledDate).dateString === dateStr &&
+      item.actionType === "THEORY" &&
+      !theoryQueue.some(q => q.id === item.id)
+    );
+    theoryMinutesOnDay = preservedTheoryOnDay.reduce((sum, item) => sum + (item.estimatedMinutes || 45), 0);
+
+    // 2. Alocar teoria pendente da Fila
+    while (theoryQueue.length > 0 && theoryMinutesOnDay < targetTheoryMinutes) {
+      const nextItem = theoryQueue.shift()!;
+      const origDateStr = getTodayRangeSP(nextItem.scheduledDate!).dateString;
       
-      // Apenas adiciona como alteração se a data realmente mudou
-      if (origDateStr !== newDateStr) {
+      updatesList.push({
+        id: nextItem.id,
+        scheduledDate: new Date(currentDate),
+        dayNumber
+      });
+
+      if (origDateStr !== dateStr) {
         changesReport.push({
-          itemId: item.id,
-          actionType: item.actionType || "UNKNOWN",
-          subjectName: item.subject?.name || "Sem Matéria",
+          itemId: nextItem.id,
+          actionType: "THEORY",
+          subjectName: nextItem.subject?.name || "Sem Matéria",
           originalDate: origDateStr,
-          newDate: newDateStr
-        });
-        
-        updatesList.push({
-          id: item.id,
-          scheduledDate: newAllocatedDate
+          newDate: dateStr
         });
       }
+
+      theoryMinutesOnDay += nextItem.estimatedMinutes || 45;
     }
+
+    // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutes
+    if (theoryMinutesOnDay < targetTheoryMinutes) {
+      const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
+      let subjectsToday: typeof eligibleSubjects = [];
+
+      if (mode === "LEGACY_TRT4") {
+        const cycleDay = (dayNumber - 1) % 6;
+        const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
+        subjectsToday = eligibleSubjects.filter(s => 
+          subjectsTodayNames.some(name => s.name.toLowerCase().includes(name.toLowerCase()))
+        );
+      } else {
+        subjectsToday = eligibleSubjects;
+      }
+
+      let blockFound = true;
+      while (theoryMinutesOnDay < targetTheoryMinutes && blockFound) {
+        blockFound = false;
+        
+        for (const subject of subjectsToday) {
+          const subjectBlocks = blocksBySubject[subject.id] || [];
+          const nextBlock = subjectBlocks.shift();
+
+          if (nextBlock) {
+            blockFound = true;
+            scheduledBlockIds.add(nextBlock.id);
+            
+            newItemsToCreate.push({
+              userId,
+              scheduleId: activeSchedule.id,
+              subjectId: nextBlock.subjectId,
+              studyBlockId: nextBlock.id,
+              actionType: "THEORY",
+              priorityScore: 90,
+              reason: `Roteiro: Teoria de ${subject.name} (Preenchimento de Lacuna)`,
+              dayNumber,
+              scheduledDate: new Date(currentDate),
+              estimatedMinutes: nextBlock.estimatedStudyMinutes || 45,
+              status: "PENDING"
+            });
+
+            changesReport.push({
+              itemId: `NEW_${nextItemIndex++}`,
+              actionType: "THEORY",
+              subjectName: subject.name,
+              originalDate: "LACUNA",
+              newDate: dateStr
+            });
+
+            theoryMinutesOnDay += nextBlock.estimatedStudyMinutes || 45;
+            if (theoryMinutesOnDay >= targetTheoryMinutes) break;
+          }
+        }
+      }
+    }
+
+    currentDate = addDays(currentDate, 1);
+    dayNumber++;
   }
 
-  // Ordenar changesReport para exibição (por data original de forma ascendente)
-  changesReport.sort((a, b) => a.originalDate.localeCompare(b.originalDate));
-
-  // Obter a última data prevista após a reorganização
-  let lastDateStr = todayStr;
-  const mappedDates = Array.from(dateMapping.values());
-  if (mappedDates.length > 0) {
-    const maxDate = new Date(Math.max(...mappedDates.map(d => d.getTime())));
-    lastDateStr = getTodayRangeSP(maxDate).dateString;
-  } else {
-    const preservedDates = allItems
-      .filter(item => !itemsToReschedule.some(r => r.id === item.id))
-      .map(item => item.scheduledDate)
-      .filter((d): d is Date => !!d);
-    if (preservedDates.length > 0) {
-      const maxDate = new Date(Math.max(...preservedDates.map(d => d.getTime())));
-      lastDateStr = getTodayRangeSP(maxDate).dateString;
-    }
-  }
-
-  // Se não estiver em dryRun, executar as atualizações em uma transação Prisma
-  if (!dryRun && updatesList.length > 0) {
-    await prisma.$transaction(
-      updatesList.map(up =>
-        (prisma as any).studyScheduleItem.update({
+  // Executar transações no banco se dryRun for false
+  if (!dryRun) {
+    await prisma.$transaction(async (tx) => {
+      // 1. Atualizar itens existentes
+      for (const up of updatesList) {
+        await (tx as any).studyScheduleItem.update({
           where: { id: up.id },
-          data: { scheduledDate: up.scheduledDate }
-        })
-      )
-    );
-    
-    // Atualizar o updatedAt do activeSchedule para hoje, para registrar que a reorganização ocorreu
-    await (prisma as any).studySchedule.update({
-      where: { id: activeSchedule.id },
-      data: { updatedAt: now }
+          data: {
+            scheduledDate: up.scheduledDate,
+            dayNumber: up.dayNumber
+          }
+        });
+      }
+
+      // 2. Criar novos itens
+      if (newItemsToCreate.length > 0) {
+        await (tx as any).studyScheduleItem.createMany({
+          data: newItemsToCreate
+        });
+      }
+
+      // 3. Atualizar cronograma
+      await (tx as any).studySchedule.update({
+        where: { id: activeSchedule.id },
+        data: { updatedAt: now }
+      });
     });
   }
+
+  const finalLastDateStr = getTodayRangeSP(addDays(currentDate, -1)).dateString;
+  const overdueItemsCount = overdueTheory.length + overdueOther.length;
+  const futureItemsShiftedCount = futureTheory.length;
+  const mergedReviewBlocksCount = overdueOther.filter(i => i.actionType === "REVIEW_BLOCK").length;
 
   return {
     success: true,
@@ -963,11 +1090,11 @@ export async function reorganizeOverdueSchedule(
     futureItemsShiftedCount,
     completedItemsPreservedCount,
     ignoredFlashcardsCount,
-    theoryDatesCount: theoryDates.length,
-    reviewOnlyDatesCount: reviewOnlyDates.length,
+    theoryDatesCount: assignedDates.size,
+    reviewOnlyDatesCount: 0,
     mergedReviewBlocksCount,
     changes: changesReport,
-    lastDateAfterReorganization: lastDateStr,
+    lastDateAfterReorganization: finalLastDateStr,
     excludedItemsPurgedCount
   };
 }
