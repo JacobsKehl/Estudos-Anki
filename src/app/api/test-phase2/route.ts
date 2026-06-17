@@ -169,6 +169,12 @@ export async function GET(req: NextRequest) {
     // Cenário 2: Validando sugestão de próximo bloco da mesma matéria (SAME_SUBJECT)
     log("Cenário 2: Validando sugestão de próximo bloco da mesma matéria (SAME_SUBJECT)...");
     const sameSubjectSuggestion = suggestions1.find((s: any) => s.type === "SAME_SUBJECT");
+    log(`[DEBUG] suggestions1: ${JSON.stringify(suggestions1)}`);
+    const debugBlock = await prisma.studyBlock.findUnique({
+      where: { id: "block-p2-a4" },
+      include: { material: true }
+    });
+    log(`[DEBUG] blockA4 in DB: ${JSON.stringify(debugBlock)}`);
     const c2Passed = sameSubjectSuggestion !== undefined &&
                      sameSubjectSuggestion.studyBlockId === blockA4.id &&
                      sameSubjectSuggestion.reason.includes("Próximo bloco desta matéria");
@@ -190,6 +196,12 @@ export async function GET(req: NextRequest) {
     await prisma.studyScheduleItem.delete({ where: { id: itemToday.id } });
 
     const suggestions2 = await getSuggestionsForTest(testUserId, blockA1.id);
+    log(`[DEBUG] suggestions2: ${JSON.stringify(suggestions2)}`);
+    const debugBlockB1 = await prisma.studyBlock.findUnique({
+      where: { id: blockB1.id },
+      include: { material: true }
+    });
+    log(`[DEBUG] blockB1 in DB: ${JSON.stringify(debugBlockB1)}`);
     const nextEligibleSuggestion = suggestions2.find((s: any) => s.type === "NEXT_ELIGIBLE");
     
     // Como deletamos blockA4, SAME_SUBJECT deve ser nulo. E itemToday deletado, TODAY_CYCLE nulo.
