@@ -1114,64 +1114,6 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
             )}
           </div>
 
-          <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-3 shadow-sm">
-            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-              <Clock className="w-4 h-4 text-accent" />
-              Tempo de Estudo
-            </h4>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-black text-foreground tabular-nums">{formatTimer(timeSpent)}</span>
-              {isTimerRunning && (
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-              )}
-            </div>
-            {step === "reading" && (
-              <div className="pt-1">
-                {startedAt === null ? (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full rounded-xl gap-2 font-bold shadow-sm h-10"
-                    onClick={() => setIsTimerRunning(true)}
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    Iniciar Leitura
-                  </Button>
-                ) : isTimerRunning ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full rounded-xl gap-2 font-bold border-amber-200 text-amber-700 hover:bg-amber-50 h-10"
-                    onClick={() => setIsTimerRunning(false)}
-                  >
-                    <Pause className="w-3.5 h-3.5 text-amber-750" />
-                    Pausar
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full rounded-xl gap-2 font-bold shadow-sm h-10"
-                    onClick={() => setIsTimerRunning(true)}
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    Retomar
-                  </Button>
-                )}
-              </div>
-            )}
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              {startedAt === null
-                ? "O cronômetro está pausado. Clique em 'Iniciar Leitura' para registrar seu tempo real."
-                : isTimerRunning
-                ? "O cronômetro está rodando. O tempo será pausado automaticamente se você se afastar por 15 minutos."
-                : "O cronômetro está pausado. Clique em 'Retomar' para continuar contando seu tempo líquido."}
-            </p>
-          </div>
-
           <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm">
             <h3 className="font-bold text-sm flex items-center gap-2 text-muted-foreground uppercase tracking-widest">
               Navegação
@@ -1224,6 +1166,60 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
             >
               Continuar Estudando
             </Button>
+          </div>
+        </div>
+      )}
+
+      {step === "reading" && (
+        <div className="fixed bottom-20 right-4 z-40 md:bottom-6 md:right-6 w-[210px] bg-background/80 backdrop-blur-xl border border-border/40 rounded-2xl p-4 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mb-1">
+              Tempo de Estudo
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-lg font-black text-foreground tabular-nums leading-none">
+                {formatTimer(timeSpent)}
+              </span>
+              {isTimerRunning && (
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center shrink-0">
+            {startedAt === null ? (
+              <Button
+                variant="primary"
+                size="icon"
+                className="w-9 h-9 rounded-xl shadow-sm"
+                onClick={() => setIsTimerRunning(true)}
+                title="Iniciar Leitura"
+              >
+                <Play className="w-4 h-4 fill-current" />
+              </Button>
+            ) : isTimerRunning ? (
+              <Button
+                variant="outline"
+                size="icon"
+                className="w-9 h-9 rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50"
+                onClick={() => setIsTimerRunning(false)}
+                title="Pausar"
+              >
+                <Pause className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="icon"
+                className="w-9 h-9 rounded-xl shadow-sm"
+                onClick={() => setIsTimerRunning(true)}
+                title="Retomar"
+              >
+                <Play className="w-4 h-4 fill-current" />
+              </Button>
+            )}
           </div>
         </div>
       )}

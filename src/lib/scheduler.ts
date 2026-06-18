@@ -299,19 +299,108 @@ async function generateLegacyTrt4Schedule(
 
           // Fallback para outra matéria ativa se não encontrar mais blocos
           if (!nextBlock) {
-            const fallbackSubjects = eligibleSubjects.filter(s => s.id !== subject.id);
-            for (const fs of fallbackSubjects) {
-              nextBlock = allPendingBlocks.find((b: any) =>
-                b.subjectId === fs.id &&
+            const fallbackCandidates = eligibleSubjects.filter(s => {
+              if (s.id === subject.id) return false;
+              return allPendingBlocks.some((b: any) =>
+                b.subjectId === s.id &&
                 !scheduledBlockIds.has(b.id)
               );
-              if (nextBlock) break;
+            });
+
+            if (fallbackCandidates.length > 0) {
+              const flattenedCycle = TRT4_STRATEGY.cycle.flat();
+              const getCycleOrder = (name: string) => {
+                const idx = flattenedCycle.findIndex(cName => 
+                  cName.toLowerCase().includes(name.toLowerCase()) ||
+                  name.toLowerCase().includes(cName.toLowerCase())
+                );
+                return idx === -1 ? 999 : idx;
+              };
+
+              const getPriorityRank = (priority: string) => {
+                if (priority === "PRIMARY") return 2;
+                if (priority === "ACTIVE") return 1;
+                return 0;
+              };
+
+              const candidatesWithScores = fallbackCandidates.map(s => {
+                const recentTheoryItems = scheduleItemsData.filter((item: any) => 
+                  item.subjectId === s.id && 
+                  item.actionType === "THEORY"
+                );
+
+                const windowStartDay = Math.max(1, dayNumber - 10);
+                const occurrencesInWindow = recentTheoryItems.filter((item: any) => 
+                  item.dayNumber >= windowStartDay && 
+                  item.dayNumber < dayNumber
+                ).length;
+
+                let lastDayStudied = 0;
+                recentTheoryItems.forEach((item: any) => {
+                  if (item.dayNumber < dayNumber && item.dayNumber > lastDayStudied) {
+                    lastDayStudied = item.dayNumber;
+                  }
+                });
+
+                const daysSinceLastStudy = lastDayStudied > 0 ? (dayNumber - lastDayStudied) : 14;
+
+                const studiedYesterday = (lastDayStudied === dayNumber - 1);
+                const penaltyYesterday = studiedYesterday ? 15 : 0;
+
+                const last7DaysStart = Math.max(1, dayNumber - 7);
+                const occurrencesLast7Days = recentTheoryItems.filter((item: any) => 
+                  item.dayNumber >= last7DaysStart && 
+                  item.dayNumber < dayNumber
+                ).length;
+                const penaltySaturated = occurrencesLast7Days >= 2 ? 10 : 0;
+
+                const score = (daysSinceLastStudy * 3) - (occurrencesInWindow * 4) - penaltyYesterday - penaltySaturated;
+
+                return {
+                  subject: s,
+                  score,
+                  occurrencesInWindow,
+                  daysSinceLastStudy
+                };
+              });
+
+              candidatesWithScores.sort((a, b) => {
+                if (b.score !== a.score) {
+                  return b.score - a.score;
+                }
+                if (a.occurrencesInWindow !== b.occurrencesInWindow) {
+                  return a.occurrencesInWindow - b.occurrencesInWindow;
+                }
+                if (b.daysSinceLastStudy !== a.daysSinceLastStudy) {
+                  return b.daysSinceLastStudy - a.daysSinceLastStudy;
+                }
+                const pA = getPriorityRank(a.subject.studyPriority);
+                const pB = getPriorityRank(b.subject.studyPriority);
+                if (pB !== pA) {
+                  return pB - pA;
+                }
+                const cOrderA = getCycleOrder(a.subject.name);
+                const cOrderB = getCycleOrder(b.subject.name);
+                if (cOrderA !== cOrderB) {
+                  return cOrderA - cOrderB;
+                }
+                return a.subject.id.localeCompare(b.subject.id);
+              });
+
+              const bestCandidate = candidatesWithScores[0]?.subject;
+              if (bestCandidate) {
+                nextBlock = allPendingBlocks.find((b: any) =>
+                  b.subjectId === bestCandidate.id &&
+                  !scheduledBlockIds.has(b.id)
+                );
+              }
             }
           }
 
           if (!nextBlock) break;
 
-          const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
+          const blockSubject = eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || subject;
+          const blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject.name);
 
           scheduleItemsData.push({
             userId,
@@ -320,7 +409,7 @@ async function generateLegacyTrt4Schedule(
             studyBlockId: nextBlock.id,
             actionType: "THEORY",
             priorityScore: 90,
-            reason: `Roteiro: Teoria de ${subject.name}`,
+            reason: `Roteiro: Teoria de ${blockSubject.name}`,
             dayNumber,
             scheduledDate: candidateDate,
             estimatedMinutes: blockMins,

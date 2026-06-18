@@ -14,7 +14,7 @@ import { toast } from "sonner";
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 type ActionType =
-  | "THEORY" | "REVIEW_BLOCK";
+  | "THEORY" | "REVIEW_BLOCK" | "REVIEW_FLASHCARDS";
 
 interface TodayTaskCardProps {
   item: any;
@@ -46,6 +46,13 @@ const ACTION_CONFIG: Record<ActionType, {
     bgColor: "bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30",
     badgeColor: "border border-emerald-200 bg-[#e6f4ea] text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800/30 dark:text-emerald-200",
   },
+  REVIEW_FLASHCARDS: {
+    label: "Revisão Cards",
+    icon: BrainCircuit,
+    color: "text-purple-600",
+    bgColor: "bg-purple-50/50 dark:bg-purple-950/10 border-purple-100 dark:border-purple-900/30",
+    badgeColor: "border border-purple-200 bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:border-purple-800/30 dark:text-purple-200",
+  },
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -56,8 +63,12 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
   const [isDone, setIsDone] = useState(item.status === "COMPLETED");
   const router = useRouter();
 
-  const actionType = ((item.actionType === "THEORY" || item.actionType === "REVIEW_BLOCK") ? item.actionType : "THEORY") as ActionType;
+  const actionType = ((item.actionType === "THEORY" || item.actionType === "REVIEW_BLOCK" || item.actionType === "REVIEW_FLASHCARDS") ? item.actionType : "THEORY") as ActionType;
   const config = ACTION_CONFIG[actionType];
+
+  const isFlashcard = item.actionType === "REVIEW_FLASHCARDS";
+  const displaySubject = isFlashcard ? "Revisão Geral" : (item.subject?.name || "Matéria");
+  const displayTitle = isFlashcard ? "Revisão Geral de Flashcards" : (item.studyBlock?.title || "Bloco");
 
   const flashcardCount = item.studyBlock?._count?.flashcards ?? 0;
   const hasFlashcards = flashcardCount > 0;
@@ -88,9 +99,10 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
     setIsCompleting(true);
 
     try {
-      const stepMap: Record<ActionType, "THEORY" | "THEORY"> = {
+      const stepMap: Record<ActionType, "THEORY"> = {
         THEORY: "THEORY",
         REVIEW_BLOCK: "THEORY",
+        REVIEW_FLASHCARDS: "THEORY",
       };
       const step = stepMap[actionType];
 
@@ -131,11 +143,11 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-bold text-xs text-[#25324A] dark:text-foreground/90">
-                  {item.subject?.name}
+                  {displaySubject}
                 </span>
                 
                 <span className="px-2 py-0.5 rounded bg-[#EAF2E4] dark:bg-[#4F6F45]/20 text-[#4F6F45] dark:text-[#d1e2c4] border border-[#C8D8B8] dark:border-[#C8D8B8]/20 text-[9px] uppercase tracking-wider font-bold">
-                  Revisão de Conteúdo
+                  {isFlashcard ? "Revisão Geral de Cards" : "Revisão de Conteúdo"}
                 </span>
 
                 {flashcardCount > 0 && (
@@ -146,7 +158,7 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
                 )}
               </div>
               <p className="text-sm font-semibold text-[#25324A] dark:text-foreground/80 leading-snug">
-                {item.studyBlock?.title}
+                {displayTitle}
               </p>
             </div>
           </div>
@@ -184,7 +196,7 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
 
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-sm">{item.subject?.name}</span>
+              <span className="font-semibold text-sm">{displaySubject}</span>
               <span className={`px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wider font-bold ${config.badgeColor}`}>
                 {config.label}
               </span>
@@ -194,9 +206,9 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
                 </span>
               )}
             </div>
-            {item.studyBlock && (
+            {(item.studyBlock || isFlashcard) && (
               <p className="text-sm font-medium text-foreground/80 mt-0.5">
-                {item.studyBlock.title}
+                {displayTitle}
               </p>
             )}
           </div>

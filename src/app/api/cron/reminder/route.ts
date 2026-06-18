@@ -83,13 +83,17 @@ function generateEmailHtml(
               else if (t.actionType === "REVIEW_FLASHCARDS") actionLabel = "Revisar Cards";
               else if (t.actionType === "REINFORCEMENT") actionLabel = "Reforço";
 
+              const isFlashcard = t.actionType === "REVIEW_FLASHCARDS";
+              const subj = isFlashcard ? "Revisão Geral" : (t.subject?.name || "Matéria");
+              const title = isFlashcard ? "Revisão Geral de Flashcards" : (t.studyBlock?.title || "Bloco de Estudo");
+
               return `
                 <li style="margin-bottom: 16px; font-size: 15px; color: #2d3748; list-style-type: none; padding-left: 12px; border-left: 3px solid #869774;">
-                  <div style="font-weight: 700; color: #2d3748; font-size: 15px;">
-                    ${t.subject?.name || "Matéria"}
+                   <div style="font-weight: 700; color: #2d3748; font-size: 15px;">
+                    ${subj}
                   </div>
                   <div style="font-size: 14px; color: #4a5568; margin-top: 2px;">
-                    <strong>Bloco:</strong> ${t.studyBlock?.title || "Bloco de Estudo"}
+                    <strong>Bloco:</strong> ${title}
                   </div>
                   ${pdfHtml}
                   <div style="font-size: 13px; color: #718096; margin-top: 4px;">
@@ -113,12 +117,17 @@ function generateEmailHtml(
     yesterdayCompletedList.length > 0
       ? yesterdayCompletedList
           .map(
-            (t) => `
+            (t) => {
+              const isFlashcard = t.actionType === "REVIEW_FLASHCARDS";
+              const subj = isFlashcard ? "Revisão Geral" : (t.subject?.name || "Matéria");
+              const title = isFlashcard ? "Revisão Geral de Flashcards" : (t.studyBlock?.title || "Bloco de Estudo");
+              return `
         <li style="margin-bottom: 6px; font-size: 14px; color: #2f855a; list-style-type: none; padding-left: 0;">
           <span style="margin-right: 6px; font-weight: bold;">✓</span>
-          <strong>${t.subject?.name || "Matéria"}:</strong> ${t.studyBlock?.title || "Bloco de Estudo"}
+          <strong>${subj}:</strong> ${title}
         </li>
-      `
+      `;
+            }
           )
           .join("")
       : `<li style="font-size: 14px; color: #718096; list-style-type: none;">Nenhuma matéria concluída ontem.</li>`;
@@ -127,12 +136,17 @@ function generateEmailHtml(
     yesterdayPendingList.length > 0
       ? yesterdayPendingList
           .map(
-            (t) => `
+            (t) => {
+              const isFlashcard = t.actionType === "REVIEW_FLASHCARDS";
+              const subj = isFlashcard ? "Revisão Geral" : (t.subject?.name || "Matéria");
+              const title = isFlashcard ? "Revisão Geral de Flashcards" : (t.studyBlock?.title || "Bloco de Estudo");
+              return `
         <li style="margin-bottom: 6px; font-size: 14px; color: #c53030; list-style-type: none; padding-left: 0;">
           <span style="margin-right: 6px; font-weight: bold;">⚠</span>
-          <strong>${t.subject?.name || "Matéria"}:</strong> ${t.studyBlock?.title || "Bloco de Estudo"} (Pendente)
+          <strong>${subj}:</strong> ${title} (Pendente)
         </li>
-      `
+      `;
+            }
           )
           .join("")
       : "";

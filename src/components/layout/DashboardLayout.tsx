@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { MobileNav } from "./mobile-nav";
-import { StudyTimer } from "@/components/study/study-timer";
 
 const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password", "/auth/callback"];
 
@@ -32,7 +31,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <MobileNav />
-      <StudyTimer />
     </div>
   );
 }
