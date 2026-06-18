@@ -9,7 +9,8 @@ import {
   Sparkles,
   Target,
   Layers,
-  Calendar
+  Calendar,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -314,26 +315,34 @@ export default async function Dashboard() {
         <div className="space-y-10">
           <NextDayStudySession userId={userId} />
           {reviewTasks.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40">
+            <details className="group space-y-4 [&_summary::-webkit-details-marker]:hidden">
+              <summary className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40 cursor-pointer list-none select-none">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-1 h-5 bg-accent rounded-full" />
                     <RotateCw className="w-4 h-4 text-accent" />
                     <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Revisões de Conteúdo</h2>
+                    <Badge variant="outline" className="ml-1 rounded-lg bg-sage-light/20 text-accent border-sage-light/40 font-bold px-2.5 py-0.5 text-[10px]">
+                      {reviewTasks.length}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-accent uppercase tracking-wider bg-sage-light/10 dark:bg-accent/5 px-2.5 py-1 rounded-lg border border-sage-light/30 dark:border-accent/10 hover:bg-sage-light/20 transition-colors">
+                    <span className="group-open:hidden">Expandir</span>
+                    <span className="hidden group-open:inline">Recolher</span>
+                    <ChevronDown className="w-3.5 h-3.5 group-open:rotate-180 transition-transform duration-300" />
                   </div>
                 </div>
                 <p className="text-[11px] text-muted-foreground/80 font-medium">
                   Materiais de apoio relacionados aos cards ainda ativos.
                 </p>
-              </div>
+              </summary>
 
-              <div className="space-y-3">
+              <div className="space-y-3 pt-2 animate-in fade-in duration-300">
                 {reviewTasks.map((item, idx) => (
                   <TodayTaskCard key={item.id} item={item} index={idx + 1} variant="review" />
                 ))}
               </div>
-            </section>
+            </details>
           )}
         </div>
       ) : (
@@ -407,26 +416,34 @@ export default async function Dashboard() {
 
       {/* ══ SEÇÃO 2: REVISÕES DE CONTEÚDO ═══ checklist compacto ═══════════════ */}
       {reviewTasks.length > 0 && (
-        <section className="space-y-4">
-          <div className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40">
+        <details className="group space-y-4 [&_summary::-webkit-details-marker]:hidden">
+          <summary className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40 cursor-pointer list-none select-none">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-1 h-5 bg-accent rounded-full" />
                 <RotateCw className="w-4 h-4 text-accent" />
                 <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Revisões de Conteúdo</h2>
+                <Badge variant="outline" className="ml-1 rounded-lg bg-sage-light/20 text-accent border-sage-light/40 font-bold px-2.5 py-0.5 text-[10px]">
+                  {reviewTasks.length}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-accent uppercase tracking-wider bg-sage-light/10 dark:bg-accent/5 px-2.5 py-1 rounded-lg border border-sage-light/30 dark:border-accent/10 hover:bg-sage-light/20 transition-colors">
+                <span className="group-open:hidden">Expandir</span>
+                <span className="hidden group-open:inline">Recolher</span>
+                <ChevronDown className="w-3.5 h-3.5 group-open:rotate-180 transition-transform duration-300" />
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground/80 font-medium">
               Materiais de apoio relacionados aos cards ainda ativos.
             </p>
-          </div>
+          </summary>
 
-          <div className="space-y-3">
+          <div className="space-y-3 pt-2 animate-in fade-in duration-300">
             {reviewTasks.map((item, idx) => (
               <TodayTaskCard key={item.id} item={item} index={idx + 1} variant="review" />
             ))}
           </div>
-        </section>
+        </details>
       )}
 
       {/* ══ SEÇÃO 3: CARDS DO DIA ═══ unified: today contents + spaced review ══ */}
