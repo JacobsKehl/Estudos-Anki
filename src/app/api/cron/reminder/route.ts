@@ -6,6 +6,7 @@ import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { getUserCopy } from "@/lib/user-copy";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { reorganizeActiveSchedule } from "@/lib/scheduler";
 
 export const dynamic = "force-dynamic";
 
@@ -330,6 +331,15 @@ async function processUserReminder(
     };
   }
 
+  // 0. Reorganizar o cronograma ativo antes de buscar as tarefas (Frente C)
+  try {
+    const reorgResult = await reorganizeActiveSchedule(user.id, 30);
+    console.log(`[CRON] Cronograma do usuário ${user.id} reorganizado com sucesso. Itens afetados: ${reorgResult?.itemsCount}`);
+  } catch (reorgErr: any) {
+    console.error(`[CRON] Falha crítica na reorganização do cronograma para o usuário ${user.id}:`, reorgErr);
+    throw new Error(`Falha ao reorganizar cronograma ativo do usuário: ${reorgErr.message || reorgErr}`);
+  }
+
   // 1. Obter itens do cronograma de ontem
   const yesterdayItems = await (prisma as any).studyScheduleItem.findMany({
     where: {
@@ -353,9 +363,6 @@ async function processUserReminder(
     (i: any) => i.status !== "COMPLETED" && i.status !== "SKIPPED"
   ).length;
   const yesterdaySkipped = yesterdayItems.filter((i: any) => i.status === "SKIPPED").length;
-
-  // H4 - REMOVIDO: reorganizeActiveSchedule(user.id, 30);
-  // O cron de e-mail agora é 100% read-only para evitar alterações inesperadas no cronograma.
 
   // 2. Obter itens agendados para hoje
   const todayItems = await (prisma as any).studyScheduleItem.findMany({

@@ -30,13 +30,10 @@ export const TRT4_STRATEGY = {
     { name: "Discursiva", examWeight: 1, isCoreSubject: false, cycleStartAfterDays: 90 },
   ] as SubjectConfig[],
 
-  // 6-day cycle definition (subject names)
+  // 3-day cycle definition (subject names)
   cycle: [
     ["Direito do Trabalho", "Língua Portuguesa"],
     ["Direito Processual do Trabalho", "Direito Administrativo"],
-    ["Direito Constitucional", "Direito Civil"],
-    ["Direito Processual Civil", "Direito do Trabalho"],
-    ["Direito Processual do Trabalho", "Língua Portuguesa"],
-    ["Direito Administrativo", "Direito Processual Civil"],
+    ["Direito Constitucional", "Direito Processual Civil"],
   ]
 };

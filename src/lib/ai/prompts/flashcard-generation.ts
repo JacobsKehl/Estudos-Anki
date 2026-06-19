@@ -13,6 +13,7 @@ export interface FlashcardPromptOptions {
   materialTitle?: string | null;
   examGoal?: string | null;
   focusArea?: string | null;
+  existingQuestions?: string[];
 }
 
 export function buildFlashcardPrompt(
@@ -36,7 +37,8 @@ export function buildFlashcardPrompt(
     blockTitle = "Conteúdo",
     materialTitle = "Material",
     examGoal = "Estudos gerais",
-    focusArea = "Geral"
+    focusArea = "Geral",
+    existingQuestions = []
   } = options;
 
   const goal = examGoal || "Estudos gerais";
@@ -125,5 +127,11 @@ Retorne estritamente um array JSON válido (sem comentários, sem blocos markdow
   }
 ]`;
 
-  return `${prompt}\n\nDificuldade desejada: ${difficultyLabel}\n\nTexto base para extração:\n${blockText}`;
+  const exclusionGuidelines = existingQuestions.length > 0
+    ? `\n\nREGRAS DE EVITAR DUPLICIDADE (MANDATÓRIO):
+Os flashcards abaixo já existem para este bloco de estudos. Você NÃO deve criar novos cards sobre os mesmos pontos ou fazer perguntas com respostas análogas ou formulações muito próximas das existentes. Explore outros conceitos importantes contidos no texto base:
+${existingQuestions.map((q, idx) => `  - Pergunta existente ${idx + 1}: "${q}"`).join("\n")}`
+    : "";
+
+  return `${prompt}${exclusionGuidelines}\n\nDificuldade desejada: ${difficultyLabel}\n\nTexto base para extração:\n${blockText}`;
 }

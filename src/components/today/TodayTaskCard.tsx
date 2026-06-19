@@ -60,6 +60,7 @@ const ACTION_CONFIG: Record<ActionType, {
 export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: TodayTaskCardProps) {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingMore, setIsGeneratingMore] = useState(false);
   const [isDone, setIsDone] = useState(item.status === "COMPLETED");
   const router = useRouter();
 
@@ -91,6 +92,27 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
       toast.error(err.message || "Erro ao gerar flashcards com IA.", { id: toastId });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateMoreCards = async () => {
+    if (!item.studyBlockId) return;
+    setIsGeneratingMore(true);
+    const toastId = toast.loading("Analisando conteúdo e gerando mais flashcards adicionais...");
+    try {
+      const res = await fetch(`/api/blocks/${item.studyBlockId}/flashcards/generate-more`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao gerar flashcards adicionais");
+      }
+      toast.success(data.message || `${data.count} novos flashcards gerados!`, { id: toastId });
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar mais flashcards com IA.", { id: toastId });
+    } finally {
+      setIsGeneratingMore(false);
     }
   };
 
@@ -179,6 +201,17 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
       </div>
     );
   }
+  const isBlockCompleted = item.studyBlock?.status === "COMPLETED";
+  const isSubjectExcluded = item.studyBlock?.subject?.studyPriority === "EXCLUDED";
+  const isSupportMaterial = item.studyBlock?.material?.materialRole === "SUPPORT_MATERIAL";
+  const showGenerateMore = 
+    !isFlashcard && 
+    !!item.studyBlockId && 
+    isBlockCompleted && 
+    !isSubjectExcluded && 
+    !isSupportMaterial && 
+    item.actionType === "THEORY" &&
+    hasFlashcards;
 
   return (
     <div
@@ -291,15 +324,34 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
             {item.studyBlockId && (
               <>
                 {hasFlashcards ? (
-                  <Button
-                    size="sm"
-                    variant="soft"
-                    className="w-full sm:w-auto rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all"
-                    onClick={() => router.push(`/practice?blockId=${item.studyBlockId}`)}
-                  >
-                    <BrainCircuit className="w-3.5 h-3.5" />
-                    Praticar Cards ({flashcardCount})
-                  </Button>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <Button
+                      size="sm"
+                      variant="soft"
+                      className="w-full sm:w-auto rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all"
+                      onClick={() => router.push(`/practice?blockId=${item.studyBlockId}`)}
+                    >
+                      <BrainCircuit className="w-3.5 h-3.5" />
+                      Praticar Cards ({flashcardCount})
+                    </Button>
+                    
+                    {showGenerateMore && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full sm:w-auto rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all border-dashed border-accent/60 text-accent hover:bg-accent/5"
+                        onClick={handleGenerateMoreCards}
+                        disabled={isGeneratingMore}
+                      >
+                        {isGeneratingMore ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5 text-accent" />
+                        )}
+                        <span>{isGeneratingMore ? "Gerando mais..." : "Gerar mais cards"}</span>
+                      </Button>
+                    )}
+                  </div>
                 ) : (
                   <Button
                     size="sm"

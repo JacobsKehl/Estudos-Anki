@@ -116,6 +116,107 @@ export async function getOrComputeBlockMinutes(block: any, subjectName: string):
   return computedMinutes;
 }
 
+function getFallbackSubjectForSlot(
+  eligibleSubjects: any[],
+  allPendingBlocks: any[],
+  scheduledBlockIds: Set<string>,
+  scheduleItemsData: any[],
+  newItemsToCreate: any[],
+  updatesList: any[],
+  dayNumber: number
+) {
+  const fallbackCandidates = eligibleSubjects.filter(s => {
+    return allPendingBlocks.some((b: any) =>
+      b.subjectId === s.id &&
+      !scheduledBlockIds.has(b.id)
+    );
+  });
+
+  if (fallbackCandidates.length === 0) return null;
+
+  const flattenedCycle = TRT4_STRATEGY.cycle.flat();
+  const getCycleOrder = (name: string) => {
+    const idx = flattenedCycle.findIndex(cName => 
+      cName.toLowerCase().includes(name.toLowerCase()) ||
+      name.toLowerCase().includes(cName.toLowerCase())
+    );
+    return idx === -1 ? 999 : idx;
+  };
+
+  const getPriorityRank = (priority: string) => {
+    if (priority === "PRIMARY") return 2;
+    if (priority === "ACTIVE") return 1;
+    return 0;
+  };
+
+  const candidatesWithScores = fallbackCandidates.map(s => {
+    const recentTheoryItems = [
+      ...scheduleItemsData.filter((item: any) => item.subjectId === s.id && item.actionType === "THEORY"),
+      ...newItemsToCreate.filter((item: any) => item.subjectId === s.id && item.actionType === "THEORY"),
+      ...updatesList.filter((item: any) => item.subjectId === s.id && item.actionType === "THEORY")
+    ];
+
+    const windowStartDay = Math.max(1, dayNumber - 10);
+    const occurrencesInWindow = recentTheoryItems.filter((item: any) => 
+      item.dayNumber >= windowStartDay && 
+      item.dayNumber < dayNumber
+    ).length;
+
+    let lastDayStudied = 0;
+    recentTheoryItems.forEach((item: any) => {
+      if (item.dayNumber < dayNumber && item.dayNumber > lastDayStudied) {
+        lastDayStudied = item.dayNumber;
+      }
+    });
+
+    const daysSinceLastStudy = lastDayStudied > 0 ? (dayNumber - lastDayStudied) : 14;
+
+    const studiedYesterday = (lastDayStudied === dayNumber - 1);
+    const penaltyYesterday = studiedYesterday ? 15 : 0;
+
+    const last7DaysStart = Math.max(1, dayNumber - 7);
+    const occurrencesLast7Days = recentTheoryItems.filter((item: any) => 
+      item.dayNumber >= last7DaysStart && 
+      item.dayNumber < dayNumber
+    ).length;
+    const penaltySaturated = occurrencesLast7Days >= 2 ? 10 : 0;
+
+    const score = (daysSinceLastStudy * 3) - (occurrencesInWindow * 4) - penaltyYesterday - penaltySaturated;
+
+    return {
+      subject: s,
+      score,
+      occurrencesInWindow,
+      daysSinceLastStudy
+    };
+  });
+
+  candidatesWithScores.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    if (a.occurrencesInWindow !== b.occurrencesInWindow) {
+      return a.occurrencesInWindow - b.occurrencesInWindow;
+    }
+    if (b.daysSinceLastStudy !== a.daysSinceLastStudy) {
+      return b.daysSinceLastStudy - a.daysSinceLastStudy;
+    }
+    const pA = getPriorityRank(a.subject.studyPriority);
+    const pB = getPriorityRank(b.subject.studyPriority);
+    if (pB !== pA) {
+      return pB - pA;
+    }
+    const cOrderA = getCycleOrder(a.subject.name);
+    const cOrderB = getCycleOrder(b.subject.name);
+    if (cOrderA !== cOrderB) {
+      return cOrderA - cOrderB;
+    }
+    return a.subject.id.localeCompare(b.subject.id);
+  });
+
+  return candidatesWithScores[0]?.subject || null;
+}
+
 // ─── Smart Schedule Generator ─────────────────────────────────────────────────
 
 export interface ScheduleGenerationResult {
@@ -248,7 +349,7 @@ async function generateLegacyTrt4Schedule(
       const dayNumber = nextStudyDayNumber;
       nextStudyDayNumber++;
       
-      const cycleDay = cycleDayIndex % 6;
+      const cycleDay = cycleDayIndex % TRT4_STRATEGY.cycle.length;
       cycleDayIndex++;
       
       const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
@@ -282,124 +383,49 @@ async function generateLegacyTrt4Schedule(
 
       const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
       const theoryMinutes = dailyMinutes - 30;
-      const targetPerSubject = theoryMinutes / 2;
       let remainingTheoryMinutes = theoryMinutes;
 
       for (let i = 0; i < subjectsToSchedule.length; i++) {
-        const subject = subjectsToSchedule[i];
-        const targetForThisSubject = i === 0 ? Math.min(targetPerSubject, remainingTheoryMinutes) : remainingTheoryMinutes;
-        let scheduledMinutesForThisSubject = 0;
+        const targetSubject = subjectsToSchedule[i];
 
-        while (scheduledMinutesForThisSubject < targetForThisSubject) {
-          // Encontra o próximo bloco
-          let nextBlock = allPendingBlocks.find((b: any) =>
-            b.subjectId === subject.id &&
-            !scheduledBlockIds.has(b.id)
+        // Encontra o próximo bloco
+        let nextBlock = allPendingBlocks.find((b: any) =>
+          b.subjectId === targetSubject.id &&
+          !scheduledBlockIds.has(b.id)
+        );
+
+        // Se não encontrar, aciona fallback balanceado para preencher o slot obrigatório
+        if (!nextBlock) {
+          const fallbackSubject = getFallbackSubjectForSlot(
+            eligibleSubjects,
+            allPendingBlocks,
+            scheduledBlockIds,
+            scheduleItemsData,
+            [],
+            [],
+            dayNumber
           );
+          if (fallbackSubject) {
+            nextBlock = allPendingBlocks.find((b: any) =>
+              b.subjectId === fallbackSubject.id &&
+              !scheduledBlockIds.has(b.id)
+            );
+          }
+        }
 
-          // Fallback para outra matéria ativa se não encontrar mais blocos
-          if (!nextBlock) {
-            const fallbackCandidates = eligibleSubjects.filter(s => {
-              if (s.id === subject.id) return false;
-              return allPendingBlocks.some((b: any) =>
-                b.subjectId === s.id &&
-                !scheduledBlockIds.has(b.id)
-              );
-            });
+        if (nextBlock) {
+          // Evitar duplicidade de studyBlockId no mesmo dia
+          const dayBlockIds = scheduleItemsData
+            .filter((item: any) => item.dayNumber === dayNumber && item.studyBlockId)
+            .map((item: any) => item.studyBlockId);
 
-            if (fallbackCandidates.length > 0) {
-              const flattenedCycle = TRT4_STRATEGY.cycle.flat();
-              const getCycleOrder = (name: string) => {
-                const idx = flattenedCycle.findIndex(cName => 
-                  cName.toLowerCase().includes(name.toLowerCase()) ||
-                  name.toLowerCase().includes(cName.toLowerCase())
-                );
-                return idx === -1 ? 999 : idx;
-              };
-
-              const getPriorityRank = (priority: string) => {
-                if (priority === "PRIMARY") return 2;
-                if (priority === "ACTIVE") return 1;
-                return 0;
-              };
-
-              const candidatesWithScores = fallbackCandidates.map(s => {
-                const recentTheoryItems = scheduleItemsData.filter((item: any) => 
-                  item.subjectId === s.id && 
-                  item.actionType === "THEORY"
-                );
-
-                const windowStartDay = Math.max(1, dayNumber - 10);
-                const occurrencesInWindow = recentTheoryItems.filter((item: any) => 
-                  item.dayNumber >= windowStartDay && 
-                  item.dayNumber < dayNumber
-                ).length;
-
-                let lastDayStudied = 0;
-                recentTheoryItems.forEach((item: any) => {
-                  if (item.dayNumber < dayNumber && item.dayNumber > lastDayStudied) {
-                    lastDayStudied = item.dayNumber;
-                  }
-                });
-
-                const daysSinceLastStudy = lastDayStudied > 0 ? (dayNumber - lastDayStudied) : 14;
-
-                const studiedYesterday = (lastDayStudied === dayNumber - 1);
-                const penaltyYesterday = studiedYesterday ? 15 : 0;
-
-                const last7DaysStart = Math.max(1, dayNumber - 7);
-                const occurrencesLast7Days = recentTheoryItems.filter((item: any) => 
-                  item.dayNumber >= last7DaysStart && 
-                  item.dayNumber < dayNumber
-                ).length;
-                const penaltySaturated = occurrencesLast7Days >= 2 ? 10 : 0;
-
-                const score = (daysSinceLastStudy * 3) - (occurrencesInWindow * 4) - penaltyYesterday - penaltySaturated;
-
-                return {
-                  subject: s,
-                  score,
-                  occurrencesInWindow,
-                  daysSinceLastStudy
-                };
-              });
-
-              candidatesWithScores.sort((a, b) => {
-                if (b.score !== a.score) {
-                  return b.score - a.score;
-                }
-                if (a.occurrencesInWindow !== b.occurrencesInWindow) {
-                  return a.occurrencesInWindow - b.occurrencesInWindow;
-                }
-                if (b.daysSinceLastStudy !== a.daysSinceLastStudy) {
-                  return b.daysSinceLastStudy - a.daysSinceLastStudy;
-                }
-                const pA = getPriorityRank(a.subject.studyPriority);
-                const pB = getPriorityRank(b.subject.studyPriority);
-                if (pB !== pA) {
-                  return pB - pA;
-                }
-                const cOrderA = getCycleOrder(a.subject.name);
-                const cOrderB = getCycleOrder(b.subject.name);
-                if (cOrderA !== cOrderB) {
-                  return cOrderA - cOrderB;
-                }
-                return a.subject.id.localeCompare(b.subject.id);
-              });
-
-              const bestCandidate = candidatesWithScores[0]?.subject;
-              if (bestCandidate) {
-                nextBlock = allPendingBlocks.find((b: any) =>
-                  b.subjectId === bestCandidate.id &&
-                  !scheduledBlockIds.has(b.id)
-                );
-              }
-            }
+          if (dayBlockIds.includes(nextBlock.id)) {
+            // Para evitar loop infinito, marca como agendado em memória temporária
+            scheduledBlockIds.add(nextBlock.id);
+            continue;
           }
 
-          if (!nextBlock) break;
-
-          const blockSubject = eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || subject;
+          const blockSubject = eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
           const blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject.name);
 
           scheduleItemsData.push({
@@ -417,8 +443,71 @@ async function generateLegacyTrt4Schedule(
           });
 
           scheduledBlockIds.add(nextBlock.id);
-          scheduledMinutesForThisSubject += blockMins;
           remainingTheoryMinutes -= blockMins;
+        }
+      }
+
+      // C. Terceiro bloco complementar por capacidade (Direito Civil ou fallback)
+      if (remainingTheoryMinutes >= 30) {
+        const civilSubject = eligibleSubjects.find(s => s.name.toLowerCase().includes("direito civil"));
+        let thirdBlock = null;
+
+        if (civilSubject) {
+          thirdBlock = allPendingBlocks.find((b: any) =>
+            b.subjectId === civilSubject.id &&
+            !scheduledBlockIds.has(b.id)
+          );
+        }
+
+        // Se Direito Civil não tiver blocos, aciona fallback balanceado
+        if (!thirdBlock) {
+          const fallbackSubject = getFallbackSubjectForSlot(
+            eligibleSubjects,
+            allPendingBlocks,
+            scheduledBlockIds,
+            scheduleItemsData,
+            [],
+            [],
+            dayNumber
+          );
+          if (fallbackSubject) {
+            thirdBlock = allPendingBlocks.find((b: any) =>
+              b.subjectId === fallbackSubject.id &&
+              !scheduledBlockIds.has(b.id)
+            );
+          }
+        }
+
+        if (thirdBlock) {
+          // Evitar duplicidade de studyBlockId no mesmo dia
+          const dayBlockIds = scheduleItemsData
+            .filter((item: any) => item.dayNumber === dayNumber && item.studyBlockId)
+            .map((item: any) => item.studyBlockId);
+
+          if (!dayBlockIds.includes(thirdBlock.id)) {
+            const blockSubject = eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
+            const blockMins = await getOrComputeBlockMinutes(thirdBlock, blockSubject?.name || "Complementar");
+
+            // Só adiciona se o bloco complementar não estourar de forma relevante
+            if (blockMins <= remainingTheoryMinutes + 15) {
+              scheduleItemsData.push({
+                userId,
+                scheduleId: schedule.id,
+                subjectId: thirdBlock.subjectId,
+                studyBlockId: thirdBlock.id,
+                actionType: "THEORY",
+                priorityScore: 80, // prioridade complementar
+                reason: `Roteiro: Teoria de ${blockSubject?.name || "Complementar"} (Complemento)`,
+                dayNumber,
+                scheduledDate: candidateDate,
+                estimatedMinutes: blockMins,
+                status: "PENDING",
+              });
+
+              scheduledBlockIds.add(thirdBlock.id);
+              remainingTheoryMinutes -= blockMins;
+            }
+          }
         }
       }
     }
@@ -892,6 +981,8 @@ export async function reorganizeOverdueSchedule(
     s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
   );
   const eligibleSubjectIds = eligibleSubjects.map(s => s.id);
+  let activeSecondaryIndex = 0;
+  const activeSecondarySubjects = eligibleSubjects.filter(s => s.studyPriority === "ACTIVE");
 
   // Filtrar itens apenas das matérias elegíveis
   const activeEligiblePendingItems = eligiblePendingItems.filter(
@@ -1078,30 +1169,66 @@ export async function reorganizeOverdueSchedule(
     // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutes
     if (theoryMinutesOnDay < targetTheoryMinutes) {
       const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
-      let subjectsToday: typeof eligibleSubjects = [];
 
       if (mode === "LEGACY_TRT4") {
-        const cycleDay = (dayNumber - 1) % 6;
+        const cycleDay = (dayNumber - 1) % TRT4_STRATEGY.cycle.length;
         const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
-        subjectsToday = eligibleSubjects.filter(s => 
-          subjectsTodayNames.some(name => s.name.toLowerCase().includes(name.toLowerCase()))
-        );
-      } else {
-        subjectsToday = eligibleSubjects;
-      }
 
-      let blockFound = true;
-      while (theoryMinutesOnDay < targetTheoryMinutes && blockFound) {
-        blockFound = false;
-        
-        for (const subject of subjectsToday) {
-          const subjectBlocks = blocksBySubject[subject.id] || [];
-          const nextBlock = subjectBlocks.shift();
+        // 1. Obter as duas matérias do ciclo
+        const subName1 = subjectsTodayNames[0];
+        let subName2 = subjectsTodayNames[1];
+
+        // Intercalação de matéria ativa se aplicável
+        if (activeSecondarySubjects.length > 0 && dayNumber % 3 === 0) {
+          const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
+          subName2 = secSubject.name;
+          activeSecondaryIndex++;
+        }
+
+        const subject1 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName1.toLowerCase()));
+        const subject2 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName2.toLowerCase()));
+        const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
+
+        // Para cada uma das duas matérias obrigatórias, tentar agendar um bloco
+        for (const targetSubject of subjectsToSchedule) {
+          if (theoryMinutesOnDay >= targetTheoryMinutes) break;
+
+          let nextBlock = (blocksBySubject[targetSubject.id] || []).shift();
+
+          // Fallback se não houver mais blocos pendentes para a matéria do ciclo
+          if (!nextBlock) {
+            const fallbackSubject = getFallbackSubjectForSlot(
+              eligibleSubjects,
+              dbPendingBlocks, // todos os blocos pendentes da DB
+              scheduledBlockIds,
+              [], // itens gerados
+              newItemsToCreate, // novos itens
+              updatesList, // itens atualizados
+              dayNumber
+            );
+            if (fallbackSubject) {
+              nextBlock = (blocksBySubject[fallbackSubject.id] || []).shift();
+            }
+          }
 
           if (nextBlock) {
-            blockFound = true;
+            // Evitar duplicidade de studyBlockId no mesmo dia
+            const dayBlockIds = [
+              ...preservedTheoryOnDay.map((item: any) => item.studyBlockId),
+              ...updatesList.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId),
+              ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId)
+            ].filter(Boolean);
+
+            if (dayBlockIds.includes(nextBlock.id)) {
+              // Se já foi agendado hoje, marcamos como agendado em memória para evitar loop infinito
+              scheduledBlockIds.add(nextBlock.id);
+              continue;
+            }
+
             scheduledBlockIds.add(nextBlock.id);
-            
+            const blockSubject = eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
+            const blockMins = nextBlock.estimatedStudyMinutes || 45;
+
             newItemsToCreate.push({
               userId,
               scheduleId: activeSchedule.id,
@@ -1109,23 +1236,136 @@ export async function reorganizeOverdueSchedule(
               studyBlockId: nextBlock.id,
               actionType: "THEORY",
               priorityScore: 90,
-              reason: `Roteiro: Teoria de ${subject.name} (Preenchimento de Lacuna)`,
+              reason: `Roteiro: Teoria de ${blockSubject.name} (Preenchimento de Lacuna)`,
               dayNumber,
               scheduledDate: new Date(currentDate),
-              estimatedMinutes: nextBlock.estimatedStudyMinutes || 45,
+              estimatedMinutes: blockMins,
               status: "PENDING"
             });
 
             changesReport.push({
               itemId: `NEW_${nextItemIndex++}`,
               actionType: "THEORY",
-              subjectName: subject.name,
+              subjectName: blockSubject.name,
               originalDate: "LACUNA",
               newDate: dateStr
             });
 
-            theoryMinutesOnDay += nextBlock.estimatedStudyMinutes || 45;
-            if (theoryMinutesOnDay >= targetTheoryMinutes) break;
+            theoryMinutesOnDay += blockMins;
+          }
+        }
+
+        // 2. Avaliar terceiro bloco complementar se ainda houver capacidade (>= 30 min e < 90 min)
+        const remainingCapacity = targetTheoryMinutes - theoryMinutesOnDay;
+        if (remainingCapacity >= 30) {
+          const civilSubject = eligibleSubjects.find(s => s.name.toLowerCase().includes("direito civil"));
+          let thirdBlock = civilSubject ? (blocksBySubject[civilSubject.id] || []).shift() : null;
+
+          // Se Direito Civil não tiver blocos, aciona fallback
+          if (!thirdBlock) {
+            const fallbackSubject = getFallbackSubjectForSlot(
+              eligibleSubjects,
+              dbPendingBlocks,
+              scheduledBlockIds,
+              [],
+              newItemsToCreate,
+              updatesList,
+              dayNumber
+            );
+            if (fallbackSubject) {
+              thirdBlock = (blocksBySubject[fallbackSubject.id] || []).shift();
+            }
+          }
+
+          if (thirdBlock) {
+            const blockSubject = eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
+            const blockMins = thirdBlock.estimatedStudyMinutes || 45;
+
+            // Evitar duplicidade de studyBlockId no mesmo dia
+            const dayBlockIds = [
+              ...preservedTheoryOnDay.map((item: any) => item.studyBlockId),
+              ...updatesList.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId),
+              ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId)
+            ].filter(Boolean);
+
+            if (!dayBlockIds.includes(thirdBlock.id)) {
+              if (blockMins <= remainingCapacity + 15) {
+                scheduledBlockIds.add(thirdBlock.id);
+
+                newItemsToCreate.push({
+                  userId,
+                  scheduleId: activeSchedule.id,
+                  subjectId: thirdBlock.subjectId,
+                  studyBlockId: thirdBlock.id,
+                  actionType: "THEORY",
+                  priorityScore: 80,
+                  reason: `Roteiro: Teoria de ${blockSubject?.name || "Complementar"} (Complemento)`,
+                  dayNumber,
+                  scheduledDate: new Date(currentDate),
+                  estimatedMinutes: blockMins,
+                  status: "PENDING"
+                });
+
+                changesReport.push({
+                  itemId: `NEW_${nextItemIndex++}`,
+                  actionType: "THEORY",
+                  subjectName: blockSubject?.name || "Complementar",
+                  originalDate: "LACUNA",
+                  newDate: dateStr
+                });
+
+                theoryMinutesOnDay += blockMins;
+              } else {
+                // Devolver o bloco para a fila se estourou muito
+                if (civilSubject && thirdBlock.subjectId === civilSubject.id) {
+                  blocksBySubject[civilSubject.id].unshift(thirdBlock);
+                } else if (thirdBlock.subjectId) {
+                  blocksBySubject[thirdBlock.subjectId].unshift(thirdBlock);
+                }
+              }
+            }
+          }
+        }
+
+      } else {
+        // Modo DYNAMIC original
+        const subjectsToday = eligibleSubjects;
+        let blockFound = true;
+        while (theoryMinutesOnDay < targetTheoryMinutes && blockFound) {
+          blockFound = false;
+          for (const subject of subjectsToday) {
+            const subjectBlocks = blocksBySubject[subject.id] || [];
+            const nextBlock = subjectBlocks.shift();
+
+            if (nextBlock) {
+              blockFound = true;
+              scheduledBlockIds.add(nextBlock.id);
+              
+              newItemsToCreate.push({
+                userId,
+                scheduleId: activeSchedule.id,
+                subjectId: nextBlock.subjectId,
+                studyBlockId: nextBlock.id,
+                actionType: "THEORY",
+                priorityScore: 90,
+                reason: `Roteiro: Teoria de ${subject.name} (Preenchimento de Lacuna)`,
+                dayNumber,
+                scheduledDate: new Date(currentDate),
+                estimatedMinutes: nextBlock.estimatedStudyMinutes || 45,
+                status: "PENDING"
+              });
+
+              changesReport.push({
+                itemId: `NEW_${nextItemIndex++}`,
+                actionType: "THEORY",
+                subjectName: subject.name,
+                originalDate: "LACUNA",
+                newDate: dateStr
+              });
+
+              theoryMinutesOnDay += nextBlock.estimatedStudyMinutes || 45;
+              if (theoryMinutesOnDay >= targetTheoryMinutes) break;
+            }
           }
         }
       }

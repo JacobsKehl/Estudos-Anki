@@ -17,6 +17,7 @@ export interface GenerateFlashcardsOptions {
   materialTitle?: string | null;
   examGoal?: string | null;
   focusArea?: string | null;
+  existingQuestions?: string[];
 }
 
 export async function generateFlashcards(
@@ -40,7 +41,8 @@ export async function generateFlashcards(
       blockTitle: optionsOrText.blockTitle,
       materialTitle: optionsOrText.materialTitle,
       examGoal: optionsOrText.examGoal,
-      focusArea: optionsOrText.focusArea
+      focusArea: optionsOrText.focusArea,
+      existingQuestions: optionsOrText.existingQuestions
     };
   }
 
