@@ -1082,7 +1082,7 @@ export async function reorganizeOverdueSchedule(
   );
   const currentDayNumber = minRescheduledDayNumber !== Infinity && minRescheduledDayNumber > 0 ? minRescheduledDayNumber : 1;
 
-  const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number }> = [];
+  const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number; subjectId?: string; actionType?: string }> = [];
   const newItemsToCreate: any[] = [];
   const changesReport: Array<{
     itemId: string;
@@ -1099,19 +1099,27 @@ export async function reorganizeOverdueSchedule(
   let currentDate = new Date(firstStudyDate);
   let dayNumber = currentDayNumber;
   let nextItemIndex = 1;
+  let iterations = 0;
+  const maxIterations = 500; // Safety guard to prevent infinite loops
 
   // Realocação de outros itens atrasados (REVIEW_BLOCK / SUPPORT)
   for (const item of overdueOther) {
     const origDateStr = getTodayRangeSP(item.scheduledDate!).dateString;
     const destDateStr = getTodayRangeSP(firstStudyDate).dateString;
-    
-    updatesList.push({
-      id: item.id,
-      scheduledDate: new Date(firstStudyDate),
-      dayNumber: currentDayNumber
-    });
+    const isDateChanged = origDateStr !== destDateStr;
+    const isDayChanged = item.dayNumber !== currentDayNumber;
 
-    if (origDateStr !== destDateStr) {
+    if (isDateChanged || isDayChanged) {
+      updatesList.push({
+        id: item.id,
+        scheduledDate: new Date(firstStudyDate),
+        dayNumber: currentDayNumber,
+        subjectId: item.subjectId,
+        actionType: item.actionType || undefined
+      });
+    }
+
+    if (isDateChanged) {
       changesReport.push({
         itemId: item.id,
         actionType: item.actionType || "UNKNOWN",
@@ -1123,7 +1131,8 @@ export async function reorganizeOverdueSchedule(
   }
 
   // Loop principal de preenchimento dos dias úteis
-  while (theoryQueue.length > 0 || currentDate.getTime() <= maxOriginalDate.getTime()) {
+  while ((theoryQueue.length > 0 || currentDate.getTime() <= maxOriginalDate.getTime()) && iterations < maxIterations) {
+    iterations++;
     if (!isStudyDay(currentDate, studyDays)) {
       currentDate = addDays(currentDate, 1);
       continue;
@@ -1146,14 +1155,20 @@ export async function reorganizeOverdueSchedule(
     while (theoryQueue.length > 0 && theoryMinutesOnDay < targetTheoryMinutes) {
       const nextItem = theoryQueue.shift()!;
       const origDateStr = getTodayRangeSP(nextItem.scheduledDate!).dateString;
-      
-      updatesList.push({
-        id: nextItem.id,
-        scheduledDate: new Date(currentDate),
-        dayNumber
-      });
+      const isDateChanged = origDateStr !== dateStr;
+      const isDayChanged = nextItem.dayNumber !== dayNumber;
 
-      if (origDateStr !== dateStr) {
+      if (isDateChanged || isDayChanged) {
+        updatesList.push({
+          id: nextItem.id,
+          scheduledDate: new Date(currentDate),
+          dayNumber,
+          subjectId: nextItem.subjectId,
+          actionType: nextItem.actionType || undefined
+        });
+      }
+
+      if (isDateChanged) {
         changesReport.push({
           itemId: nextItem.id,
           actionType: "THEORY",

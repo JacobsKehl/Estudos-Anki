@@ -7,11 +7,39 @@
  * Retorna a diferença de fuso horário de São Paulo em relação ao UTC (em horas) para uma determinada data.
  * Normalmente retorna 3 (UTC-3), mas compensará de forma 100% dinâmica se houver alterações ou horário de verão.
  */
+const spDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+});
+
+const spResetFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  hour12: false
+});
+
+const spOffsetCache: Record<string, number> = {};
+
+/**
+ * Retorna a diferença de fuso horário de São Paulo em relação ao UTC (em horas) para uma determinada data.
+ * Normalmente retorna 3 (UTC-3), mas compensará de forma 100% dinâmica se houver alterações ou horário de verão.
+ */
 function getSPOffsetHours(date: Date): number {
+  const yearMonthDay = `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`;
+  if (spOffsetCache[yearMonthDay] !== undefined) {
+    return spOffsetCache[yearMonthDay];
+  }
   const utcS = date.toLocaleString("en-US", { timeZone: "UTC" });
   const tzS = date.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
   const diffMs = new Date(utcS).getTime() - new Date(tzS).getTime();
-  return Math.round(diffMs / 3600000);
+  const offset = Math.round(diffMs / 3600000);
+  spOffsetCache[yearMonthDay] = offset;
+  return offset;
 }
 
 /**
@@ -19,13 +47,7 @@ function getSPOffsetHours(date: Date): number {
  * Como São Paulo é UTC-3, 00:00 SP = 03:00 UTC.
  */
 export function getTodayRangeSP(now: Date = new Date(), offsetDays = 0) {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
-  const parts = fmt.formatToParts(now);
+  const parts = spDateFormatter.formatToParts(now);
   const partMap = Object.fromEntries(parts.map((p) => [p.type, p.value]));
 
   const year = parseInt(partMap.year);
@@ -59,15 +81,7 @@ export function getTodayRangeSP(now: Date = new Date(), offsetDays = 0) {
  * Exemplo: se agora é 12:00 do dia 21/05, retorna 00:00 do dia 22/05 (representado em UTC às 03:00).
  */
 export function getNextStudyResetAt(now: Date = new Date(), customHour = 0): Date {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    hour12: false
-  });
-  const parts = fmt.formatToParts(now);
+  const parts = spResetFormatter.formatToParts(now);
   const partMap = Object.fromEntries(parts.map((p) => [p.type, p.value]));
 
   const year = parseInt(partMap.year);

@@ -15,13 +15,15 @@ export default async function SubjectsPage() {
 
   let subjects: any[] = [];
   let scheduleMode = "DYNAMIC";
+  let userPrefsCreatedAt: string | undefined = undefined;
 
   try {
     const userPrefs = await prisma.userPreferences.findUnique({
       where: { userId },
-      select: { scheduleGenerationMode: true }
+      select: { scheduleGenerationMode: true, createdAt: true }
     });
     scheduleMode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
+    userPrefsCreatedAt = userPrefs?.createdAt ? userPrefs.createdAt.toISOString() : undefined;
 
     const subjectsWithMetrics = await getAllSubjectsMetrics(userId);
     
@@ -69,7 +71,12 @@ export default async function SubjectsPage() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {subjects.map((subject) => (
-            <SubjectCard key={subject.id} subject={subject} scheduleGenerationMode={scheduleMode} />
+            <SubjectCard 
+              key={subject.id} 
+              subject={subject} 
+              scheduleGenerationMode={scheduleMode} 
+              userCreatedAt={userPrefsCreatedAt} 
+            />
           ))}
         </div>
       )}

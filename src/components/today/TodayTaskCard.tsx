@@ -210,8 +210,9 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
     isBlockCompleted && 
     !isSubjectExcluded && 
     !isSupportMaterial && 
-    item.actionType === "THEORY" &&
-    hasFlashcards;
+    (item.actionType === "THEORY" || item.actionType === "REVIEW_BLOCK") &&
+    hasFlashcards &&
+    flashcardCount < 18;
 
   return (
     <div
@@ -306,7 +307,7 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
         </div>
       )}
 
-      {!isDone && (
+      {(!isDone || !!item.studyBlockId) && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pl-0 md:pl-[52px] pt-1 w-full">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
             {item.studyBlockId && (
@@ -372,22 +373,24 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
             )}
           </div>
 
-          <div className="w-full md:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full md:w-auto rounded-lg font-bold border-accent/50 text-accent hover:bg-accent/10 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
-              onClick={handleCompleteStep}
-              disabled={isCompleting}
-            >
-              {isCompleting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4" />
-              )}
-              Concluir
-            </Button>
-          </div>
+          {!isDone && (
+            <div className="w-full md:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full md:w-auto rounded-lg font-bold border-accent/50 text-accent hover:bg-accent/10 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+                onClick={handleCompleteStep}
+                disabled={isCompleting}
+              >
+                {isCompleting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                Concluir
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

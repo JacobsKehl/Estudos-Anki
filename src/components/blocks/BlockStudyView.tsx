@@ -169,6 +169,7 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
   const lastActivityRef = React.useRef(0);
   const [suggestions, setSuggestions] = React.useState<ContinueSuggestion[]>([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = React.useState(false);
+  const [isGeneratingMore, setIsGeneratingMore] = React.useState(false);
 
   // Initialize lastActivityRef on mount (avoids impure Date.now() call during render)
   React.useEffect(() => {
@@ -435,6 +436,29 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
     }
   };
 
+  const handleGenerateMoreCards = async () => {
+    setIsGeneratingMore(true);
+    const toastId = toast.loading("Analisando conteúdo e gerando mais flashcards adicionais...");
+    try {
+      const res = await fetch(`/api/blocks/${block.id}/flashcards/generate-more`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao gerar flashcards adicionais");
+      }
+      toast.success(data.message || `${data.count} novos flashcards gerados!`, { id: toastId });
+      router.refresh();
+      if (data.flashcards && data.flashcards.length > 0) {
+        setCuratorCards((prev) => [...prev, ...data.flashcards]);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar mais flashcards com IA.", { id: toastId });
+    } finally {
+      setIsGeneratingMore(false);
+    }
+  };
+
   // State 2: Action - Curation complete, lock block as COMPLETED
   const handleCurationComplete = async () => {
     if (startedAt === null) {
@@ -553,6 +577,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
   // ==========================================
   if (step === "summary") {
     const approvedCount = curatorCards.filter((c) => c.status === "APPROVED").length;
+    const isSubjectExcluded = block.subject?.studyPriority === "EXCLUDED";
+    const isSupportMaterial = block.material?.materialRole === "SUPPORT_MATERIAL";
+    const showGenerateMoreSummary = !isSubjectExcluded && !isSupportMaterial && approvedCount > 0 && approvedCount < 18;
 
     return (
       <div className="max-w-3xl mx-auto py-12 animate-in fade-in zoom-in-95 duration-500">
@@ -705,6 +732,24 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
                 Nenhum card para praticar
               </Button>
             )}
+
+            {showGenerateMoreSummary && (
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-2xl font-bold w-full sm:w-auto border-dashed border-accent/60 text-accent hover:bg-accent/5 transition-all"
+                onClick={handleGenerateMoreCards}
+                disabled={isGeneratingMore}
+              >
+                {isGeneratingMore ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 mr-2 text-accent" />
+                )}
+                {isGeneratingMore ? "Gerando mais..." : "Gerar mais cards"}
+              </Button>
+            )}
+
             <Button 
               variant="soft" 
               size="lg" 

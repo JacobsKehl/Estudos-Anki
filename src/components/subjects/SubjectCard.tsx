@@ -28,6 +28,7 @@ interface SubjectCardProps {
     createdAt: string | Date;
   };
   scheduleGenerationMode?: string | null;
+  userCreatedAt?: string | Date;
 }
 
 const HEALTH_CONFIG = {
@@ -44,7 +45,7 @@ const PRIORITY_CONFIG = {
   EXCLUDED: { label: "Fora do cronograma", class: "bg-muted/50 text-muted-foreground/60 border border-border/20" },
 };
 
-export function SubjectCard({ subject, scheduleGenerationMode }: SubjectCardProps) {
+export function SubjectCard({ subject, scheduleGenerationMode, userCreatedAt }: SubjectCardProps) {
   const router = useRouter();
   const health = subject.metrics?.health || 'GOOD';
   const config = HEALTH_CONFIG[health];
@@ -55,8 +56,8 @@ export function SubjectCard({ subject, scheduleGenerationMode }: SubjectCardProp
   // Regra TRT4: verificar se está no ciclo
   const strategySub = TRT4_STRATEGY.subjects.find(s => s.name === subject.name);
   const now = new Date();
-  const createdAt = new Date(subject.createdAt);
-  const daysSinceCreated = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+  const baseDate = userCreatedAt ? new Date(userCreatedAt) : new Date(subject.createdAt);
+  const daysSinceCreated = (now.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24);
   
   // Só aplica "Aguardando Ciclo" para Gabriela / LEGACY_TRT4
   const isWaitingCycle = scheduleGenerationMode === "LEGACY_TRT4" && 
