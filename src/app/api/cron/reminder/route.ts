@@ -45,7 +45,6 @@ function generateEmailHtml(
   studentName: string,
   todayLabel: string,
   todayTasks: any[],
-  todayCardsCount: number,
   yesterdayStats: { completed: number; pending: number; skipped: number },
   yesterdayItems: any[],
   appUrl: string,
@@ -77,7 +76,7 @@ function generateEmailHtml(
                 : "";
 
               let actionLabel = "Estudo";
-              if (t.actionType === "THEORY") actionLabel = "Teoria";
+              if (t.actionType === "THEORY") actionLabel = "Estudar Bloco";
               else if (t.actionType === "QUESTIONS") actionLabel = "Questões";
               else if (t.actionType === "GENERATE_FLASHCARDS") actionLabel = "Criar Cards";
               else if (t.actionType === "REVIEW_BLOCK") actionLabel = "Revisar Bloco";
@@ -110,7 +109,7 @@ function generateEmailHtml(
           .join("")
       : `
         <li style="margin-bottom: 8px; font-size: 15px; color: #718096; list-style-type: none; padding-left: 0;">
-          Nenhuma matéria agendada para hoje.
+          Hoje não há blocos de teoria pendentes no seu cronograma.
         </li>
       `;
 
@@ -233,18 +232,6 @@ function generateEmailHtml(
                 </tr>
               </table>
 
-              <!-- Section: Cards do Dia -->
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 25px; background-color: #f7fafc; border: 1px solid #edf2f7; border-radius: 12px; padding: 20px;">
-                <tr>
-                  <td>
-                    <h2 style="font-size: 16px; color: #4a5568; margin-top: 0; margin-bottom: 8px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">🧠 Cards do Dia (SRS)</h2>
-                    <p style="font-size: 15px; color: #2d3748; margin: 0;">
-                      Você tem <strong>${todayCardsCount}</strong> flashcards disponíveis para praticar hoje.
-                    </p>
-                  </td>
-                </tr>
-              </table>
-
               <!-- Section: Ontem -->
               <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px; background-color: #fffaf0; border: 1px solid #feebc8; border-radius: 12px; padding: 20px;">
                 <tr>
@@ -340,12 +327,18 @@ async function processUserReminder(
     throw new Error(`Falha ao reorganizar cronograma ativo do usuário: ${reorgErr.message || reorgErr}`);
   }
 
-  // 1. Obter itens do cronograma de ontem
+  // 1. Obter itens do cronograma de ontem (apenas teoria e prioridade não secundaria/excluida)
   const yesterdayItems = await (prisma as any).studyScheduleItem.findMany({
     where: {
       userId: user.id,
       schedule: { status: "ACTIVE" },
       scheduledDate: { gte: yesterdayRange.start, lt: yesterdayRange.end },
+      actionType: "THEORY",
+      subject: {
+        studyPriority: {
+          notIn: ["SECONDARY", "EXCLUDED"]
+        }
+      }
     },
     include: {
       subject: true,
@@ -364,25 +357,24 @@ async function processUserReminder(
   ).length;
   const yesterdaySkipped = yesterdayItems.filter((i: any) => i.status === "SKIPPED").length;
 
-  // 2. Obter itens agendados para hoje
+  // 2. Obter itens agendados para hoje (apenas teoria e prioridade não secundaria/excluida)
   const todayItems = await (prisma as any).studyScheduleItem.findMany({
     where: {
       userId: user.id,
       schedule: { status: "ACTIVE" },
       scheduledDate: { gte: todayRange.start, lt: todayRange.end },
+      actionType: "THEORY",
+      subject: {
+        studyPriority: {
+          notIn: ["SECONDARY", "EXCLUDED"]
+        }
+      }
     },
     include: {
       subject: true,
       studyBlock: {
         include: {
-          material: true,
-          flashcards: {
-            where: {
-              status: "APPROVED",
-              reviewState: { in: ["NEW", "LEARNING", "REVIEW", "RELEARNING"] }
-            },
-            select: { id: true }
-          }
+          material: true
         }
       },
       material: true
@@ -392,20 +384,10 @@ async function processUserReminder(
   const todayTasks = todayItems.filter((item: any) => {
     // 1. Filtrar apenas tarefas ativas/pendentes/em progresso
     const isActive = item.status === "PENDING" || item.status === "IN_PROGRESS";
-    if (!isActive) return false;
-
-    // 2. Apenas THEORY ou REVIEW_BLOCK com flashcards ativos
-    if (item.actionType === "THEORY") {
-      return true;
-    }
-    if (item.actionType === "REVIEW_BLOCK") {
-      const activeCards = item.studyBlock?.flashcards || [];
-      return activeCards.length > 0;
-    }
-    return false;
+    return isActive;
   });
 
-  // 3. Buscar a próxima teoria pendente (sugestão de adiantamento)
+  // 3. Buscar a próxima teoria pendente (sugestão de adiantamento, apenas teoria e prioridade não secundaria/excluida)
   const nextTheoryItem = await (prisma as any).studyScheduleItem.findFirst({
     where: {
       userId: user.id,
@@ -413,7 +395,7 @@ async function processUserReminder(
       actionType: "THEORY",
       scheduledDate: { gte: todayRange.end },
       subject: {
-        studyPriority: { not: "EXCLUDED" }
+        studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
       }
     },
     include: {
@@ -432,14 +414,8 @@ async function processUserReminder(
     ]
   });
 
-  // 4. Obter contagem de cards do SRS
-  let todayCardsCount = 0;
-  try {
-    const unifiedData = await getUnifiedTodayCards(user.id);
-    todayCardsCount = unifiedData.stats.total;
-  } catch (err) {
-    console.error(`[CRON] Erro ao carregar SRS para usuário ${user.id}:`, err);
-  }
+  // 4. Obter contagem de cards do SRS (desativado para e-mail diário com apenas teoria)
+  const todayCardsCount = 0;
 
   // 5. Renderizar HTML
   const studentName = user.name || "Estudante";
@@ -449,7 +425,6 @@ async function processUserReminder(
     studentName,
     todayRange.label,
     todayTasks,
-    todayCardsCount,
     {
       completed: yesterdayCompleted,
       pending: yesterdayPending,
