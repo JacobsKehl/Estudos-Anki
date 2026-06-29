@@ -28,6 +28,9 @@ export async function GET(req: NextRequest) {
         status: { in: ["PENDING", "IN_PROGRESS"] },
         actionType: { in: ["THEORY", "REVIEW_BLOCK"] },
         scheduledDate: { gte: todayRange.end },
+        subject: {
+          studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
+        }
       },
       include: {
         subject: true,

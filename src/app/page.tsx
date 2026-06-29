@@ -78,6 +78,9 @@ export default async function Dashboard() {
           userId,
           schedule: { status: "ACTIVE" },
           scheduledDate: { gte: todayStart, lt: todayEnd },
+          subject: {
+            studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
+          }
         },
         include: {
           subject: true,
@@ -178,6 +181,9 @@ export default async function Dashboard() {
           userId,
           schedule: { status: "ACTIVE" },
           scheduledDate: { gte: todayStart, lt: todayEnd },
+          subject: {
+            studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
+          }
         },
         include: {
           subject: true,

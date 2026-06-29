@@ -105,7 +105,10 @@ export async function getAdaptiveStudyQueue(
   const tasks: StudyTask[] = [];
 
   const subjects = await prisma.studySubject.findMany({
-    where: { userId },
+    where: {
+      userId,
+      studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
+    },
     select: { id: true, name: true, examWeight: true },
   });
 

@@ -425,8 +425,12 @@ async function generateLegacyTrt4Schedule(
             continue;
           }
 
-          const blockSubject = eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
+          const blockSubject = nextBlock.subject || eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
           const blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject.name);
+          const isFallback = nextBlock.subjectId !== targetSubject.id;
+          const reasonText = isFallback 
+            ? `Roteiro: Teoria de ${blockSubject.name} (Fallback)` 
+            : `Roteiro: Teoria de ${blockSubject.name}`;
 
           scheduleItemsData.push({
             userId,
@@ -435,7 +439,7 @@ async function generateLegacyTrt4Schedule(
             studyBlockId: nextBlock.id,
             actionType: "THEORY",
             priorityScore: 90,
-            reason: `Roteiro: Teoria de ${blockSubject.name}`,
+            reason: reasonText,
             dayNumber,
             scheduledDate: candidateDate,
             estimatedMinutes: blockMins,
@@ -485,7 +489,7 @@ async function generateLegacyTrt4Schedule(
             .map((item: any) => item.studyBlockId);
 
           if (!dayBlockIds.includes(thirdBlock.id)) {
-            const blockSubject = eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
+            const blockSubject = thirdBlock.subject || eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
             const blockMins = await getOrComputeBlockMinutes(thirdBlock, blockSubject?.name || "Complementar");
 
             // Só adiciona se o bloco complementar não estourar de forma relevante
@@ -541,11 +545,13 @@ async function generateDynamicSchedule(
   const startDate = options.startDate ?? new Date();
   startDate.setHours(0, 0, 0, 0);
 
-  // 1. Obter matérias do usuário (Ignorando EXCLUDED)
+  // 1. Obter matérias do usuário (Ignorando EXCLUDED e SECONDARY)
   const userSubjects = await prisma.studySubject.findMany({
     where: { userId },
   });
-  const eligibleSubjects = userSubjects.filter(s => s.studyPriority !== "EXCLUDED");
+  const eligibleSubjects = userSubjects.filter(
+    s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
+  );
 
   // 2. Buscar todos os blocos pendentes das matérias elegíveis
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
@@ -1241,8 +1247,12 @@ export async function reorganizeOverdueSchedule(
             }
 
             scheduledBlockIds.add(nextBlock.id);
-            const blockSubject = eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
+            const blockSubject = nextBlock.subject || eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
             const blockMins = nextBlock.estimatedStudyMinutes || 45;
+            const isFallback = nextBlock.subjectId !== targetSubject.id;
+            const reasonText = isFallback
+              ? `Roteiro: Teoria de ${blockSubject.name} (Fallback — Preenchimento de Lacuna)`
+              : `Roteiro: Teoria de ${blockSubject.name} (Preenchimento de Lacuna)`;
 
             newItemsToCreate.push({
               userId,
@@ -1251,7 +1261,7 @@ export async function reorganizeOverdueSchedule(
               studyBlockId: nextBlock.id,
               actionType: "THEORY",
               priorityScore: 90,
-              reason: `Roteiro: Teoria de ${blockSubject.name} (Preenchimento de Lacuna)`,
+              reason: reasonText,
               dayNumber,
               scheduledDate: new Date(currentDate),
               estimatedMinutes: blockMins,
@@ -1293,7 +1303,7 @@ export async function reorganizeOverdueSchedule(
           }
 
           if (thirdBlock) {
-            const blockSubject = eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
+            const blockSubject = thirdBlock.subject || eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
             const blockMins = thirdBlock.estimatedStudyMinutes || 45;
 
             // Evitar duplicidade de studyBlockId no mesmo dia

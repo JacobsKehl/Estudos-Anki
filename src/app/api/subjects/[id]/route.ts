@@ -33,7 +33,7 @@ export async function PATCH(
       }
     }
 
-    // 3. Atualizar de forma segura dentro de uma transação Prisma, garantindo remoção de pendências se marcado como EXCLUDED
+    // 3. Atualizar de forma segura dentro de uma transação Prisma, garantindo remoção de pendências se marcado como EXCLUDED ou SECONDARY
     const subject = await prisma.$transaction(async (tx) => {
       const updatedSubject = await tx.studySubject.update({
         where: { 
@@ -43,13 +43,45 @@ export async function PATCH(
         data: { name, description, priority, examWeight, studyPriority }
       });
 
-      if (studyPriority === "EXCLUDED") {
-        await tx.studyScheduleItem.deleteMany({
+      if (studyPriority === "EXCLUDED" || studyPriority === "SECONDARY") {
+        // Encontrar o cronograma ativo
+        const activeSchedule = await tx.studySchedule.findFirst({
+          where: { userId, status: "ACTIVE" }
+        });
+
+        // Contar itens pendentes/in_progress no cronograma ativo
+        const pendingItemsCount = await tx.studyScheduleItem.count({
           where: {
             userId,
+            scheduleId: activeSchedule?.id,
             subjectId: id,
             status: { in: ["PENDING", "IN_PROGRESS"] }
           }
+        });
+
+        // Deletar os itens pendentes de forma cirúrgica e segura
+        let deletedCount = 0;
+        if (pendingItemsCount > 0 && activeSchedule) {
+          const deleteRes = await tx.studyScheduleItem.deleteMany({
+            where: {
+              userId,
+              scheduleId: activeSchedule.id,
+              subjectId: id,
+              status: { in: ["PENDING", "IN_PROGRESS"] }
+            }
+          });
+          deletedCount = deleteRes.count;
+        }
+
+        // Registrar log detalhado
+        console.log(`[SUBJECT PRIORITY CHANGE PURGE]`, {
+          userId,
+          subjectId: id,
+          previousPriority: existingSubject.studyPriority,
+          newPriority: studyPriority,
+          activeScheduleId: activeSchedule?.id || "None",
+          pendingItemsFound: pendingItemsCount,
+          itemsRemoved: deletedCount
         });
       }
 
