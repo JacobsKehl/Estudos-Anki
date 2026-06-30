@@ -1,0 +1,27 @@
+name: Temp Database Diagnosis
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run diagnostics
+        env:
+          DATABASE_URL: "postgresql://postgres.msmdekjetxajcwuxmxps:EFWAg7wGNgVF4Uc3@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require"
+          DIRECT_URL: "postgresql://postgres.msmdekjetxajcwuxmxps:EFWAg7wGNgVF4Uc3@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
+        run: npx tsx scripts/diagnose-processual-civil.ts
