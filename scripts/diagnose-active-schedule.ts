@@ -5,7 +5,6 @@ const prisma = new PrismaClient();
 async function run() {
   try {
     const gabrielaEmail = "gabriela.furtado.p@gmail.com";
-    console.log(`🔍 Buscando usuário Gabriela...`);
     const user = await prisma.user.findUnique({
       where: { email: gabrielaEmail }
     });
@@ -15,7 +14,6 @@ async function run() {
       return;
     }
 
-    // 1. Buscar o cronograma ativo
     const activeSchedule = await prisma.studySchedule.findFirst({
       where: { userId: user.id, status: "ACTIVE" }
     });
@@ -25,43 +23,38 @@ async function run() {
       return;
     }
 
-    console.log(`👤 Cronograma Ativo: "${activeSchedule.title}" (ID: ${activeSchedule.id}) | Data Início: ${activeSchedule.startDate.toISOString()}`);
+    console.log(`👤 Cronograma Ativo: ID ${activeSchedule.id}`);
 
-    // 2. Buscar todos os itens do cronograma ativo ordenados por data
-    const activeItems = await prisma.studyScheduleItem.findMany({
+    // Buscar todos os itens do tipo THEORY do cronograma ativo ordenados por dayNumber
+    const theoryItems = await prisma.studyScheduleItem.findMany({
       where: {
-        scheduleId: activeSchedule.id
+        scheduleId: activeSchedule.id,
+        actionType: "THEORY"
       },
       include: {
         subject: { select: { name: true } },
         studyBlock: { select: { title: true } }
       },
-      orderBy: [
-        { scheduledDate: "asc" },
-        { dayNumber: "asc" },
-        { priorityScore: "desc" }
-      ]
+      orderBy: { dayNumber: "asc" }
     });
 
-    console.log(`\n=== LISTA COMPLETA DO CRONOGRAMA ATIVO (Total: ${activeItems.length} itens) ===`);
+    console.log("\n=== ITENS DE TEORIA POR DIA DE ESTUDO (dayNumber) ===");
     
-    // Agrupar por data
-    const itemsByDate: Record<string, typeof activeItems> = {};
-    activeItems.forEach(item => {
-      if (!item.scheduledDate) return;
-      const dateStr = item.scheduledDate.toISOString().split("T")[0];
-      if (!itemsByDate[dateStr]) {
-        itemsByDate[dateStr] = [];
+    // Agrupar por dayNumber
+    const itemsByDay: Record<number, typeof theoryItems> = {};
+    theoryItems.forEach(item => {
+      if (item.dayNumber === null || item.dayNumber === undefined) return;
+      if (!itemsByDay[item.dayNumber]) {
+        itemsByDay[item.dayNumber] = [];
       }
-      itemsByDate[dateStr].push(item);
+      itemsByDay[item.dayNumber].push(item);
     });
 
-    // Listar os dias ao redor de hoje (de 26/06 até 05/07)
-    const dates = Object.keys(itemsByDate).sort();
-    dates.forEach(dateStr => {
-      console.log(`\n📅 Data: ${dateStr}`);
-      itemsByDate[dateStr].forEach(item => {
-        console.log(`  - [ID: ${item.id}] [Tipo: ${item.actionType}] [Status: ${item.status}] [Day: ${item.dayNumber}] Matéria: ${item.subject?.name} | Bloco: ${item.studyBlock?.title || "Revisão/Cards"}`);
+    const days = Object.keys(itemsByDay).map(Number).sort((a, b) => a - b);
+    days.forEach(day => {
+      console.log(`\n📆 Estudo Day ${day}:`);
+      itemsByDay[day].forEach(item => {
+        console.log(`  - [ID: ${item.id}] [Date: ${item.scheduledDate?.toISOString().split('T')[0]}] [Status: ${item.status}] Matéria: ${item.subject?.name} | Bloco: ${item.studyBlock?.title}`);
       });
     });
 
