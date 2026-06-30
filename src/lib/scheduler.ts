@@ -1308,15 +1308,79 @@ export async function reorganizeOverdueSchedule(
       prevDaySubjects.push(...lastCompletedSubjectIds);
     }
 
+    const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
+    let cycleSubjects: string[] = [];
+    if (mode === "LEGACY_TRT4") {
+      const cycleDay = (dayNumber - 1 + cycleOffset) % TRT4_STRATEGY.cycle.length;
+      cycleSubjects = TRT4_STRATEGY.cycle[cycleDay].map(s => s.toLowerCase());
+    }
+
+    // Tentativa 1: Alocar itens da fila principal que correspondem às matérias do ciclo de hoje (prioridade)
+    if (mode === "LEGACY_TRT4" && cycleSubjects.length > 0) {
+      let queueIndex = 0;
+      while (queueIndex < theoryQueue.length && theoryMinutesOnDay < targetTheoryMinutes) {
+        const nextItem = theoryQueue[queueIndex];
+        const nextItemSubjectName = nextItem.subject?.name?.toLowerCase() || "";
+        const nextItemSubjectId = nextItem.subjectId;
+
+        // Verificar se pertence ao ciclo de hoje
+        const matchesCycle = cycleSubjects.some(subName => nextItemSubjectName.includes(subName));
+        if (!matchesCycle) {
+          queueIndex++;
+          continue;
+        }
+
+        const isRepeated = prevDaySubjects.includes(nextItemSubjectId);
+        const hasNonRepeatedInQueue = theoryQueue.slice(queueIndex).some(item => 
+          cycleSubjects.some(subName => (item.subject?.name?.toLowerCase() || "").includes(subName)) && 
+          !prevDaySubjects.includes(item.subjectId)
+        );
+
+        if (isRepeated && hasNonRepeatedInQueue) {
+          queueIndex++;
+          continue;
+        }
+
+        // Remover da fila e agendar
+        theoryQueue.splice(queueIndex, 1);
+        const origDateStr = getTodayRangeSP(nextItem.scheduledDate!).dateString;
+        const isDateChanged = origDateStr !== dateStr;
+        const isDayChanged = nextItem.dayNumber !== dayNumber;
+
+        if (isDateChanged || isDayChanged) {
+          updatesList.push({
+            id: nextItem.id,
+            scheduledDate: new Date(currentDate),
+            dayNumber,
+            subjectId: nextItem.subjectId,
+            actionType: nextItem.actionType || undefined
+          });
+        }
+
+        if (isDateChanged) {
+          changesReport.push({
+            itemId: nextItem.id,
+            actionType: "THEORY",
+            subjectName: nextItem.subject?.name || "Sem Matéria",
+            originalDate: origDateStr,
+            newDate: dateStr
+          });
+        }
+
+        theoryMinutesOnDay += nextItem.estimatedMinutes || 45;
+      }
+    }
+
+    // Tentativa 2: Alocar qualquer outro item da fila (fallback/carryover)
     let queueIndex = 0;
     while (queueIndex < theoryQueue.length && theoryMinutesOnDay < targetTheoryMinutes) {
       const nextItem = theoryQueue[queueIndex];
-      
-      const isRepeated = prevDaySubjects.includes(nextItem.subjectId);
+      const nextItemSubjectId = nextItem.subjectId;
+
+      const isRepeated = prevDaySubjects.includes(nextItemSubjectId);
       const hasNonRepeatedInQueue = theoryQueue.slice(queueIndex).some(item => !prevDaySubjects.includes(item.subjectId));
 
       if (isRepeated && hasNonRepeatedInQueue) {
-        // Pular o item repetido para que ele seja agendado no próximo dia útil elegível
         queueIndex++;
         continue;
       }
@@ -1348,13 +1412,10 @@ export async function reorganizeOverdueSchedule(
       }
 
       theoryMinutesOnDay += nextItem.estimatedMinutes || 45;
-      // Não incrementamos queueIndex já que o item foi removido
     }
 
     // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutes
     if (theoryMinutesOnDay < targetTheoryMinutes) {
-      const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
-
       if (mode === "LEGACY_TRT4") {
         const cycleDay = (dayNumber - 1 + cycleOffset) % TRT4_STRATEGY.cycle.length;
         const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
