@@ -5,10 +5,9 @@ const prisma = new PrismaClient();
 async function run() {
   try {
     const gabrielaEmail = "gabriela.furtado.p@gmail.com";
-    console.log(`🔍 Buscando usuário Gabriela: ${gabrielaEmail}...`);
+    console.log(`🔍 Buscando usuário Gabriela...`);
     const user = await prisma.user.findUnique({
-      where: { email: gabrielaEmail },
-      include: { preferences: true }
+      where: { email: gabrielaEmail }
     });
 
     if (!user) {
@@ -16,81 +15,79 @@ async function run() {
       return;
     }
 
-    console.log(`👤 Usuário encontrado: ${user.name} (ID: ${user.id})`);
-    console.log(`⚙️ Modo de geração: ${user.preferences?.scheduleGenerationMode}`);
-
-    // 1. Listar todas as matérias e prioridades
-    console.log("\n=== MATÉRIAS E PRIORIDADES DA GABRIELA ===");
-    const subjects = await prisma.studySubject.findMany({
-      where: { userId: user.id },
-      orderBy: { name: "asc" }
+    // 1. Buscar a matéria de Direito Processual Civil
+    const subject = await prisma.studySubject.findFirst({
+      where: { userId: user.id, name: { contains: "Processual Civil" } }
     });
 
-    for (const sub of subjects) {
+    if (!subject) {
+      console.error("❌ Matéria de Direito Processual Civil não encontrada!");
+      return;
+    }
+
+    console.log(`Matéria: ${subject.name} (ID: ${subject.id})`);
+
+    // 2. Buscar todos os materiais cadastrados para essa matéria
+    console.log("\n=== MATERIAIS DE DIREITO PROCESSUAL CIVIL ===");
+    const materials = await prisma.studyMaterial.findMany({
+      where: { userId: user.id, subjectId: subject.id }
+    });
+
+    for (const mat of materials) {
+      const blocksCount = await prisma.studyBlock.count({
+        where: { userId: user.id, materialId: mat.id }
+      });
       const pendingBlocksCount = await prisma.studyBlock.count({
-        where: { userId: user.id, subjectId: sub.id, status: { not: "COMPLETED" } }
+        where: { userId: user.id, materialId: mat.id, status: { not: "COMPLETED" } }
       });
-      const completedBlocksCount = await prisma.studyBlock.count({
-        where: { userId: user.id, subjectId: sub.id, status: "COMPLETED" }
-      });
-      console.log(`- ${sub.name}: Prioridade = ${sub.studyPriority} | Blocos Pendentes = ${pendingBlocksCount} | Blocos Concluídos = ${completedBlocksCount}`);
+      console.log(`- Nome: "${mat.fileName}" | ID: ${mat.id} | Função: ${mat.materialRole} | Total de Blocos: ${blocksCount} | Blocos Pendentes: ${pendingBlocksCount}`);
     }
 
-    // 2. Analisar especificamente Direito Processual Civil
-    console.log("\n=== ANÁLISE DE DIREITO PROCESSUAL CIVIL ===");
-    const procCivil = subjects.find(s => s.name.toLowerCase().includes("processual civil"));
-    if (!procCivil) {
-      console.log("❌ Matéria 'Direito Processual Civil' não encontrada!");
-    } else {
-      console.log(`Matéria: ${procCivil.name} (ID: ${procCivil.id})`);
-      console.log(`Prioridade ativa: ${procCivil.studyPriority}`);
-
-      // Buscar todos os blocos desta matéria
-      const blocks = await prisma.studyBlock.findMany({
-        where: { userId: user.id, subjectId: procCivil.id },
-        orderBy: { orderIndex: "asc" }
-      });
-
-      console.log(`Total de blocos cadastrados: ${blocks.length}`);
-      if (blocks.length === 0) {
-        console.log("⚠️ Nenhum bloco teórico cadastrado para esta matéria!");
-      } else {
-        blocks.forEach((block, idx) => {
-          console.log(`  [${idx + 1}] Título: "${block.title}" | Status: ${block.status} | Ordem: ${block.orderIndex}`);
-        });
-      }
-    }
-
-    // 3. Buscar agendamentos de hoje
-    console.log("\n=== ITENS AGENDADOS PARA HOJE (30/06/2026) ===");
-    const startOfToday = new Date("2026-06-30T00:00:00-03:00");
-    const endOfToday = new Date("2026-06-30T23:59:59.999-03:00");
-
-    const todayItems = await prisma.studyScheduleItem.findMany({
+    // 3. Buscar blocos da matéria que NÃO estão concluídos
+    console.log("\n=== BLOCOS DE DIREITO PROCESSUAL CIVIL PENDENTES ===");
+    const pendingBlocks = await prisma.studyBlock.findMany({
       where: {
         userId: user.id,
-        scheduledDate: {
-          gte: startOfToday,
-          lte: endOfToday
-        }
+        subjectId: subject.id,
+        status: { not: "COMPLETED" }
       },
       include: {
-        subject: { select: { name: true } },
-        studyBlock: { select: { title: true } }
+        material: true
       },
-      orderBy: { priorityScore: "desc" }
+      orderBy: { orderIndex: "asc" },
+      take: 10
     });
 
-    if (todayItems.length === 0) {
-      console.log("Nenhum item agendado para hoje no banco de dados.");
+    if (pendingBlocks.length === 0) {
+      console.log("Nenhum bloco pendente encontrado!");
     } else {
-      todayItems.forEach(item => {
-        console.log(`- Matéria: ${item.subject?.name} | Bloco: ${item.studyBlock?.title || "Revisão/Cards"} | Tipo: ${item.actionType} | Status: ${item.status}`);
+      pendingBlocks.forEach((block, idx) => {
+        console.log(`- [${idx+1}] Bloco: "${block.title}" (ID: ${block.id}) | Status: ${block.status} | Material Role: ${block.material?.materialRole || "N/A"} | Material ID: ${block.materialId}`);
       });
     }
 
+    // 4. Verificar se há agendamentos futuros ou passados do tipo THEORY para Direito Processual Civil
+    console.log("\n=== ITENS DO CRONOGRAMA DE DIREITO PROCESSUAL CIVIL ===");
+    const scheduleItems = await prisma.studyScheduleItem.findMany({
+      where: {
+        userId: user.id,
+        subjectId: subject.id
+      },
+      include: {
+        studyBlock: true
+      },
+      orderBy: { scheduledDate: "asc" }
+    });
+
+    console.log(`Total de agendamentos: ${scheduleItems.length}`);
+    const theoryItems = scheduleItems.filter(item => item.actionType === "THEORY");
+    console.log(`Agendamentos do tipo THEORY: ${theoryItems.length}`);
+    theoryItems.forEach((item, idx) => {
+      console.log(`  [${idx+1}] Bloco: "${item.studyBlock?.title || "N/A"}" (ID: ${item.studyBlockId}) | Data: ${item.scheduledDate?.toISOString()} | Status: ${item.status}`);
+    });
+
   } catch (err: any) {
-    console.error("❌ Erro ao executar diagnóstico:", err.message);
+    console.error("❌ Erro no script:", err.message);
   } finally {
     await prisma.$disconnect();
   }
