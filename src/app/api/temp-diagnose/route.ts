@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
     // 3. Obter todos os blocos de Direito Processual Civil especificamente
     const procCivilSubject = subjects.find(s => s.name.toLowerCase().includes("processual civil"));
-    let procCivilBlocks = [];
+    let procCivilBlocks: any[] = [];
     if (procCivilSubject) {
       procCivilBlocks = await prisma.studyBlock.findMany({
         where: { userId, subjectId: procCivilSubject.id },
