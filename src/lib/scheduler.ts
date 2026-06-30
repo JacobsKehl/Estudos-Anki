@@ -181,6 +181,51 @@ async function getLastCompletedTheorySubjectIds(userId: string): Promise<string[
   return Array.from(new Set(completedOnSameDay.map(item => item.subjectId)));
 }
 
+async function getCycleOffset(userId: string, currentDayNumber: number): Promise<number> {
+  const lastCompletedSubjects = await getLastCompletedTheorySubjectIds(userId);
+  if (lastCompletedSubjects.length === 0) return 0;
+
+  const subjects = await prisma.studySubject.findMany({
+    where: { id: { in: lastCompletedSubjects } },
+    select: { name: true }
+  });
+  const subjectNames = subjects.map(s => s.name);
+
+  let lastCycleDay = null;
+  for (const name of subjectNames) {
+    const nameLower = name.toLowerCase();
+    if (nameLower.includes("trabalho") && !nameLower.includes("processo") && !nameLower.includes("processual")) {
+      lastCycleDay = 0;
+      break;
+    }
+    if (nameLower.includes("português") || nameLower.includes("portugues")) {
+      lastCycleDay = 0;
+      break;
+    }
+    if (nameLower.includes("processual do trabalho") || nameLower.includes("processo do trabalho")) {
+      lastCycleDay = 1;
+      break;
+    }
+    if (nameLower.includes("administrativo")) {
+      lastCycleDay = 1;
+      break;
+    }
+    if (nameLower.includes("constitucional")) {
+      lastCycleDay = 2;
+      break;
+    }
+    if (nameLower.includes("processual civil") || nameLower.includes("processo civil")) {
+      lastCycleDay = 2;
+      break;
+    }
+  }
+
+  if (lastCycleDay === null) return 0;
+
+  const targetCycleDay = (lastCycleDay + 1) % 3;
+  return (targetCycleDay - (currentDayNumber - 1) % 3 + 3) % 3;
+}
+
 function getFallbackSubjectForSlot(
   eligibleSubjects: any[],
   allPendingBlocks: any[],
@@ -434,6 +479,7 @@ async function generateLegacyTrt4Schedule(
 
   let currentDate = new Date(startDate);
   let nextStudyDayNumber = uniqueCompletedCount + 1;
+  const cycleOffset = await getCycleOffset(userId, nextStudyDayNumber);
 
   while (currentDate.getTime() <= deadline.getTime()) {
     const isStudy = isStudyDay(currentDate, studyDays);
@@ -443,7 +489,7 @@ async function generateLegacyTrt4Schedule(
       const dayNumber = nextStudyDayNumber;
       nextStudyDayNumber++;
       
-      const cycleDay = (dayNumber - 1) % TRT4_STRATEGY.cycle.length;
+      const cycleDay = (dayNumber - 1 + cycleOffset) % TRT4_STRATEGY.cycle.length;
       
       const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
 
@@ -465,7 +511,7 @@ async function generateLegacyTrt4Schedule(
       const subName1 = subjectsTodayNames[0];
       let subName2 = subjectsTodayNames[1];
 
-      if (activeSecondarySubjects.length > 0 && dayNumber % 3 === 0) {
+      if (activeSecondarySubjects.length > 0 && cycleDay === 0) {
         const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
         subName2 = secSubject.name;
         activeSecondaryIndex++;
@@ -1181,6 +1227,7 @@ export async function reorganizeOverdueSchedule(
   const lastCompletedSubjectIds = await getLastCompletedTheorySubjectIds(userId);
   const uniqueCompletedCount = await getUniqueCompletedTheoryDaysCount(userId);
   const currentDayNumber = uniqueCompletedCount + 1;
+  const cycleOffset = await getCycleOffset(userId, currentDayNumber);
 
   const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number; subjectId?: string; actionType?: string }> = [];
   const newItemsToCreate: any[] = [];
@@ -1309,7 +1356,7 @@ export async function reorganizeOverdueSchedule(
       const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
 
       if (mode === "LEGACY_TRT4") {
-        const cycleDay = (dayNumber - 1) % TRT4_STRATEGY.cycle.length;
+        const cycleDay = (dayNumber - 1 + cycleOffset) % TRT4_STRATEGY.cycle.length;
         const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
 
         // 1. Obter as duas matérias do ciclo
@@ -1317,7 +1364,7 @@ export async function reorganizeOverdueSchedule(
         let subName2 = subjectsTodayNames[1];
 
         // Intercalação de matéria ativa se aplicável
-        if (activeSecondarySubjects.length > 0 && dayNumber % 3 === 0) {
+        if (activeSecondarySubjects.length > 0 && cycleDay === 0) {
           const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
           subName2 = secSubject.name;
           activeSecondaryIndex++;
