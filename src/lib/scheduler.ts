@@ -116,6 +116,71 @@ export async function getOrComputeBlockMinutes(block: any, subjectName: string):
   return computedMinutes;
 }
 
+async function getUniqueCompletedTheoryDaysCount(userId: string): Promise<number> {
+  const completedItems = await prisma.studyScheduleItem.findMany({
+    where: {
+      userId,
+      status: "COMPLETED",
+      actionType: "THEORY"
+    },
+    select: {
+      completedAt: true,
+      scheduledDate: true
+    }
+  });
+
+  const uniqueDates = new Set<string>();
+  completedItems.forEach(item => {
+    const dateToUse = item.completedAt || item.scheduledDate;
+    if (dateToUse) {
+      const dateStr = getTodayRangeSP(dateToUse).dateString;
+      uniqueDates.add(dateStr);
+    }
+  });
+
+  return uniqueDates.size;
+}
+
+async function getLastCompletedTheorySubjectIds(userId: string): Promise<string[]> {
+  const lastCompleted = await prisma.studyScheduleItem.findFirst({
+    where: {
+      userId,
+      status: "COMPLETED",
+      actionType: "THEORY"
+    },
+    orderBy: {
+      completedAt: "desc"
+    },
+    select: {
+      completedAt: true,
+      scheduledDate: true
+    }
+  });
+
+  if (!lastCompleted) return [];
+
+  const dateToUse = lastCompleted.completedAt || lastCompleted.scheduledDate;
+  if (!dateToUse) return [];
+
+  const range = getTodayRangeSP(dateToUse);
+  const completedOnSameDay = await prisma.studyScheduleItem.findMany({
+    where: {
+      userId,
+      status: "COMPLETED",
+      actionType: "THEORY",
+      OR: [
+        { completedAt: { gte: range.start, lt: range.end } },
+        { completedAt: null, scheduledDate: { gte: range.start, lt: range.end } }
+      ]
+    },
+    select: {
+      subjectId: true
+    }
+  });
+
+  return Array.from(new Set(completedOnSameDay.map(item => item.subjectId)));
+}
+
 function getFallbackSubjectForSlot(
   eligibleSubjects: any[],
   allPendingBlocks: any[],
@@ -123,7 +188,8 @@ function getFallbackSubjectForSlot(
   scheduleItemsData: any[],
   newItemsToCreate: any[],
   updatesList: any[],
-  dayNumber: number
+  dayNumber: number,
+  lastCompletedSubjectIds: string[] = []
 ) {
   const fallbackCandidates = eligibleSubjects.filter(s => {
     return allPendingBlocks.some((b: any) =>
@@ -133,6 +199,31 @@ function getFallbackSubjectForSlot(
   });
 
   if (fallbackCandidates.length === 0) return null;
+
+  // Encontrar matérias estudadas no dia anterior (em memória ou no histórico do banco)
+  let prevDayWithTheory = dayNumber - 1;
+  let prevDaySubjects: string[] = [];
+  while (prevDayWithTheory > 0 && prevDaySubjects.length === 0) {
+    prevDaySubjects = [
+      ...scheduleItemsData.filter((item: any) => item.dayNumber === prevDayWithTheory && item.actionType === "THEORY").map((item: any) => item.subjectId),
+      ...newItemsToCreate.filter((item: any) => item.dayNumber === prevDayWithTheory && item.actionType === "THEORY").map((item: any) => item.subjectId),
+      ...updatesList.filter((item: any) => item.dayNumber === prevDayWithTheory && item.actionType === "THEORY").map((item: any) => item.subjectId)
+    ];
+    if (prevDaySubjects.length === 0) {
+      prevDayWithTheory--;
+    }
+  }
+
+  if (prevDaySubjects.length === 0) {
+    prevDaySubjects = lastCompletedSubjectIds || [];
+  }
+
+  // Filtrar candidatos que não foram estudados no dia anterior
+  const nonRepeatedCandidates = fallbackCandidates.filter(s => !prevDaySubjects.includes(s.id));
+  
+  // Se existirem matérias não repetidas com blocos pendentes, usamos apenas elas.
+  // Caso contrário, recorre a todos os candidatos (exceção se todas estiverem indisponíveis).
+  const finalCandidates = nonRepeatedCandidates.length > 0 ? nonRepeatedCandidates : fallbackCandidates;
 
   const flattenedCycle = TRT4_STRATEGY.cycle.flat();
   const getCycleOrder = (name: string) => {
@@ -149,7 +240,7 @@ function getFallbackSubjectForSlot(
     return 0;
   };
 
-  const candidatesWithScores = fallbackCandidates.map(s => {
+  const candidatesWithScores = finalCandidates.map(s => {
     const recentTheoryItems = [
       ...scheduleItemsData.filter((item: any) => item.subjectId === s.id && item.actionType === "THEORY"),
       ...newItemsToCreate.filter((item: any) => item.subjectId === s.id && item.actionType === "THEORY"),
@@ -337,9 +428,12 @@ async function generateLegacyTrt4Schedule(
   let activeSecondaryIndex = 0;
   const activeSecondarySubjects = eligibleSubjects.filter(s => s.studyPriority === "ACTIVE");
 
+  // Frente B: Buscar matérias e contagem real de dias de estudo concluídos do histórico
+  const lastCompletedSubjectIds = await getLastCompletedTheorySubjectIds(userId);
+  const uniqueCompletedCount = await getUniqueCompletedTheoryDaysCount(userId);
+
   let currentDate = new Date(startDate);
-  let nextStudyDayNumber = 1;
-  let cycleDayIndex = 0;
+  let nextStudyDayNumber = uniqueCompletedCount + 1;
 
   while (currentDate.getTime() <= deadline.getTime()) {
     const isStudy = isStudyDay(currentDate, studyDays);
@@ -349,8 +443,7 @@ async function generateLegacyTrt4Schedule(
       const dayNumber = nextStudyDayNumber;
       nextStudyDayNumber++;
       
-      const cycleDay = cycleDayIndex % TRT4_STRATEGY.cycle.length;
-      cycleDayIndex++;
+      const cycleDay = (dayNumber - 1) % TRT4_STRATEGY.cycle.length;
       
       const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
 
@@ -372,7 +465,7 @@ async function generateLegacyTrt4Schedule(
       const subName1 = subjectsTodayNames[0];
       let subName2 = subjectsTodayNames[1];
 
-      if (activeSecondarySubjects.length > 0 && cycleDayIndex % 3 === 0) {
+      if (activeSecondarySubjects.length > 0 && dayNumber % 3 === 0) {
         const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
         subName2 = secSubject.name;
         activeSecondaryIndex++;
@@ -403,7 +496,8 @@ async function generateLegacyTrt4Schedule(
             scheduleItemsData,
             [],
             [],
-            dayNumber
+            dayNumber,
+            lastCompletedSubjectIds
           );
           if (fallbackSubject) {
             nextBlock = allPendingBlocks.find((b: any) =>
@@ -472,7 +566,8 @@ async function generateLegacyTrt4Schedule(
             scheduleItemsData,
             [],
             [],
-            dayNumber
+            dayNumber,
+            lastCompletedSubjectIds
           );
           if (fallbackSubject) {
             thirdBlock = allPendingBlocks.find((b: any) =>
@@ -1082,11 +1177,10 @@ export async function reorganizeOverdueSchedule(
   const allDates = allItems.map(item => item.scheduledDate).filter((d): d is Date => !!d);
   const maxOriginalDate = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))) : addDays(now, 30);
 
-  // Determinar o dayNumber inicial de realocação
-  const minRescheduledDayNumber = Math.min(
-    ...theoryQueue.map(item => item.dayNumber).filter((n): n is number => n !== null && n !== undefined)
-  );
-  const currentDayNumber = minRescheduledDayNumber !== Infinity && minRescheduledDayNumber > 0 ? minRescheduledDayNumber : 1;
+  // Frente B: Determinar o dayNumber inicial de realocação com base no histórico real de estudos concluídos
+  const lastCompletedSubjectIds = await getLastCompletedTheorySubjectIds(userId);
+  const uniqueCompletedCount = await getUniqueCompletedTheoryDaysCount(userId);
+  const currentDayNumber = uniqueCompletedCount + 1;
 
   const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number; subjectId?: string; actionType?: string }> = [];
   const newItemsToCreate: any[] = [];
@@ -1157,9 +1251,31 @@ export async function reorganizeOverdueSchedule(
     );
     theoryMinutesOnDay = preservedTheoryOnDay.reduce((sum, item) => sum + (item.estimatedMinutes || 45), 0);
 
-    // 2. Alocar teoria pendente da Fila
-    while (theoryQueue.length > 0 && theoryMinutesOnDay < targetTheoryMinutes) {
-      const nextItem = theoryQueue.shift()!;
+    // 2. Alocar teoria pendente da Fila (Frente C: com regra de anti-repetição no carryover)
+    const prevDaySubjects = [
+      ...preservedTheoryOnDay.filter((item: any) => item.dayNumber === dayNumber - 1).map((item: any) => item.subjectId),
+      ...updatesList.filter((item: any) => item.dayNumber === dayNumber - 1 && item.actionType === "THEORY").map((item: any) => item.subjectId),
+      ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber - 1 && item.actionType === "THEORY").map((item: any) => item.subjectId)
+    ];
+    if (prevDaySubjects.length === 0) {
+      prevDaySubjects.push(...lastCompletedSubjectIds);
+    }
+
+    let queueIndex = 0;
+    while (queueIndex < theoryQueue.length && theoryMinutesOnDay < targetTheoryMinutes) {
+      const nextItem = theoryQueue[queueIndex];
+      
+      const isRepeated = prevDaySubjects.includes(nextItem.subjectId);
+      const hasNonRepeatedInQueue = theoryQueue.slice(queueIndex).some(item => !prevDaySubjects.includes(item.subjectId));
+
+      if (isRepeated && hasNonRepeatedInQueue) {
+        // Pular o item repetido para que ele seja agendado no próximo dia útil elegível
+        queueIndex++;
+        continue;
+      }
+
+      // Remover da fila e agendar
+      theoryQueue.splice(queueIndex, 1);
       const origDateStr = getTodayRangeSP(nextItem.scheduledDate!).dateString;
       const isDateChanged = origDateStr !== dateStr;
       const isDayChanged = nextItem.dayNumber !== dayNumber;
@@ -1185,6 +1301,7 @@ export async function reorganizeOverdueSchedule(
       }
 
       theoryMinutesOnDay += nextItem.estimatedMinutes || 45;
+      // Não incrementamos queueIndex já que o item foi removido
     }
 
     // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutes
@@ -1225,7 +1342,8 @@ export async function reorganizeOverdueSchedule(
               [], // itens gerados
               newItemsToCreate, // novos itens
               updatesList, // itens atualizados
-              dayNumber
+              dayNumber,
+              lastCompletedSubjectIds
             );
             if (fallbackSubject) {
               nextBlock = (blocksBySubject[fallbackSubject.id] || []).shift();
@@ -1295,7 +1413,8 @@ export async function reorganizeOverdueSchedule(
               [],
               newItemsToCreate,
               updatesList,
-              dayNumber
+              dayNumber,
+              lastCompletedSubjectIds
             );
             if (fallbackSubject) {
               thirdBlock = (blocksBySubject[fallbackSubject.id] || []).shift();

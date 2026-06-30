@@ -155,15 +155,11 @@ export default async function Dashboard() {
 
     let shouldReorganize = false;
     if (hasPastPending) {
-      if (activeSchedule) {
-        const scheduleTodayStr = getTodayRangeSP(activeSchedule.updatedAt).dateString;
-        const todayStr = todayRange.dateString;
-        if (scheduleTodayStr !== todayStr) {
-          shouldReorganize = true;
-        } else {
-          console.log(`[Dashboard] Skip auto-reorganization: already ran today (${todayStr})`);
-        }
-      } else {
+      shouldReorganize = true;
+    } else if (activeSchedule) {
+      const scheduleTodayStr = getTodayRangeSP(activeSchedule.updatedAt).dateString;
+      const todayStr = todayRange.dateString;
+      if (scheduleTodayStr !== todayStr) {
         shouldReorganize = true;
       }
     }
