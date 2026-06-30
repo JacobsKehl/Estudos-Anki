@@ -88,6 +88,11 @@ async function run() {
 
     console.log(`👤 Usuário Encontrado: ${user.name} (${user.id})`);
 
+    const prefs = await prisma.userPreferences.findUnique({
+      where: { userId: user.id }
+    });
+    console.log(`⚙️ Preferências do Usuário:`, JSON.stringify(prefs, null, 2));
+
     // B. Auditar histórico de conclusão
     const uniqueCountResult = await getUniqueCompletedTheoryDaysCount(user.id);
     console.log("\n=== AUDITORIA DE HISTÓRICO ===");
