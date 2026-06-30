@@ -1,0 +1,207 @@
+👤 Usuário Encontrado: Gabriela Furtado (cmp8od0wz0000iybklaotfqbs)
+
+=== AUDITORIA DE HISTÓRICO ===
+Quantidade de datas únicas com teoria concluída: 9
+Datas únicas identificadas:
+  - 2026-06-18
+  - 2026-06-21
+  - 2026-06-22
+  - 2026-06-23
+  - 2026-06-24
+  - 2026-06-25
+  - 2026-06-26
+  - 2026-06-28
+  - 2026-06-29
+nextStudyDayNumber calculado: 10
+
+Matérias concluídas no último dia ativo de estudo:
+  - Matéria: Direito Processual do Trabalho (completedAt: Mon Jun 29 2026 23:56:28 GMT+0000 (Coordinated Universal Time), scheduledDate: Mon Jun 29 2026 03:00:00 GMT+0000 (Coordinated Universal Time))
+  - Matéria: Direito Administrativo (completedAt: Mon Jun 29 2026 22:52:18 GMT+0000 (Coordinated Universal Time), scheduledDate: Mon Jun 29 2026 03:00:00 GMT+0000 (Coordinated Universal Time))
+
+=== SIMULAÇÃO DE ROLLOVER (DRY RUN) ===
+Sucesso: true
+Itens com data deslocada (carryover): 182
+
+Detalhes das alterações propostas (exemplo de reordenamento):
+  - Item ID: cmqkbunkf0013iyf8pw51eyq9 [THEORY] Matéria: Direito do Trabalho de 2026-07-01 para 2026-06-30
+  - Item ID: cmqkbunkf0011iyf8797kq37h [THEORY] Matéria: Direito Processual Civil de 2026-07-01 para 2026-06-30
+  - Item ID: cmqkbunkf0019iyf8ga32qi0g [THEORY] Matéria: Direito Constitucional de 2026-07-04 para 2026-07-02
+  - Item ID: cmqkbunkf000yiyf8vkmp71ho [THEORY] Matéria: Direito Administrativo de 2026-06-30 para 2026-07-03
+  - Item ID: cmqkbunkf0017iyf8ci14onm4 [THEORY] Matéria: Direito Administrativo de 2026-07-02 para 2026-07-03
+  - Item ID: cmqkbunkg001iiyf88gl9fjhs [THEORY] Matéria: Direito Constitucional de 2026-07-07 para 2026-07-06
+  - Item ID: cmqkbunkg001fiyf825jb3ubb [THEORY] Matéria: Direito Processual do Trabalho de 2026-07-06 para 2026-07-07
+  - Item ID: cmqkbunkg001giyf8c35o8825 [THEORY] Matéria: Direito Administrativo de 2026-07-07 para 2026-07-08
+  - Item ID: cmqkbunkg001liyf8m3zlch0z [THEORY] Matéria: Direito do Trabalho de 2026-07-08 para 2026-07-09
+  - Item ID: cmqkbunkg001piyf8s2owfa35 [THEORY] Matéria: Direito Administrativo de 2026-07-09 para 2026-07-10
+  - Item ID: cmqkbunkg001riyf865dxvo1x [THEORY] Matéria: Direito Constitucional de 2026-07-10 para 2026-07-11
+  - Item ID: cmqkbunkg001siyf8sieu4ukh [THEORY] Matéria: Direito Processual Civil de 2026-07-11 para 2026-07-12
+  - Item ID: cmqkbunkg001xiyf8lmctt7gu [THEORY] Matéria: Direito Processual do Trabalho de 2026-07-12 para 2026-07-13
+  - Item ID: cmqkbunkg001yiyf8tnsf0b3i [THEORY] Matéria: Direito Administrativo de 2026-07-12 para 2026-07-13
+  - Item ID: cmqkbunkg0021iyf8ld2u1wcc [THEORY] Matéria: Direito Processual Civil de 2026-07-13 para 2026-07-14
+  - Item ID: cmqkbunkg0026iyf8blx2iogq [THEORY] Matéria: Direito Processual do Trabalho de 2026-07-14 para 2026-07-15
+  - Item ID: cmqkbunkg0023iyf80j6tdbkn [THEORY] Matéria: Direito do Trabalho de 2026-07-15 para 2026-07-16
+  - Item ID: cmqkbunkg0029iyf8r3kxkd47 [THEORY] Matéria: Direito Constitucional de 2026-07-16 para 2026-07-17
+  - Item ID: cmqkbunkg002iiyf8zdmjl0ai [THEORY] Matéria: Direito Constitucional de 2026-07-18 para 2026-07-17
+  - Item ID: cmqkbunkg002ciyf8y6nv2i51 [THEORY] Matéria: Direito do Trabalho de 2026-07-17 para 2026-07-18
+  - Item ID: cmqkbunkg002fiyf8p76tntda [THEORY] Matéria: Direito Processual do Trabalho de 2026-07-18 para 2026-07-19
+  - Item ID: cmqkbunkg002jiyf8j39484ge [THEORY] Matéria: Direito Processual Civil de 2026-07-19 para 2026-07-20
+  - Item ID: cmqkbunkh002miyf838aok0tf [THEORY] Matéria: Língua Portuguesa de 2026-07-20 para 2026-07-21
+  - Item ID: cmqkbunkh002piyf812jln7nr [THEORY] Matéria: Direito Administrativo de 2026-07-21 para 2026-07-22
+  - Item ID: cmqkbunkh002viyf8epmvd858 [THEORY] Matéria: Língua Portuguesa de 2026-07-22 para 2026-07-23
+  - Item ID: cmqkbunkh002siyf8o3t5qt91 [THEORY] Matéria: Direito Processual Civil de 2026-07-22 para 2026-07-23
+  - Item ID: cmqkbunkh002uiyf88v76au13 [THEORY] Matéria: Direito do Trabalho de 2026-07-23 para 2026-07-24
+  - Item ID: cmqkbunkh002xiyf87jrarh0e [THEORY] Matéria: Direito Processual do Trabalho de 2026-07-23 para 2026-07-24
+  - Item ID: cmqkbunkh002yiyf8o664num0 [THEORY] Matéria: Direito Administrativo de 2026-07-24 para 2026-07-25
+  - Item ID: cmqkbunkh0031iyf8dfu6cu99 [THEORY] Matéria: Direito Processual Civil de 2026-07-24 para 2026-07-25
+  - Item ID: cmqkbunkh0030iyf8h4bjrjur [THEORY] Matéria: Direito Constitucional de 2026-07-25 para 2026-07-26
+  - Item ID: cmqkbunkh0033iyf83sz5xilw [THEORY] Matéria: Direito do Trabalho de 2026-07-25 para 2026-07-26
+  - Item ID: cmqkbunkh0036iyf8fkcajwde [THEORY] Matéria: Direito Processual do Trabalho de 2026-07-26 para 2026-07-27
+  - Item ID: cmqkbunkh0034iyf83h3ef6rj [THEORY] Matéria: Língua Portuguesa de 2026-07-26 para 2026-07-27
+  - Item ID: cmqkbunkh0037iyf8qc5kcqva [THEORY] Matéria: Direito Administrativo de 2026-07-27 para 2026-07-28
+  - Item ID: cmqkbunkh0039iyf85ugnwdf0 [THEORY] Matéria: Direito Constitucional de 2026-07-27 para 2026-07-28
+  - Item ID: cmqkbunkh003aiyf8sy76v5eo [THEORY] Matéria: Direito Processual Civil de 2026-07-28 para 2026-07-29
+  - Item ID: cmqkbunkh003ciyf86sgax5jy [THEORY] Matéria: Direito do Trabalho de 2026-07-28 para 2026-07-29
+  - Item ID: cmqkbunkh003diyf8xjpbji01 [THEORY] Matéria: Língua Portuguesa de 2026-07-29 para 2026-07-30
+  - Item ID: cmqkbunkh003fiyf8nwnw184z [THEORY] Matéria: Direito Processual do Trabalho de 2026-07-29 para 2026-07-30
+  - Item ID: cmqkbunkh003giyf8ruk3p7lf [THEORY] Matéria: Direito Administrativo de 2026-07-30 para 2026-07-31
+  - Item ID: cmqkbunkh003iiyf8lgeg2ou6 [THEORY] Matéria: Direito Constitucional de 2026-07-30 para 2026-07-31
+  - Item ID: cmqkbunkh003jiyf876biuzjv [THEORY] Matéria: Direito Processual Civil de 2026-07-31 para 2026-08-01
+  - Item ID: cmqkbunkh003liyf8rkven7ym [THEORY] Matéria: Direito do Trabalho de 2026-07-31 para 2026-08-01
+  - Item ID: cmqkbunkh003miyf86wzbnq8q [THEORY] Matéria: Língua Portuguesa de 2026-08-01 para 2026-08-02
+  - Item ID: cmqkbunkh003oiyf8mzf59awv [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-01 para 2026-08-02
+  - Item ID: cmqkbunkh003piyf8f09z0puu [THEORY] Matéria: Direito Administrativo de 2026-08-02 para 2026-08-03
+  - Item ID: cmqkbunki003riyf8ih01gp72 [THEORY] Matéria: Direito Constitucional de 2026-08-02 para 2026-08-03
+  - Item ID: cmqkbunki003siyf8ykxtn8sj [THEORY] Matéria: Direito Processual Civil de 2026-08-03 para 2026-08-04
+  - Item ID: cmqkbunki003uiyf8sol0cumf [THEORY] Matéria: Direito do Trabalho de 2026-08-03 para 2026-08-04
+  - Item ID: cmqkbunki003xiyf8mky8gz4f [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-04 para 2026-08-05
+  - Item ID: cmqkbunki003viyf8h3d0egyj [THEORY] Matéria: Língua Portuguesa de 2026-08-04 para 2026-08-05
+  - Item ID: cmqkbunki003yiyf8fe18ho23 [THEORY] Matéria: Direito Administrativo de 2026-08-05 para 2026-08-06
+  - Item ID: cmqkbunki0040iyf8of2t9r9w [THEORY] Matéria: Direito Constitucional de 2026-08-05 para 2026-08-06
+  - Item ID: cmqkbunki0041iyf8ws4p3y8t [THEORY] Matéria: Direito Processual Civil de 2026-08-06 para 2026-08-07
+  - Item ID: cmqkbunki0043iyf88gojp8wz [THEORY] Matéria: Direito do Trabalho de 2026-08-06 para 2026-08-07
+  - Item ID: cmqkbunki0044iyf8g2rzqmq1 [THEORY] Matéria: Língua Portuguesa de 2026-08-07 para 2026-08-08
+  - Item ID: cmqkbunki0046iyf8zuisb0tz [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-07 para 2026-08-08
+  - Item ID: cmqkbunki0049iyf8jksve152 [THEORY] Matéria: Direito Constitucional de 2026-08-08 para 2026-08-09
+  - Item ID: cmqkbunki0047iyf8w46nqofx [THEORY] Matéria: Direito Administrativo de 2026-08-08 para 2026-08-09
+  - Item ID: cmqkbunki004ciyf8cfdyp74f [THEORY] Matéria: Direito do Trabalho de 2026-08-09 para 2026-08-10
+  - Item ID: cmqkbunki004aiyf82y61zy48 [THEORY] Matéria: Direito Processual Civil de 2026-08-09 para 2026-08-10
+  - Item ID: cmqkbunki004diyf8cbkkd1zt [THEORY] Matéria: Língua Portuguesa de 2026-08-10 para 2026-08-11
+  - Item ID: cmqkbunki004fiyf8g33rxcs6 [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-10 para 2026-08-11
+  - Item ID: cmqkbunki004giyf83tyz3gcb [THEORY] Matéria: Direito Administrativo de 2026-08-10 para 2026-08-11
+  - Item ID: cmqkbunki004jiyf8eses311p [THEORY] Matéria: Direito Processual Civil de 2026-08-11 para 2026-08-12
+  - Item ID: cmqkbunki004iiyf8q1jhanjb [THEORY] Matéria: Direito Constitucional de 2026-08-11 para 2026-08-12
+  - Item ID: cmqkbunki004liyf8avp1vf3w [THEORY] Matéria: Direito do Trabalho de 2026-08-12 para 2026-08-13
+  - Item ID: cmqkbunki004miyf84w74nov0 [THEORY] Matéria: Língua Portuguesa de 2026-08-12 para 2026-08-13
+  - Item ID: cmqkbunki004oiyf8tyi3my11 [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-13 para 2026-08-14
+  - Item ID: cmqkbunki004piyf8t5fm4308 [THEORY] Matéria: Direito Administrativo de 2026-08-13 para 2026-08-14
+  - Item ID: cmqkbunki004riyf8bfffd9p2 [THEORY] Matéria: Direito Constitucional de 2026-08-14 para 2026-08-15
+  - Item ID: cmqkbunki004siyf8uf55euk1 [THEORY] Matéria: Direito Processual Civil de 2026-08-14 para 2026-08-15
+  - Item ID: cmqkbunki004uiyf8dq930l7q [THEORY] Matéria: Direito do Trabalho de 2026-08-15 para 2026-08-16
+  - Item ID: cmqkbunkj004viyf8hhfk2v8d [THEORY] Matéria: Língua Portuguesa de 2026-08-15 para 2026-08-16
+  - Item ID: cmqkbunkj004xiyf841a4l8ro [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-16 para 2026-08-17
+  - Item ID: cmqkbunkj004yiyf8kwdv0zgu [THEORY] Matéria: Direito Administrativo de 2026-08-16 para 2026-08-17
+  - Item ID: cmqkbunkj0050iyf8mqi3d9me [THEORY] Matéria: Direito Constitucional de 2026-08-17 para 2026-08-18
+  - Item ID: cmqkbunkj0053iyf8gdm88mxw [THEORY] Matéria: Direito do Trabalho de 2026-08-17 para 2026-08-18
+  - Item ID: cmqkbunkj0054iyf8d6d9nbzg [THEORY] Matéria: Língua Portuguesa de 2026-08-18 para 2026-08-19
+  - Item ID: cmqkbunkj0056iyf8hyrsug03 [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-18 para 2026-08-19
+  - Item ID: cmqkbunkj0057iyf8bxoeuz5a [THEORY] Matéria: Direito Civil de 2026-08-19 para 2026-08-20
+  - Item ID: cmqkbunkj0059iyf8smbr4kq0 [THEORY] Matéria: Direito Constitucional de 2026-08-19 para 2026-08-20
+  - Item ID: cmqkbunkj005aiyf8y0i5b172 [THEORY] Matéria: Direito Processual Civil de 2026-08-20 para 2026-08-21
+  - Item ID: cmqkbunkj005ciyf8h2ly36dd [THEORY] Matéria: Direito do Trabalho de 2026-08-20 para 2026-08-21
+  - Item ID: cmqkbunkj005diyf8z1hcdcp2 [THEORY] Matéria: Língua Portuguesa de 2026-08-21 para 2026-08-22
+  - Item ID: cmqkbunkj005fiyf8qv2hh9i5 [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-21 para 2026-08-22
+  - Item ID: cmqkbunkj0051iyf8jke77b0a [THEORY] Matéria: Direito Processual Civil de 2026-08-20 para 2026-08-23
+  - Item ID: cmqkbunkj005giyf8rrh0eiei [THEORY] Matéria: Direito Civil de 2026-08-22 para 2026-08-23
+  - Item ID: cmqkbunkj005iiyf8k3tufveb [THEORY] Matéria: Direito Constitucional de 2026-08-22 para 2026-08-23
+  - Item ID: cmqkbunkj005liyf8el5uxg2u [THEORY] Matéria: Direito do Trabalho de 2026-08-23 para 2026-08-24
+  - Item ID: cmqkbunkj005miyf8lzny3qnz [THEORY] Matéria: Língua Portuguesa de 2026-08-23 para 2026-08-24
+  - Item ID: cmqkbunkj005oiyf80hsv13op [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-23 para 2026-08-24
+  - Item ID: cmqkbunkj005jiyf8avkmc1yx [THEORY] Matéria: Direito Processual Civil de 2026-08-22 para 2026-08-25
+  - Item ID: cmqkbunkj005piyf8sbwhp0cn [THEORY] Matéria: Direito Civil de 2026-08-24 para 2026-08-25
+  - Item ID: cmqkbunkj005riyf8pk4f0g3x [THEORY] Matéria: Direito Constitucional de 2026-08-24 para 2026-08-26
+  - Item ID: cmqkbunkj005uiyf8fbpbkqhx [THEORY] Matéria: Direito do Trabalho de 2026-08-25 para 2026-08-26
+  - Item ID: cmqkbunkj005siyf87adeff5u [THEORY] Matéria: Direito Processual Civil de 2026-08-24 para 2026-08-27
+  - Item ID: cmqkbunkj005viyf8c897uafo [THEORY] Matéria: Língua Portuguesa de 2026-08-25 para 2026-08-27
+  - Item ID: cmqkbunkj005xiyf8jkf2czku [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-26 para 2026-08-27
+  - Item ID: cmqkbunkk0060iyf8kvi50cq3 [THEORY] Matéria: Direito Constitucional de 2026-08-27 para 2026-08-28
+  - Item ID: cmqkbunkj005yiyf814aqrmuw [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-26 para 2026-08-29
+  - Item ID: cmqkbunkk0061iyf8xavz5sqk [THEORY] Matéria: Direito Processual Civil de 2026-08-27 para 2026-08-29
+  - Item ID: cmqkbunkk0063iyf8piysbi5r [THEORY] Matéria: Direito do Trabalho de 2026-08-28 para 2026-08-30
+  - Item ID: cmqkbunkk0064iyf8nc1qxnz7 [THEORY] Matéria: Língua Portuguesa de 2026-08-28 para 2026-08-30
+  - Item ID: cmqkbunkk0069iyf8jubph8f2 [THEORY] Matéria: Direito Constitucional de 2026-08-29 para 2026-08-30
+  - Item ID: cmqkbunkk0066iyf8yop3drsl [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-29 para 2026-08-31
+  - Item ID: cmqkbunkk006aiyf8b3ta82d9 [THEORY] Matéria: Direito Processual Civil de 2026-08-30 para 2026-08-31
+  - Item ID: cmqkbunkk006ciyf8dgmkw2we [THEORY] Matéria: Direito do Trabalho de 2026-08-30 para 2026-09-01
+  - Item ID: cmqkbunkk006diyf8jqei1r9b [THEORY] Matéria: Língua Portuguesa de 2026-08-31 para 2026-09-01
+  - Item ID: cmqkbunkk006fiyf84knwzz9r [THEORY] Matéria: Direito Processual do Trabalho de 2026-08-31 para 2026-09-02
+  - Item ID: cmqkbunkk006iiyf8vszzqpqb [THEORY] Matéria: Direito Constitucional de 2026-09-01 para 2026-09-02
+  - Item ID: cmqkbunkk006jiyf8rouns5fi [THEORY] Matéria: Direito Processual Civil de 2026-09-01 para 2026-09-02
+  - Item ID: cmqkbunkk006giyf8s8ok0rdz [THEORY] Matéria: Direito Civil de 2026-09-02 para 2026-09-03
+  - Item ID: cmqkbunkk006liyf864csw4u4 [THEORY] Matéria: Direito do Trabalho de 2026-09-02 para 2026-09-03
+  - Item ID: cmqkbunkk006miyf8v7sujotn [THEORY] Matéria: Língua Portuguesa de 2026-09-03 para 2026-09-04
+  - Item ID: cmqkbunkk006oiyf8jekwagvd [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-03 para 2026-09-04
+  - Item ID: cmqkbunkk006piyf89tk0qm5u [THEORY] Matéria: Direito Civil de 2026-09-03 para 2026-09-05
+  - Item ID: cmqkbunkk006viyf8o0632uj0 [THEORY] Matéria: Língua Portuguesa de 2026-09-04 para 2026-09-06
+  - Item ID: cmqkbunkk006xiyf8sr1ttr5n [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-05 para 2026-09-06
+  - Item ID: cmqkbunkl0071iyf8c0f92mpp [THEORY] Matéria: Direito Processual Civil de 2026-09-06 para 2026-09-07
+  - Item ID: cmqkbunkk006yiyf87njjljt2 [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-06 para 2026-09-08
+  - Item ID: cmqkbunkl0073iyf8uthmem4q [THEORY] Matéria: Direito do Trabalho de 2026-09-07 para 2026-09-08
+  - Item ID: cmqkbunkl0079iyf8913oi823 [THEORY] Matéria: Direito Constitucional de 2026-09-10 para 2026-09-09
+  - Item ID: cmqkbunkl0076iyf8fohof4fn [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-09 para 2026-09-10
+  - Item ID: cmqkbunkl007aiyf80wc38de0 [THEORY] Matéria: Direito Processual Civil de 2026-09-10 para 2026-09-11
+  - Item ID: cmqkbunkl007diyf84wszfovq [THEORY] Matéria: Língua Portuguesa de 2026-09-11 para 2026-09-12
+  - Item ID: cmqkbunkl007giyf87iv6km51 [THEORY] Matéria: Direito Civil de 2026-09-12 para 2026-09-13
+  - Item ID: cmqkbunkl007jiyf8zr2t5nhz [THEORY] Matéria: Direito Processual Civil de 2026-09-13 para 2026-09-14
+  - Item ID: cmqkbunkl007miyf8pv4rf0lr [THEORY] Matéria: Língua Portuguesa de 2026-09-14 para 2026-09-15
+  - Item ID: cmqkbunkl007oiyf8ano98yla [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-16 para 2026-09-15
+  - Item ID: cmqkbunkl007piyf8c9qr9xel [THEORY] Matéria: Direito Civil de 2026-09-16 para 2026-09-15
+  - Item ID: cmqkbunkm0080iyf86tk8d8pn [THEORY] Matéria: Direito Constitucional de 2026-09-19 para 2026-09-18
+  - Item ID: cmqkbunkm007xiyf8hbxsikmd [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-18 para 2026-09-19
+  - Item ID: cmqkbunkm0084iyf84bzbckyj [THEORY] Matéria: Língua Portuguesa de 2026-09-22 para 2026-09-21
+  - Item ID: cmqkbunkm0087iyf8egz6iq5x [THEORY] Matéria: Direito Civil de 2026-09-23 para 2026-09-21
+  - Item ID: cmqkbunkm0089iyf86b7jvh6v [THEORY] Matéria: Direito Constitucional de 2026-09-23 para 2026-09-21
+  - Item ID: cmqkbunkm007yiyf8myo754kw [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-19 para 2026-09-22
+  - Item ID: cmqkbunkn008giyf88m1j45l7 [THEORY] Matéria: Direito Constitucional de 2026-09-26 para 2026-09-25
+  - Item ID: cmqkbunkm0086iyf88b52n1kr [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-22 para 2026-09-26
+  - Item ID: cmqkbunkn008iiyf89h7e889v [THEORY] Matéria: Direito Constitucional de 2026-09-26 para 2026-09-27
+  - Item ID: cmqkbunkn008fiyf8ofr2k6f9 [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-25 para 2026-09-28
+  - Item ID: cmqkbunkn008miyf81e3s7b3m [THEORY] Matéria: Língua Portuguesa de 2026-09-27 para 2026-09-28
+  - Item ID: cmqkbunkn008jiyf8vl9ars4r [THEORY] Matéria: Direito Processual Civil de 2026-09-28 para 2026-09-29
+  - Item ID: cmqkbunkn008oiyf8q46udvqm [THEORY] Matéria: Direito Processual do Trabalho de 2026-09-28 para 2026-09-30
+  - Item ID: cmqkbunkn008siyf89rcx8qka [THEORY] Matéria: Direito Processual Civil de 2026-09-30 para 2026-10-01
+  - Item ID: cmqkbunko0091iyf83zrdq70c [THEORY] Matéria: Direito Processual Civil de 2026-10-02 para 2026-10-01
+  - Item ID: cmqkbunko008xiyf85hhdjeku [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-01 para 2026-10-02
+  - Item ID: cmqkbunko0093iyf8i85ow82c [THEORY] Matéria: Língua Portuguesa de 2026-10-04 para 2026-10-03
+  - Item ID: cmqkbunko008yiyf8enatdstc [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-02 para 2026-10-04
+  - Item ID: cmqkbunko0094iyf813bijnl2 [THEORY] Matéria: Língua Portuguesa de 2026-10-04 para 2026-10-05
+  - Item ID: cmqkbunko0096iyf84r3h7hz2 [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-04 para 2026-10-06
+  - Item ID: cmqkbunko0097iyf83v15glcm [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-05 para 2026-10-06
+  - Item ID: cmqkbunko009fiyf8hu3gg60r [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-07 para 2026-10-06
+  - Item ID: cmqkbunko009ciyf835h0jikq [THEORY] Matéria: Língua Portuguesa de 2026-10-06 para 2026-10-07
+  - Item ID: cmqkbunko009giyf8qryryyqh [THEORY] Matéria: Direito Processual Civil de 2026-10-07 para 2026-10-08
+  - Item ID: cmqkbunko009diyf8xgvlqojs [THEORY] Matéria: Língua Portuguesa de 2026-10-06 para 2026-10-09
+  - Item ID: cmqkbunkp009iiyf8y2ikhpgr [THEORY] Matéria: Língua Portuguesa de 2026-10-07 para 2026-10-09
+  - Item ID: cmqkbunkp009jiyf8e3bnahyh [THEORY] Matéria: Direito Processual Civil de 2026-10-08 para 2026-10-10
+  - Item ID: cmqkbunkp009oiyf88g4qm9ef [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-09 para 2026-10-10
+  - Item ID: cmqkbunkp009riyf885i0p5vc [THEORY] Matéria: Língua Portuguesa de 2026-10-10 para 2026-10-11
+  - Item ID: cmqkbunkp009piyf8k6zlffhv [THEORY] Matéria: Direito Processual Civil de 2026-10-10 para 2026-10-12
+  - Item ID: cmqkbunkp009siyf89hi4cekp [THEORY] Matéria: Direito Processual Civil de 2026-10-11 para 2026-10-12
+  - Item ID: cmqkbunkp009xiyf88omzbdql [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-12 para 2026-10-13
+  - Item ID: cmqkbunkp009viyf8czs7hx42 [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-12 para 2026-10-13
+  - Item ID: cmqkbunkp009yiyf8iuo6amz7 [THEORY] Matéria: Direito Processual Civil de 2026-10-13 para 2026-10-14
+  - Item ID: cmqkbunkp00a0iyf8gjoxbrve [THEORY] Matéria: Direito Processual Civil de 2026-10-13 para 2026-10-14
+  - Item ID: cmqkbunkp00a3iyf8yk92kwht [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-14 para 2026-10-15
+  - Item ID: cmqkbunkp00a1iyf8pw0tlqob [THEORY] Matéria: Direito Processual Civil de 2026-10-14 para 2026-10-16
+  - Item ID: cmqkbunkq00aeiyf8jmmpw9ny [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-18 para 2026-10-17
+  - Item ID: cmqkbunkq00a7iyf892vpi37c [THEORY] Matéria: Direito Processual Civil de 2026-10-16 para 2026-10-18
+  - Item ID: cmqkbunkq00a8iyf8t6st7t4t [THEORY] Matéria: Direito Processual Civil de 2026-10-17 para 2026-10-18
+  - Item ID: cmqkbunkq00agiyf8wtmur4ml [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-18 para 2026-10-19
+  - Item ID: cmqkbunkq00amiyf89c8vf163 [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-20 para 2026-10-19
+  - Item ID: cmqkbunkq00ajiyf8plixg0ie [THEORY] Matéria: Direito Processual Civil de 2026-10-19 para 2026-10-20
+  - Item ID: cmqkbunkq00aniyf8dcenz42u [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-22 para 2026-10-21
+  - Item ID: cmqkbunkq00atiyf8ylbl6b1w [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-23 para 2026-10-21
+  - Item ID: cmqkbunkq00apiyf8e5lwxqiu [THEORY] Matéria: Direito Processual do Trabalho de 2026-10-23 para 2026-10-21
+  - Item ID: cmqkbunkq00ahiyf8occaiusg [THEORY] Matéria: Direito Processual Civil de 2026-10-19 para 2026-10-22
+  - Item ID: cmqkbunkq00akiyf89tyapsuh [THEORY] Matéria: Direito Processual Civil de 2026-10-20 para 2026-10-23
+  - Item ID: cmqkbunkq00aqiyf82b4yi4xk [THEORY] Matéria: Direito Processual Civil de 2026-10-22 para 2026-10-24
+  - Item ID: cmqkbunkq00asiyf84iq7x8ky [THEORY] Matéria: Direito Processual Civil de 2026-10-23 para 2026-10-24
