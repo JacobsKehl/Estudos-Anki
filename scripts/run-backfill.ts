@@ -13,9 +13,22 @@ async function main() {
 
   let userId: string;
   try {
-    userId = await getMockUserId();
-  } catch (err) {
-    console.error("Erro: Não foi possível obter o ID do usuário. Verifique mock auth.");
+    const email = process.env.ADMIN_EMAIL || process.env.DAILY_REMINDER_EMAIL || "gabriela.furtado.p@gmail.com";
+    const user = await prisma.user.findFirst({
+      where: { email }
+    });
+    if (user) {
+      userId = user.id;
+    } else {
+      const firstUser = await prisma.user.findFirst();
+      if (firstUser) {
+        userId = firstUser.id;
+      } else {
+        userId = await getMockUserId();
+      }
+    }
+  } catch (err: any) {
+    console.error("Erro: Não foi possível obter o ID do usuário. Detalhes:", err.message);
     process.exit(1);
   }
 
