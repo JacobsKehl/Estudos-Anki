@@ -25,7 +25,34 @@ export function QuestionReviewSection({ initialReviews }: QuestionReviewSectionP
   };
 
   if (reviews.length === 0) {
-    return null;
+    return (
+      <details open className="group space-y-4 [&_summary::-webkit-details-marker]:hidden">
+        <summary className="flex flex-col gap-1 pb-3 border-b-2 border-sage-light/40 cursor-pointer list-none select-none">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-1 h-5 bg-[#c9ad7f] rounded-full" />
+              <ClipboardCheck className="w-4 h-4 text-[#c9ad7f]" />
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Questões de Revisão</h2>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground/80 font-medium">
+            Assuntos estudados anteriormente para revisar por questões.
+          </p>
+        </summary>
+
+        <div className="pt-4 pb-6 flex flex-col items-center justify-center text-center space-y-3 bg-muted/5 rounded-[2rem] border border-dashed border-border/60 p-6 animate-in fade-in duration-300">
+          <p className="text-xs text-muted-foreground font-medium">
+            Nenhuma revisão por questões disponível hoje.
+          </p>
+          <button
+            onClick={() => window.location.href = "/question-reviews"}
+            className="text-[11px] font-bold text-[#c9ad7f] hover:text-[#b0966a] underline underline-offset-4 flex items-center gap-1 transition-colors"
+          >
+            Configurar revisões para assuntos já estudados →
+          </button>
+        </div>
+      </details>
+    );
   }
 
   return (
