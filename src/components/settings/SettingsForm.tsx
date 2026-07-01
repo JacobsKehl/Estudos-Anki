@@ -1029,6 +1029,22 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
               </div>
             </div>
 
+            <div className="bg-sage-light/10 border border-accent/25 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-foreground">Carga Inicial de Revisão por Questões</h3>
+                <p className="text-xs text-muted-foreground">
+                  Simule e aplique o backfill de revisões por questões para matérias ativas de forma simples.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => window.location.href = "/admin/question-reviews"}
+                className="rounded-xl text-xs h-10 px-4 bg-accent border-accent text-accent-foreground shrink-0 hover:scale-[1.01] transition-transform font-bold"
+              >
+                Acessar Painel de Carga
+              </Button>
+            </div>
+
             <form onSubmit={handleSendInvite} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
