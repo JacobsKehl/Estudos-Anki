@@ -9,7 +9,9 @@ try {
 
   // 2. Run migrations only if we are building on Vercel
   if (process.env.VERCEL === '1') {
-    console.log('> Vercel detected. Running database migrations...');
+    console.log('> Vercel detected. Running pre-migration check...');
+    execSync('node scripts/create-migration-table.js', { stdio: 'inherit' });
+    console.log('> Running database migrations...');
     execSync('npx prisma migrate deploy', { stdio: 'inherit' });
   } else {
     console.log('> Local build detected. Skipping database migrations.');
