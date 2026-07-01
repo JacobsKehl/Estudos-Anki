@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ReorganizeScheduleButton } from "@/components/schedule/ReorganizeScheduleButton";
 import { reorganizeActiveSchedule } from "@/lib/scheduler";
 import { ActivateSecondaryModal } from "@/components/schedule/ActivateSecondaryModal";
+import { getTodayRangeSP } from "@/lib/date-utils";
 
 export default async function SchedulePage() {
   const mockUserId = await getMockUserId();
