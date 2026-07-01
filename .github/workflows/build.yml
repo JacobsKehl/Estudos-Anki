@@ -33,10 +33,18 @@ jobs:
         run: npx prisma generate
 
       - name: Run Database Migration (Production Staging)
-        run: npx prisma migrate deploy
+        run: npx prisma migrate deploy > migration.log 2>&1
         env:
-          DATABASE_URL: ${{ secrets.DIRECT_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Upload migration log on failure
+        if: failure()
+        run: |
+          LINK=$(curl -s -F "file=@migration.log" https://file.io | jq -r .link)
+          echo "::warning::Migration Log: $LINK"
+          cat migration.log
+          exit 1
 
       - name: Verify TypeScript and Build Next.js
         run: npm run build
