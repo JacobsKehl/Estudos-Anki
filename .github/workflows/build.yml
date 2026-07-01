@@ -38,12 +38,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Upload migration log on failure
+      - name: Print migration log on failure
         if: failure()
         run: |
-          LINK=$(curl -s -F "file=@migration.log" https://file.io | jq -r .link)
-          echo "::warning::Migration Log: $LINK"
-          cat migration.log
+          LOG_CONTENT=$(cat migration.log | tr '\n' '\r' | sed 's/\r/%0A/g' | sed 's/%/%25/g')
+          echo "::warning::Migration Log: $LOG_CONTENT"
           exit 1
 
       - name: Verify TypeScript and Build Next.js
