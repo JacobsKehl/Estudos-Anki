@@ -160,13 +160,11 @@ export default async function Dashboard() {
     // reorganizedToday will only be set to true if a rollover actually takes place and makes changes.
 
     let shouldReorganize = false;
-    if (hasPastPending) {
-      shouldReorganize = true;
-    } else if (activeSchedule) {
+    if (activeSchedule) {
       const scheduleTodayStr = getTodayRangeSP(activeSchedule.updatedAt).dateString;
       const todayStr = todayRange.dateString;
       if (scheduleTodayStr !== todayStr) {
-        shouldReorganize = true;
+        shouldReorganize = true; // Primeiro acesso do dia — reorganiza uma vez
       }
     }
 

@@ -145,14 +145,11 @@ export default async function SchedulePage() {
     });
 
     if (schedule && schedule.items) {
-      const hasPastPending = schedule.items.some((item: any) => 
-        (item.status === "PENDING" || item.status === "IN_PROGRESS") && 
-        item.scheduledDate && 
-        new Date(item.scheduledDate) < todayStart
-      );
+      const schedTodayStr = getTodayRangeSP(schedule.updatedAt).dateString;
+      const nowTodayStr = getTodayRangeSP(new Date()).dateString;
 
-      if (hasPastPending) {
-        console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado...");
+      if (schedTodayStr !== nowTodayStr) {
+        console.log("Auto-reorganizando cronograma (primeiro acesso do dia na página de cronograma)...");
         await reorganizeActiveSchedule(mockUserId, 30);
 
         schedule = await (prisma as any).studySchedule.findFirst({

@@ -151,7 +151,6 @@ export async function completeStudyBlock(
       };
 
       const sameSubjectCandidates = candidateBlocks.filter((b: any) => b.subjectId === block.subjectId);
-      const otherSubjectCandidates = candidateBlocks.filter((b: any) => b.subjectId !== block.subjectId);
 
       const sortBlocks = (a: any, b: any) => {
         if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex;
@@ -161,14 +160,9 @@ export async function completeStudyBlock(
 
       sameSubjectCandidates.sort(sortBlocks);
 
-      otherSubjectCandidates.sort((a: any, b: any) => {
-        const weightA = priorityWeights[a.subject?.studyPriority] || 0;
-        const weightB = priorityWeights[b.subject?.studyPriority] || 0;
-        if (weightA !== weightB) return weightB - weightA; // Descending weight
-        return sortBlocks(a, b);
-      });
-
-      return sameSubjectCandidates[0] || otherSubjectCandidates[0] || null;
+      // Só substituir por bloco da MESMA matéria para não confundir o cronograma.
+      // Se não houver, retorna null e o item original será deletado (não trocado).
+      return sameSubjectCandidates[0] || null;
     };
     
     if (scheduleItemId) {

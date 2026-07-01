@@ -121,26 +121,14 @@ export function TodayTaskCard({ item, index, isAdvanced, variant = "study" }: To
     setIsCompleting(true);
 
     try {
-      const stepMap: Record<ActionType, "THEORY"> = {
-        THEORY: "THEORY",
-        REVIEW_BLOCK: "THEORY",
-        REVIEW_FLASHCARDS: "THEORY",
-      };
-      const step = stepMap[actionType];
-
       await fetch(`/api/study-blocks/${item.studyBlockId}/complete-step`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step }),
+        body: JSON.stringify({
+          step: "THEORY",
+          scheduleItemId: item._fromQueue ? undefined : item.id,
+        }),
       });
-
-      if (!item._fromQueue && item.id) {
-        await fetch(`/api/schedule/items/${item.id}/status`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "COMPLETED" }),
-        });
-      }
 
       setIsDone(true);
       toast.success(`"${item.studyBlock?.title ?? "Tarefa"}" concluída!`);
