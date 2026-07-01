@@ -25,7 +25,14 @@ jobs:
         run: npx prisma generate
 
       - name: Run Backfill (Dry Run)
-        run: npx tsx scripts/run-backfill.ts
+        run: npx tsx scripts/run-backfill.ts > backfill.log 2>&1
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Print backfill log on failure
+        if: failure()
+        run: |
+          LOG_CONTENT=$(cat backfill.log | tr '\n' '\r' | sed 's/\r/%0A/g' | sed 's/%/%25/g')
+          echo "::warning::Backfill Log: $LOG_CONTENT"
+          exit 1
