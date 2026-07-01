@@ -1,0 +1,31 @@
+name: Production Backfill Preview
+
+on:
+  workflow_dispatch:
+
+jobs:
+  preview:
+    name: Run Backfill Preview (Dry Run)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run Backfill (Dry Run)
+        run: npx tsx scripts/run-backfill.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
