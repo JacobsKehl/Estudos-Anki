@@ -25,6 +25,8 @@ import { reorganizeOverdueSchedule } from "@/lib/scheduler";
 import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
 import { NextDayStudySession } from "@/components/today/NextDayStudySession";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { getTodayQuestionReviews } from "@/lib/services/question-review";
+import { QuestionReviewSection } from "@/components/today/QuestionReviewSection";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,7 @@ export default async function Dashboard() {
   let initialTodayItems: any[] = [];
   let activeSchedule = null;
   let reorganizedToday = false;
+  let initialQuestionReviews: any[] = [];
 
   try {
     const [
@@ -55,8 +58,9 @@ export default async function Dashboard() {
       blocksCountRes,
       unorganizedMaterialRes,
       hasPastPendingRes,
-      todayItemsRes,
-      activeScheduleRes
+      initialTodayItemsRes,
+      activeScheduleRes,
+      questionReviewsRes
     ] = await Promise.all([
       getUnifiedTodayCards(userId),
       prisma.studySubject.count({ where: { userId } }),
@@ -107,7 +111,8 @@ export default async function Dashboard() {
       }),
       (prisma as any).studySchedule.findFirst({
         where: { userId, status: "ACTIVE" }
-      })
+      }),
+      getTodayQuestionReviews(userId, now)
     ]);
 
     unifiedData = unifiedDataRes;
@@ -116,8 +121,9 @@ export default async function Dashboard() {
     blocksCount = blocksCountRes;
     unorganizedMaterial = unorganizedMaterialRes;
     hasPastPending = hasPastPendingRes;
-    initialTodayItems = todayItemsRes;
+    initialTodayItems = initialTodayItemsRes;
     activeSchedule = activeScheduleRes;
+    initialQuestionReviews = questionReviewsRes;
   } catch (error) {
     console.error("Error loading dashboard pre-fetch:", error);
     // Fallback if anything fails
@@ -415,6 +421,9 @@ export default async function Dashboard() {
           </div>
         )}
       </section>
+      
+      {/* ══ SEÇÃO 1.5: QUESTÕES DE REVISÃO ═══ */}
+      <QuestionReviewSection initialReviews={initialQuestionReviews} />
 
       {/* ══ SEÇÃO 2: REVISÕES DE CONTEÚDO ═══ checklist compacto ═══════════════ */}
       {reviewTasks.length > 0 && (

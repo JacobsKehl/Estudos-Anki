@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getTodayRangeSP } from "@/lib/date-utils";
 
 export type SubjectHealth = 'EXCELLENT' | 'GOOD' | 'ATTENTION' | 'CRITICAL';
 
@@ -136,14 +137,31 @@ export async function getAllSubjectsMetrics(userId: string) {
 }
 
 /**
+ * Helper to add days to a Date
+ */
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+/**
  * Get global study metrics for the user
  */
 export async function getGlobalMetrics(userId: string) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
-  // Fetch subject metrics, reviews heatmap, and mastery breakdown in parallel
-  const [subjectsMetrics, reviews, flashcards] = await Promise.all([
+  // Fetch subject metrics, reviews heatmap, mastery breakdown, logs, schedule items, and question review tasks in parallel
+  const [
+    subjectsMetrics,
+    reviews,
+    flashcards,
+    logs,
+    scheduleItems,
+    questionTasks,
+    eligibleBlocks
+  ] = await Promise.all([
     getAllSubjectsMetrics(userId),
     prisma.flashcardReview.findMany({
       where: {
@@ -158,8 +176,77 @@ export async function getGlobalMetrics(userId: string) {
       by: ['reviewState'],
       where: { userId, status: 'APPROVED' },
       _count: { _all: true }
+    }),
+    prisma.studySessionLog.findMany({
+      where: { userId },
+      select: { studiedAt: true }
+    }),
+    prisma.studyScheduleItem.findMany({
+      where: { userId, status: "COMPLETED", actionType: "THEORY", completedAt: { not: null } },
+      select: { completedAt: true }
+    }),
+    prisma.questionReviewTask.findMany({
+      where: { userId, status: "COMPLETED", completedAt: { not: null } },
+      select: { completedAt: true }
+    }),
+    prisma.studyBlock.findMany({
+      where: {
+        userId,
+        subject: {
+          studyPriority: { in: ["PRIMARY", "ACTIVE"] }
+        },
+        material: {
+          materialRole: { not: "SUPPORT_MATERIAL" }
+        }
+      },
+      select: {
+        status: true
+      }
     })
   ]);
+
+  // 1. Calcular dias ativos consolidando as três fontes nos últimos 30 dias
+  const studyDates = new Set<string>();
+  
+  logs.forEach(l => studyDates.add(getTodayRangeSP(l.studiedAt).dateString));
+  scheduleItems.forEach(s => {
+    if (s.completedAt) studyDates.add(getTodayRangeSP(s.completedAt).dateString);
+  });
+  questionTasks.forEach(q => {
+    if (q.completedAt) studyDates.add(getTodayRangeSP(q.completedAt).dateString);
+  });
+
+  const now = new Date();
+  const last30DaysStrings = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    return getTodayRangeSP(d).dateString;
+  });
+  
+  const activeDaysCount = last30DaysStrings.filter(dateStr => studyDates.has(dateStr)).length;
+
+  // 2. Calcular streak/sequência atual de dias estudados
+  let currentStreak = 0;
+  const todayStr = getTodayRangeSP(now).dateString;
+  const yesterdayStr = getTodayRangeSP(addDays(now, -1)).dateString;
+
+  if (studyDates.has(todayStr) || studyDates.has(yesterdayStr)) {
+    let checkDate = studyDates.has(todayStr) ? now : addDays(now, -1);
+    while (true) {
+      const checkStr = getTodayRangeSP(checkDate).dateString;
+      if (studyDates.has(checkStr)) {
+        currentStreak++;
+        checkDate = addDays(checkDate, -1);
+      } else {
+        break;
+      }
+    }
+  }
+
+  // 3. Porcentagem de progresso de teoria real (apenas teoria de matérias PRIMARY/ACTIVE)
+  const totalTheory = eligibleBlocks.length;
+  const completedTheory = eligibleBlocks.filter(b => b.status === "COMPLETED").length;
+  const globalProgress = totalTheory > 0 ? Math.round((completedTheory / totalTheory) * 100) : 0;
   
   // Total summary
   const summary = {
@@ -172,12 +259,12 @@ export async function getGlobalMetrics(userId: string) {
     averageAccuracy: subjectsMetrics.length > 0 
       ? Math.round(subjectsMetrics.reduce((acc, s) => acc + s.metrics.accuracyRate, 0) / subjectsMetrics.length) 
       : 0,
-    globalProgress: subjectsMetrics.length > 0
-      ? Math.round(subjectsMetrics.reduce((acc, s) => acc + s.metrics.progress, 0) / subjectsMetrics.length)
-      : 0
+    globalProgress,
+    activeDays: activeDaysCount,
+    streak: currentStreak
   };
 
-  // Group by date (ignoring time)
+  // Group by date (ignoring time) for the heatmap component
   const heatmap: Record<string, number> = {};
   reviews.forEach(review => {
     try {
@@ -207,4 +294,5 @@ export async function getGlobalMetrics(userId: string) {
     mastery
   };
 }
+
 

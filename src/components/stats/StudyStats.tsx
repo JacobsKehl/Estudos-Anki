@@ -10,7 +10,9 @@ import {
   TrendingUp,
   BookMarked,
   BrainCircuit,
-  CheckCircle2
+  CheckCircle2,
+  Flame,
+  PieChart
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,11 +59,32 @@ export function StudyStats({ data }: StudyStatsProps) {
       {/* ── Summary Grid ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard 
+          title="Dias Ativos (30d)" 
+          value={summary.activeDays} 
+          icon={Flame} 
+          color="text-[#d48166]" 
+          bgColor="bg-peach" 
+        />
+        <StatsCard 
+          title="Sequência Atual" 
+          value={`${summary.streak} ${summary.streak === 1 ? 'dia' : 'dias'} 🔥`} 
+          icon={Zap} 
+          color="text-warning-text" 
+          bgColor="bg-warning-bg" 
+        />
+        <StatsCard 
+          title="Conteúdo Concluído" 
+          value={`${summary.globalProgress}%`} 
+          icon={PieChart} 
+          color="text-[#789461]" 
+          bgColor="bg-sage-light" 
+        />
+        <StatsCard 
           title="Matérias" 
           value={summary.totalSubjects} 
           icon={BookMarked} 
-          color="text-[#d48166]" 
-          bgColor="bg-peach" 
+          color="text-[#8e7cc3]" 
+          bgColor="bg-lavender" 
         />
         <StatsCard 
           title="Blocos Estudados" 

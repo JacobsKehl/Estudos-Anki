@@ -45,6 +45,7 @@ model User {
   studySchedules         StudySchedule[]
   studyScheduleItems     StudyScheduleItem[]
   studySessionLogs       StudySessionLog[]
+  questionReviewTasks    QuestionReviewTask[]
 }
 
 model UserPreferences {
@@ -94,6 +95,7 @@ model StudySubject {
   studyBlocks      StudyBlock[]
   schedules        StudySchedule[]
   scheduleItems    StudyScheduleItem[]
+  questionReviewTasks    QuestionReviewTask[]
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 }
@@ -305,6 +307,7 @@ model StudyBlock {
   scheduleItems StudyScheduleItem[]
   supportMaterials StudyBlockSupport[]
   studySessionLogs StudySessionLog[]
+  questionReviewTask     QuestionReviewTask?
 
   @@index([userId, status])
 }
@@ -408,4 +411,67 @@ model StudySessionLog {
 
   @@index([userId, studiedAt])
   @@index([userId, studyBlockId])
+}
+
+// ═══ REVISÃO POR QUESTÕES (independente do cronograma principal) ═══
+
+enum QuestionReviewStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum QuestionReviewOrigin {
+  AUTOMATIC
+  BACKFILL
+}
+
+model QuestionReviewTask {
+  id                     String                @id @default(cuid())
+  userId                 String
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Referência opcional com onDelete: SetNull para preservação histórica
+  studyBlockId           String?               @unique
+  studyBlock             StudyBlock?           @relation(fields: [studyBlockId], references: [id], onDelete: SetNull)
+  subjectId              String
+  subject                StudySubject          @relation(fields: [subjectId], references: [id])
+  
+  // Snapshots para integridade histórica se o bloco for excluído
+  sourceBlockTitle       String
+  sourceMaterialName     String?
+  sourcePageStart        Int?
+  sourcePageEnd          Int?
+  sourceSubjectName      String
+  
+  // Configurações e links
+  questionBankUrl        String?
+  recommendedQuestionCount Int                 @default(15)
+  
+  // Datas
+  sourceStudyDate        DateTime              // Data em que o bloco de teoria foi concluído
+  scheduledDate          DateTime              // Data agendada para revisão (D+15 com overflow)
+  
+  // Status e Métricas
+  status                 QuestionReviewStatus  @default(PENDING)
+  completedAt            DateTime?
+  questionsAttempted     Int?
+  correctCount           Int?
+  wrongCount             Int?
+  
+  // Mapeamento CFC (Manual)
+  cfcPdfName             String?
+  cfcStartPage           Int?
+  cfcEndPage             Int?
+  cfcTopic               String?
+  cfcNotes               String?
+  
+  notes                  String?
+  origin                 QuestionReviewOrigin  @default(AUTOMATIC)
+  
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@index([userId, scheduledDate, status])
+  @@index([userId, subjectId, status])
 }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "@/lib/date-utils";
-import { StudySessionActionType, StudySessionSource } from "@prisma/client";
+import { StudySessionActionType, StudySessionSource, QuestionReviewOrigin } from "@prisma/client";
+import { scheduleQuestionReview } from "@/lib/services/question-review";
 
 /**
  * Completes a study block and synchronizes it with the schedule.
@@ -16,7 +17,7 @@ export async function completeStudyBlock(
 ) {
   const now = new Date();
 
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // 1. Update the StudyBlock
     const block = await tx.studyBlock.update({
       where: { id: blockId },
@@ -398,6 +399,32 @@ export async function completeStudyBlock(
       message: "Conteúdo concluído. Agendamos suas revisões e seus flashcards já estão disponíveis para curadoria."
     };
   });
+
+  // Disparar criação da tarefa de revisão (fora da transação principal para isolamento)
+  try {
+    const blockWithSubject = await prisma.studyBlock.findUnique({
+      where: { id: blockId },
+      include: { subject: true }
+    });
+
+    if (
+      blockWithSubject?.subject &&
+      blockWithSubject.subject.studyPriority !== "EXCLUDED" &&
+      blockWithSubject.subject.studyPriority !== "SECONDARY"
+    ) {
+      await scheduleQuestionReview(
+        prisma,
+        userId,
+        blockId,
+        new Date(),
+        QuestionReviewOrigin.AUTOMATIC
+      );
+    }
+  } catch (error) {
+    console.error("[QUESTION REVIEW HOOK ERROR] Falha ao agendar revisão:", error);
+  }
+
+  return result;
 }
 
 /**
@@ -405,7 +432,7 @@ export async function completeStudyBlock(
  * Also removes any future unscheduled reviews.
  */
 export async function reopenStudyBlock(userId: string, blockId: string, targetStatus: string = "NOT_STARTED") {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     let blockStatus = targetStatus;
     if (targetStatus === "PENDING") {
       blockStatus = "NOT_STARTED";
@@ -484,6 +511,21 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
       message: "Bloco reaberto com sucesso."
     };
   });
+
+  // Remover revisões por questões PENDING criadas para o bloco
+  try {
+    await prisma.questionReviewTask.deleteMany({
+      where: {
+        userId,
+        studyBlockId: blockId,
+        status: "PENDING"
+      }
+    });
+  } catch (error) {
+    console.error("[QUESTION REVIEW HOOK ERROR] Falha ao remover revisão pendente:", error);
+  }
+
+  return result;
 }
 
 function addDays(date: Date, days: number): Date {
