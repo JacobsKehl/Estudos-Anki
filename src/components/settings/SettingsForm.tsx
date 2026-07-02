@@ -985,7 +985,7 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Advanced tool 1 */}
                 <div className="border border-border/40 bg-background rounded-2xl p-5 flex flex-col justify-between h-40">
                   <div className="space-y-1">
@@ -1009,25 +1009,6 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
                   </div>
                   <div className="flex items-center">
                     <OrganizeAllButton unorganizedCount={unorganizedCount} force={true} />
-                  </div>
-                </div>
-
-                {/* Advanced tool 3 - Carga de Revisão */}
-                <div className="border border-border/40 bg-background rounded-2xl p-5 flex flex-col justify-between h-40">
-                  <div className="space-y-1">
-                    <span className="text-xs font-extrabold text-foreground">Revisão por Questões</span>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Agende revisões por questões retroativas a partir do histórico de blocos teóricos concluídos.
-                    </p>
-                  </div>
-                  <div>
-                    <Button
-                      type="button"
-                      onClick={() => window.location.href = "/question-reviews"}
-                      className="rounded-xl text-[11px] h-9 px-4 bg-accent border-accent text-accent-foreground hover:scale-[1.01] transition-transform font-bold"
-                    >
-                      Configurar Revisões
-                    </Button>
                   </div>
                 </div>
               </div>

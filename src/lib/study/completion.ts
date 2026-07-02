@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "@/lib/date-utils";
-import { StudySessionActionType, StudySessionSource, QuestionReviewOrigin } from "@prisma/client";
-import { scheduleQuestionReview } from "@/lib/services/question-review";
+import { StudySessionActionType, StudySessionSource } from "@prisma/client";
 
 /**
  * Completes a study block and synchronizes it with the schedule.
@@ -394,7 +393,8 @@ export async function completeStudyBlock(
     };
   });
 
-  // Disparar criação da tarefa de revisão (fora da transação principal para isolamento)
+  // Agendamento automático desativado em favor do novo modelo de Revisão Semanal.
+  /*
   try {
     const blockWithSubject = await prisma.studyBlock.findUnique({
       where: { id: blockId },
@@ -417,6 +417,7 @@ export async function completeStudyBlock(
   } catch (error) {
     console.error("[QUESTION REVIEW HOOK ERROR] Falha ao agendar revisão:", error);
   }
+  */
 
   return result;
 }
@@ -506,7 +507,8 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
     };
   });
 
-  // Remover revisões por questões PENDING criadas para o bloco
+  // Remoção de revisões automáticas desativada em favor do novo modelo de Revisão Semanal.
+  /*
   try {
     await prisma.questionReviewTask.deleteMany({
       where: {
@@ -518,6 +520,7 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
   } catch (error) {
     console.error("[QUESTION REVIEW HOOK ERROR] Falha ao remover revisão pendente:", error);
   }
+  */
 
   return result;
 }
