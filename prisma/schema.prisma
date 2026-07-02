@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "darwin", "darwin-arm64", "windows"]
 }
 
@@ -20,106 +20,109 @@ enum MaterialRole {
 }
 
 model User {
-  id                     String              @id @default(cuid())
+  id                     String    @id @default(cuid())
   name                   String?
-  email                  String?             @unique
+  email                  String?   @unique
   passwordHash           String?
-  authUserId             String?             @unique
+  authUserId             String?   @unique
   lastLoginAt            DateTime?
-  googleAccountConnected Boolean             @default(false)
+  googleAccountConnected Boolean   @default(false)
   googleAccessToken      String?
   googleRefreshToken     String?
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
-  
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
+  preferences UserPreferences?
 
-  preferences            UserPreferences?
-
-  subjects               StudySubject[]
-  studyPlans             StudyPlan[]
-  flashcards             Flashcard[]
-  materials              StudyMaterial[]
-  extractedContent       ExtractedContent[]
-  studyBlocks            StudyBlock[]
-  studySchedules         StudySchedule[]
-  studyScheduleItems     StudyScheduleItem[]
-  studySessionLogs       StudySessionLog[]
-  questionReviewTasks    QuestionReviewTask[]
+  subjects             StudySubject[]
+  studyPlans           StudyPlan[]
+  flashcards           Flashcard[]
+  materials            StudyMaterial[]
+  extractedContent     ExtractedContent[]
+  studyBlocks          StudyBlock[]
+  studySchedules       StudySchedule[]
+  studyScheduleItems   StudyScheduleItem[]
+  studySessionLogs     StudySessionLog[]
+  questionReviewTasks  QuestionReviewTask[]
+  weeklyReviewSessions WeeklyReviewSession[]
 }
 
 model UserPreferences {
-  id                          String   @id @default(cuid())
-  userId                      String   @unique
-  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  dailyGoalMinutes            Int      @default(120)
-  studyResetTime              String   @default("00:00")
-  studyDaysOfWeek             String   @default("1,2,3,4,5")
-  defaultBlockDurationMinutes Int      @default(30)
-  maxNewCardsPerDay           Int      @default(20)
-  flashcardDifficulty         String   @default("NORMAL_PLUS")
-  emailReminderEnabled        Boolean  @default(true)
-  emailReminderTime           String   @default("08:00")
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dailyGoalMinutes            Int                        @default(120)
+  studyResetTime              String                     @default("00:00")
+  studyDaysOfWeek             String                     @default("1,2,3,4,5")
+  defaultBlockDurationMinutes Int                        @default(30)
+  maxNewCardsPerDay           Int                        @default(20)
+  flashcardDifficulty         String                     @default("NORMAL_PLUS")
+  emailReminderEnabled        Boolean                    @default(true)
+  emailReminderTime           String                     @default("08:00")
   dailyReminderEmail          String?
   lastDailyReminderSentAt     DateTime?
-  visualDensity               String   @default("comfortable")
-  reducedMotion               Boolean  @default(false)
-  focusArea                   String   @default("Geral")
-  theme                       String   @default("light")
-  displayName                 String   @default("Estudante")
-  examGoal                    String   @default("TRT4")
+  visualDensity               String                     @default("comfortable")
+  reducedMotion               Boolean                    @default(false)
+  focusArea                   String                     @default("Geral")
+  theme                       String                     @default("light")
+  displayName                 String                     @default("Estudante")
+  examGoal                    String                     @default("TRT4")
   deadline                    DateTime?
   avatarUrl                   String?
-  languageTone                String   @default("MASCULINE_NEUTRAL")
-  scheduleGenerationMode      String?  @default("DYNAMIC")
-  
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
+  languageTone                String                     @default("MASCULINE_NEUTRAL")
+  scheduleGenerationMode      String?                    @default("DYNAMIC")
+  weeklyReviewEnabled         Boolean                    @default(false)
+  weeklyReviewDayOfWeek       Int                        @default(0)
+  weeklyReviewMissedBehavior  WeeklyReviewMissedBehavior @default(MOVE_TO_NEXT_AVAILABLE_DAY)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model StudySubject {
-  id               String              @id @default(cuid())
-  name             String
-  description      String?
-  priority         Int                 @default(1)
-  examWeight       Float               @default(1.0)
-  progress         Float               @default(0)
-  studyPriority    String              @default("PRIMARY")
-  userId           String
-  user             User                @relation(fields: [userId], references: [id])
-  materials        StudyMaterial[]
-  flashcards       Flashcard[]
-  studyPlanDays    StudyPlanDay[]
-  extractedContent ExtractedContent[]
-  studyBlocks      StudyBlock[]
-  schedules        StudySchedule[]
-  scheduleItems    StudyScheduleItem[]
-  questionReviewTasks    QuestionReviewTask[]
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  id                  String               @id @default(cuid())
+  name                String
+  description         String?
+  priority            Int                  @default(1)
+  examWeight          Float                @default(1.0)
+  progress            Float                @default(0)
+  studyPriority       String               @default("PRIMARY")
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  materials           StudyMaterial[]
+  flashcards          Flashcard[]
+  studyPlanDays       StudyPlanDay[]
+  extractedContent    ExtractedContent[]
+  studyBlocks         StudyBlock[]
+  schedules           StudySchedule[]
+  scheduleItems       StudyScheduleItem[]
+  questionReviewTasks QuestionReviewTask[]
+  weeklyReviewTopics  WeeklyReviewTopic[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 model StudyMaterial {
-  id                 String              @id @default(cuid())
-  userId             String
-  user               User                @relation(fields: [userId], references: [id])
-  fileName           String
-  originalFileName   String?
-  filePath           String?
-  googleDriveFileId  String?
-  mimeType           String              @default("application/pdf")
-  fileSize           Int?
-  totalPages         Int?
-  
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id])
+  fileName          String
+  originalFileName  String?
+  filePath          String?
+  googleDriveFileId String?
+  mimeType          String  @default("application/pdf")
+  fileSize          Int?
+  totalPages        Int?
+
   // New fields for the intelligent organizer
-  sourceType         String              @default("LOCAL_UPLOAD") // LOCAL_UPLOAD, LOCAL_INBOX
-  sourcePath         String?
-  fileHash           String?
-  organizationStatus String              @default("UPLOADED") // UPLOADED, IMPORTED, EXTRACTING, ANALYZING, ORGANIZED, NEEDS_REVIEW, ERROR
+  sourceType          String  @default("LOCAL_UPLOAD") // LOCAL_UPLOAD, LOCAL_INBOX
+  sourcePath          String?
+  fileHash            String?
+  organizationStatus  String  @default("UPLOADED") // UPLOADED, IMPORTED, EXTRACTING, ANALYZING, ORGANIZED, NEEDS_REVIEW, ERROR
   detectedSubjectName String?
-  detectedStructure  String?             // JSON string for structure
-  
+  detectedStructure   String? // JSON string for structure
+
   processingStatus   String              @default("PENDING") // PENDING, PROCESSING, PROCESSED, ERROR
   processingError    String?
   subjectId          String?
@@ -196,12 +199,12 @@ model Flashcard {
   studyBlockId String?
   studyBlock   StudyBlock?       @relation(fields: [studyBlockId], references: [id], onDelete: SetNull)
 
-  question     String
-  answer       String
-  type         String @default("QUESTION_ANSWER") // QUESTION_ANSWER, CLOZE
-  difficulty   String @default("MEDIUM") // EASY, MEDIUM, HARD
-  status       String @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, ARCHIVED
-  
+  question   String
+  answer     String
+  type       String @default("QUESTION_ANSWER") // QUESTION_ANSWER, CLOZE
+  difficulty String @default("MEDIUM") // EASY, MEDIUM, HARD
+  status     String @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, ARCHIVED
+
   // SRS (Anki-style)
   reviewState     String?   @default("NEW") // NEW, LEARNING, REVIEW, RELEARNING, SUSPENDED
   learningStep    Int?      @default(0)
@@ -216,28 +219,28 @@ model Flashcard {
   sourcePageStart Int?
   sourcePageEnd   Int?
 
-  reviews         FlashcardReview[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  reviews   FlashcardReview[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   @@index([userId, nextReviewAt])
   @@index([userId, reviewState])
 }
 
 model FlashcardReview {
-  id                 String    @id @default(cuid())
-  flashcardId        String
-  flashcard          Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
-  userId             String
-  rating             Int // 1=Again, 2=Hard, 3=Good, 4=Easy
-  reviewedAt         DateTime  @default(now())
-  
-  previousState      String
-  newState           String
-  previousInterval   Int
-  newInterval        Int
-  previousEaseFactor Float
-  newEaseFactor      Float
+  id          String    @id @default(cuid())
+  flashcardId String
+  flashcard   Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  userId      String
+  rating      Int // 1=Again, 2=Hard, 3=Good, 4=Easy
+  reviewedAt  DateTime  @default(now())
+
+  previousState        String
+  newState             String
+  previousInterval     Int
+  newInterval          Int
+  previousEaseFactor   Float
+  newEaseFactor        Float
   previousNextReviewAt DateTime
   newNextReviewAt      DateTime
 }
@@ -269,45 +272,46 @@ model StudyBlock {
   status                String  @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, SKIPPED
 
   // AI organization metadata
-  createdBy             String  @default("MANUAL") // MANUAL, AI
-  sourceHeading         String?
-  sourceSection         String?
-  officialTopicId       String?
-  officialTopicName     String?
-  topicCode             String?
-  confidence            Float?
+  createdBy         String  @default("MANUAL") // MANUAL, AI
+  sourceHeading     String?
+  sourceSection     String?
+  officialTopicId   String?
+  officialTopicName String?
+  topicCode         String?
+  confidence        Float?
 
   // Study cycle lifecycle
-  theoryStatus          String    @default("NOT_STARTED") // NOT_STARTED | COMPLETED
-  questionsStatus       String    @default("NOT_STARTED") // NOT_STARTED | COMPLETED
-  flashcardsStatus      String    @default("NOT_STARTED") // NOT_STARTED | GENERATED
+  theoryStatus     String @default("NOT_STARTED") // NOT_STARTED | COMPLETED
+  questionsStatus  String @default("NOT_STARTED") // NOT_STARTED | COMPLETED
+  flashcardsStatus String @default("NOT_STARTED") // NOT_STARTED | GENERATED
 
   theoryCompletedAt     DateTime?
   questionsCompletedAt  DateTime?
   flashcardsGeneratedAt DateTime?
 
   // Spaced repetition block reviews
-  review1dScheduledAt   DateTime?
-  review7dScheduledAt   DateTime?
-  review15dScheduledAt  DateTime?
-  review30dScheduledAt  DateTime?
+  review1dScheduledAt  DateTime?
+  review7dScheduledAt  DateTime?
+  review15dScheduledAt DateTime?
+  review30dScheduledAt DateTime?
 
-  review1dCompletedAt   DateTime?
-  review7dCompletedAt   DateTime?
-  review15dCompletedAt  DateTime?
-  review30dCompletedAt  DateTime?
+  review1dCompletedAt  DateTime?
+  review7dCompletedAt  DateTime?
+  review15dCompletedAt DateTime?
+  review30dCompletedAt DateTime?
 
-  lastStudiedAt         DateTime?
-  nextActionType        String?   // THEORY | QUESTIONS | GENERATE_FLASHCARDS | REVIEW_BLOCK | REINFORCEMENT
-  nextActionAt          DateTime?
+  lastStudiedAt  DateTime?
+  nextActionType String? // THEORY | QUESTIONS | GENERATE_FLASHCARDS | REVIEW_BLOCK | REINFORCEMENT
+  nextActionAt   DateTime?
 
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  flashcards    Flashcard[]
-  scheduleItems StudyScheduleItem[]
-  supportMaterials StudyBlockSupport[]
-  studySessionLogs StudySessionLog[]
-  questionReviewTask     QuestionReviewTask?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  flashcards               Flashcard[]
+  scheduleItems            StudyScheduleItem[]
+  supportMaterials         StudyBlockSupport[]
+  studySessionLogs         StudySessionLog[]
+  questionReviewTask       QuestionReviewTask?
+  weeklyReviewTopicSources WeeklyReviewTopicSource[]
 
   @@index([userId, status])
 }
@@ -320,7 +324,7 @@ model StudyBlockSupport {
   material     StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
   pageStart    Int?
   pageEnd      Int?
-  supportType  String?       // BIZU, MAPA_MENTAL, RESUMO, REVISAO, QUESTOES
+  supportType  String? // BIZU, MAPA_MENTAL, RESUMO, REVISAO, QUESTOES
   confidence   Float?
   createdAt    DateTime      @default(now())
 }
@@ -342,32 +346,32 @@ model StudySchedule {
 }
 
 model StudyScheduleItem {
-  id               String         @id @default(cuid())
-  userId           String
-  user             User           @relation(fields: [userId], references: [id])
-  scheduleId       String
-  schedule         StudySchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  subjectId        String
-  subject          StudySubject   @relation(fields: [subjectId], references: [id])
-  materialId       String?
-  material         StudyMaterial? @relation(fields: [materialId], references: [id])
-  studyBlockId     String?
-  studyBlock       StudyBlock?    @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id])
+  scheduleId   String
+  schedule     StudySchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      StudySubject   @relation(fields: [subjectId], references: [id])
+  materialId   String?
+  material     StudyMaterial? @relation(fields: [materialId], references: [id])
+  studyBlockId String?
+  studyBlock   StudyBlock?    @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
 
   // Action metadata (new)
-  actionType       String?        // THEORY | QUESTIONS | GENERATE_FLASHCARDS | REVIEW_BLOCK | REVIEW_FLASHCARDS | REINFORCEMENT
-  priorityScore    Float?
-  reason           String?
+  actionType    String? // THEORY | QUESTIONS | GENERATE_FLASHCARDS | REVIEW_BLOCK | REVIEW_FLASHCARDS | REINFORCEMENT
+  priorityScore Float?
+  reason        String?
 
-  dayNumber        Int
-  scheduledDate    DateTime?
-  estimatedMinutes Int?
-  startedAt        DateTime?
-  completedAt      DateTime?
+  dayNumber             Int
+  scheduledDate         DateTime?
+  estimatedMinutes      Int?
+  startedAt             DateTime?
+  completedAt           DateTime?
   actualDurationMinutes Int?
-  status           String         @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SKIPPED
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  status                String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, SKIPPED
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   studySessionLogs StudySessionLog[]
 
@@ -391,23 +395,23 @@ enum StudySessionSource {
 }
 
 model StudySessionLog {
-  id                  String                 @id @default(cuid())
+  id                  String             @id @default(cuid())
   userId              String
-  user                User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   studyBlockId        String?
-  studyBlock          StudyBlock?            @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  studyBlock          StudyBlock?        @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
   studyScheduleItemId String?
-  studyScheduleItem   StudyScheduleItem?     @relation(fields: [studyScheduleItemId], references: [id], onDelete: SetNull)
-  
-  actionType          StudySessionActionType
-  durationMinutes     Int
-  startedAt           DateTime?
-  completedAt         DateTime?
-  studiedAt           DateTime               @default(now())
-  source              StudySessionSource     @default(TIMER)
-  
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
+  studyScheduleItem   StudyScheduleItem? @relation(fields: [studyScheduleItemId], references: [id], onDelete: SetNull)
+
+  actionType      StudySessionActionType
+  durationMinutes Int
+  startedAt       DateTime?
+  completedAt     DateTime?
+  studiedAt       DateTime               @default(now())
+  source          StudySessionSource     @default(TIMER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, studiedAt])
   @@index([userId, studyBlockId])
@@ -427,51 +431,163 @@ enum QuestionReviewOrigin {
 }
 
 model QuestionReviewTask {
-  id                     String                @id @default(cuid())
-  userId                 String
-  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Referência opcional com onDelete: SetNull para preservação histórica
-  studyBlockId           String?               @unique
-  studyBlock             StudyBlock?           @relation(fields: [studyBlockId], references: [id], onDelete: SetNull)
-  subjectId              String
-  subject                StudySubject          @relation(fields: [subjectId], references: [id])
-  
+  studyBlockId String?      @unique
+  studyBlock   StudyBlock?  @relation(fields: [studyBlockId], references: [id], onDelete: SetNull)
+  subjectId    String
+  subject      StudySubject @relation(fields: [subjectId], references: [id])
+
   // Snapshots para integridade histórica se o bloco for excluído
-  sourceBlockTitle       String
-  sourceMaterialName     String?
-  sourcePageStart        Int?
-  sourcePageEnd          Int?
-  sourceSubjectName      String
-  
+  sourceBlockTitle   String
+  sourceMaterialName String?
+  sourcePageStart    Int?
+  sourcePageEnd      Int?
+  sourceSubjectName  String
+
   // Configurações e links
-  questionBankUrl        String?
-  recommendedQuestionCount Int                 @default(15)
-  
+  questionBankUrl          String?
+  recommendedQuestionCount Int     @default(15)
+
   // Datas
-  sourceStudyDate        DateTime              // Data em que o bloco de teoria foi concluído
-  scheduledDate          DateTime              // Data agendada para revisão (D+15 com overflow)
-  
+  sourceStudyDate DateTime // Data em que o bloco de teoria foi concluído
+  scheduledDate   DateTime // Data agendada para revisão (D+15 com overflow)
+
   // Status e Métricas
-  status                 QuestionReviewStatus  @default(PENDING)
-  completedAt            DateTime?
-  questionsAttempted     Int?
-  correctCount           Int?
-  wrongCount             Int?
-  
+  status             QuestionReviewStatus @default(PENDING)
+  completedAt        DateTime?
+  questionsAttempted Int?
+  correctCount       Int?
+  wrongCount         Int?
+
   // Mapeamento CFC (Manual)
-  cfcPdfName             String?
-  cfcStartPage           Int?
-  cfcEndPage             Int?
-  cfcTopic               String?
-  cfcNotes               String?
-  
-  notes                  String?
-  origin                 QuestionReviewOrigin  @default(AUTOMATIC)
-  
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  cfcPdfName   String?
+  cfcStartPage Int?
+  cfcEndPage   Int?
+  cfcTopic     String?
+  cfcNotes     String?
+
+  notes  String?
+  origin QuestionReviewOrigin @default(AUTOMATIC)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, scheduledDate, status])
   @@index([userId, subjectId, status])
+}
+
+enum WeeklyReviewMissedBehavior {
+  MOVE_TO_NEXT_AVAILABLE_DAY
+  SKIP_CURRENT_WEEK
+}
+
+enum WeeklyReviewSessionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum WeeklyReviewSelectionReason {
+  WEEK_CONTENT
+  OVERDUE
+  LONG_UNSEEN
+}
+
+enum WeeklyReviewTopicResult {
+  PENDING
+  DID_WELL
+  HAD_DOUBTS
+  REVIEW_AGAIN
+}
+
+model WeeklyReviewSession {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  originalScheduledDate  DateTime @db.Date
+  effectiveScheduledDate DateTime @db.Date
+
+  sourcePeriodStart DateTime @db.Date
+  sourcePeriodEnd   DateTime @db.Date
+
+  status         WeeklyReviewSessionStatus  @default(PENDING)
+  missedBehavior WeeklyReviewMissedBehavior
+
+  availableMinutes       Int?
+  suggestedQuestionCount Int?
+  targetQuestionCount    Int?
+  actualQuestionCount    Int?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  skippedAt   DateTime?
+
+  topics WeeklyReviewTopic[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, originalScheduledDate])
+  @@index([userId, effectiveScheduledDate, status])
+}
+
+model WeeklyReviewTopic {
+  id                    String              @id @default(cuid())
+  weeklyReviewSessionId String
+  weeklyReviewSession   WeeklyReviewSession @relation(fields: [weeklyReviewSessionId], references: [id], onDelete: Cascade)
+
+  subjectId String?
+  subject   StudySubject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  sourceSubjectName String
+  displayTitle      String
+  groupKey          String
+
+  carriedFromTopicId String?
+  carriedFromTopic   WeeklyReviewTopic?  @relation("WeeklyReviewTopicCarryover", fields: [carriedFromTopicId], references: [id], onDelete: SetNull)
+  carriedTopics      WeeklyReviewTopic[] @relation("WeeklyReviewTopicCarryover")
+
+  priorityRank       Int?
+  suggestedQuestions Int?
+
+  selectionReason  WeeklyReviewSelectionReason
+  result           WeeklyReviewTopicResult     @default(PENDING)
+  resultRecordedAt DateTime?
+  notes            String?
+
+  sources WeeklyReviewTopicSource[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([weeklyReviewSessionId, groupKey])
+  @@index([weeklyReviewSessionId, selectionReason, result])
+  @@index([carriedFromTopicId])
+}
+
+model WeeklyReviewTopicSource {
+  id                  String            @id @default(cuid())
+  weeklyReviewTopicId String
+  weeklyReviewTopic   WeeklyReviewTopic @relation(fields: [weeklyReviewTopicId], references: [id], onDelete: Cascade)
+
+  studyBlockId String?
+  studyBlock   StudyBlock? @relation(fields: [studyBlockId], references: [id], onDelete: SetNull)
+
+  sourceBlockTitle   String // Snapshot do título do bloco
+  sourceMaterialName String? // Snapshot do nome do material (PDF)
+  sourcePageStart    Int?
+  sourcePageEnd      Int?
+  sourceStudyDate    DateTime // Data em que a teoria foi concluída
+
+  createdAt DateTime @default(now())
+
+  @@unique([weeklyReviewTopicId, studyBlockId])
+  @@index([weeklyReviewTopicId])
+  @@index([studyBlockId])
 }
