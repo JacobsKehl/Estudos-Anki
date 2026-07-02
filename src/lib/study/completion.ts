@@ -393,31 +393,7 @@ export async function completeStudyBlock(
     };
   });
 
-  // Agendamento automático desativado em favor do novo modelo de Revisão Semanal.
-  /*
-  try {
-    const blockWithSubject = await prisma.studyBlock.findUnique({
-      where: { id: blockId },
-      include: { subject: true }
-    });
-
-    if (
-      blockWithSubject?.subject &&
-      blockWithSubject.subject.studyPriority !== "EXCLUDED" &&
-      blockWithSubject.subject.studyPriority !== "SECONDARY"
-    ) {
-      await scheduleQuestionReview(
-        prisma,
-        userId,
-        blockId,
-        new Date(),
-        QuestionReviewOrigin.AUTOMATIC
-      );
-    }
-  } catch (error) {
-    console.error("[QUESTION REVIEW HOOK ERROR] Falha ao agendar revisão:", error);
-  }
-  */
+  // A antiga revisão D+15 foi descontinuada. A revisão agora é gerenciada semanalmente.
 
   return result;
 }
@@ -507,20 +483,7 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
     };
   });
 
-  // Remoção de revisões automáticas desativada em favor do novo modelo de Revisão Semanal.
-  /*
-  try {
-    await prisma.questionReviewTask.deleteMany({
-      where: {
-        userId,
-        studyBlockId: blockId,
-        status: "PENDING"
-      }
-    });
-  } catch (error) {
-    console.error("[QUESTION REVIEW HOOK ERROR] Falha ao remover revisão pendente:", error);
-  }
-  */
+  // A antiga revisão D+15 foi descontinuada.
 
   return result;
 }
