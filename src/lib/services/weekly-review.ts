@@ -49,7 +49,6 @@ export type WeeklyReviewPreview = {
 // Função central da fonte canônica para verificar se um bloco de teoria está concluído
 export function isTheoryBlockCompleted(block: any): boolean {
   return (
-    block.status === "COMPLETED" &&
     block.theoryStatus === "COMPLETED" &&
     block.theoryCompletedAt !== null
   );
@@ -103,7 +102,6 @@ export async function getWeeklyReviewPeriod(
     const blocksInPeriod = await client.studyBlock.findMany({
       where: {
         userId,
-        status: "COMPLETED",
         theoryStatus: "COMPLETED",
         theoryCompletedAt: {
           gte: sourcePeriodStart,
@@ -128,7 +126,6 @@ export async function getWeeklyReviewPeriod(
     const activeDays = await client.studyBlock.findMany({
       where: {
         userId,
-        status: "COMPLETED",
         theoryStatus: "COMPLETED",
         theoryCompletedAt: { lt: originalScheduledDate }
       },
@@ -175,7 +172,6 @@ export async function getCompletedTheoryBlocks(userId: string, tx?: any) {
   const blocks = await client.studyBlock.findMany({
     where: {
       userId,
-      status: "COMPLETED",
       theoryStatus: "COMPLETED",
       theoryCompletedAt: { not: null }
     },
@@ -209,7 +205,6 @@ export async function buildWeeklyReviewPreview(
   const referenceDate = new Date(referenceDateStr + "T12:00:00Z");
   const client = tx || prisma;
   
-  // A data original da sessão é o domingo/dia de revisão.
   const originalScheduledDate = referenceDate;
 
   // Obter o período de teoria e a lista exata de datas ativas de estudo
@@ -223,12 +218,19 @@ export async function buildWeeklyReviewPreview(
   const startStr = getTodayRangeSP(sourcePeriodStart).dateString;
   const endStr = getTodayRangeSP(sourcePeriodEnd).dateString;
 
-  // Buscar sessões passadas (com data de agendamento estritamente anterior à data de referência)
-  const pastSessions = await client.weeklyReviewSession.findMany({
+  // Buscar todas as sessões passadas do usuário (com originalScheduledDate anterior)
+  const allPastSessions = await client.weeklyReviewSession.findMany({
     where: {
       userId,
       originalScheduledDate: { lt: originalScheduledDate }
     }
+  });
+
+  // Filtrar apenas sessões vencidas (finalizadas ou que não foram transferidas para o futuro)
+  const pastSessions = allPastSessions.filter((s: any) => {
+    const isFinalized = s.status === "COMPLETED" || s.status === "SKIPPED";
+    const isPast = s.effectiveScheduledDate.getTime() < originalScheduledDate.getTime();
+    return isFinalized || isPast;
   });
 
   // Obter todos os blocos concluídos
@@ -264,28 +266,70 @@ export async function buildWeeklyReviewPreview(
   // Identificar se a última revisão do bloco foi REVIEW_AGAIN
   const getMostRecentReviewState = (block: any) => {
     if (block.weeklyReviewTopicSources.length === 0) return null;
-    // Encontrar o tópico mais recente com base no effectiveScheduledDate da sessão
     const sortedSources = [...block.weeklyReviewTopicSources].sort((a: any, b: any) => {
       const dateA = a.weeklyReviewTopic?.weeklyReviewSession?.effectiveScheduledDate?.getTime() || 0;
       const dateB = b.weeklyReviewTopic?.weeklyReviewSession?.effectiveScheduledDate?.getTime() || 0;
       return dateB - dateA;
     });
     
-    const mostRecentTopic = sortedSources[0].weeklyReviewTopic;
-    return mostRecentTopic;
+    return sortedSources[0].weeklyReviewTopic;
   };
 
   // Filtrar apenas blocos que ainda não foram revisados (ou cuja última revisão foi REVIEW_AGAIN)
   const unreviewedBlocks = eligibleBlocks.filter((block: any) => !isBlockReviewed(block));
 
-  // --- SELEÇÃO DO GRUPO B (OVERDUE - limite de 2) ---
-  // Elegíveis para OVERDUE: blocos unreviewed que foram concluídos antes de pelo menos uma sessão semanal passada
-  const overdueCandidates = unreviewedBlocks.filter((block: any) => {
+  // Função para verificar se o bloco tem um tópico associado que preenche as condições de OVERDUE
+  const getTopicOverdueStatus = (block: any) => {
+    return block.weeklyReviewTopicSources.some((source: any) => {
+      const topic = source.weeklyReviewTopic;
+      if (!topic) return false;
+      const session = topic.weeklyReviewSession;
+      if (!session) return false;
+
+      // Ignorar sessões agendadas a partir do dia de referência
+      if (session.originalScheduledDate.getTime() >= referenceDate.getTime()) return false;
+
+      // 1. Marcado como REVIEW_AGAIN
+      if (topic.result === "REVIEW_AGAIN") return true;
+
+      // 2. Pertenceu a uma sessão SKIPPED
+      if (session.status === "SKIPPED") return true;
+
+      // 3. Tópico PENDING de sessão anterior vencida (não concluída/skipped e data efetiva < referenceDate)
+      const isSessionVencida =
+        session.status !== "COMPLETED" &&
+        session.status !== "SKIPPED" &&
+        session.effectiveScheduledDate.getTime() < referenceDate.getTime();
+      
+      const isTopicPending = topic.result === null || topic.result === undefined;
+
+      if (isTopicPending && (session.status === "COMPLETED" || isSessionVencida)) {
+        return true;
+      }
+
+      // 4. Sessão vencida e não concluída em geral
+      if (isSessionVencida) return true;
+
+      return false;
+    });
+  };
+
+  // Função para verificar se a conclusão do bloco caiu dentro do período de cobertura de alguma sessão anterior
+  const isBlockWithinPastSessionPeriod = (block: any) => {
     const T = block.theoryCompletedAt;
     if (!T) return false;
-    return pastSessions.some(
-      (session: any) => session.originalScheduledDate.getTime() > T.getTime()
-    );
+    const time = T.getTime();
+    return pastSessions.some((session: any) => {
+      const start = session.sourcePeriodStart.getTime();
+      const end = session.sourcePeriodEnd.getTime();
+      return time >= start && time <= end;
+    });
+  };
+
+  // --- SELEÇÃO DO GRUPO B (OVERDUE - limite de 2) ---
+  // Elegíveis para OVERDUE: blocos unreviewed que caíram dentro do período de sessões anteriores ou têm tópicos em estados elegíveis de atraso
+  const overdueCandidates = unreviewedBlocks.filter((block: any) => {
+    return isBlockWithinPastSessionPeriod(block) || getTopicOverdueStatus(block);
   });
 
   // Estrutura de priorização para OVERDUE
@@ -298,19 +342,13 @@ export async function buildWeeklyReviewPreview(
       block,
       isReviewAgain,
       carriedFromTopicId,
-      // Quanto menor a data de conclusão, mais antigo é o bloco
       ageMs: block.theoryCompletedAt ? block.theoryCompletedAt.getTime() : 0,
-      // Pesos das matérias
       examWeight: block.subject?.examWeight || 1.0,
       subjectPriority: block.subject?.priority || 1
     };
   });
 
-  // Ordenar conforme regras do Grupo B:
-  // 1. REVIEW_AGAIN primeiro.
-  // 2. Mais antigo primeiro (ageMs menor primeiro).
-  // 3. Maior peso de prova desc.
-  // 4. Maior prioridade de matéria desc.
+  // Ordenar conforme regras do Grupo B
   overdueWithPriority.sort((a: any, b: any) => {
     if (a.isReviewAgain && !b.isReviewAgain) return -1;
     if (!a.isReviewAgain && b.isReviewAgain) return 1;
@@ -332,7 +370,6 @@ export async function buildWeeklyReviewPreview(
 
   // WEEK_CONTENT ordenado cronologicamente de estudo
   const selectedWeek = weekCandidates.slice(0, 12);
-  const selectedWeekIds = new Set(selectedWeek.map((w: any) => w.id));
 
   // --- SELEÇÃO DO GRUPO C (LONG_UNSEEN - limite de 1) ---
   // Apenas matérias PRIMARY ou ACTIVE do usuário
@@ -340,16 +377,7 @@ export async function buildWeeklyReviewPreview(
     new Set(eligibleBlocks.map((b: any) => b.subject).filter((s: any): s is any => s !== null))
   ).filter((s: any) => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE");
 
-  // Coletar IDs de matérias já selecionadas no Grupo A ou Grupo B
-  const selectedSubjectIds = new Set<string>();
-  selectedOverdue.forEach((o: any) => {
-    if (o.block.subjectId) selectedSubjectIds.add(o.block.subjectId);
-  });
-  selectedWeek.forEach((w: any) => {
-    if (w.subjectId) selectedSubjectIds.add(w.subjectId);
-  });
-
-  // Calcular última data de conclusão real de teoria por matéria (do histórico completo elegível)
+  // Calcular última data de conclusão real de teoria por matéria (do histórico completo elegível sem filtros de semana)
   const subjectLastCompletions = userSubjects.map((subject: any) => {
     const subjectBlocks = eligibleBlocks.filter((b: any) => b.subjectId === subject.id);
     const completionTimes = subjectBlocks
@@ -361,35 +389,49 @@ export async function buildWeeklyReviewPreview(
       subject,
       lastTime
     };
-  }).filter((x: any) => x.lastTime > 0); // Excluir matérias sem nenhuma conclusão histórica
+  }).filter((x: any) => x.lastTime > 0);
 
-  // Filtrar apenas matérias distintas das selecionadas em A e B
-  const distinctSubjectLastCompletions = subjectLastCompletions.filter(
-    (item: any) => !selectedSubjectIds.has(item.subject.id)
-  );
+  // Regra de exclusão de LONG_UNSEEN:
+  // 1. Matéria que possui qualquer teoria concluída dentro do sourcePeriod atual não pode ser selecionada.
+  // 2. Matéria que já possui bloco selecionado como WEEK_CONTENT ou OVERDUE.
+  const selectedSubjectIds = new Set<string>();
+  selectedOverdue.forEach((o: any) => {
+    if (o.block.subjectId) selectedSubjectIds.add(o.block.subjectId);
+  });
+  selectedWeek.forEach((w: any) => {
+    if (w.subjectId) selectedSubjectIds.add(w.subjectId);
+  });
+
+  const distinctSubjectLastCompletions = subjectLastCompletions.filter((item: any) => {
+    // Verificar se houve conclusão no período atual
+    const hasTheoryInPeriod = eligibleBlocks.some((block: any) => {
+      if (block.subjectId !== item.subject.id || !block.theoryCompletedAt) return false;
+      const T = block.theoryCompletedAt.getTime();
+      return T >= sourcePeriodStart.getTime() && T <= sourcePeriodEnd.getTime();
+    });
+
+    return !hasTheoryInPeriod && !selectedSubjectIds.has(item.subject.id);
+  });
 
   // Escolher a matéria com a conclusão de teoria mais antiga
   distinctSubjectLastCompletions.sort((a: any, b: any) => a.lastTime - b.lastTime);
 
   let selectedLongUnseenBlock: typeof eligibleBlocks[0] | null = null;
 
-  for (const item of distinctSubjectLastCompletions) {
-    const candidateBlocks = unreviewedBlocks.filter(
-      (b: any) =>
-        b.subjectId === item.subject.id &&
-        !selectedOverdueIds.has(b.id) &&
-        !selectedWeekIds.has(b.id)
+  if (distinctSubjectLastCompletions.length > 0) {
+    const targetSubjectItem = distinctSubjectLastCompletions[0];
+    const candidateBlocks = eligibleBlocks.filter(
+      (b: any) => b.subjectId === targetSubjectItem.subject.id
     );
 
     if (candidateBlocks.length > 0) {
-      // Selecionar o bloco mais recentemente concluído desta matéria para dar contexto
+      // Selecionar o bloco concluído mais recente desta matéria para dar contexto
       candidateBlocks.sort((a: any, b: any) => {
         const timeA = a.theoryCompletedAt?.getTime() || 0;
         const timeB = b.theoryCompletedAt?.getTime() || 0;
         return timeB - timeA;
       });
       selectedLongUnseenBlock = candidateBlocks[0];
-      break;
     }
   }
 
@@ -450,15 +492,11 @@ export async function buildWeeklyReviewPreview(
   const totalQuestions = suggestQuestionCount(availableMinutes);
   let remaining = totalQuestions;
 
-  // Ordem de prioridade para distribuição de questões:
-  // 1. OVERDUE (ordenados por idade: antigos primeiro)
   const distOverdue = topics.filter((t) => t.selectionReason === "OVERDUE");
   distOverdue.sort((a, b) => a.sourceStudyDate.localeCompare(b.sourceStudyDate));
 
-  // 2. LONG_UNSEEN
   const distLongUnseen = topics.filter((t) => t.selectionReason === "LONG_UNSEEN");
 
-  // 3. WEEK_CONTENT (ordenados por idade: antigos primeiro)
   const distWeek = topics.filter((t) => t.selectionReason === "WEEK_CONTENT");
   distWeek.sort((a, b) => a.sourceStudyDate.localeCompare(b.sourceStudyDate));
 
