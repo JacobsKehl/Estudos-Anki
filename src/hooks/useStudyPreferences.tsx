@@ -28,6 +28,11 @@ export interface StudyPreferences {
   avatarUrl: string | null;
   languageTone: "FEMININE" | "MASCULINE_NEUTRAL";
   scheduleGenerationMode: "DYNAMIC" | "LEGACY_TRT4";
+  weeklyReviewEnabled: boolean;
+  weeklyReviewDayOfWeek: number;
+  weeklyReviewMissedBehavior:
+    | "MOVE_TO_NEXT_AVAILABLE_DAY"
+    | "SKIP_CURRENT_WEEK";
 }
 
 const DEFAULT_PREFERENCES: StudyPreferences = {
@@ -55,6 +60,9 @@ const DEFAULT_PREFERENCES: StudyPreferences = {
   avatarUrl: null,
   languageTone: "MASCULINE_NEUTRAL",
   scheduleGenerationMode: "DYNAMIC",
+  weeklyReviewEnabled: false,
+  weeklyReviewDayOfWeek: 0,
+  weeklyReviewMissedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY",
 };
 
 interface StudyPreferencesContextType {
@@ -159,6 +167,9 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
           avatarUrl: dbPrefs.avatarUrl ?? preferences.avatarUrl,
           languageTone: dbPrefs.languageTone ?? preferences.languageTone,
           scheduleGenerationMode: dbPrefs.scheduleGenerationMode ?? preferences.scheduleGenerationMode,
+          weeklyReviewEnabled: dbPrefs.weeklyReviewEnabled ?? preferences.weeklyReviewEnabled,
+          weeklyReviewDayOfWeek: dbPrefs.weeklyReviewDayOfWeek ?? preferences.weeklyReviewDayOfWeek,
+          weeklyReviewMissedBehavior: dbPrefs.weeklyReviewMissedBehavior ?? preferences.weeklyReviewMissedBehavior,
         };
         
         setPreferences(merged);

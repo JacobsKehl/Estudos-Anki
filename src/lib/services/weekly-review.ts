@@ -674,7 +674,7 @@ export async function createOrGetWeeklyReviewSession(
       }
     });
     if (existing) {
-      return existing;
+      return { session: existing, created: false };
     }
 
     // 4. Gerar a prévia com o motor de seleção
@@ -734,7 +734,7 @@ export async function createOrGetWeeklyReviewSession(
       });
     }
 
-    return await activeTx.weeklyReviewSession.findFirst({
+    const finalSession = await activeTx.weeklyReviewSession.findFirst({
       where: { id: session.id },
       include: {
         topics: {
@@ -744,6 +744,8 @@ export async function createOrGetWeeklyReviewSession(
         }
       }
     });
+
+    return { session: finalSession, created: true };
   };
 
   try {
@@ -765,7 +767,7 @@ export async function createOrGetWeeklyReviewSession(
         }
       });
       if (existing) {
-        return existing;
+        return { session: existing, created: false };
       }
     }
     throw error;

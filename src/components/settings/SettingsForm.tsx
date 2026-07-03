@@ -21,6 +21,7 @@ import { RepairSupportsButton } from "@/components/materials/RepairSupportsButto
 import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
 import { useStudyPreferences } from "@/hooks/useStudyPreferences";
 import { toast } from "sonner";
+import { WeeklyReviewSettingsCard } from "./WeeklyReviewSettingsCard";
 
 interface SettingsFormProps {
   unorganizedCount: number;
@@ -373,6 +374,10 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
           <a href="#email" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground">
             <Mail className="w-4 h-4 text-muted-foreground" />
             Lembrete Diário
+          </a>
+          <a href="#revisao-semanal" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground">
+            <Wrench className="w-4 h-4 text-muted-foreground" />
+            Revisão Semanal
           </a>
         </div>
 
@@ -768,6 +773,8 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
             </Button>
           </div>
         </form>
+
+        <WeeklyReviewSettingsCard />
 
         {/* SYSTEM / ADVANCED TOOLS COLLAPSIBLE ACCORDION */}
         <div className="bg-card border border-border/40 rounded-[2.5rem] shadow-sm relative overflow-hidden">

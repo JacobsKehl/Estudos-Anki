@@ -1,6 +1,6 @@
 import {
   buildWeeklyReviewPreview,
-  createOrGetWeeklyReviewSession,
+  createOrGetWeeklyReviewSession as realCreateOrGet,
   startWeeklyReviewSession,
   recordWeeklyReviewTopicResult,
   completeWeeklyReviewSession,
@@ -8,6 +8,16 @@ import {
   carryWeeklyReviewSession,
   getWeeklyReviewSessionForUser
 } from "@/lib/services/weekly-review";
+
+async function createOrGetWeeklyReviewSession(params: any, client?: any) {
+  const result = await realCreateOrGet(params, client);
+  const session = result.session;
+  if (session) {
+    (session as any).created = result.created;
+  }
+  return session;
+}
+
 
 let totalAssertions = 0;
 
