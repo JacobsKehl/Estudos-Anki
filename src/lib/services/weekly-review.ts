@@ -320,6 +320,7 @@ export async function buildWeeklyReviewPreview(
     if (!T) return false;
     const time = T.getTime();
     return pastSessions.some((session: any) => {
+      if (!session.sourcePeriodStart || !session.sourcePeriodEnd) return false;
       const start = session.sourcePeriodStart.getTime();
       const end = session.sourcePeriodEnd.getTime();
       return time >= start && time <= end;
@@ -542,3 +543,501 @@ export async function buildWeeklyReviewPreview(
     excluded: excludedBlocks
   };
 }
+
+// Helper para executar transações Serializable com retry limitado
+export async function runSerializableTransaction<T>(
+  client: any,
+  fn: (tx: any) => Promise<T>,
+  maxRetries = 3
+): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await client.$transaction(
+        async (tx: any) => {
+          return await fn(tx);
+        },
+        {
+          isolationLevel: "Serializable",
+          timeout: 15000 // 15s timeout para teste concorrente lento
+        }
+      );
+    } catch (error: any) {
+      attempt++;
+      const isSerializationError =
+        error.code === "P2034" ||
+        error.message?.includes("serialization") ||
+        error.message?.includes("40001");
+      
+      if (isSerializationError && attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, Math.random() * 100 + 50));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+// Helper para validar ancestralidade de carryover
+export async function validateCarriedFromTopic(
+  client: any,
+  userId: string,
+  carriedFromTopicId: string,
+  originalScheduledDate: Date
+) {
+  let currentAncestorId = carriedFromTopicId;
+  const visited = new Set<string>();
+  let depth = 0;
+  const maxDepth = 100;
+
+  while (currentAncestorId) {
+    if (visited.has(currentAncestorId)) {
+      throw new Error("CIRCULAR_CARRYOVER_DETECTED");
+    }
+    visited.add(currentAncestorId);
+    depth++;
+    if (depth > maxDepth) {
+      throw new Error("MAX_CARRYOVER_DEPTH_EXCEEDED");
+    }
+
+    const ancestor = await client.weeklyReviewTopic.findUnique({
+      where: { id: currentAncestorId },
+      include: {
+        weeklyReviewSession: true
+      }
+    });
+
+    if (!ancestor) {
+      throw new Error("CARRIED_TOPIC_NOT_FOUND");
+    }
+
+    if (ancestor.weeklyReviewSession.userId !== userId) {
+      throw new Error("CARRIED_TOPIC_USER_MISMATCH");
+    }
+
+    if (ancestor.weeklyReviewSession.originalScheduledDate.getTime() >= originalScheduledDate.getTime()) {
+      throw new Error("CARRIED_TOPIC_DATE_INVALID");
+    }
+
+    if (ancestor.result !== "REVIEW_AGAIN") {
+      throw new Error("CARRIED_TOPIC_RESULT_NOT_REVIEW_AGAIN");
+    }
+
+    currentAncestorId = ancestor.carriedFromTopicId;
+  }
+}
+
+// 1. Criar ou recuperar uma sessão semanal
+export async function createOrGetWeeklyReviewSession(
+  params: {
+    userId: string;
+    originalScheduledDate: Date;
+    timezone: string;
+  },
+  tx?: any
+) {
+  const { userId, originalScheduledDate, timezone } = params;
+  const client = tx || prisma;
+
+  // 1. Buscar preferências
+  const prefs = await client.userPreferences.findUnique({
+    where: { userId }
+  });
+  if (!prefs) {
+    throw new Error("USER_PREFERENCES_NOT_FOUND");
+  }
+  if (!prefs.weeklyReviewEnabled) {
+    throw new Error("WEEKLY_REVIEW_DISABLED");
+  }
+  if (prefs.weeklyReviewDayOfWeek < 0 || prefs.weeklyReviewDayOfWeek > 6) {
+    throw new Error("INVALID_DAY_OF_WEEK");
+  }
+
+  // 2. Normalizar data e validar correspondência com o dia da semana configurado
+  const range = getTodayRangeSP(originalScheduledDate);
+  const normalizedDate = new Date(range.dateString + "T12:00:00Z");
+  const dayOfWeek = normalizedDate.getUTCDay();
+  if (dayOfWeek !== prefs.weeklyReviewDayOfWeek) {
+    throw new Error("SCHEDULED_DATE_MISMATCH");
+  }
+
+  const runTx = async (activeTx: any) => {
+    // 3. Buscar sessão existente
+    const existing = await activeTx.weeklyReviewSession.findFirst({
+      where: { userId, originalScheduledDate: range.start },
+      include: {
+        topics: {
+          include: {
+            sources: true
+          }
+        }
+      }
+    });
+    if (existing) {
+      return existing;
+    }
+
+    // 4. Gerar a prévia com o motor de seleção
+    const preview = await buildWeeklyReviewPreview(userId, range.dateString, timezone, undefined, activeTx);
+    if (preview.topics.length === 0) {
+      throw new Error("NO_ELIGIBLE_TOPICS");
+    }
+
+    // 5. Validar ancestralidade se houver carriedFromTopicId
+    for (const topic of preview.topics) {
+      if (topic.carriedFromTopicId) {
+        await validateCarriedFromTopic(activeTx, userId, topic.carriedFromTopicId, range.start);
+      }
+    }
+
+    // 6. Criar a sessão
+    const session = await activeTx.weeklyReviewSession.create({
+      data: {
+        userId,
+        originalScheduledDate: range.start,
+        effectiveScheduledDate: range.start,
+        sourcePeriodStart: preview.sourcePeriodStart ? new Date(preview.sourcePeriodStart + "T12:00:00Z") : range.start,
+        sourcePeriodEnd: preview.sourcePeriodEnd ? new Date(preview.sourcePeriodEnd + "T12:00:00Z") : range.start,
+        status: "PENDING",
+        missedBehavior: prefs.weeklyReviewMissedBehavior
+      }
+    });
+
+    // 7. Criar os tópicos e fontes
+    for (let i = 0; i < preview.topics.length; i++) {
+      const topicData = preview.topics[i];
+      const createdTopic = await activeTx.weeklyReviewTopic.create({
+        data: {
+          weeklyReviewSessionId: session.id,
+          subjectId: topicData.subjectId,
+          sourceSubjectName: topicData.subjectName,
+          displayTitle: topicData.title,
+          groupKey: topicData.groupKey,
+          carriedFromTopicId: topicData.carriedFromTopicId,
+          priorityRank: i + 1,
+          suggestedQuestions: topicData.suggestedQuestions,
+          selectionReason: topicData.selectionReason,
+          result: "PENDING"
+        }
+      });
+
+      await activeTx.weeklyReviewTopicSource.create({
+        data: {
+          weeklyReviewTopicId: createdTopic.id,
+          studyBlockId: topicData.studyBlockId,
+          sourceBlockTitle: topicData.title,
+          sourceMaterialName: topicData.materialName || null,
+          sourcePageStart: topicData.pageStart || null,
+          sourcePageEnd: topicData.pageEnd || null,
+          sourceStudyDate: new Date(topicData.sourceStudyDate + "T12:00:00Z")
+        }
+      });
+    }
+
+    return await activeTx.weeklyReviewSession.findFirst({
+      where: { id: session.id },
+      include: {
+        topics: {
+          include: {
+            sources: true
+          }
+        }
+      }
+    });
+  };
+
+  try {
+    if (typeof (client as any).$transaction !== "function") {
+      return await runTx(client);
+    } else {
+      return await runSerializableTransaction(client, runTx);
+    }
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      const existing = await client.weeklyReviewSession.findFirst({
+        where: { userId, originalScheduledDate: range.start },
+        include: {
+          topics: {
+            include: {
+              sources: true
+            }
+          }
+        }
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+    throw error;
+  }
+}
+
+// 2. Iniciar a sessão semanal
+export async function startWeeklyReviewSession(
+  params: {
+    userId: string;
+    sessionId: string;
+    availableMinutes: number;
+    targetQuestionCount: number;
+  },
+  tx?: any
+) {
+  const { userId, sessionId, availableMinutes, targetQuestionCount } = params;
+  const client = tx || prisma;
+
+  if (availableMinutes < 5 || availableMinutes > 480) {
+    throw new Error("INVALID_AVAILABLE_MINUTES");
+  }
+  if (targetQuestionCount < 1 || targetQuestionCount > 500) {
+    throw new Error("INVALID_TARGET_QUESTION_COUNT");
+  }
+
+  const runTx = async (activeTx: any) => {
+    const session = await activeTx.weeklyReviewSession.findFirst({
+      where: { id: sessionId, userId }
+    });
+    if (!session) {
+      throw new Error("SESSION_NOT_FOUND");
+    }
+
+    if (session.status === "COMPLETED" || session.status === "SKIPPED") {
+      throw new Error("INVALID_SESSION_STATUS");
+    }
+
+    if (session.status === "IN_PROGRESS") {
+      if (
+        session.availableMinutes === availableMinutes &&
+        session.targetQuestionCount === targetQuestionCount
+      ) {
+        return session;
+      }
+      throw new Error("SESSION_ALREADY_IN_PROGRESS_WITH_DIFFERENT_PARAMS");
+    }
+
+    const suggestedQuestionCount = suggestQuestionCount(availableMinutes);
+
+    return await activeTx.weeklyReviewSession.update({
+      where: { id: sessionId },
+      data: {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+        availableMinutes,
+        suggestedQuestionCount,
+        targetQuestionCount
+      }
+    });
+  };
+
+  return tx ? await runTx(client) : await client.$transaction(runTx);
+}
+
+// 3. Registrar o resultado de cada tópico
+export async function recordWeeklyReviewTopicResult(
+  params: {
+    userId: string;
+    sessionId: string;
+    topicId: string;
+    result: "DID_WELL" | "HAD_DOUBTS" | "REVIEW_AGAIN";
+    notes?: string;
+  },
+  tx?: any
+) {
+  const { userId, sessionId, topicId, result, notes } = params;
+  const client = tx || prisma;
+
+  if (result === ("PENDING" as any)) {
+    throw new Error("INVALID_RESULT");
+  }
+
+  if (notes && notes.length > 5000) {
+    throw new Error("NOTES_TOO_LONG");
+  }
+
+  const runTx = async (activeTx: any) => {
+    const session = await activeTx.weeklyReviewSession.findFirst({
+      where: { id: sessionId, userId }
+    });
+    if (!session) {
+      throw new Error("SESSION_NOT_FOUND");
+    }
+
+    if (session.status !== "IN_PROGRESS") {
+      throw new Error("SESSION_NOT_IN_PROGRESS");
+    }
+
+    const topic = await activeTx.weeklyReviewTopic.findFirst({
+      where: { id: topicId, weeklyReviewSessionId: sessionId }
+    });
+    if (!topic) {
+      throw new Error("TOPIC_NOT_FOUND_IN_SESSION");
+    }
+
+    if (topic.result === result && topic.notes === (notes || null)) {
+      return topic;
+    }
+
+    return await activeTx.weeklyReviewTopic.update({
+      where: { id: topicId },
+      data: {
+        result,
+        notes: notes || null,
+        resultRecordedAt: new Date()
+      }
+    });
+  };
+
+  return tx ? await runTx(client) : await client.$transaction(runTx);
+}
+
+// 4. Concluir a sessão
+export async function completeWeeklyReviewSession(
+  params: {
+    userId: string;
+    sessionId: string;
+    actualQuestionCount?: number;
+  },
+  tx?: any
+) {
+  const { userId, sessionId, actualQuestionCount } = params;
+  const client = tx || prisma;
+
+  if (actualQuestionCount !== undefined && (actualQuestionCount < 0 || actualQuestionCount > 500)) {
+    throw new Error("INVALID_ACTUAL_QUESTION_COUNT");
+  }
+
+  const runTx = async (activeTx: any) => {
+    const session = await activeTx.weeklyReviewSession.findFirst({
+      where: { id: sessionId, userId },
+      include: {
+        topics: true
+      }
+    });
+    if (!session) {
+      throw new Error("SESSION_NOT_FOUND");
+    }
+
+    if (session.status !== "IN_PROGRESS") {
+      throw new Error("SESSION_NOT_IN_PROGRESS");
+    }
+
+    const hasResults = session.topics.some((t: any) => t.result !== "PENDING");
+    if (!hasResults) {
+      throw new Error("NO_RESULTS_RECORDED");
+    }
+
+    return await activeTx.weeklyReviewSession.update({
+      where: { id: sessionId },
+      data: {
+        status: "COMPLETED",
+        completedAt: new Date(),
+        actualQuestionCount: actualQuestionCount !== undefined ? actualQuestionCount : null
+      }
+    });
+  };
+
+  return tx ? await runTx(client) : await client.$transaction(runTx);
+}
+
+// 5. Pular a sessão
+export async function skipWeeklyReviewSession(
+  params: {
+    userId: string;
+    sessionId: string;
+  },
+  tx?: any
+) {
+  const { userId, sessionId } = params;
+  const client = tx || prisma;
+
+  const runTx = async (activeTx: any) => {
+    const session = await activeTx.weeklyReviewSession.findFirst({
+      where: { id: sessionId, userId }
+    });
+    if (!session) {
+      throw new Error("SESSION_NOT_FOUND");
+    }
+
+    if (session.status !== "PENDING") {
+      throw new Error("SESSION_NOT_PENDING");
+    }
+
+    return await activeTx.weeklyReviewSession.update({
+      where: { id: sessionId },
+      data: {
+        status: "SKIPPED",
+        skippedAt: new Date()
+      }
+    });
+  };
+
+  return tx ? await runTx(client) : await client.$transaction(runTx);
+}
+
+// 6. Transferir uma sessão pendente para o próximo dia
+export async function carryWeeklyReviewSession(
+  params: {
+    userId: string;
+    sessionId: string;
+    newEffectiveScheduledDate: Date;
+  },
+  tx?: any
+) {
+  const { userId, sessionId, newEffectiveScheduledDate } = params;
+  const client = tx || prisma;
+
+  const runTx = async (activeTx: any) => {
+    const session = await activeTx.weeklyReviewSession.findFirst({
+      where: { id: sessionId, userId }
+    });
+    if (!session) {
+      throw new Error("SESSION_NOT_FOUND");
+    }
+
+    if (session.status !== "PENDING") {
+      throw new Error("SESSION_NOT_PENDING");
+    }
+
+    if (session.missedBehavior !== "MOVE_TO_NEXT_AVAILABLE_DAY") {
+      throw new Error("CARRYOVER_NOT_ALLOWED_BY_BEHAVIOR");
+    }
+
+    const rangeNew = getTodayRangeSP(newEffectiveScheduledDate);
+    const normalizedNew = new Date(rangeNew.dateString + "T12:00:00Z");
+
+    const rangeCurrent = getTodayRangeSP(session.effectiveScheduledDate);
+    const normalizedCurrent = new Date(rangeCurrent.dateString + "T12:00:00Z");
+
+    if (normalizedNew.getTime() <= normalizedCurrent.getTime()) {
+      throw new Error("INVALID_CARRYOVER_DATE");
+    }
+
+    return await activeTx.weeklyReviewSession.update({
+      where: { id: sessionId },
+      data: {
+        effectiveScheduledDate: rangeNew.start
+      }
+    });
+  };
+
+  return tx ? await runTx(client) : await client.$transaction(runTx);
+}
+
+// 7. Consultar uma sessão pertencente ao usuário autenticado
+export async function getWeeklyReviewSessionForUser(
+  userId: string,
+  sessionId: string,
+  tx?: any
+) {
+  const client = tx || prisma;
+  return await client.weeklyReviewSession.findFirst({
+    where: { id: sessionId, userId },
+    include: {
+      topics: {
+        include: {
+          sources: true
+        }
+      }
+    }
+  });
+}
+
