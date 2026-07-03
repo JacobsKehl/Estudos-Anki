@@ -6,11 +6,7 @@ import { handlePostPreview } from "../src/app/api/weekly-review/preview/handlers
 import { handlePostCreateSession } from "../src/app/api/weekly-review/sessions/handlers";
 import { handleGetActiveSession } from "../src/app/api/weekly-review/sessions/active/handlers";
 import { handleGetSessionById } from "../src/app/api/weekly-review/sessions/[sessionId]/handlers";
-import { handlePostStartSession } from "../src/app/api/weekly-review/sessions/[sessionId]/start/handlers";
-import { handlePostCompleteSession } from "../src/app/api/weekly-review/sessions/[sessionId]/complete/handlers";
-import { handlePostSkipSession } from "../src/app/api/weekly-review/sessions/[sessionId]/skip/handlers";
 import { handlePostCarrySession } from "../src/app/api/weekly-review/sessions/[sessionId]/carry/handlers";
-import { handlePatchTopicResult } from "../src/app/api/weekly-review/sessions/[sessionId]/topics/[topicId]/handlers";
 import { RouteDependencies } from "../src/lib/api/weekly-review-response";
 
 let totalAssertions = 0;
@@ -123,7 +119,7 @@ class MockWeeklyReviewService {
   public carryCalledWith: any = null;
   public recordCalledWith: any = null;
 
-  public async buildWeeklyReviewPreview(userId: string, refDate: string, tz: string, mins: any, tx: any) {
+  public async buildWeeklyReviewPreview(userId: string, refDate: string, _tz: string, mins: any) {
     this.previewCalledWith = { userId, refDate, mins };
     return {
       sourcePeriodStart: "2026-06-28",
@@ -142,7 +138,7 @@ class MockWeeklyReviewService {
     };
   }
 
-  public async createOrGetWeeklyReviewSession(params: any, client: any) {
+  public async createOrGetWeeklyReviewSession(params: any) {
     this.createCalledWith = params;
     const session = {
       id: "session-1",
@@ -157,27 +153,27 @@ class MockWeeklyReviewService {
     return { session, created: true };
   }
 
-  public async startWeeklyReviewSession(id: string, mins: number, questions: number, client: any) {
+  public async startWeeklyReviewSession(id: string, mins: number, questions: number) {
     this.startCalledWith = { id, mins, questions };
     return { id, status: "IN_PROGRESS", availableMinutes: mins, targetQuestionCount: questions };
   }
 
-  public async completeWeeklyReviewSession(id: string, count: number, client: any) {
+  public async completeWeeklyReviewSession(id: string, count: number) {
     this.completeCalledWith = { id, count };
     return { id, status: "COMPLETED", actualQuestionCount: count };
   }
 
-  public async skipWeeklyReviewSession(id: string, client: any) {
+  public async skipWeeklyReviewSession(id: string) {
     this.skipCalledWith = { id };
     return { id, status: "SKIPPED" };
   }
 
-  public async carryWeeklyReviewSession(id: string, newDate: Date, client: any) {
+  public async carryWeeklyReviewSession(id: string, newDate: Date) {
     this.carryCalledWith = { id, newDate };
     return { id, status: "PENDING", effectiveScheduledDate: newDate };
   }
 
-  public async recordWeeklyReviewTopicResult(sid: string, tid: string, result: string, notes: string, client: any) {
+  public async recordWeeklyReviewTopicResult(sid: string, tid: string, result: string, notes: string) {
     this.recordCalledWith = { sid, tid, result, notes };
     return { id: tid, result, notes };
   }
@@ -214,7 +210,7 @@ async function runTests() {
   console.log("[INICIANDO] Testes de Integração de APIs da Revisão Semanal");
   console.log("====================================================");
 
-  const mockUserId = "user-gabriela";
+  const mockUserId = "test-user-1";
   const frozenNow = new Date("2026-07-05T12:00:00Z"); // Domingo em SP
 
   // Dependências de produção mockadas
@@ -302,7 +298,6 @@ async function runTests() {
     });
     const resPatchErr = await handlePatchPreferences(reqPatchErr, localDeps);
     assert(resPatchErr.status === 400, "Rejeita payload com campo extra userId.");
-    const jsonPatchErr = await resPatchErr.status;
     assert(resPatchErr.status === 400, "Rejeitado com 400.");
 
     // PATCH válido
@@ -393,7 +388,7 @@ async function runTests() {
     const localPrisma = new MockPrisma();
     localPrisma.sessions.push({
       id: "session-other",
-      userId: "another-user-id",
+      userId: "test-user-2",
       status: "PENDING",
       effectiveScheduledDate: new Date("2026-07-05T12:00:00Z")
     });
@@ -429,6 +424,78 @@ async function runTests() {
     });
     const resOk = await handlePostCarrySession(reqOk, "session-1", localDeps);
     assert(resOk.status === 200, "Carry válido deve retornar 200.");
+  }
+
+  // 9. Proteção Avançada Same-Origin
+  {
+    const originalEnvNodeEnv = process.env.NODE_ENV;
+    const originalAppUrl = process.env.APP_URL;
+    const originalNextAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    try {
+      // Configurar modo de produção artificialmente para o teste
+      (process.env as any).NODE_ENV = "production";
+      process.env.APP_URL = "https://app-url-config.com";
+      process.env.NEXT_PUBLIC_APP_URL = "https://next-app-url-config.com";
+
+      const testSameOrigin = async (originHeader: string | null, hostHeader: string = "kehlstudy.com", xForwardedHost: string | null = null) => {
+        const headers: Record<string, string> = {
+          "content-type": "application/json",
+          "host": hostHeader
+        };
+        if (originHeader) {
+          headers["origin"] = originHeader;
+        }
+        if (xForwardedHost) {
+          headers["x-forwarded-host"] = xForwardedHost;
+        }
+
+        const req = createRequest("POST", "http://localhost/api/weekly-review/preview", {}, headers);
+        const res = await handlePostPreview(req, deps);
+        return res.status;
+      };
+
+      // 1. domínio oficial aceito
+      assert(await testSameOrigin("https://kehlstudy.com") === 200, "Domínio oficial https://kehlstudy.com deve ser aceito em prod.");
+      assert(await testSameOrigin("https://estudos-anki.vercel.app") === 200, "Domínio oficial https://estudos-anki.vercel.app deve ser aceito em prod.");
+
+      // 2. APP_URL aceito
+      assert(await testSameOrigin("https://app-url-config.com") === 200, "APP_URL origin deve ser aceito em prod.");
+
+      // 3. NEXT_PUBLIC_APP_URL aceito
+      assert(await testSameOrigin("https://next-app-url-config.com") === 200, "NEXT_PUBLIC_APP_URL origin deve ser aceito em prod.");
+
+      // 4. host arbitrário rejeitado em produção (mesmo que Host coincida com Origin)
+      assert(await testSameOrigin("https://arbitrary-host.com", "arbitrary-host.com") === 400, "Host arbitrário coincidente com Origin deve ser rejeitado em prod.");
+
+      // 5. x-forwarded-host arbitrário rejeitado em produção
+      assert(await testSameOrigin("https://bad-proxy.com", "kehlstudy.com", "bad-proxy.com") === 400, "X-Forwarded-Host arbitrário coincidente com Origin deve ser rejeitado em prod.");
+
+      // 7. protocolo incorreto rejeitado (ex: http em vez de https)
+      assert(await testSameOrigin("http://kehlstudy.com") === 400, "Protocolo http para domínio oficial deve ser rejeitado.");
+
+      // 8. domínio semelhante rejeitado
+      assert(await testSameOrigin("https://kehlstudy.com.br") === 400, "Domínio semelhante (kehlstudy.com.br) deve ser rejeitado.");
+      assert(await testSameOrigin("https://kehlstudy-fake.com") === 400, "Domínio semelhante (kehlstudy-fake.com) deve ser rejeitado.");
+
+      // 9. subdomínio não autorizado rejeitado
+      assert(await testSameOrigin("https://api.kehlstudy.com") === 400, "Subdomínio não autorizado deve ser rejeitado.");
+
+      // Configurar modo de desenvolvimento
+      (process.env as any).NODE_ENV = "development";
+
+      // 6. localhost aceito em teste
+      assert(await testSameOrigin("http://localhost:3000") === 200, "Localhost com porta deve ser aceito em desenvolvimento.");
+      assert(await testSameOrigin("http://127.0.0.1:3000") === 200, "127.0.0.1 com porta deve ser aceito em desenvolvimento.");
+      
+      // Host dinâmico aceito em teste
+      assert(await testSameOrigin("http://dynamic-dev-host.local", "dynamic-dev-host.local") === 200, "Host dinâmico coincidente com Origin deve ser aceito em desenvolvimento.");
+    } finally {
+      // Restaurar variáveis de ambiente originais
+      (process.env as any).NODE_ENV = originalEnvNodeEnv;
+      if (originalAppUrl === undefined) delete process.env.APP_URL; else process.env.APP_URL = originalAppUrl;
+      if (originalNextAppUrl === undefined) delete process.env.NEXT_PUBLIC_APP_URL; else process.env.NEXT_PUBLIC_APP_URL = originalNextAppUrl;
+    }
   }
 
   console.log("====================================================");

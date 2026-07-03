@@ -69,7 +69,11 @@ export function mapWeeklyReviewDomainError(error: any) {
     return errorResponse("INVALID_ORIGIN", "Origem da requisição não permitida.", 400);
   }
 
-  console.error("[WeeklyReview API Error]:", error);
+  console.error("[WeeklyReview API Error]", {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorCode: typeof error?.code === "string" ? error.code : "INTERNAL_ERROR",
+    timestamp: new Date().toISOString()
+  });
   return errorResponse("INTERNAL_ERROR", "Ocorreu um erro interno no servidor.", 500);
 }
 
@@ -95,44 +99,58 @@ export function assertSameOriginMutation(request: Request) {
     return;
   }
 
-  // Resolver origem canônica esperada
-  const canonicalUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
-  let canonicalOrigin: string | null = null;
-  if (canonicalUrl) {
-    try {
-      canonicalOrigin = new URL(canonicalUrl).origin;
-    } catch {
-      // Ignorar erros de parse
-    }
-  }
+  const isProd = process.env.NODE_ENV === "production";
 
-  // Resolver origem via cabeçalhos de proxy do request
-  const proto = request.headers.get("x-forwarded-proto") || "http";
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
-  let requestOrigin = "";
-  if (host) {
-    requestOrigin = `${proto}://${host}`;
-  }
-
-  // Lista de origens autorizadas oficiais
-  const allowedOrigins = [
+  // Resolver origens autorizadas oficiais
+  const allowedOrigins: string[] = [
     "https://kehlstudy.com",
     "https://estudos-anki.vercel.app"
   ];
-  if (canonicalOrigin) {
-    allowedOrigins.push(canonicalOrigin);
-  }
-  if (requestOrigin) {
+
+  if (process.env.APP_URL) {
     try {
-      allowedOrigins.push(new URL(requestOrigin).origin);
+      allowedOrigins.push(new URL(process.env.APP_URL).origin);
+    } catch {}
+  }
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    try {
+      allowedOrigins.push(new URL(process.env.NEXT_PUBLIC_APP_URL).origin);
     } catch {}
   }
 
-  try {
-    const originUrl = new URL(origin);
-    const originOrigin = originUrl.origin;
+  // Em desenvolvimento, podemos aceitar localhost, 127.0.0.1, nextUrl.origin e headers de Host dinâmicos
+  if (!isProd) {
+    allowedOrigins.push("http://localhost");
+    allowedOrigins.push("http://127.0.0.1");
 
-    // Verificar se existe correspondência exata de origin. origin.includes não é permitido.
+    // Adiciona localhost com portas comuns
+    for (const port of ["3000", "3001", "3002", "4000"]) {
+      allowedOrigins.push(`http://localhost:${port}`);
+      allowedOrigins.push(`http://127.0.0.1:${port}`);
+    }
+
+    // Aceitar nextUrl.origin se disponível
+    const nextUrlOrigin = (request as any).nextUrl?.origin;
+    if (nextUrlOrigin) {
+      try {
+        allowedOrigins.push(new URL(nextUrlOrigin).origin);
+      } catch {}
+    }
+
+    // Aceitar Host e X-Forwarded-Host dinâmicos
+    const proto = request.headers.get("x-forwarded-proto") || "http";
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
+    if (host) {
+      try {
+        allowedOrigins.push(new URL(`${proto}://${host}`).origin);
+      } catch {}
+    }
+  }
+
+  try {
+    const originOrigin = new URL(origin).origin;
+
+    // Verificar se existe correspondência exata de origin.
     const isAllowed = allowedOrigins.some((allowed) => {
       try {
         return new URL(allowed).origin === originOrigin;

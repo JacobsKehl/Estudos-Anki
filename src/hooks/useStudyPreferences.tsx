@@ -185,6 +185,7 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
 
   useEffect(() => {
     syncWithServer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Listen to system theme changes if set to 'system'
