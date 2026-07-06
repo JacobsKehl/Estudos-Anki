@@ -38,9 +38,12 @@ export async function handlePostStartSession(
     }
 
     const started = await deps.weeklyReviewService.startWeeklyReviewSession(
-      cleanSessionId,
-      input.availableMinutes,
-      input.targetQuestionCount,
+      {
+        userId,
+        sessionId: cleanSessionId,
+        availableMinutes: input.availableMinutes,
+        targetQuestionCount: input.targetQuestionCount
+      },
       deps.prisma
     );
 

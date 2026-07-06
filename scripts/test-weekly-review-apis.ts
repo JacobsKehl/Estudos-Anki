@@ -7,6 +7,10 @@ import { handlePostCreateSession } from "../src/app/api/weekly-review/sessions/h
 import { handleGetActiveSession } from "../src/app/api/weekly-review/sessions/active/handlers";
 import { handleGetSessionById } from "../src/app/api/weekly-review/sessions/[sessionId]/handlers";
 import { handlePostCarrySession } from "../src/app/api/weekly-review/sessions/[sessionId]/carry/handlers";
+import { handlePostStartSession } from "../src/app/api/weekly-review/sessions/[sessionId]/start/handlers";
+import { handlePostCompleteSession } from "../src/app/api/weekly-review/sessions/[sessionId]/complete/handlers";
+import { handlePostSkipSession } from "../src/app/api/weekly-review/sessions/[sessionId]/skip/handlers";
+import { handlePatchTopicResult } from "../src/app/api/weekly-review/sessions/[sessionId]/topics/[topicId]/handlers";
 import { RouteDependencies } from "../src/lib/api/weekly-review-response";
 
 let totalAssertions = 0;
@@ -153,29 +157,56 @@ class MockWeeklyReviewService {
     return { session, created: true };
   }
 
-  public async startWeeklyReviewSession(id: string, mins: number, questions: number) {
-    this.startCalledWith = { id, mins, questions };
-    return { id, status: "IN_PROGRESS", availableMinutes: mins, targetQuestionCount: questions };
+  public async startWeeklyReviewSession(params: {
+    userId: string;
+    sessionId: string;
+    availableMinutes: number;
+    targetQuestionCount: number;
+  }) {
+    const { userId, sessionId, availableMinutes, targetQuestionCount } = params;
+    this.startCalledWith = { userId, id: sessionId, mins: availableMinutes, questions: targetQuestionCount };
+    return { id: sessionId, status: "IN_PROGRESS", availableMinutes, targetQuestionCount };
   }
 
-  public async completeWeeklyReviewSession(id: string, count: number) {
-    this.completeCalledWith = { id, count };
-    return { id, status: "COMPLETED", actualQuestionCount: count };
+  public async completeWeeklyReviewSession(params: {
+    userId: string;
+    sessionId: string;
+    actualQuestionCount?: number;
+  }) {
+    const { userId, sessionId, actualQuestionCount } = params;
+    this.completeCalledWith = { userId, id: sessionId, count: actualQuestionCount };
+    return { id: sessionId, status: "COMPLETED", actualQuestionCount };
   }
 
-  public async skipWeeklyReviewSession(id: string) {
-    this.skipCalledWith = { id };
-    return { id, status: "SKIPPED" };
+  public async skipWeeklyReviewSession(params: {
+    userId: string;
+    sessionId: string;
+  }) {
+    const { userId, sessionId } = params;
+    this.skipCalledWith = { userId, id: sessionId };
+    return { id: sessionId, status: "SKIPPED" };
   }
 
-  public async carryWeeklyReviewSession(id: string, newDate: Date) {
-    this.carryCalledWith = { id, newDate };
-    return { id, status: "PENDING", effectiveScheduledDate: newDate };
+  public async carryWeeklyReviewSession(params: {
+    userId: string;
+    sessionId: string;
+    newEffectiveScheduledDate: Date;
+  }) {
+    const { userId, sessionId, newEffectiveScheduledDate } = params;
+    this.carryCalledWith = { userId, id: sessionId, newDate: newEffectiveScheduledDate };
+    return { id: sessionId, status: "PENDING", effectiveScheduledDate: newEffectiveScheduledDate };
   }
 
-  public async recordWeeklyReviewTopicResult(sid: string, tid: string, result: string, notes: string) {
-    this.recordCalledWith = { sid, tid, result, notes };
-    return { id: tid, result, notes };
+  public async recordWeeklyReviewTopicResult(params: {
+    userId: string;
+    sessionId: string;
+    topicId: string;
+    result: "DID_WELL" | "HAD_DOUBTS" | "REVIEW_AGAIN";
+    notes?: string;
+  }) {
+    const { userId, sessionId, topicId, result, notes } = params;
+    this.recordCalledWith = { userId, sid: sessionId, tid: topicId, result, notes };
+    return { id: topicId, result, notes };
   }
 }
 
@@ -496,6 +527,71 @@ async function runTests() {
       if (originalAppUrl === undefined) delete process.env.APP_URL; else process.env.APP_URL = originalAppUrl;
       if (originalNextAppUrl === undefined) delete process.env.NEXT_PUBLIC_APP_URL; else process.env.NEXT_PUBLIC_APP_URL = originalNextAppUrl;
     }
+  }
+
+  // 10. Validação de Mutações de Sessão e Tópicos (Start, Complete, Skip, Topic PATCH)
+  {
+    const localPrisma = new MockPrisma();
+    localPrisma.sessions.push({
+      id: "session-active",
+      userId: mockUserId,
+      status: "PENDING",
+      effectiveScheduledDate: new Date("2026-07-05T12:00:00Z"),
+      missedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY"
+    });
+    localPrisma.topics.push({
+      id: "topic-active",
+      weeklyReviewSessionId: "session-active",
+      result: "PENDING"
+    });
+    
+    const localService = new MockWeeklyReviewService();
+    const localDeps = { ...deps, prisma: localPrisma, weeklyReviewService: localService };
+
+    // A. Start Session
+    const reqStart = createRequest("POST", "http://localhost/api/weekly-review/sessions/session-active/start", {
+      availableMinutes: 60,
+      targetQuestionCount: 20
+    });
+    const resStart = await handlePostStartSession(reqStart, "session-active", localDeps);
+    assert(resStart.status === 200, "Start session deve retornar 200.");
+    assert(localService.startCalledWith.userId === mockUserId, "Start deve passar userId.");
+    assert(localService.startCalledWith.id === "session-active", "Start deve passar sessionId.");
+    assert(localService.startCalledWith.mins === 60, "Start deve passar availableMinutes.");
+    assert(localService.startCalledWith.questions === 20, "Start deve passar targetQuestionCount.");
+
+    // B. Record Topic Result
+    const reqTopic = createRequest("PATCH", "http://localhost/api/weekly-review/sessions/session-active/topics/topic-active", {
+      result: "HAD_DOUBTS",
+      notes: "Algumas anotações"
+    });
+    // Simular que o status da sessão foi para IN_PROGRESS para passar nas validações do handler
+    localPrisma.sessions[0].status = "IN_PROGRESS";
+    const resTopic = await handlePatchTopicResult(reqTopic, "session-active", "topic-active", localDeps);
+    assert(resTopic.status === 200, "Topic result PATCH deve retornar 200.");
+    assert(localService.recordCalledWith.userId === mockUserId, "Topic PATCH deve passar userId.");
+    assert(localService.recordCalledWith.sid === "session-active", "Topic PATCH deve passar sessionId.");
+    assert(localService.recordCalledWith.tid === "topic-active", "Topic PATCH deve passar topicId.");
+    assert(localService.recordCalledWith.result === "HAD_DOUBTS", "Topic PATCH deve passar result.");
+    assert(localService.recordCalledWith.notes === "Algumas anotações", "Topic PATCH deve passar notes.");
+
+    // C. Complete Session
+    const reqComplete = createRequest("POST", "http://localhost/api/weekly-review/sessions/session-active/complete", {
+      actualQuestionCount: 18
+    });
+    const resComplete = await handlePostCompleteSession(reqComplete, "session-active", localDeps);
+    assert(resComplete.status === 200, "Complete session deve retornar 200.");
+    assert(localService.completeCalledWith.userId === mockUserId, "Complete deve passar userId.");
+    assert(localService.completeCalledWith.id === "session-active", "Complete deve passar sessionId.");
+    assert(localService.completeCalledWith.count === 18, "Complete deve passar actualQuestionCount.");
+
+    // D. Skip Session (resetando status para PENDING)
+    localPrisma.sessions[0].status = "PENDING";
+    const reqSkip = createRequest("POST", "http://localhost/api/weekly-review/sessions/session-active/skip", {});
+    const resSkip = await handlePostSkipSession(reqSkip, "session-active", localDeps);
+    assert(resSkip.status === 200, "Skip session deve retornar 200.");
+    assert(localService.skipCalledWith.userId === mockUserId, "Skip deve passar userId.");
+    assert(localService.skipCalledWith.id === "session-active", "Skip deve passar sessionId.");
   }
 
   console.log("====================================================");

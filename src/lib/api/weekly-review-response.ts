@@ -44,18 +44,51 @@ export function mapWeeklyReviewDomainError(error: any) {
   if (msg === "UNAUTHENTICATED") {
     return errorResponse("UNAUTHENTICATED", "Sessão inválida ou expirada.", 401);
   }
-  if (msg === "SESSION_NOT_FOUND" || msg === "TOPIC_NOT_FOUND" || msg === "USER_NOT_FOUND") {
+
+  // 404 NOT_FOUND
+  if (
+    msg === "SESSION_NOT_FOUND" ||
+    msg === "TOPIC_NOT_FOUND" ||
+    msg === "USER_NOT_FOUND" ||
+    msg === "TOPIC_NOT_FOUND_IN_SESSION"
+  ) {
     return errorResponse("NOT_FOUND", "Recurso não encontrado.", 404);
   }
+
+  // 409 CONFLICT / INVALID STATE
   if (
     msg === "WEEKLY_REVIEW_DISABLED" ||
     msg === "INVALID_SCHEDULED_DAY" ||
     msg === "INVALID_STATE_TRANSITION" ||
     msg === "CIRCULAR_CARRYOVER_DETECTED" ||
-    msg === "SESSION_NOT_PENDING"
+    msg === "SESSION_NOT_PENDING" ||
+    msg === "INVALID_SESSION_STATUS" ||
+    msg === "SESSION_NOT_IN_PROGRESS" ||
+    msg === "CARRYOVER_NOT_ALLOWED_BY_BEHAVIOR"
   ) {
-    return errorResponse(msg, msg === "WEEKLY_REVIEW_DISABLED" ? "Revisão semanal desativada." : msg, 409);
+    let friendlyMessage = "Operação inválida para o estado atual da revisão.";
+    if (msg === "WEEKLY_REVIEW_DISABLED") {
+      friendlyMessage = "Revisão semanal desativada.";
+    } else if (msg === "INVALID_SCHEDULED_DAY") {
+      friendlyMessage = "Dia inválido para revisão semanal.";
+    }
+    return errorResponse(msg, friendlyMessage, 409);
   }
+
+  // 400 INVALID_INPUT
+  if (
+    msg === "SESSION_ALREADY_IN_PROGRESS_WITH_DIFFERENT_PARAMS" ||
+    msg === "INVALID_CARRYOVER_DATE" ||
+    msg === "INVALID_AVAILABLE_MINUTES" ||
+    msg === "INVALID_TARGET_QUESTION_COUNT" ||
+    msg === "INVALID_ACTUAL_QUESTION_COUNT" ||
+    msg === "INVALID_RESULT" ||
+    msg === "NOTES_TOO_LONG" ||
+    msg === "NO_RESULTS_RECORDED"
+  ) {
+    return errorResponse("INVALID_INPUT", `Entrada inválida: ${msg}`, 400);
+  }
+
   if (msg === "NO_ELIGIBLE_TOPICS") {
     return errorResponse("NO_ELIGIBLE_TOPICS", "Nenhum assunto elegível encontrado para revisão nesta semana.", 422);
   }
@@ -183,9 +216,12 @@ export async function getSafeJsonBody(request: Request): Promise<any> {
   }
 }
 
+import { PrismaClient, Prisma } from "@prisma/client";
+import type * as WeeklyReviewService from "@/lib/services/weekly-review";
+
 export interface RouteDependencies {
   getCurrentUserId: () => Promise<string>;
-  prisma: any;
-  weeklyReviewService: any;
+  prisma: PrismaClient | Prisma.TransactionClient;
+  weeklyReviewService: typeof WeeklyReviewService;
   getNow: () => Date;
 }
