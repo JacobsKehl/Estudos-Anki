@@ -93,7 +93,7 @@ export function useWeeklyReview() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const abortControllerRef = useRef<AbortController | null>(null);
-  const hasInitializedRef = useRef(false);
+  const lastInitializationKeyRef = useRef<string | null>(null);
 
   // Core state
   const [phase, setPhase] = useState<ReviewPhase>("loading");
@@ -167,22 +167,28 @@ export function useWeeklyReview() {
     [abortPrevious, fetchSessionById]
   );
 
+  const requestedSessionId = searchParams.get("sessionId");
+
+  const initializationKey = [
+    weeklyReviewEnabled ? "enabled" : "disabled",
+    requestedSessionId ?? "active",
+  ].join(":");
+
   // Initial load
   useEffect(() => {
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
+    if (lastInitializationKeyRef.current === initializationKey) {
+      return;
+    }
+    lastInitializationKeyRef.current = initializationKey;
 
     let cancelled = false;
+    const signal = abortPrevious();
 
     async function init() {
-      const signal = abortPrevious();
-
       try {
-        const urlSessionId = searchParams.get("sessionId");
-
-        if (urlSessionId) {
+        if (requestedSessionId) {
           // Direct link to a specific session
-          const sess = await fetchSessionById(urlSessionId, signal);
+          const sess = await fetchSessionById(requestedSessionId, signal);
           if (cancelled) return;
 
           if (sess) {
@@ -251,6 +257,7 @@ export function useWeeklyReview() {
         setPhase(weeklyReviewEnabled ? "preview-form" : "disabled");
       } catch (err: unknown) {
         if ((err instanceof Error && err.name === "AbortError") || cancelled) return;
+        lastInitializationKeyRef.current = null;
         setErrorMessage("Erro ao carregar dados da revisão semanal.");
         setPhase("error");
       }
@@ -261,7 +268,14 @@ export function useWeeklyReview() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, fetchSessionById, abortPrevious, router, weeklyReviewEnabled]);
+  }, [
+    initializationKey,
+    requestedSessionId,
+    weeklyReviewEnabled,
+    abortPrevious,
+    fetchSessionById,
+    router,
+  ]);
 
   // Re-derive phase when weeklyReviewEnabled changes (after init)
   useEffect(() => {
