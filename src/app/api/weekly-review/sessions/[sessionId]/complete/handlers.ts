@@ -38,8 +38,11 @@ export async function handlePostCompleteSession(
     }
 
     const completed = await deps.weeklyReviewService.completeWeeklyReviewSession(
-      cleanSessionId,
-      input.actualQuestionCount,
+      {
+        userId,
+        sessionId: cleanSessionId,
+        actualQuestionCount: input.actualQuestionCount
+      },
       deps.prisma
     );
 

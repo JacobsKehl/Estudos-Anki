@@ -12,17 +12,19 @@ import { parsePreferencesInput } from "@/lib/validation/weekly-review";
 export async function handleGetPreferences(request: Request, deps: RouteDependencies) {
   try {
     const userId = await deps.getCurrentUserId();
-    
-    let prefs = await deps.prisma.userPreferences.findUnique({
+
+    const prefs = await deps.prisma.userPreferences.findUnique({
       where: { userId }
     });
 
-    if (!prefs) {
-      prefs = {
-        weeklyReviewEnabled: false,
-        weeklyReviewDayOfWeek: 0,
-        weeklyReviewMissedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY"
-      };
+    let enabled = false;
+    let dayOfWeek = 0;
+    let missedBehavior = "MOVE_TO_NEXT_AVAILABLE_DAY";
+
+    if (prefs) {
+      enabled = prefs.weeklyReviewEnabled;
+      dayOfWeek = prefs.weeklyReviewDayOfWeek;
+      missedBehavior = prefs.weeklyReviewMissedBehavior;
     }
 
     const openSessionCount = await deps.prisma.weeklyReviewSession.count({
@@ -33,9 +35,9 @@ export async function handleGetPreferences(request: Request, deps: RouteDependen
     });
 
     return successResponse({
-      enabled: prefs.weeklyReviewEnabled,
-      dayOfWeek: prefs.weeklyReviewDayOfWeek,
-      missedBehavior: prefs.weeklyReviewMissedBehavior,
+      enabled,
+      dayOfWeek,
+      missedBehavior,
       hasOpenSession: openSessionCount > 0
     });
   } catch (error) {
@@ -58,7 +60,13 @@ export async function handlePatchPreferences(request: Request, deps: RouteDepend
 
     const input = parsePreferencesInput(body);
 
-    const updateData: any = {};
+    interface PreferencesUpdateInput {
+      weeklyReviewEnabled?: boolean;
+      weeklyReviewDayOfWeek?: number;
+      weeklyReviewMissedBehavior?: "MOVE_TO_NEXT_AVAILABLE_DAY" | "SKIP_CURRENT_WEEK";
+    }
+
+    const updateData: PreferencesUpdateInput = {};
     if (input.enabled !== undefined) updateData.weeklyReviewEnabled = input.enabled;
     if (input.dayOfWeek !== undefined) updateData.weeklyReviewDayOfWeek = input.dayOfWeek;
     if (input.missedBehavior !== undefined) updateData.weeklyReviewMissedBehavior = input.missedBehavior;

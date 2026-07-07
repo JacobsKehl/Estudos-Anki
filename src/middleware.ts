@@ -12,7 +12,8 @@ const PRIVATE_ROUTES = [
   "/reviews",
   "/settings",
   "/blocks",
-  "/stats"
+  "/stats",
+  "/weekly-review"
 ];
 
 // Lista de rotas públicas de autenticação

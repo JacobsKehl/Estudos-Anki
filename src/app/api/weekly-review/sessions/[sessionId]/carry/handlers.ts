@@ -71,8 +71,11 @@ export async function handlePostCarrySession(
     }
 
     const carried = await deps.weeklyReviewService.carryWeeklyReviewSession(
-      cleanSessionId,
-      new Date(newDateStr + "T12:00:00Z"),
+      {
+        userId,
+        sessionId: cleanSessionId,
+        newEffectiveScheduledDate: new Date(newDateStr + "T12:00:00Z")
+      },
       deps.prisma
     );
 

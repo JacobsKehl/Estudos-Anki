@@ -48,10 +48,13 @@ export async function handlePatchTopicResult(
     }
 
     const updated = await deps.weeklyReviewService.recordWeeklyReviewTopicResult(
-      cleanSessionId,
-      cleanTopicId,
-      input.result,
-      input.notes,
+      {
+        userId,
+        sessionId: cleanSessionId,
+        topicId: cleanTopicId,
+        result: input.result,
+        notes: input.notes
+      },
       deps.prisma
     );
 

@@ -5,7 +5,7 @@ const DEFAULT_HEADERS = {
   "Cache-Control": "no-store"
 };
 
-export function successResponse(data: any, status = 200) {
+export function successResponse(data: unknown, status = 200) {
   return NextResponse.json(
     {
       success: true,
@@ -34,28 +34,61 @@ export function errorResponse(code: string, message: string, status = 400) {
   );
 }
 
-export function mapWeeklyReviewDomainError(error: any) {
+export function mapWeeklyReviewDomainError(error: unknown) {
   if (error instanceof WeeklyReviewValidationError) {
     return errorResponse("INVALID_INPUT", error.message, 400);
   }
 
-  const msg = error.message || "";
-  
+  const msg = error instanceof Error ? error.message : typeof error === "object" && error !== null && "message" in error ? String((error as { message: unknown }).message) : "";
+
   if (msg === "UNAUTHENTICATED") {
     return errorResponse("UNAUTHENTICATED", "Sessão inválida ou expirada.", 401);
   }
-  if (msg === "SESSION_NOT_FOUND" || msg === "TOPIC_NOT_FOUND" || msg === "USER_NOT_FOUND") {
+
+  // 404 NOT_FOUND
+  if (
+    msg === "SESSION_NOT_FOUND" ||
+    msg === "TOPIC_NOT_FOUND" ||
+    msg === "USER_NOT_FOUND" ||
+    msg === "TOPIC_NOT_FOUND_IN_SESSION"
+  ) {
     return errorResponse("NOT_FOUND", "Recurso não encontrado.", 404);
   }
+
+  // 409 CONFLICT / INVALID STATE
   if (
     msg === "WEEKLY_REVIEW_DISABLED" ||
     msg === "INVALID_SCHEDULED_DAY" ||
     msg === "INVALID_STATE_TRANSITION" ||
     msg === "CIRCULAR_CARRYOVER_DETECTED" ||
-    msg === "SESSION_NOT_PENDING"
+    msg === "SESSION_NOT_PENDING" ||
+    msg === "INVALID_SESSION_STATUS" ||
+    msg === "SESSION_NOT_IN_PROGRESS" ||
+    msg === "CARRYOVER_NOT_ALLOWED_BY_BEHAVIOR"
   ) {
-    return errorResponse(msg, msg === "WEEKLY_REVIEW_DISABLED" ? "Revisão semanal desativada." : msg, 409);
+    let friendlyMessage = "Operação inválida para o estado atual da revisão.";
+    if (msg === "WEEKLY_REVIEW_DISABLED") {
+      friendlyMessage = "Revisão semanal desativada.";
+    } else if (msg === "INVALID_SCHEDULED_DAY") {
+      friendlyMessage = "Dia inválido para revisão semanal.";
+    }
+    return errorResponse(msg, friendlyMessage, 409);
   }
+
+  // 400 INVALID_INPUT
+  if (
+    msg === "SESSION_ALREADY_IN_PROGRESS_WITH_DIFFERENT_PARAMS" ||
+    msg === "INVALID_CARRYOVER_DATE" ||
+    msg === "INVALID_AVAILABLE_MINUTES" ||
+    msg === "INVALID_TARGET_QUESTION_COUNT" ||
+    msg === "INVALID_ACTUAL_QUESTION_COUNT" ||
+    msg === "INVALID_RESULT" ||
+    msg === "NOTES_TOO_LONG" ||
+    msg === "NO_RESULTS_RECORDED"
+  ) {
+    return errorResponse("INVALID_INPUT", `Entrada inválida: ${msg}`, 400);
+  }
+
   if (msg === "NO_ELIGIBLE_TOPICS") {
     return errorResponse("NO_ELIGIBLE_TOPICS", "Nenhum assunto elegível encontrado para revisão nesta semana.", 422);
   }
@@ -71,7 +104,7 @@ export function mapWeeklyReviewDomainError(error: any) {
 
   console.error("[WeeklyReview API Error]", {
     errorName: error instanceof Error ? error.name : "UnknownError",
-    errorCode: typeof error?.code === "string" ? error.code : "INTERNAL_ERROR",
+    errorCode: typeof (error as { code?: unknown })?.code === "string" ? String((error as { code?: unknown }).code) : "INTERNAL_ERROR",
     timestamp: new Date().toISOString()
   });
   return errorResponse("INTERNAL_ERROR", "Ocorreu um erro interno no servidor.", 500);
@@ -130,7 +163,7 @@ export function assertSameOriginMutation(request: Request) {
     }
 
     // Aceitar nextUrl.origin se disponível
-    const nextUrlOrigin = (request as any).nextUrl?.origin;
+    const nextUrlOrigin = (request as { nextUrl?: { origin?: string } }).nextUrl?.origin;
     if (nextUrlOrigin) {
       try {
         allowedOrigins.push(new URL(nextUrlOrigin).origin);
@@ -162,8 +195,9 @@ export function assertSameOriginMutation(request: Request) {
     if (!isAllowed) {
       throw new Error("ORIGIN_MISMATCH");
     }
-  } catch (e: any) {
-    if (e.message === "ORIGIN_MISMATCH") {
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : "";
+    if (errorMsg === "ORIGIN_MISMATCH") {
       throw e;
     }
     throw new Error("INVALID_ORIGIN");
@@ -171,21 +205,55 @@ export function assertSameOriginMutation(request: Request) {
 }
 
 // Helper seguro para obter o body JSON ou retornar um objeto vazio
-export async function getSafeJsonBody(request: Request): Promise<any> {
+export async function getSafeJsonBody(request: Request): Promise<Record<string, unknown>> {
   const text = await request.text();
   if (!text || text.trim() === "") {
     return {};
   }
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as Record<string, unknown>;
   } catch {
     throw new WeeklyReviewValidationError("JSON inválido no corpo da requisição.");
   }
 }
 
+import {
+  Prisma,
+  UserPreferences,
+  WeeklyReviewSession,
+  WeeklyReviewTopic
+} from "@prisma/client";
+import type * as WeeklyReviewService from "@/lib/services/weekly-review";
+
+export interface PrismaClientLike {
+  userPreferences: {
+    findUnique(args: Prisma.UserPreferencesFindUniqueArgs): Promise<UserPreferences | null>;
+    create(args: Prisma.UserPreferencesCreateArgs): Promise<UserPreferences>;
+    update(args: Prisma.UserPreferencesUpdateArgs): Promise<UserPreferences>;
+  };
+  weeklyReviewSession: {
+    count(args: Prisma.WeeklyReviewSessionCountArgs): Promise<number>;
+    findUnique(args: Prisma.WeeklyReviewSessionFindUniqueArgs): Promise<WeeklyReviewSession | null>;
+    findMany(args: Prisma.WeeklyReviewSessionFindManyArgs): Promise<WeeklyReviewSession[]>;
+  };
+  weeklyReviewTopic: {
+    findUnique(args: Prisma.WeeklyReviewTopicFindUniqueArgs): Promise<WeeklyReviewTopic | null>;
+  };
+}
+
+export interface WeeklyReviewServiceLike {
+  buildWeeklyReviewPreview: typeof WeeklyReviewService.buildWeeklyReviewPreview;
+  createOrGetWeeklyReviewSession: typeof WeeklyReviewService.createOrGetWeeklyReviewSession;
+  startWeeklyReviewSession: typeof WeeklyReviewService.startWeeklyReviewSession;
+  recordWeeklyReviewTopicResult: typeof WeeklyReviewService.recordWeeklyReviewTopicResult;
+  completeWeeklyReviewSession: typeof WeeklyReviewService.completeWeeklyReviewSession;
+  skipWeeklyReviewSession: typeof WeeklyReviewService.skipWeeklyReviewSession;
+  carryWeeklyReviewSession: typeof WeeklyReviewService.carryWeeklyReviewSession;
+}
+
 export interface RouteDependencies {
   getCurrentUserId: () => Promise<string>;
-  prisma: any;
-  weeklyReviewService: any;
+  prisma: PrismaClientLike;
+  weeklyReviewService: WeeklyReviewServiceLike;
   getNow: () => Date;
 }

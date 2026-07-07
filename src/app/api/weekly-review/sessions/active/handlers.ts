@@ -3,6 +3,7 @@ import {
   successResponse,
   mapWeeklyReviewDomainError
 } from "@/lib/api/weekly-review-response";
+import { WeeklyReviewSession } from "@prisma/client";
 
 export async function handleGetActiveSession(request: Request, deps: RouteDependencies) {
   try {
@@ -27,7 +28,7 @@ export async function handleGetActiveSession(request: Request, deps: RouteDepend
       // 1. IN_PROGRESS primeiro (status: 0 para IN_PROGRESS, 1 para PENDING)
       // 2. data efetiva mais antiga
       // 3. createdAt mais antigo
-      sessions.sort((a: any, b: any) => {
+      sessions.sort((a: WeeklyReviewSession, b: WeeklyReviewSession) => {
         const statusA = a.status === "IN_PROGRESS" ? 0 : 1;
         const statusB = b.status === "IN_PROGRESS" ? 0 : 1;
         if (statusA !== statusB) return statusA - statusB;

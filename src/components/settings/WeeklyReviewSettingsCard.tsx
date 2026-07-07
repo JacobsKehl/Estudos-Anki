@@ -78,7 +78,7 @@ export function WeeklyReviewSettingsCard() {
       if (res.ok && data.success) {
         toast.success("Configurações da revisão semanal salvas com sucesso!");
         setHasOpenSession(data.data.hasOpenSession);
-        
+
         // Atualizar hook de preferências para persistir as alterações globalmente
         await syncWithServer();
       } else {
@@ -216,6 +216,24 @@ export function WeeklyReviewSettingsCard() {
             A revisão semanal ainda não altera automaticamente o seu cronograma. A sessão será preparada somente quando você solicitar.
           </div>
         </div>
+
+        {/* CTA Link to Weekly Review Page */}
+        {(enabled || hasOpenSession) && (
+          <div className="flex justify-between items-center p-4 bg-sage-light/10 border border-accent/20 rounded-2xl">
+            <div className="space-y-0.5">
+              <h4 className="text-sm font-bold text-foreground">Sessão de Revisão Disponível</h4>
+              <p className="text-xs text-muted-foreground">
+                Acesse a página de revisão semanal para visualizar seu progresso ou iniciar uma nova sessão.
+              </p>
+            </div>
+            <a
+              href="/weekly-review"
+              className="flex items-center justify-center px-5 h-10 rounded-xl text-xs font-bold bg-accent text-white hover:scale-[1.01] transition-all cursor-pointer"
+            >
+              ABRIR REVISÃO SEMANAL
+            </a>
+          </div>
+        )}
 
         {/* Save Button */}
         <div className="flex justify-end pt-2">
