@@ -7,6 +7,10 @@ import { handlePostCreateSession } from "../src/app/api/weekly-review/sessions/h
 import { handleGetActiveSession } from "../src/app/api/weekly-review/sessions/active/handlers";
 import { handleGetSessionById } from "../src/app/api/weekly-review/sessions/[sessionId]/handlers";
 import { handlePostCarrySession } from "../src/app/api/weekly-review/sessions/[sessionId]/carry/handlers";
+import { handlePostStartSession } from "../src/app/api/weekly-review/sessions/[sessionId]/start/handlers";
+import { handlePostCompleteSession } from "../src/app/api/weekly-review/sessions/[sessionId]/complete/handlers";
+import { handlePostSkipSession } from "../src/app/api/weekly-review/sessions/[sessionId]/skip/handlers";
+import { handlePatchTopicResult } from "../src/app/api/weekly-review/sessions/[sessionId]/topics/[topicId]/handlers";
 import { RouteDependencies } from "../src/lib/api/weekly-review-response";
 
 let totalAssertions = 0;
@@ -20,14 +24,122 @@ function assert(condition: boolean, message: string) {
   passedAssertions++;
 }
 
+import {
+  Prisma,
+  UserPreferences,
+  WeeklyReviewSession,
+  WeeklyReviewTopic,
+  WeeklyReviewTopicSource,
+  WeeklyReviewSelectionReason
+} from "@prisma/client";
+import { PrismaClientLike, WeeklyReviewServiceLike } from "../src/lib/api/weekly-review-response";
+
+interface PrefsRecord {
+  id?: string;
+  userId: string;
+  weeklyReviewEnabled: boolean;
+  weeklyReviewDayOfWeek: number;
+  weeklyReviewMissedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY" | "SKIP_CURRENT_WEEK";
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface SessionRecord {
+  id: string;
+  userId: string;
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED";
+  originalScheduledDate?: Date;
+  effectiveScheduledDate: Date;
+  missedBehavior?: "MOVE_TO_NEXT_AVAILABLE_DAY" | "SKIP_CURRENT_WEEK";
+  createdAt?: Date;
+  updatedAt?: Date;
+  availableMinutes?: number | null;
+  targetQuestionCount?: number | null;
+  actualQuestionCount?: number | null;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
+  skippedAt?: Date | null;
+  topics?: TopicRecord[];
+}
+
+interface TopicRecord {
+  id: string;
+  weeklyReviewSessionId: string;
+  result: "PENDING" | "DID_WELL" | "HAD_DOUBTS" | "REVIEW_AGAIN";
+  title?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  subjectId?: string | null;
+  sourceSubjectName?: string;
+  notes?: string | null;
+  priorityRank?: number;
+  carriedFromTopicId?: string | null;
+  sourceStudyDate?: Date | null;
+  materialName?: string | null;
+  pageStart?: number | null;
+  pageEnd?: number | null;
+  selectionReason?: WeeklyReviewSelectionReason;
+  sources?: WeeklyReviewTopicSource[];
+}
+
+const defaultUserPreferences: UserPreferences = {
+  id: "",
+  userId: "",
+  dailyGoalMinutes: 120,
+  studyResetTime: "00:00",
+  studyDaysOfWeek: "1,2,3,4,5",
+  defaultBlockDurationMinutes: 30,
+  maxNewCardsPerDay: 20,
+  flashcardDifficulty: "NORMAL_PLUS",
+  emailReminderEnabled: true,
+  emailReminderTime: "08:00",
+  dailyReminderEmail: null,
+  lastDailyReminderSentAt: null,
+  visualDensity: "comfortable",
+  reducedMotion: false,
+  focusArea: "Geral",
+  theme: "light",
+  displayName: "Estudante",
+  examGoal: "TRT4",
+  deadline: null,
+  avatarUrl: null,
+  languageTone: "MASCULINE_NEUTRAL",
+  scheduleGenerationMode: "DYNAMIC",
+  weeklyReviewEnabled: false,
+  weeklyReviewDayOfWeek: 0,
+  weeklyReviewMissedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY",
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+
+const defaultWeeklyReviewSession: WeeklyReviewSession = {
+  id: "",
+  userId: "",
+  status: "PENDING",
+  originalScheduledDate: new Date(),
+  effectiveScheduledDate: new Date(),
+  missedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  sourcePeriodStart: new Date(),
+  sourcePeriodEnd: new Date(),
+  suggestedQuestionCount: 20,
+  availableMinutes: null,
+  targetQuestionCount: null,
+  actualQuestionCount: null,
+  startedAt: null,
+  completedAt: null,
+  skippedAt: null
+};
+
 // ----------------------------------------------------
 // Mock da base de dados e do serviço de domínio
 // ----------------------------------------------------
-class MockPrisma {
-  public preferences: any[] = [];
-  public sessions: any[] = [];
-  public topics: any[] = [];
-  public sources: any[] = [];
+class MockPrisma implements PrismaClientLike {
+  public preferences: PrefsRecord[] = [];
+  public sessions: SessionRecord[] = [];
+  public topics: TopicRecord[] = [];
+  public sources: WeeklyReviewTopicSource[] = [];
 
   public countCalls = 0;
   public findUniqueCalls = 0;
@@ -36,146 +148,361 @@ class MockPrisma {
   public updateCalls = 0;
   public upsertCalls = 0;
 
+  private mapPrefs(p: PrefsRecord): UserPreferences {
+    return {
+      ...defaultUserPreferences,
+      id: p.id || `pref-${Math.random()}`,
+      userId: p.userId,
+      weeklyReviewEnabled: p.weeklyReviewEnabled,
+      weeklyReviewDayOfWeek: p.weeklyReviewDayOfWeek,
+      weeklyReviewMissedBehavior: p.weeklyReviewMissedBehavior,
+      createdAt: p.createdAt || new Date(),
+      updatedAt: p.updatedAt || new Date()
+    };
+  }
+
+  private mapSession(s: SessionRecord): WeeklyReviewSession {
+    return {
+      ...defaultWeeklyReviewSession,
+      id: s.id,
+      userId: s.userId,
+      status: s.status,
+      originalScheduledDate: s.originalScheduledDate || new Date(),
+      effectiveScheduledDate: s.effectiveScheduledDate,
+      missedBehavior: s.missedBehavior || "MOVE_TO_NEXT_AVAILABLE_DAY",
+      createdAt: s.createdAt || new Date(),
+      updatedAt: s.updatedAt || new Date(),
+      availableMinutes: s.availableMinutes ?? null,
+      targetQuestionCount: s.targetQuestionCount ?? null,
+      actualQuestionCount: s.actualQuestionCount ?? null,
+      startedAt: s.startedAt || null,
+      completedAt: s.completedAt || null,
+      skippedAt: s.skippedAt || null
+    };
+  }
+
   public userPreferences = {
-    findUnique: async (args: any) => {
+    findUnique: async (args: Prisma.UserPreferencesFindUniqueArgs): Promise<UserPreferences | null> => {
       this.findUniqueCalls++;
-      return this.preferences.find(p => p.userId === args.where.userId) || null;
+      if (!args.where || !args.where.userId) return null;
+      const p = this.preferences.find(x => x.userId === args.where.userId);
+      return p ? this.mapPrefs(p) : null;
     },
-    create: async (args: any) => {
+    create: async (args: Prisma.UserPreferencesCreateArgs): Promise<UserPreferences> => {
       this.createCalls++;
-      const newPref = { id: `pref-${Math.random()}`, ...args.data };
+      const userIdVal = typeof args.data.userId === "string" ? args.data.userId : "";
+      const newPref: PrefsRecord = {
+        userId: userIdVal,
+        weeklyReviewEnabled: args.data.weeklyReviewEnabled ?? false,
+        weeklyReviewDayOfWeek: args.data.weeklyReviewDayOfWeek ?? 0,
+        weeklyReviewMissedBehavior: (args.data.weeklyReviewMissedBehavior as "MOVE_TO_NEXT_AVAILABLE_DAY" | "SKIP_CURRENT_WEEK") ?? "MOVE_TO_NEXT_AVAILABLE_DAY"
+      };
       this.preferences.push(newPref);
-      return newPref;
+      return this.mapPrefs(newPref);
     },
-    update: async (args: any) => {
+    update: async (args: Prisma.UserPreferencesUpdateArgs): Promise<UserPreferences> => {
       this.updateCalls++;
+      if (!args.where || !args.where.userId) throw new Error("Missing where clause");
       const p = this.preferences.find(x => x.userId === args.where.userId);
       if (p) {
-        Object.assign(p, args.data);
-        return p;
+        if (args.data.weeklyReviewEnabled !== undefined) {
+          p.weeklyReviewEnabled = args.data.weeklyReviewEnabled as boolean;
+        }
+        if (args.data.weeklyReviewDayOfWeek !== undefined) {
+          p.weeklyReviewDayOfWeek = args.data.weeklyReviewDayOfWeek as number;
+        }
+        if (args.data.weeklyReviewMissedBehavior !== undefined) {
+          p.weeklyReviewMissedBehavior = args.data.weeklyReviewMissedBehavior as "MOVE_TO_NEXT_AVAILABLE_DAY" | "SKIP_CURRENT_WEEK";
+        }
+        return this.mapPrefs(p);
       }
       throw new Error("Pref not found");
     }
   };
 
   public weeklyReviewSession = {
-    count: async (args: any) => {
+    count: async (args: Prisma.WeeklyReviewSessionCountArgs): Promise<number> => {
       this.countCalls++;
       let filtered = this.sessions;
-      if (args.where.userId) {
-        filtered = filtered.filter(s => s.userId === args.where.userId);
+      if (args.where?.userId) {
+        filtered = filtered.filter(s => s.userId === args.where?.userId);
       }
-      if (args.where.status?.in) {
-        filtered = filtered.filter(s => args.where.status.in.includes(s.status));
+      if (args.where?.status) {
+        const statusVal = args.where.status;
+        if (typeof statusVal === "object" && statusVal !== null && "in" in statusVal) {
+          const inList = (statusVal as { in?: string[] }).in || [];
+          filtered = filtered.filter(s => inList.includes(s.status));
+        } else if (typeof statusVal === "string") {
+          filtered = filtered.filter(s => s.status === statusVal);
+        }
       }
       return filtered.length;
     },
-    findFirst: async (args: any) => {
+    findFirst: async (args: Prisma.WeeklyReviewSessionFindFirstArgs): Promise<WeeklyReviewSession | null> => {
       this.findUniqueCalls++;
       let filtered = this.sessions;
-      if (args.where.userId) {
-        filtered = filtered.filter(s => s.userId === args.where.userId);
+      if (args.where?.userId) {
+        filtered = filtered.filter(s => s.userId === args.where?.userId);
       }
-      if (args.where.status?.in) {
-        filtered = filtered.filter(s => args.where.status.in.includes(s.status));
+      if (args.where?.status) {
+        const statusVal = args.where.status;
+        if (typeof statusVal === "object" && statusVal !== null && "in" in statusVal) {
+          const inList = (statusVal as { in?: string[] }).in || [];
+          filtered = filtered.filter(s => inList.includes(s.status));
+        } else if (typeof statusVal === "string") {
+          filtered = filtered.filter(s => s.status === statusVal);
+        }
       }
-      if (args.where.originalScheduledDate) {
+      if (args.where?.originalScheduledDate) {
         const d = args.where.originalScheduledDate;
-        filtered = filtered.filter(s => new Date(s.originalScheduledDate).getTime() === new Date(d).getTime());
+        filtered = filtered.filter(s => new Date(s.originalScheduledDate || "").getTime() === new Date(d as Date).getTime());
       }
-      return filtered[0] || null;
+      return filtered[0] ? this.mapSession(filtered[0]) : null;
     },
-    findMany: async (args: any) => {
+    findMany: async (args: Prisma.WeeklyReviewSessionFindManyArgs): Promise<WeeklyReviewSession[]> => {
       this.findManyCalls++;
       let filtered = this.sessions;
-      if (args.where.userId) {
-        filtered = filtered.filter(s => s.userId === args.where.userId);
+      if (args.where?.userId) {
+        filtered = filtered.filter(s => s.userId === args.where?.userId);
       }
-      if (args.where.status?.in) {
-        filtered = filtered.filter(s => args.where.status.in.includes(s.status));
+      if (args.where?.status) {
+        const statusVal = args.where.status;
+        if (typeof statusVal === "object" && statusVal !== null && "in" in statusVal) {
+          const inList = (statusVal as { in?: string[] }).in || [];
+          filtered = filtered.filter(s => inList.includes(s.status));
+        } else if (typeof statusVal === "string") {
+          filtered = filtered.filter(s => s.status === statusVal);
+        }
       }
-      return [...filtered];
+      return filtered.map(s => this.mapSession(s));
     },
-    findUnique: async (args: any) => {
+    findUnique: async (args: Prisma.WeeklyReviewSessionFindUniqueArgs): Promise<WeeklyReviewSession | null> => {
       this.findUniqueCalls++;
-      return this.sessions.find(s => s.id === args.where.id) || null;
+      if (!args.where || !args.where.id) return null;
+      const s = this.sessions.find(x => x.id === args.where.id);
+      return s ? this.mapSession(s) : null;
     }
   };
 
   public weeklyReviewTopic = {
-    findUnique: async (args: any) => {
+    findUnique: async (args: Prisma.WeeklyReviewTopicFindUniqueArgs): Promise<WeeklyReviewTopic | null> => {
       this.findUniqueCalls++;
-      return this.topics.find(t => t.id === args.where.id) || null;
+      if (!args.where || !args.where.id) return null;
+      const t = this.topics.find(x => x.id === args.where.id);
+      if (!t) return null;
+      return {
+        id: t.id,
+        weeklyReviewSessionId: t.weeklyReviewSessionId,
+        subjectId: t.subjectId || null,
+        sourceSubjectName: t.sourceSubjectName || "",
+        displayTitle: t.title || "",
+        groupKey: t.id,
+        selectionReason: t.selectionReason || "WEEK_CONTENT",
+        result: t.result,
+        notes: t.notes || null,
+        priorityRank: t.priorityRank || 1,
+        carriedFromTopicId: t.carriedFromTopicId || null,
+        suggestedQuestions: null,
+        resultRecordedAt: null,
+        createdAt: t.createdAt || new Date(),
+        updatedAt: t.updatedAt || new Date()
+      };
     }
   };
 }
 
-class MockWeeklyReviewService {
-  public previewCalledWith: any = null;
-  public createCalledWith: any = null;
-  public startCalledWith: any = null;
-  public completeCalledWith: any = null;
-  public skipCalledWith: any = null;
-  public carryCalledWith: any = null;
-  public recordCalledWith: any = null;
+class MockWeeklyReviewService implements WeeklyReviewServiceLike {
+  public previewCalledWith = { userId: "", refDate: "", mins: 0 };
+  public createCalledWith = { userId: "", originalScheduledDate: new Date(), timezone: "" };
+  public startCalledWith = { userId: "", id: "", mins: 0, questions: 0 };
+  public completeCalledWith = { userId: "", id: "", count: undefined as number | undefined };
+  public skipCalledWith = { userId: "", id: "" };
+  public carryCalledWith = { userId: "", id: "", newDate: new Date() };
+  public recordCalledWith = { userId: "", sid: "", tid: "", result: "", notes: undefined as string | undefined };
 
-  public async buildWeeklyReviewPreview(userId: string, refDate: string, _tz: string, mins: any) {
-    this.previewCalledWith = { userId, refDate, mins };
+  public async buildWeeklyReviewPreview(
+    userId: string,
+    referenceDateStr: string,
+    timezone: string = "America/Sao_Paulo",
+    availableMinutes?: number,
+    _tx?: PrismaClientLike
+  ) {
+    if (_tx) {}
+    this.previewCalledWith = { userId, refDate: referenceDateStr, mins: availableMinutes || 0 };
     return {
-      sourcePeriodStart: "2026-06-28",
-      sourcePeriodEnd: "2026-07-04",
+      userId,
+      referenceDate: referenceDateStr,
+      originalScheduledDate: "2026-07-05",
+      sourcePeriodStart: "2026-06-28T00:00:00.000Z",
+      sourcePeriodEnd: "2026-07-04T23:59:59.000Z",
+      timezone,
+      activeStudyDates: ["2026-06-29"],
+      availableMinutes,
+      suggestedQuestionCount: availableMinutes ? Math.max(5, Math.min(50, Math.floor(availableMinutes / 3))) : 20,
+      totals: {
+        selected: 1,
+        weekContent: 1,
+        overdue: 0,
+        longUnseen: 0,
+        excessWeekContent: 0,
+        excessOverdue: 0,
+      },
       topics: [
         {
-          id: "topic-1",
+          studyBlockId: "topic-1",
           subjectId: "sub-1",
           subjectName: "Direito Constitucional",
           title: "Direitos Individuais",
           groupKey: "dir-const-individuais",
-          selectionReason: "WEEK_CONTENT",
-          sourceStudyDate: "2026-06-29"
+          selectionReason: "WEEK_CONTENT" as const,
+          sourceStudyDate: "2026-06-29T12:00:00.000Z"
         }
-      ]
+      ],
+      excluded: [],
     };
   }
 
-  public async createOrGetWeeklyReviewSession(params: any) {
+  public async createOrGetWeeklyReviewSession(
+    params: { userId: string; originalScheduledDate: Date; timezone: string },
+    _prisma: PrismaClientLike
+  ) {
+    if (_prisma) {}
     this.createCalledWith = params;
-    const session = {
+    const session: WeeklyReviewSession = {
+      ...defaultWeeklyReviewSession,
       id: "session-1",
       userId: params.userId,
       originalScheduledDate: params.originalScheduledDate,
       effectiveScheduledDate: params.originalScheduledDate,
       status: "PENDING",
-      missedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY",
       createdAt: new Date(),
-      topics: []
+      updatedAt: new Date()
     };
     return { session, created: true };
   }
 
-  public async startWeeklyReviewSession(id: string, mins: number, questions: number) {
-    this.startCalledWith = { id, mins, questions };
-    return { id, status: "IN_PROGRESS", availableMinutes: mins, targetQuestionCount: questions };
+  public async startWeeklyReviewSession(
+    params: {
+      userId: string;
+      sessionId: string;
+      availableMinutes: number;
+      targetQuestionCount: number;
+    },
+    _tx?: PrismaClientLike
+  ) {
+    if (_tx) {}
+    const { userId, sessionId, availableMinutes, targetQuestionCount } = params;
+    this.startCalledWith = { userId, id: sessionId, mins: availableMinutes, questions: targetQuestionCount };
+    return {
+      id: sessionId,
+      userId,
+      originalScheduledDate: new Date(),
+      effectiveScheduledDate: new Date(),
+      status: "IN_PROGRESS" as const,
+      availableMinutes,
+      targetQuestionCount,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 
-  public async completeWeeklyReviewSession(id: string, count: number) {
-    this.completeCalledWith = { id, count };
-    return { id, status: "COMPLETED", actualQuestionCount: count };
+  public async completeWeeklyReviewSession(
+    params: {
+      userId: string;
+      sessionId: string;
+      actualQuestionCount?: number;
+    },
+    _tx?: PrismaClientLike
+  ) {
+    if (_tx) {}
+    const { userId, sessionId, actualQuestionCount } = params;
+    this.completeCalledWith = { userId, id: sessionId, count: actualQuestionCount };
+    return {
+      id: sessionId,
+      userId,
+      originalScheduledDate: new Date(),
+      effectiveScheduledDate: new Date(),
+      status: "COMPLETED" as const,
+      availableMinutes: 30,
+      targetQuestionCount: 10,
+      actualQuestionCount: actualQuestionCount !== undefined ? actualQuestionCount : null,
+      completedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 
-  public async skipWeeklyReviewSession(id: string) {
-    this.skipCalledWith = { id };
-    return { id, status: "SKIPPED" };
+  public async skipWeeklyReviewSession(
+    params: {
+      userId: string;
+      sessionId: string;
+    },
+    _tx?: PrismaClientLike
+  ) {
+    if (_tx) {}
+    const { userId, sessionId } = params;
+    this.skipCalledWith = { userId, id: sessionId };
+    return {
+      id: sessionId,
+      userId,
+      originalScheduledDate: new Date(),
+      effectiveScheduledDate: new Date(),
+      status: "SKIPPED" as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 
-  public async carryWeeklyReviewSession(id: string, newDate: Date) {
-    this.carryCalledWith = { id, newDate };
-    return { id, status: "PENDING", effectiveScheduledDate: newDate };
+  public async carryWeeklyReviewSession(
+    params: {
+      userId: string;
+      sessionId: string;
+      newEffectiveScheduledDate: Date;
+    },
+    _tx?: PrismaClientLike
+  ) {
+    if (_tx) {}
+    const { userId, sessionId, newEffectiveScheduledDate } = params;
+    this.carryCalledWith = { userId, id: sessionId, newDate: newEffectiveScheduledDate };
+    return {
+      id: sessionId,
+      userId,
+      originalScheduledDate: new Date(),
+      effectiveScheduledDate: newEffectiveScheduledDate,
+      status: "PENDING" as const,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 
-  public async recordWeeklyReviewTopicResult(sid: string, tid: string, result: string, notes: string) {
-    this.recordCalledWith = { sid, tid, result, notes };
-    return { id: tid, result, notes };
+  public async recordWeeklyReviewTopicResult(
+    params: {
+      userId: string;
+      sessionId: string;
+      topicId: string;
+      result: "DID_WELL" | "HAD_DOUBTS" | "REVIEW_AGAIN";
+      notes?: string;
+    },
+    _prisma: PrismaClientLike
+  ) {
+    if (_prisma) {}
+    const { userId, sessionId, topicId, result, notes } = params;
+    this.recordCalledWith = { userId, sid: sessionId, tid: topicId, result, notes };
+    return {
+      id: topicId,
+      sessionId,
+      subjectId: "sub-1",
+      subjectName: "Constitucional",
+      title: "Direitos Individuais",
+      groupKey: "individuais",
+      selectionReason: "WEEK_CONTENT" as const,
+      sourceStudyDate: new Date(),
+      result,
+      notes: notes || null,
+      priorityRank: 1,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 }
 
@@ -185,7 +512,7 @@ class MockWeeklyReviewService {
 function createRequest(
   method: string,
   url: string,
-  bodyObj: any,
+  bodyObj: unknown,
   headersObj: Record<string, string> = {
     "content-type": "application/json",
     "origin": "https://estudos-anki.vercel.app"
@@ -194,7 +521,7 @@ function createRequest(
   const bodyText = bodyObj === null ? "" : JSON.stringify(bodyObj);
   const headers = new Headers();
   Object.keys(headersObj).forEach(k => headers.append(k, headersObj[k]));
-  
+
   return new Request(url, {
     method,
     headers,
@@ -434,7 +761,7 @@ async function runTests() {
 
     try {
       // Configurar modo de produção artificialmente para o teste
-      (process.env as any).NODE_ENV = "production";
+      (process.env as { NODE_ENV: string }).NODE_ENV = "production";
       process.env.APP_URL = "https://app-url-config.com";
       process.env.NEXT_PUBLIC_APP_URL = "https://next-app-url-config.com";
 
@@ -482,20 +809,87 @@ async function runTests() {
       assert(await testSameOrigin("https://api.kehlstudy.com") === 400, "Subdomínio não autorizado deve ser rejeitado.");
 
       // Configurar modo de desenvolvimento
-      (process.env as any).NODE_ENV = "development";
+      (process.env as { NODE_ENV: string }).NODE_ENV = "development";
 
       // 6. localhost aceito em teste
       assert(await testSameOrigin("http://localhost:3000") === 200, "Localhost com porta deve ser aceito em desenvolvimento.");
       assert(await testSameOrigin("http://127.0.0.1:3000") === 200, "127.0.0.1 com porta deve ser aceito em desenvolvimento.");
-      
+
       // Host dinâmico aceito em teste
       assert(await testSameOrigin("http://dynamic-dev-host.local", "dynamic-dev-host.local") === 200, "Host dinâmico coincidente com Origin deve ser aceito em desenvolvimento.");
     } finally {
       // Restaurar variáveis de ambiente originais
-      (process.env as any).NODE_ENV = originalEnvNodeEnv;
+      if (originalEnvNodeEnv) {
+        (process.env as { NODE_ENV: string }).NODE_ENV = originalEnvNodeEnv;
+      }
       if (originalAppUrl === undefined) delete process.env.APP_URL; else process.env.APP_URL = originalAppUrl;
       if (originalNextAppUrl === undefined) delete process.env.NEXT_PUBLIC_APP_URL; else process.env.NEXT_PUBLIC_APP_URL = originalNextAppUrl;
     }
+  }
+
+  // 10. Validação de Mutações de Sessão e Tópicos (Start, Complete, Skip, Topic PATCH)
+  {
+    const localPrisma = new MockPrisma();
+    localPrisma.sessions.push({
+      id: "session-active",
+      userId: mockUserId,
+      status: "PENDING",
+      effectiveScheduledDate: new Date("2026-07-05T12:00:00Z"),
+      missedBehavior: "MOVE_TO_NEXT_AVAILABLE_DAY"
+    });
+    localPrisma.topics.push({
+      id: "topic-active",
+      weeklyReviewSessionId: "session-active",
+      result: "PENDING"
+    });
+
+    const localService = new MockWeeklyReviewService();
+    const localDeps = { ...deps, prisma: localPrisma, weeklyReviewService: localService };
+
+    // A. Start Session
+    const reqStart = createRequest("POST", "http://localhost/api/weekly-review/sessions/session-active/start", {
+      availableMinutes: 60,
+      targetQuestionCount: 20
+    });
+    const resStart = await handlePostStartSession(reqStart, "session-active", localDeps);
+    assert(resStart.status === 200, "Start session deve retornar 200.");
+    assert(localService.startCalledWith.userId === mockUserId, "Start deve passar userId.");
+    assert(localService.startCalledWith.id === "session-active", "Start deve passar sessionId.");
+    assert(localService.startCalledWith.mins === 60, "Start deve passar availableMinutes.");
+    assert(localService.startCalledWith.questions === 20, "Start deve passar targetQuestionCount.");
+
+    // B. Record Topic Result
+    const reqTopic = createRequest("PATCH", "http://localhost/api/weekly-review/sessions/session-active/topics/topic-active", {
+      result: "HAD_DOUBTS",
+      notes: "Algumas anotações"
+    });
+    // Simular que o status da sessão foi para IN_PROGRESS para passar nas validações do handler
+    localPrisma.sessions[0].status = "IN_PROGRESS";
+    const resTopic = await handlePatchTopicResult(reqTopic, "session-active", "topic-active", localDeps);
+    assert(resTopic.status === 200, "Topic result PATCH deve retornar 200.");
+    assert(localService.recordCalledWith.userId === mockUserId, "Topic PATCH deve passar userId.");
+    assert(localService.recordCalledWith.sid === "session-active", "Topic PATCH deve passar sessionId.");
+    assert(localService.recordCalledWith.tid === "topic-active", "Topic PATCH deve passar topicId.");
+    assert(localService.recordCalledWith.result === "HAD_DOUBTS", "Topic PATCH deve passar result.");
+    assert(localService.recordCalledWith.notes === "Algumas anotações", "Topic PATCH deve passar notes.");
+
+    // C. Complete Session
+    const reqComplete = createRequest("POST", "http://localhost/api/weekly-review/sessions/session-active/complete", {
+      actualQuestionCount: 18
+    });
+    const resComplete = await handlePostCompleteSession(reqComplete, "session-active", localDeps);
+    assert(resComplete.status === 200, "Complete session deve retornar 200.");
+    assert(localService.completeCalledWith.userId === mockUserId, "Complete deve passar userId.");
+    assert(localService.completeCalledWith.id === "session-active", "Complete deve passar sessionId.");
+    assert(localService.completeCalledWith.count === 18, "Complete deve passar actualQuestionCount.");
+
+    // D. Skip Session (resetando status para PENDING)
+    localPrisma.sessions[0].status = "PENDING";
+    const reqSkip = createRequest("POST", "http://localhost/api/weekly-review/sessions/session-active/skip", {});
+    const resSkip = await handlePostSkipSession(reqSkip, "session-active", localDeps);
+    assert(resSkip.status === 200, "Skip session deve retornar 200.");
+    assert(localService.skipCalledWith.userId === mockUserId, "Skip deve passar userId.");
+    assert(localService.skipCalledWith.id === "session-active", "Skip deve passar sessionId.");
   }
 
   console.log("====================================================");

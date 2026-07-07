@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/weekly-review-response";
 import { parseCreateSessionInput } from "@/lib/validation/weekly-review";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { WeeklyReviewSession } from "@prisma/client";
 
 function calculateMostRecentOccurrence(today: Date, targetDayOfWeek: number): Date {
   const currentDayOfWeek = today.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -59,7 +60,7 @@ export async function handlePostCreateSession(request: Request, deps: RouteDepen
 
     if (existingOpenSessions.length > 0) {
       // Ordenação determinística para retornar a mais prioritária
-      existingOpenSessions.sort((a: any, b: any) => {
+      existingOpenSessions.sort((a: WeeklyReviewSession, b: WeeklyReviewSession) => {
         const statusA = a.status === "IN_PROGRESS" ? 0 : 1;
         const statusB = b.status === "IN_PROGRESS" ? 0 : 1;
         if (statusA !== statusB) return statusA - statusB;
@@ -100,15 +101,14 @@ export async function handlePostCreateSession(request: Request, deps: RouteDepen
       return errorResponse("INVALID_SCHEDULED_DAY", "A data de revisão calculada está a mais de 7 dias de distância.", 409);
     }
 
-    // 4. Chamar o serviço
-    const result = await deps.weeklyReviewService.createOrGetWeeklyReviewSession(
+    const result = (await deps.weeklyReviewService.createOrGetWeeklyReviewSession(
       {
         userId,
         originalScheduledDate: occurrence,
         timezone: "America/Sao_Paulo"
       },
       deps.prisma
-    );
+    )) as { session: unknown; created: boolean };
 
     return successResponse({ session: result.session, created: result.created }, result.created ? 201 : 200);
   } catch (error) {

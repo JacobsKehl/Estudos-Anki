@@ -12,7 +12,8 @@ const PRIVATE_ROUTES = [
   "/reviews",
   "/settings",
   "/blocks",
-  "/stats"
+  "/stats",
+  "/weekly-review"
 ];
 
 // Lista de rotas públicas de autenticação
@@ -28,10 +29,10 @@ function isTokenExpired(token: string): boolean {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return true;
-    
+
     // Decodificar base64url no middleware usando atob
     let payloadBase64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    
+
     // Adicionar preenchimento de segurança para compatibilidade com o padrão estrito do atob no Edge Runtime
     const pad = payloadBase64.length % 4;
     if (pad === 2) {
@@ -39,10 +40,10 @@ function isTokenExpired(token: string): boolean {
     } else if (pad === 3) {
       payloadBase64 += "=";
     }
-    
+
     const payloadDecoded = atob(payloadBase64);
     const payload = JSON.parse(payloadDecoded);
-    
+
     if (payload && typeof payload.exp === "number") {
       // Deixar margem de 10 segundos de segurança
       return Date.now() >= (payload.exp * 1000 - 10000);
@@ -55,7 +56,7 @@ function isTokenExpired(token: string): boolean {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  
+
   // Obter cookies da sessão
   const accessToken = req.cookies.get("sb-access-token")?.value;
   const refreshToken = req.cookies.get("sb-refresh-token")?.value;
@@ -70,7 +71,7 @@ export async function middleware(req: NextRequest) {
   if (!isLoggedIn && refreshToken) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
+
     if (supabaseUrl && supabaseAnonKey) {
       try {
         const refreshResponse = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
@@ -81,7 +82,7 @@ export async function middleware(req: NextRequest) {
           },
           body: JSON.stringify({ refresh_token: refreshToken })
         });
-        
+
         if (refreshResponse.ok) {
           const refreshData = await refreshResponse.json();
           newAccessToken = refreshData.access_token;
@@ -97,7 +98,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // 1. Verificar se a rota atual é privada
-  const isPrivateRoute = PRIVATE_ROUTES.some(route => 
+  const isPrivateRoute = PRIVATE_ROUTES.some(route =>
     pathname === route || pathname.startsWith(`${route}/`)
   );
 
@@ -106,7 +107,7 @@ export async function middleware(req: NextRequest) {
       // Redireciona para login guardando a URL de origem
       const loginUrl = new URL("/login", req.url);
       loginUrl.searchParams.set("redirectedFrom", pathname);
-      
+
       const response = NextResponse.redirect(loginUrl);
       // Limpa cookies inválidos de sessão se existirem
       if (accessToken || refreshToken) {
@@ -115,7 +116,7 @@ export async function middleware(req: NextRequest) {
       }
       return response;
     }
-    
+
     const response = NextResponse.next();
     if (hasRefreshed && newAccessToken && newRefreshToken && newExpiresIn) {
       const isProd = process.env.NODE_ENV === "production";

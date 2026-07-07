@@ -36,7 +36,10 @@ export async function handlePostSkipSession(
     }
 
     const skipped = await deps.weeklyReviewService.skipWeeklyReviewSession(
-      cleanSessionId,
+      {
+        userId,
+        sessionId: cleanSessionId
+      },
       deps.prisma
     );
 
