@@ -9,7 +9,7 @@ export interface ActiveStudyTimerSession {
   subjectId: string;
   subjectName: string;
   blockTitle: string;
-  startedAt: string; // ISO string
+  startedAt: string | null; // ISO string or null
 }
 
 export interface StudyTimerSnapshot {
@@ -25,6 +25,11 @@ export interface StudyTimerSessionInput {
   blockTitle: string;
 }
 
+export type PrepareSessionResult =
+  | { status: "PREPARED" }
+  | { status: "ALREADY_CURRENT" }
+  | { status: "CONFLICT"; activeSession: ActiveStudyTimerSession };
+
 export interface StudyTimerContextValue {
   session: ActiveStudyTimerSession | null;
   elapsedSeconds: number;
@@ -32,7 +37,9 @@ export interface StudyTimerContextValue {
   isIdle: boolean;
   pauseReason: "IDLE" | "DAY_CHANGED" | null;
   legacyUnassigned: number;
-  startSession(input: StudyTimerSessionInput, startRunning?: boolean): void;
+  isHydrated: boolean;
+  prepareSession(input: StudyTimerSessionInput): PrepareSessionResult;
+  startOrResume(): void;
   pause(reason?: "IDLE" | "DAY_CHANGED"): void;
   resume(): void;
   reset(): void;
@@ -55,6 +62,7 @@ interface PersistedTimerState {
 }
 
 const STORAGE_KEY = "kehl-study-timer:v2";
+const ACTIVITY_KEY = "kehl-study-timer-activity:v2";
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 function getDefaultState(userId: string): PersistedTimerState {
@@ -88,15 +96,14 @@ function sanitizeState(parsed: any, userId: string): PersistedTimerState {
       typeof s.blockId === "string" &&
       typeof s.subjectId === "string" &&
       typeof s.subjectName === "string" &&
-      typeof s.blockTitle === "string" &&
-      typeof s.startedAt === "string"
+      typeof s.blockTitle === "string"
     ) {
       sanitized.session = {
         blockId: s.blockId,
         subjectId: s.subjectId,
         subjectName: s.subjectName,
         blockTitle: s.blockTitle,
-        startedAt: s.startedAt,
+        startedAt: typeof s.startedAt === "string" ? s.startedAt : null,
       };
     }
   }
@@ -158,21 +165,26 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
 
   // The central state
   const [state, setState] = useState<PersistedTimerState | null>(null);
-  // React state updated in interval to tick UI smoothly
+  const [isHydrated, setIsHydrated] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const lastActivityRef = useRef<number>(0);
+  const stateRef = useRef<PersistedTimerState | null>(null);
   const unmountInProgressRef = useRef(false);
 
-  // Helper to persist to localStorage safely
-  const persistState = useCallback((nextState: PersistedTimerState) => {
+  const localLastActivityRef = useRef<number>(0);
+  const sharedLastActivityRef = useRef<number>(0);
+  const lastActivityWriteRef = useRef<number>(0);
+
+  // Helper to persist to localStorage safely (synchronously updates ref)
+  const commitState = useCallback((nextState: PersistedTimerState) => {
     try {
       const stateToSave = {
         ...nextState,
         lastPersistedAt: Date.now(),
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+      stateRef.current = stateToSave;
       setState(stateToSave);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (e) {
       console.error("Erro ao gravar localStorage no timer:", e);
     }
@@ -187,9 +199,22 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
     return Math.max(0, elapsed);
   }, []);
 
+  // Reset hydration when userId changes
+  useEffect(() => {
+    if (userId) {
+      setIsHydrated(false);
+    }
+  }, [userId]);
+
   // Load / migrate on mount (once preferences are loaded)
   useEffect(() => {
-    if (prefsLoading || !userId) return;
+    if (prefsLoading || !userId) {
+      setIsHydrated(false);
+      stateRef.current = null;
+      setState(null);
+      setElapsedSeconds(0);
+      return;
+    }
 
     let loadedState: PersistedTimerState | null = null;
     try {
@@ -203,8 +228,8 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
           loadedState = getDefaultState(userId);
         }
       }
-    } catch (e) {
-      console.warn("Falha ao analisar JSON do cronômetro global, reiniciando:", e);
+    } catch {
+      console.warn("Falha ao analisar JSON do cronômetro global, reiniciando:");
     }
 
     if (!loadedState) {
@@ -232,26 +257,28 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
         }
         legacyVal = oldElapsed;
       }
-    } catch (e) {
-      console.error("Erro na leitura de chaves legadas:", e);
+    } catch {
+      console.error("Erro na leitura de chaves legadas:");
     }
 
     if (hasLegacy) {
       loadedState.legacyUnassigned = legacyVal;
       loadedState.revision += 1;
-      persistState(loadedState);
+      commitState(loadedState);
       try {
         localStorage.removeItem(oldAccKey);
         localStorage.removeItem(oldStartKey);
-      } catch (e) {}
+      } catch {}
     } else {
+      stateRef.current = loadedState;
       setState(loadedState);
     }
 
     // Set initial elapsed
     setElapsedSeconds(getElapsedFromState(loadedState));
-    lastActivityRef.current = Date.now();
-  }, [userId, prefsLoading, getElapsedFromState, persistState]);
+    localLastActivityRef.current = Date.now();
+    setIsHydrated(true);
+  }, [userId, prefsLoading, getElapsedFromState, commitState]);
 
   // Synchronize state changes from other tabs in real-time
   useEffect(() => {
@@ -263,18 +290,26 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
           const parsed = JSON.parse(event.newValue);
           const incoming = sanitizeState(parsed, userId);
           if (incoming.userId === userId) {
-            setState((curr) => {
-              const currentRev = curr ? curr.revision : -1;
-              if (incoming.revision > currentRev) {
-                setElapsedSeconds(getElapsedFromState(incoming));
-                return incoming;
-              }
-              return curr;
-            });
+            const currentRev = stateRef.current ? stateRef.current.revision : -1;
+            if (incoming.revision > currentRev) {
+              stateRef.current = incoming;
+              setState(incoming);
+              setElapsedSeconds(getElapsedFromState(incoming));
+            }
           }
         } catch (e) {
           console.error("Erro ao sincronizar cronômetro entre abas:", e);
         }
+      } else if (event.key === ACTIVITY_KEY && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (parsed && parsed.userId === userId && typeof parsed.lastActivityAt === "number") {
+            const now = Date.now();
+            if (parsed.lastActivityAt >= 0 && parsed.lastActivityAt <= now + 60000) {
+              sharedLastActivityRef.current = Math.max(sharedLastActivityRef.current, parsed.lastActivityAt);
+            }
+          }
+        } catch {}
       }
     };
 
@@ -287,55 +322,89 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
     if (!state || !state.isRunning) return;
 
     const interval = setInterval(() => {
+      const currentState = stateRef.current;
+      if (!currentState || !currentState.isRunning) return;
+
       // 1. Tick elapsed seconds
-      const elapsed = getElapsedFromState(state);
+      const elapsed = getElapsedFromState(currentState);
       setElapsedSeconds(elapsed);
 
-      // 2. Inactivity check (15 minutes limit)
+      // 2. Inactivity check (15 minutes limit) with multi-tab activity sync
       const now = Date.now();
-      const idleTime = now - lastActivityRef.current;
-      if (idleTime >= IDLE_TIMEOUT_MS) {
+      let sharedLastActivityAt = 0;
+      try {
+        const sharedRaw = localStorage.getItem(ACTIVITY_KEY);
+        if (sharedRaw) {
+          const parsedShared = JSON.parse(sharedRaw);
+          if (parsedShared && parsedShared.userId === userId && typeof parsedShared.lastActivityAt === "number") {
+            if (parsedShared.lastActivityAt >= 0 && parsedShared.lastActivityAt <= now + 60000) {
+              sharedLastActivityAt = parsedShared.lastActivityAt;
+            }
+          }
+        }
+      } catch {}
+
+      sharedLastActivityRef.current = Math.max(sharedLastActivityRef.current, sharedLastActivityAt);
+      const latestActivity = Math.max(localLastActivityRef.current, sharedLastActivityRef.current);
+
+      if (now - latestActivity >= IDLE_TIMEOUT_MS) {
         // Pause due to idle
-        const accumulated = state.accumulatedSeconds + Math.floor((now - state.runningSince!) / 1000);
+        const accumulated = currentState.accumulatedSeconds + Math.floor((now - currentState.runningSince!) / 1000);
         const nextState: PersistedTimerState = {
-          ...state,
+          ...currentState,
           isRunning: false,
           runningSince: null,
           accumulatedSeconds: Math.max(0, accumulated),
           pauseReason: "IDLE",
-          revision: state.revision + 1,
+          revision: currentState.revision + 1,
         };
-        persistState(nextState);
+        commitState(nextState);
         return;
       }
 
       // 3. Day civil rollover check
       const currentDayStr = getTodayRangeSP(new Date()).dateString;
-      if (currentDayStr !== state.dateStringSP) {
+      if (currentDayStr !== currentState.dateStringSP) {
         // Roll over detected: Pause timer, set DAY_CHANGED
-        const accumulated = state.accumulatedSeconds + Math.floor((now - state.runningSince!) / 1000);
+        const accumulated = currentState.accumulatedSeconds + Math.floor((now - currentState.runningSince!) / 1000);
         const nextState: PersistedTimerState = {
-          ...state,
+          ...currentState,
           isRunning: false,
           runningSince: null,
           accumulatedSeconds: Math.max(0, accumulated),
           pauseReason: "DAY_CHANGED",
           dateStringSP: currentDayStr,
-          revision: state.revision + 1,
+          revision: currentState.revision + 1,
         };
-        persistState(nextState);
+        commitState(nextState);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [state, getElapsedFromState, persistState]);
+  }, [userId, state, getElapsedFromState, commitState]);
 
   // Activity listeners to reset idle timer
   useEffect(() => {
-    if (!state || !state.isRunning) return;
+    if (!userId) return;
 
     const handleActivity = () => {
-      lastActivityRef.current = Date.now();
+      const now = Date.now();
+      localLastActivityRef.current = now;
+
+      // Limit writes to once every 15 seconds
+      if (now - lastActivityWriteRef.current >= 15000) {
+        lastActivityWriteRef.current = now;
+        sharedLastActivityRef.current = now;
+        try {
+          localStorage.setItem(
+            ACTIVITY_KEY,
+            JSON.stringify({
+              userId,
+              lastActivityAt: now,
+            })
+          );
+        } catch {}
+      }
     };
 
     window.addEventListener("mousemove", handleActivity);
@@ -351,21 +420,29 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
       window.removeEventListener("scroll", handleActivity);
       window.removeEventListener("touchstart", handleActivity);
     };
-  }, [state]);
+  }, [userId]);
 
   // Handle logout: clean up state when userId goes empty or changes
   useEffect(() => {
-    if (!prefsLoading && !userId && state) {
-      // User is logged out, clear context
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch (e) {}
+    if (!prefsLoading && !userId) {
+      if (stateRef.current && stateRef.current.isRunning) {
+        const paused = {
+          ...stateRef.current,
+          isRunning: false,
+          runningSince: null,
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(paused));
+        } catch {}
+      }
+      stateRef.current = null;
       setState(null);
       setElapsedSeconds(0);
+      setIsHydrated(false);
     }
-  }, [userId, prefsLoading, state]);
+  }, [userId, prefsLoading]);
 
-  // Pause on unmount (public route navigation or tab exit)
+  // Clean up timer on unmount: pause the timer to prevent orphaned running sessions
   useEffect(() => {
     unmountInProgressRef.current = false;
     return () => {
@@ -374,6 +451,8 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
+          // Pause only if we are logging out or going to a public route
+          // Check if current user actually logged out or layout unmounted
           if (parsed && parsed.isRunning && parsed.runningSince) {
             const now = Date.now();
             const accumulated = parsed.accumulatedSeconds + Math.floor((now - parsed.runningSince) / 1000);
@@ -394,130 +473,187 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
-  // Action: Iniciar Sessão
-  const startSession = useCallback((input: StudyTimerSessionInput, startRunning = false) => {
-    if (!userId || !state) return;
+  // Action: Iniciar / Preparar Sessão (idempotente)
+  const prepareSession = useCallback((input: StudyTimerSessionInput): PrepareSessionResult => {
+    if (!userId) {
+      return { status: "PREPARED" };
+    }
 
-    const nextState: PersistedTimerState = {
-      ...state,
+    const current = stateRef.current;
+    if (!current) {
+      const newState = getDefaultState(userId);
+      newState.session = {
+        blockId: input.blockId,
+        subjectId: input.subjectId,
+        subjectName: input.subjectName,
+        blockTitle: input.blockTitle,
+        startedAt: null,
+      };
+      newState.revision = 1;
+      commitState(newState);
+      setElapsedSeconds(0);
+      return { status: "PREPARED" };
+    }
+
+    const s = current.session;
+    // 1. Same block already prepared or initiated
+    if (s && s.blockId === input.blockId) {
+      return { status: "ALREADY_CURRENT" };
+    }
+
+    // 2. Conflict: another block with real time registered or running
+    const elapsed = getElapsedFromState(current);
+    if (s && (s.startedAt !== null || elapsed > 0 || current.isRunning)) {
+      return { status: "CONFLICT", activeSession: s };
+    }
+
+    // 3. Substitutable: another block but paused and zeroed
+    const newState: PersistedTimerState = {
+      ...current,
       session: {
         blockId: input.blockId,
         subjectId: input.subjectId,
         subjectName: input.subjectName,
         blockTitle: input.blockTitle,
-        startedAt: new Date().toISOString(),
+        startedAt: null,
       },
       accumulatedSeconds: 0,
-      runningSince: startRunning ? Date.now() : null,
-      isRunning: startRunning,
+      runningSince: null,
+      isRunning: false,
       pauseReason: null,
-      revision: state.revision + 1,
+      revision: current.revision + 1,
+    };
+    commitState(newState);
+    setElapsedSeconds(0);
+    return { status: "PREPARED" };
+  }, [userId, commitState, getElapsedFromState]);
+
+  // Action: startOrResume (seguro)
+  const startOrResume = useCallback(() => {
+    const current = stateRef.current;
+    if (!userId || !current || !current.session) return;
+    if (current.isRunning) return; // Already running
+
+    const s = current.session;
+    const now = Date.now();
+    const nextState: PersistedTimerState = {
+      ...current,
+      isRunning: true,
+      runningSince: now,
+      pauseReason: null,
+      revision: current.revision + 1,
     };
 
-    persistState(nextState);
-    setElapsedSeconds(0);
-    lastActivityRef.current = Date.now();
-  }, [userId, state, persistState]);
+    if (s.startedAt === null) {
+      nextState.session = {
+        ...s,
+        startedAt: new Date().toISOString(),
+      };
+    }
+
+    commitState(nextState);
+    setElapsedSeconds(getElapsedFromState(nextState));
+    localLastActivityRef.current = Date.now();
+  }, [userId, commitState, getElapsedFromState]);
 
   // Action: Pausar
   const pause = useCallback((reason?: "IDLE" | "DAY_CHANGED") => {
-    if (!userId || !state) return;
+    const current = stateRef.current;
+    if (!userId || !current || !current.session) return;
+    if (!current.isRunning) return; // Already paused
 
-    const nextState = { ...state };
-    if (state.isRunning && state.runningSince) {
-      const now = Date.now();
-      const elapsed = state.accumulatedSeconds + Math.floor((now - state.runningSince) / 1000);
-      nextState.accumulatedSeconds = Math.max(0, elapsed);
-    }
-    nextState.isRunning = false;
-    nextState.runningSince = null;
-    nextState.pauseReason = reason || null;
-    nextState.revision += 1;
+    const now = Date.now();
+    const elapsed = current.accumulatedSeconds + Math.floor((now - current.runningSince!) / 1000);
 
-    persistState(nextState);
+    const nextState: PersistedTimerState = {
+      ...current,
+      isRunning: false,
+      runningSince: null,
+      accumulatedSeconds: Math.max(0, elapsed),
+      pauseReason: reason || null,
+      revision: current.revision + 1,
+    };
+
+    commitState(nextState);
     setElapsedSeconds(nextState.accumulatedSeconds);
-  }, [userId, state, persistState]);
+  }, [userId, commitState]);
 
   // Action: Retomar
   const resume = useCallback(() => {
-    if (!userId || !state || !state.session) return;
-
-    const nextState: PersistedTimerState = {
-      ...state,
-      isRunning: true,
-      runningSince: Date.now(),
-      pauseReason: null,
-      revision: state.revision + 1,
-    };
-
-    persistState(nextState);
-    setElapsedSeconds(getElapsedFromState(nextState));
-    lastActivityRef.current = Date.now();
-  }, [userId, state, getElapsedFromState, persistState]);
+    startOrResume();
+  }, [startOrResume]);
 
   // Action: Zerar / Resetar
   const reset = useCallback(() => {
-    if (!userId || !state) return;
+    const current = stateRef.current;
+    if (!userId || !current) return;
 
     const nextState: PersistedTimerState = {
-      ...state,
+      ...current,
       session: null,
       accumulatedSeconds: 0,
       runningSince: null,
       isRunning: false,
       pauseReason: null,
-      revision: state.revision + 1,
+      revision: current.revision + 1,
     };
 
-    persistState(nextState);
+    commitState(nextState);
     setElapsedSeconds(0);
-  }, [userId, state, persistState]);
+  }, [userId, commitState]);
 
   // Action: Resetar tempo legado
   const resetLegacy = useCallback(() => {
-    if (!userId || !state) return;
+    const current = stateRef.current;
+    if (!userId || !current) return;
 
     const nextState: PersistedTimerState = {
-      ...state,
+      ...current,
       legacyUnassigned: 0,
-      revision: state.revision + 1,
+      revision: current.revision + 1,
     };
-    persistState(nextState);
-  }, [userId, state, persistState]);
+    commitState(nextState);
+  }, [userId, commitState]);
 
   // Action: Obter snapshot para envio à API (não modifica estado)
   const getSessionSnapshot = useCallback((blockId: string): StudyTimerSnapshot => {
-    if (!state || !state.session || state.session.blockId !== blockId) {
+    const current = stateRef.current;
+    if (!current || !current.session || current.session.blockId !== blockId) {
       return { startedAt: null, completedAt: null, actualDurationMinutes: null };
     }
 
-    const currentElapsed = getElapsedFromState(state);
-    const durationMin = Math.max(1, Math.round(currentElapsed / 60));
+    const s = current.session;
+    const currentElapsed = getElapsedFromState(current);
+
+    if (s.startedAt === null || currentElapsed <= 0) {
+      return { startedAt: null, completedAt: null, actualDurationMinutes: null };
+    }
 
     return {
-      startedAt: state.session.startedAt,
+      startedAt: s.startedAt,
       completedAt: new Date().toISOString(),
-      actualDurationMinutes: durationMin,
+      actualDurationMinutes: Math.max(1, Math.round(currentElapsed / 60)),
     };
-  }, [state, getElapsedFromState]);
+  }, [getElapsedFromState]);
 
   // Action: Confirmar e encerrar a sessão (após sucesso da API)
   const completeSession = useCallback((blockId: string) => {
-    if (!userId || !state) return;
-    if (state.session && state.session.blockId === blockId) {
+    const current = stateRef.current;
+    if (!userId || !current) return;
+    if (current.session && current.session.blockId === blockId) {
       const nextState: PersistedTimerState = {
-        ...state,
+        ...current,
         session: null,
         accumulatedSeconds: 0,
         runningSince: null,
         isRunning: false,
         pauseReason: null,
-        revision: state.revision + 1,
+        revision: current.revision + 1,
       };
-      persistState(nextState);
+      commitState(nextState);
       setElapsedSeconds(0);
     }
-  }, [userId, state, persistState]);
+  }, [userId, commitState]);
 
   const value: StudyTimerContextValue = {
     session: state ? state.session : null,
@@ -526,7 +662,9 @@ export function StudyTimerProvider({ children }: { children: React.ReactNode }) 
     isIdle: state ? (!state.isRunning && state.pauseReason === "IDLE") : false,
     pauseReason: state ? state.pauseReason : null,
     legacyUnassigned: state ? state.legacyUnassigned : 0,
-    startSession,
+    isHydrated,
+    prepareSession,
+    startOrResume,
     pause,
     resume,
     reset,

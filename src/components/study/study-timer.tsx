@@ -36,6 +36,7 @@ export function StudyTimer() {
     isRunning,
     pauseReason,
     legacyUnassigned,
+    isHydrated,
     resume,
     pause,
     reset,
@@ -56,7 +57,7 @@ export function StudyTimer() {
     }
   }, [isRunning, pause, resume]);
 
-  if (!mounted) return null;
+  if (!mounted || !isHydrated) return null;
 
   return (
     <div

@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { PdfBlockViewer } from "./PdfBlockViewer";
 import { CardCurator } from "@/components/flashcards/CardCurator";
 import { useStudyTimer } from "@/contexts/StudyTimerContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const SUPPORT_TYPE_LABELS: Record<string, string> = {
   SUMMARY: "Resumo Teórico",
@@ -170,7 +171,8 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
   const {
     session,
     elapsedSeconds,
-    startSession,
+    isHydrated,
+    prepareSession,
     pause,
     resume,
     reset,
@@ -180,49 +182,36 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
 
   const [sessionDurationSeconds, setSessionDurationSeconds] = React.useState(0);
   const [showConflictModal, setShowConflictModal] = React.useState(false);
+  const [isSwapping, setIsSwapping] = React.useState(false);
+  const completedLocallyRef = React.useRef(false);
 
-  // Conflict and initialization verification on mount
+  // Auto-prepare current block if no session conflict exists
   React.useEffect(() => {
-    try {
-      const raw = localStorage.getItem("kehl-study-timer:v2");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.session && parsed.session.blockId !== block.id) {
-          const isTimerRunningOnOther = parsed.isRunning;
-          const accumulated = parsed.accumulatedSeconds || 0;
-          const runningSince = parsed.runningSince || 0;
-          const elapsed = isTimerRunningOnOther && runningSince > 0
-            ? accumulated + Math.floor((Date.now() - runningSince) / 1000)
-            : accumulated;
+    if (!isHydrated) return;
+    if (step !== "reading") return;
+    if (block.status === "COMPLETED") return;
+    if (completedLocallyRef.current) return;
 
-          if (elapsed > 0 || isTimerRunningOnOther) {
-            setShowConflictModal(true);
-            return;
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Erro ao analisar localStorage no mount de BlockStudyView:", e);
-    }
-
-    // Auto-prepare current block if no session conflict exists
-    try {
-      const raw = localStorage.getItem("kehl-study-timer:v2");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.session && parsed.session.blockId === block.id) {
-          return;
-        }
-      }
-    } catch (e) {}
-
-    startSession({
+    const res = prepareSession({
       blockId: block.id,
       subjectId: block.subjectId,
       subjectName: block.subject.name,
       blockTitle: block.title,
-    }, false);
-  }, [block.id, block.subjectId, block.subject.name, block.title, startSession]);
+    });
+
+    if (res.status === "CONFLICT") {
+      setShowConflictModal(true);
+    }
+  }, [
+    block.id,
+    block.subjectId,
+    block.subject.name,
+    block.title,
+    block.status,
+    isHydrated,
+    step,
+    prepareSession,
+  ]);
 
   function formatDuration(totalSeconds: number): string {
     const s = Math.max(0, Math.floor(totalSeconds));
@@ -326,6 +315,7 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
       }
 
       setSessionDurationSeconds(elapsedSeconds);
+      completedLocallyRef.current = true;
       completeSession(block.id);
 
       toast.success("Segunda leitura registrada com sucesso!", { id: toastId });
@@ -389,6 +379,7 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
 
           if (completeRes.ok) {
             setSessionDurationSeconds(elapsedSeconds);
+            completedLocallyRef.current = true;
             completeSession(block.id);
             toast.success("Estudo concluído! Bons estudos.", { id: toastId });
             setStep("summary");
@@ -422,6 +413,7 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
       }
 
       setSessionDurationSeconds(elapsedSeconds);
+      completedLocallyRef.current = true;
       completeSession(block.id);
 
       toast.success("Flashcards prontos e bloco concluído!", { id: toastId });
@@ -493,6 +485,7 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
       const data = await res.json();
       
       setSessionDurationSeconds(elapsedSeconds);
+      completedLocallyRef.current = true;
       completeSession(block.id);
 
       toast.success(data.message || "Bloco concluído! Parabéns pelos estudos.", { id: toastId });
@@ -527,19 +520,20 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
       
       setStep("reading");
       setSessionDurationSeconds(0);
+      completedLocallyRef.current = false;
       
       const updatedBlock = await res.json();
       if (updatedBlock.flashcards) {
         setCuratorCards(updatedBlock.flashcards);
       }
       
-      // Initialize study timer context session again (paused)
-      startSession({
+      // Initialize study timer context session again (prepared and paused)
+      prepareSession({
         blockId: block.id,
         subjectId: block.subjectId,
         subjectName: block.subject.name,
         blockTitle: block.title,
-      }, false);
+      });
 
       router.refresh();
     } catch (error: any) {
@@ -1209,65 +1203,73 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
         </aside>
       </div>
 
-      {showConflictModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-[2rem] border border-border/40 p-8 shadow-xl max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mx-auto">
-              <AlertCircle className="w-8 h-8" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-foreground">Cronômetro Ativo</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Você já possui uma sessão ativa para o bloco <strong>{session?.blockTitle}</strong> da matéria <strong>{session?.subjectName}</strong>.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="primary"
-                className="w-full rounded-2xl font-bold shadow-md shadow-accent/15 transition-all"
-                onClick={() => {
-                  if (session) {
-                    router.push(`/blocks/${session.blockId}`);
-                  }
-                  setShowConflictModal(false);
-                }}
-              >
-                Continuar bloco ativo
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full rounded-2xl font-bold border-red-200 hover:bg-red-50 text-red-700 hover:text-red-800 transition-all"
-                onClick={() => {
-                  const confirmChange = window.confirm(
-                    "Tem certeza que deseja encerrar o cronômetro do outro bloco? O tempo acumulado lá NÃO será registrado."
-                  );
-                  if (confirmChange) {
-                    reset();
-                    startSession({
-                      blockId: block.id,
-                      subjectId: block.subjectId,
-                      subjectName: block.subject.name,
-                      blockTitle: block.title,
-                    }, false);
-                    setShowConflictModal(false);
-                  }
-                }}
-              >
-                Encerrar e trocar de bloco
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full rounded-2xl font-bold text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  router.push(returnTarget.href);
-                }}
-              >
-                Cancelar
-              </Button>
-            </div>
+      <Dialog open={showConflictModal} onOpenChange={(open) => {
+        if (!open) {
+          router.push(returnTarget.href);
+        }
+      }}>
+        <DialogContent className="max-w-md text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mx-auto">
+            <AlertCircle className="w-8 h-8" />
           </div>
-        </div>
-      )}
+          <DialogHeader className="space-y-2 text-center sm:text-center">
+            <DialogTitle className="text-xl font-bold text-foreground text-center w-full">Cronômetro Ativo</DialogTitle>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Você já possui uma sessão ativa para o bloco <strong>{session?.blockTitle}</strong> da matéria <strong>{session?.subjectName}</strong>.
+            </p>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="primary"
+              className="w-full rounded-2xl font-bold shadow-md shadow-accent/15 transition-all"
+              disabled={isSwapping}
+              onClick={() => {
+                if (session) {
+                  router.push(`/blocks/${session.blockId}`);
+                }
+                setShowConflictModal(false);
+              }}
+            >
+              Continuar bloco ativo
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full rounded-2xl font-bold border-red-200 hover:bg-red-50 text-red-700 hover:text-red-800 transition-all"
+              disabled={isSwapping}
+              onClick={() => {
+                if (isSwapping) return;
+                const confirmChange = window.confirm(
+                  "Tem certeza que deseja encerrar o cronômetro do outro bloco? O tempo acumulado lá NÃO será registrado."
+                );
+                if (confirmChange) {
+                  setIsSwapping(true);
+                  reset();
+                  prepareSession({
+                    blockId: block.id,
+                    subjectId: block.subjectId,
+                    subjectName: block.subject.name,
+                    blockTitle: block.title,
+                  });
+                  setShowConflictModal(false);
+                  setIsSwapping(false);
+                }
+              }}
+            >
+              Encerrar e trocar de bloco
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full rounded-2xl font-bold text-muted-foreground hover:text-foreground"
+              disabled={isSwapping}
+              onClick={() => {
+                router.push(returnTarget.href);
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

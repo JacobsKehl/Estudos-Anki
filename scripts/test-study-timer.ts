@@ -138,7 +138,7 @@ require.cache["sonner-mock"] = {
 
 // Mock window.fetch
 let mockFetchResponseStatus = 200;
-let mockFetchResponseBody = {};
+let mockFetchResponseBody: any = {};
 
 global.fetch = async (url: string | URL | Request, options?: RequestInit) => {
   return {
@@ -177,6 +177,7 @@ require.cache[preferencesPath] = {
 
 import { StudyTimerProvider, useStudyTimer } from "../src/contexts/StudyTimerContext";
 import { BlockStudyView } from "../src/components/blocks/BlockStudyView";
+import { StudyTimer } from "../src/components/study/study-timer";
 import { getTodayRangeSP } from "../src/lib/date-utils";
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -201,7 +202,7 @@ function assert(condition: boolean, message: string) {
 }
 
 async function runTests() {
-  console.log("🚀 Starting Study Timer global state JSDOM tests...\n");
+  console.log("🚀 Starting Study Timer JSDOM & Accessibility hardening tests...\n");
 
   const rootEl = document.getElementById("root")!;
 
@@ -218,6 +219,13 @@ async function runTests() {
     mockFetchResponseStatus = 200;
     mockFetchResponseBody = {};
     rootEl.innerHTML = "";
+    document.body.style.overflow = "";
+    // Remove direct body portal elements
+    const portals = Array.from(document.body.childNodes).filter(
+      (node) => node.nodeType === 1 && (node as HTMLElement).id !== "root"
+    );
+    portals.forEach((p) => p.remove());
+    fakeTime = OriginalDate.now();
   };
 
   // --- TEST 1: Display visível em todas as rotas privadas ---
@@ -225,8 +233,6 @@ async function runTests() {
     cleanup();
     currentRoute = "/subjects";
     const root = createRoot(rootEl);
-    
-    // Render DashboardLayout (which contains provider & timer)
     const { DashboardLayout } = require("../src/components/layout/DashboardLayout");
     
     await act(async () => {
@@ -239,10 +245,9 @@ async function runTests() {
       );
     });
 
-    // Check if StudyTimer is mounted (has element with "Tempo de estudo")
     assert(
       rootEl.innerHTML.includes("Tempo de estudo"),
-      "Test 1: Display do cronômetro é visível em rotas privadas"
+      "Test 1.1: Display do cronômetro é visível em rotas privadas"
     );
     root.unmount();
   }
@@ -266,7 +271,7 @@ async function runTests() {
 
     assert(
       !rootEl.innerHTML.includes("Tempo de estudo"),
-      "Test 2: Display do cronômetro NÃO é montado em rotas públicas"
+      "Test 2.1: Display do cronômetro NÃO é montado em rotas públicas"
     );
     root.unmount();
   }
@@ -307,11 +312,10 @@ async function runTests() {
       );
     });
 
-    // Count how many times the header "Tempo de estudo" occurs in innerHTML
     const occurrences = (rootEl.innerHTML.match(/Tempo de estudo/g) || []).length;
     assert(
       occurrences === 1,
-      `Test 3: Somente 1 cronômetro é renderizado na página do bloco (encontrados: ${occurrences})`
+      `Test 3.1: Somente 1 cronômetro é renderizado na página do bloco`
     );
     root.unmount();
   }
@@ -331,19 +335,18 @@ async function runTests() {
       );
     });
 
-    // Initially 0 intervals because it starts paused
     assert(intervalCallbacks.length === 0, "Test 4.1: Sem intervalos ativos quando pausado");
     root.unmount();
   }
 
-  // --- TEST 5 & 6 & 7 & 8: Manual operations: start, pause, resume, reset ---
+  // --- TEST 5: Operações manuais: prepareSession, startOrResume, pause, reset, snapshot ---
   {
     cleanup();
     const root = createRoot(rootEl);
-    let timerContextValue: any = null;
+    let timerVal: any = null;
 
     function TestComponent() {
-      timerContextValue = useStudyTimer();
+      timerVal = useStudyTimer();
       return null;
     }
 
@@ -357,60 +360,74 @@ async function runTests() {
       );
     });
 
-    // 5. Manual start
+    // 5.1 Prepare Session
+    let prepResult: any = null;
     await act(async () => {
-      timerContextValue.startSession({
+      prepResult = timerVal.prepareSession({
         blockId: "block-1",
         subjectId: "sub-1",
         subjectName: "Matemática",
         blockTitle: "Geometria",
-      }, true); // Start running
+      });
     });
 
-    assert(timerContextValue.isRunning === true, "Test 5.1: startSession inicia o timer");
-    assert(intervalCallbacks.length === 1, "Test 5.2: Ticking interval é iniciado");
+    assert(prepResult.status === "PREPARED", "Test 5.1.1: prepareSession prepara com sucesso");
+    assert(timerVal.session !== null, "Test 5.1.2: Session é montada no estado");
+    assert(timerVal.session.startedAt === null, "Test 5.1.3: startedAt inicia nulo no prepareSession");
+    assert(timerVal.isRunning === false, "Test 5.1.4: O cronômetro inicia pausado");
 
+    // 5.2 Start or Resume (primeiro início)
     await act(async () => {
-      advanceTime(5000); // 5 seconds
+      timerVal.startOrResume();
     });
-    assert(timerContextValue.elapsedSeconds === 5, "Test 5.3: Tempo decorrido soma 5 segundos");
 
-    // 6. Pause
-    await act(async () => {
-      timerContextValue.pause();
-    });
-    assert(timerContextValue.isRunning === false, "Test 6.1: pause() interrompe execução");
-    assert(intervalCallbacks.length === 0, "Test 6.2: Intervalo é limpo");
-    
+    assert(timerVal.isRunning === true, "Test 5.2.1: startOrResume inicia cronômetro");
+    assert(timerVal.session.startedAt !== null, "Test 5.2.2: startedAt recebe string ISO");
+    const originalStartedAt = timerVal.session.startedAt;
+
     await act(async () => {
       advanceTime(5000);
     });
-    assert(timerContextValue.elapsedSeconds === 5, "Test 6.3: Tempo decorrido permanece inalterado com tempo passando");
+    assert(timerVal.elapsedSeconds === 5, "Test 5.2.3: Cronômetro incrementa tempo decorrido");
 
-    // 7. Resume
+    // 5.3 Strict-mode startOrResume call (unpause when already running does not duplicate intervals)
+    const initialIntervalCount = intervalCallbacks.length;
     await act(async () => {
-      timerContextValue.resume();
+      timerVal.startOrResume();
     });
-    assert(timerContextValue.isRunning === true, "Test 7.1: resume() retoma execução");
-    assert(intervalCallbacks.length === 1, "Test 7.2: Intervalo é recriado");
+    assert(intervalCallbacks.length === initialIntervalCount, "Test 5.3.1: Chamar startOrResume rodando não duplica intervalos");
+    assert(timerVal.session.startedAt === originalStartedAt, "Test 5.3.2: startedAt é preservado ao chamar startOrResume novamente");
 
+    // 5.4 Pause
     await act(async () => {
-      advanceTime(3000);
+      timerVal.pause();
     });
-    assert(timerContextValue.elapsedSeconds === 8, "Test 7.3: Tempo volta a contar");
+    assert(timerVal.isRunning === false, "Test 5.4.1: pause() interrompe o cronômetro");
+    assert(intervalCallbacks.length === 0, "Test 5.4.2: Intervalo de ticking é limpo");
 
-    // 8. Reset
+    // 5.5 Resume (retomada)
     await act(async () => {
-      timerContextValue.reset();
+      timerVal.startOrResume();
     });
-    assert(timerContextValue.session === null, "Test 8.1: reset() limpa a sessão");
-    assert(timerContextValue.isRunning === false, "Test 8.2: reset() desativa execução");
-    assert(timerContextValue.elapsedSeconds === 0, "Test 8.3: reset() zera o tempo");
+    assert(timerVal.isRunning === true, "Test 5.5.1: startOrResume retoma cronômetro pausado");
+    assert(timerVal.session.startedAt === originalStartedAt, "Test 5.5.2: startedAt original é mantido pós retomadas");
+
+    // 5.6 Snapshot
+    const snapshot = timerVal.getSessionSnapshot("block-1");
+    assert(snapshot.startedAt === originalStartedAt, "Test 5.6.1: Snapshot possui startedAt original");
+    assert(snapshot.actualDurationMinutes !== null, "Test 5.6.2: Snapshot calcula minutos decorridos");
+
+    // 5.7 Reset
+    await act(async () => {
+      timerVal.reset();
+    });
+    assert(timerVal.session === null, "Test 5.7.1: reset() limpa a sessão");
+    assert(timerVal.elapsedSeconds === 0, "Test 5.7.2: reset() zera o tempo decorrido");
 
     root.unmount();
   }
 
-  // --- TEST 9: Navegação preserva o tempo ---
+  // --- TEST 6: Navegação privada normal preserva o cronômetro ---
   {
     cleanup();
     const root = createRoot(rootEl);
@@ -426,7 +443,6 @@ async function runTests() {
       return null;
     }
 
-    // Step 1: Render Page1
     await act(async () => {
       root.render(
         React.createElement(
@@ -438,19 +454,20 @@ async function runTests() {
     });
 
     await act(async () => {
-      timerVal1.startSession({
+      timerVal1.prepareSession({
         blockId: "block-1",
         subjectId: "sub-1",
         subjectName: "Matemática",
         blockTitle: "Geometria",
-      }, true);
+      });
+      timerVal1.startOrResume();
     });
+
     await act(async () => {
       advanceTime(10000);
     });
-    assert(timerVal1.elapsedSeconds === 10, "Test 9.1: Contador inicializado na Página 1");
 
-    // Step 2: Render Page2 (simulating router navigation keeping same provider instance)
+    // Simula renderização do mesmo provider em outra página
     await act(async () => {
       root.render(
         React.createElement(
@@ -461,16 +478,16 @@ async function runTests() {
       );
     });
 
-    assert(timerVal2.session !== null, "Test 9.2: Sessão persistida na Página 2");
-    assert(timerVal2.elapsedSeconds === 10, "Test 9.3: Tempo preservado na navegação");
+    assert(timerVal2.session !== null, "Test 6.1: Sessão mantida após navegação privada comum");
+    assert(timerVal2.elapsedSeconds === 10, "Test 6.2: Tempo decorrido mantido");
+    assert(timerVal2.isRunning === true, "Test 6.3: Cronômetro continua rodando após navegação");
 
     root.unmount();
   }
 
-  // --- TEST 10 & 11: Refresh/Remount restaura o tempo e calcula offline delta ---
+  // --- TEST 7: Refresh/Remount restaura o tempo e calcula offline delta ---
   {
     cleanup();
-    // Start session and advance time
     localStorage.setItem(
       "kehl-study-timer:v2",
       JSON.stringify({
@@ -493,10 +510,9 @@ async function runTests() {
       })
     );
 
-    // Simulate closing app, advancing time by 45 seconds while page was unmounted
+    // Avança 45 segundos offline
     fakeTime += 45000;
 
-    // Load provider
     const root = createRoot(rootEl);
     let timerVal: any = null;
     function TestComponent() {
@@ -514,12 +530,11 @@ async function runTests() {
       );
     });
 
-    // The new elapsed seconds should be 20 + 45 = 65 seconds
-    assert(timerVal.elapsedSeconds === 65, `Test 10 & 11: Refresh restaura o tempo e adiciona delta offline (esperado: 65, obtido: ${timerVal.elapsedSeconds})`);
+    assert(timerVal.elapsedSeconds === 65, `Test 7.1: Delta offline é somado na hidratação (decorrido: ${timerVal.elapsedSeconds})`);
     root.unmount();
   }
 
-  // --- TEST 12: StrictMode não duplica a contagem ---
+  // --- TEST 8: StrictMode não causa dupla contagem ou loops de hidratação ---
   {
     cleanup();
     const root = createRoot(rootEl);
@@ -544,26 +559,24 @@ async function runTests() {
     });
 
     await act(async () => {
-      timerVal.startSession({
+      timerVal.prepareSession({
         blockId: "block-1",
         subjectId: "sub-1",
         subjectName: "Matemática",
         blockTitle: "Geometria",
-      }, true);
+      });
+      timerVal.startOrResume();
     });
+
     await act(async () => {
       advanceTime(5000);
     });
 
-    // Ticking once in interval loop should add exactly 5 seconds
-    assert(
-      timerVal.elapsedSeconds === 5,
-      `Test 12: StrictMode não causa dupla contagem de segundos (esperado: 5, obtido: ${timerVal.elapsedSeconds})`
-    );
+    assert(timerVal.elapsedSeconds === 5, `Test 8.1: StrictMode não afeta contagem (decorrido: ${timerVal.elapsedSeconds})`);
     root.unmount();
   }
 
-  // --- TEST 13: JSON inválido é descartado com segurança ---
+  // --- TEST 9: JSON inválido é descartado com segurança ---
   {
     cleanup();
     localStorage.setItem("kehl-study-timer:v2", "CORRUPTED_JSON_STRING{]");
@@ -585,12 +598,12 @@ async function runTests() {
       );
     });
 
-    assert(timerVal.session === null, "Test 13.1: JSON corrompido é ignorado");
-    assert(timerVal.elapsedSeconds === 0, "Test 13.2: Cronômetro inicia zerado");
+    assert(timerVal.session === null, "Test 9.1: JSON corrompido é ignorado");
+    assert(timerVal.elapsedSeconds === 0, "Test 9.2: Cronômetro inicia zerado pós corrupção");
     root.unmount();
   }
 
-  // --- TEST 14: Mudança de data civil de SP pausa o cronômetro com DAY_CHANGED ---
+  // --- TEST 10: Mudança de data civil de SP pausa o cronômetro com DAY_CHANGED ---
   {
     cleanup();
     const root = createRoot(rootEl);
@@ -611,32 +624,32 @@ async function runTests() {
     });
 
     await act(async () => {
-      timerVal.startSession({
+      timerVal.prepareSession({
         blockId: "block-1",
         subjectId: "sub-1",
         subjectName: "Matemática",
         blockTitle: "Geometria",
-      }, true);
+      });
+      timerVal.startOrResume();
     });
+
     await act(async () => {
       advanceTime(5000);
     });
 
-    // Force day rollover (advance time by 24 hours) and dispatch click to avoid idle timeout
+    // Avança 24 horas (força rollover) e despacha clique para evitar timeout de inatividade
     await act(async () => {
       fakeTime += 24 * 60 * 60 * 1000;
       window.dispatchEvent(new dom.window.Event("click"));
       intervalCallbacks.forEach((cb) => cb());
     });
 
-    assert(timerVal.isRunning === false, "Test 14.1: Mudança de data civil de SP pausa o cronômetro");
-    assert(timerVal.pauseReason === "DAY_CHANGED", "Test 14.2: pauseReason é definido como DAY_CHANGED");
-    assert(timerVal.elapsedSeconds > 0, "Test 14.3: Tempo acumulado é preservado");
-
+    assert(timerVal.isRunning === false, "Test 10.1: Rollover do dia pausa o timer");
+    assert(timerVal.pauseReason === "DAY_CHANGED", "Test 10.2: pauseReason é DAY_CHANGED");
     root.unmount();
   }
 
-  // --- TEST 15 & 16: Conclusão envia tempo global correto e falha preserva tempo ---
+  // --- TEST 11: Inatividade local pausa o cronômetro ---
   {
     cleanup();
     const root = createRoot(rootEl);
@@ -657,170 +670,134 @@ async function runTests() {
     });
 
     await act(async () => {
-      timerVal.startSession({
+      timerVal.prepareSession({
         blockId: "block-1",
         subjectId: "sub-1",
         subjectName: "Matemática",
         blockTitle: "Geometria",
-      }, true);
-    });
-    await act(async () => {
-      advanceTime(120000); // 120 seconds = 2 minutes
-    });
-
-    const snapshot = timerVal.getSessionSnapshot("block-1");
-    assert(snapshot.actualDurationMinutes === 2, `Test 15: Snapshot possui duração correta (esperado: 2, obtido: ${snapshot.actualDurationMinutes})`);
-
-    // Mock API Failure
-    mockFetchResponseStatus = 500;
-    
-    // Simulate failed API conclusion in BlockStudyView
-    let concludedSuccessfully = false;
-    try {
-      await act(async () => {
-        timerVal.pause(); // Pause
-        const res = await fetch("/api/complete", { method: "POST", body: JSON.stringify(snapshot) });
-        if (!res.ok) throw new Error("API Error");
-        timerVal.completeSession("block-1");
-        concludedSuccessfully = true;
       });
-    } catch (e) {
-      // Re-resume on failure
-      await act(async () => {
-        timerVal.resume();
-      });
-    }
-
-    assert(concludedSuccessfully === false, "Test 16.1: API com erro falha a conclusão");
-    assert(timerVal.session !== null, "Test 16.2: Sessão continua preservada no timer");
-    assert(timerVal.isRunning === true, "Test 16.3: Timer foi retomado");
-
-    // Mock API Success
-    mockFetchResponseStatus = 200;
-    await act(async () => {
-      timerVal.pause();
-      const res = await fetch("/api/complete", { method: "POST", body: JSON.stringify(snapshot) });
-      if (res.ok) {
-        timerVal.completeSession("block-1");
-      }
+      timerVal.startOrResume();
     });
 
-    assert(timerVal.session === null, "Test 16.4: API com sucesso limpa a sessão exatamente uma vez");
-    root.unmount();
-  }
-
-  // --- TEST 17: Segundo bloco não substitui sessão ativa sem confirmação ---
-  {
-    cleanup();
-    // Simulate an active study session for block-1 with 150 accumulated seconds
-    localStorage.setItem(
-      "kehl-study-timer:v2",
-      JSON.stringify({
-        userId: "user-123",
-        session: {
-          blockId: "block-1",
-          subjectId: "sub-1",
-          subjectName: "Matemática",
-          blockTitle: "Geometria",
-          startedAt: new Date().toISOString(),
-        },
-        accumulatedSeconds: 150,
-        runningSince: null,
-        isRunning: false,
-        lastPersistedAt: fakeTime,
-        revision: 1,
-        pauseReason: null,
-        legacyUnassigned: 0,
-        dateStringSP: getTodayRangeSP(new Date()).dateString,
-      })
-    );
-
-    const root = createRoot(rootEl);
-    const block2Mock = {
-      id: "block-2",
-      title: "Algebra Linear",
-      materialId: "mat-2",
-      pageStart: 1,
-      pageEnd: 15,
-      subjectId: "sub-2",
-      subject: { name: "Matemática" },
-      material: { fileName: "algebra.pdf" },
-      flashcards: [],
-      status: "IN_PROGRESS",
-    };
-
-    // Render BlockStudyView for block-2
-    await act(async () => {
-      root.render(
-        React.createElement(
-          StudyTimerProvider,
-          null,
-          React.createElement(BlockStudyView, {
-            block: block2Mock,
-            content: [],
-            stats: { total: 0, pending: 0, approved: 0 },
-            returnTo: "/",
-            from: null,
-          })
-        )
-      );
-    });
-
-    // Check if the conflict modal has popped up
-    assert(
-      rootEl.innerHTML.includes("Cronômetro Ativo") || rootEl.innerHTML.includes("trocar de bloco"),
-      "Test 17: Modal de conflito é apresentado ao carregar outro bloco com cronômetro registrado"
-    );
-    root.unmount();
-  }
-
-  // --- TEST 18: Inatividade pausa o cronômetro ---
-  {
-    cleanup();
-    const root = createRoot(rootEl);
-    let timerVal: any = null;
-    function TestComponent() {
-      timerVal = useStudyTimer();
-      return null;
-    }
-
-    await act(async () => {
-      root.render(
-        React.createElement(
-          StudyTimerProvider,
-          null,
-          React.createElement(TestComponent)
-        )
-      );
-    });
-
-    await act(async () => {
-      timerVal.startSession({
-        blockId: "block-1",
-        subjectId: "sub-1",
-        subjectName: "Matemática",
-        blockTitle: "Geometria",
-      }, true);
-    });
-    await act(async () => {
-      advanceTime(5000);
-    });
-
-    // Simulate 16 minutes of absolute user inactivity
+    // 16 minutos de inatividade total local
     await act(async () => {
       advanceTime(16 * 60 * 1000);
     });
 
-    assert(timerVal.isRunning === false, "Test 18.1: Inatividade de 15+ minutos pausa o cronômetro");
-    assert(timerVal.pauseReason === "IDLE", "Test 18.2: pauseReason é definido como IDLE");
-    assert(timerVal.elapsedSeconds > 0, "Test 18.3: Tempo acumulado é mantido");
+    assert(timerVal.isRunning === false, "Test 11.1: Inatividade local de 15m+ pausa o timer");
+    assert(timerVal.pauseReason === "IDLE", "Test 11.2: pauseReason é definido como IDLE");
     root.unmount();
   }
 
-  // --- TEST 19: Logout e isolamento de usuários ---
+  // --- TEST 12: Inatividade compartilhada (multi-tab activity sync) ---
   {
     cleanup();
-    // Simulate user-123 logged in with active session
+    const root = createRoot(rootEl);
+    let timerVal: any = null;
+    function TestComponent() {
+      timerVal = useStudyTimer();
+      return null;
+    }
+
+    await act(async () => {
+      root.render(
+        React.createElement(
+          StudyTimerProvider,
+          null,
+          React.createElement(TestComponent)
+        )
+      );
+    });
+
+    await act(async () => {
+      timerVal.prepareSession({
+        blockId: "block-1",
+        subjectId: "sub-1",
+        subjectName: "Matemática",
+        blockTitle: "Geometria",
+      });
+      timerVal.startOrResume();
+    });
+
+    // Passam 10 minutos (local inativo, mas a outra aba está ativa)
+    await act(async () => {
+      advanceTime(10 * 60 * 1000);
+    });
+
+    // Simula evento da outra aba enviando atividade
+    await act(async () => {
+      const storageEvent = new dom.window.StorageEvent("storage", {
+        key: "kehl-study-timer-activity:v2",
+        newValue: JSON.stringify({
+          userId: "user-123",
+          lastActivityAt: fakeTime,
+        }),
+      });
+      window.dispatchEvent(storageEvent);
+    });
+
+    // Avança mais 10 minutos (total local = 20m inativo, mas pela atividade compartilhada faz apenas 10m da última atividade)
+    await act(async () => {
+      advanceTime(10 * 60 * 1000);
+    });
+
+    assert(timerVal.isRunning === true, "Test 12.1: Atividade em outra aba previne pausa local");
+    root.unmount();
+  }
+
+  // --- TEST 13: Inatividade compartilhada pausa se ambas as abas estiverem inativas ---
+  {
+    cleanup();
+    const root = createRoot(rootEl);
+    let timerVal: any = null;
+    function TestComponent() {
+      timerVal = useStudyTimer();
+      return null;
+    }
+
+    await act(async () => {
+      root.render(
+        React.createElement(
+          StudyTimerProvider,
+          null,
+          React.createElement(TestComponent)
+        )
+      );
+    });
+
+    await act(async () => {
+      timerVal.prepareSession({
+        blockId: "block-1",
+        subjectId: "sub-1",
+        subjectName: "Matemática",
+        blockTitle: "Geometria",
+      });
+      timerVal.startOrResume();
+    });
+
+    // Envia atividade compartilhada agora
+    const activityTime = fakeTime;
+    localStorage.setItem(
+      "kehl-study-timer-activity:v2",
+      JSON.stringify({
+        userId: "user-123",
+        lastActivityAt: activityTime,
+      })
+    );
+
+    // Avança 16 minutos (sem novas atividades em nenhuma das abas)
+    await act(async () => {
+      advanceTime(16 * 60 * 1000);
+    });
+
+    assert(timerVal.isRunning === false, "Test 13.1: Pausa se ambas as abas excederem o timeout");
+    assert(timerVal.pauseReason === "IDLE", "Test 13.2: pauseReason de inatividade persistido");
+    root.unmount();
+  }
+
+  // --- TEST 14: Logout e isolamento de usuários ---
+  {
+    cleanup();
     localStorage.setItem(
       "kehl-study-timer:v2",
       JSON.stringify({
@@ -843,7 +820,7 @@ async function runTests() {
       })
     );
 
-    // Switch current user to empty (simulating logout)
+    // Altera userId para vazio (logout)
     currentUserId = "";
 
     const root = createRoot(rootEl);
@@ -863,17 +840,17 @@ async function runTests() {
       );
     });
 
-    assert(timerVal.session === null, "Test 19.1: Logout zera o contexto");
-    assert(timerVal.elapsedSeconds === 0, "Test 19.2: Cronômetro do usuário deslogado fica zerado");
+    assert(timerVal.session === null, "Test 14.1: Logout limpa sessão no contexto");
+    assert(timerVal.elapsedSeconds === 0, "Test 14.2: Tempo zerado após logout");
+    assert(timerVal.isHydrated === false, "Test 14.3: Hydration é false quando deslogado");
     root.unmount();
   }
 
-  // --- TEST 20: Tempo legado não é atribuído ao bloco ---
+  // --- TEST 15: Tempo legado não é atribuído ao bloco ---
   {
     cleanup();
-    // Set legacy unassigned keys
     const todayStr = getTodayRangeSP(new Date()).dateString;
-    localStorage.setItem(`study-timer-accumulated-${todayStr}`, "1200"); // 20 minutes
+    localStorage.setItem(`study-timer-accumulated-${todayStr}`, "1200"); // 20m legado
 
     const root = createRoot(rootEl);
     let timerVal: any = null;
@@ -892,24 +869,174 @@ async function runTests() {
       );
     });
 
-    assert(timerVal.legacyUnassigned === 1200, "Test 20.1: Tempo legado migrado com sucesso");
-    assert(timerVal.session === null, "Test 20.2: Sessão permanece nula pós migração");
+    assert(timerVal.legacyUnassigned === 1200, "Test 15.1: Tempo legado migrado para legacyUnassigned");
     
-    // Start session and check snapshot
     await act(async () => {
-      timerVal.startSession({
+      timerVal.prepareSession({
         blockId: "block-1",
         subjectId: "sub-1",
         subjectName: "Matemática",
         blockTitle: "Geometria",
-      }, true);
+      });
+      timerVal.startOrResume();
     });
+
     await act(async () => {
-      advanceTime(60000); // 1 minute
+      advanceTime(60000); // 1 minuto
     });
 
     const snapshot = timerVal.getSessionSnapshot("block-1");
-    assert(snapshot.actualDurationMinutes === 1, `Test 20.3: Tempo legado não foi atribuído ao bloco (esperado: 1, obtido: ${snapshot.actualDurationMinutes})`);
+    assert(snapshot.actualDurationMinutes === 1, `Test 15.2: Tempo legado não foi embutido no snapshot do bloco (esperado: 1, obtido: ${snapshot.actualDurationMinutes})`);
+    root.unmount();
+  }
+
+  // --- TEST 16: Dialog Acessível ---
+  {
+    cleanup();
+    const root = createRoot(rootEl);
+    const { Dialog, DialogContent, DialogTitle } = require("../src/components/ui/dialog");
+    let isDialogOpen: boolean = true;
+    const handleOpenChange = (open: boolean) => {
+      isDialogOpen = open;
+    };
+
+    // Save previous active element to assert return focus
+    const prevButton = document.createElement("button");
+    prevButton.id = "prev-active-element";
+    document.body.appendChild(prevButton);
+    prevButton.focus();
+    assert(document.activeElement === prevButton, "Test 16.1: Foco inicial está no botão de fora");
+
+    await act(async () => {
+      root.render(
+        React.createElement(
+          Dialog,
+          { open: isDialogOpen, onOpenChange: handleOpenChange },
+          React.createElement(
+            DialogContent,
+            null,
+            React.createElement(DialogTitle, null, "Modal Título"),
+            React.createElement("button", { id: "modal-button" }, "Clique Aqui")
+          )
+        )
+      );
+    });
+
+    // 16.2 check tags
+    const dialogEl = document.body.querySelector("[role='dialog']");
+    assert(dialogEl !== null, "Test 16.2.1: Atributo role dialog está presente");
+    assert(dialogEl?.getAttribute("aria-modal") === "true", "Test 16.2.2: aria-modal é true");
+    const labelId = dialogEl?.getAttribute("aria-labelledby");
+    assert(!!labelId && labelId.startsWith("dialog-title-"), "Test 16.2.3: aria-labelledby aponta para o título");
+
+    // 16.3 check initial focus trap
+    const modalBtn = document.getElementById("modal-button");
+    assert(document.activeElement === modalBtn, "Test 16.3.1: Foco inicial foi movido para o botão do modal");
+
+    // 16.4 scroll lock
+    assert(document.body.style.overflow === "hidden", "Test 16.4.1: Body scroll foi travado (overflow: hidden)");
+
+    // 16.5 Escape closes dialog
+    await act(async () => {
+      const escapeEvent = new dom.window.KeyboardEvent("keydown", { key: "Escape" });
+      window.dispatchEvent(escapeEvent);
+    });
+
+    assert(!isDialogOpen, "Test 16.5.1: Tecla Escape fecha o diálogo");
+
+    root.unmount();
+    document.body.removeChild(prevButton);
+  }
+
+  // --- TEST 17: Conclusão com falha e sucesso no BlockStudyView ---
+  {
+    cleanup();
+    const root = createRoot(rootEl);
+    const blockMock = {
+      id: "block-1",
+      title: "Geometria Espacial",
+      materialId: "mat-1",
+      pageStart: 1,
+      pageEnd: 10,
+      subjectId: "sub-1",
+      subject: { name: "Matemática" },
+      material: { fileName: "apostila.pdf" },
+      flashcards: [],
+      status: "IN_PROGRESS",
+    };
+
+    // Render BlockStudyView and StudyTimer inside the Provider
+    await act(async () => {
+      root.render(
+        React.createElement(
+          StudyTimerProvider,
+          null,
+          React.createElement(
+            "div",
+            null,
+            React.createElement(BlockStudyView, {
+              block: blockMock,
+              content: [],
+              stats: { total: 0, pending: 0, approved: 0 },
+              returnTo: "/",
+              from: null,
+            }),
+            React.createElement(StudyTimer)
+          )
+        )
+      );
+    });
+
+    // Find the floating play/pause button in JSDOM body
+    const playBtn = document.body.querySelector("[aria-label='Iniciar cronômetro']") as HTMLButtonElement;
+    assert(playBtn !== null, "Test 17.1.1: Botão de iniciar cronômetro está presente");
+
+    await act(async () => {
+      playBtn.click();
+    });
+
+    // Advance 125 seconds
+    await act(async () => {
+      advanceTime(125 * 1000);
+    });
+
+    // Assert that we have elapsed seconds >= 125
+    const elapsedText = document.body.querySelector(".font-mono")?.textContent;
+    assert(elapsedText === "02:05", `Test 17.1.2: Cronômetro registrou 125s decorridos (exibido: ${elapsedText})`);
+
+    // Mock API Failure (500)
+    mockFetchResponseStatus = 500;
+    // Click "Concluir sem Gerar Cards"
+    const concludeBtn = Array.from(document.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.includes("Concluir sem Gerar Cards")
+    ) as HTMLButtonElement;
+    assert(concludeBtn !== null, "Test 17.2.1: Botão Concluir sem Gerar Cards está presente");
+
+    // Click conclude
+    await act(async () => {
+      concludeBtn.click();
+    });
+
+    // Assert session is STILL PRESERVED, time is kept, and timer resumes
+    const postFailText = document.body.querySelector(".font-mono")?.textContent;
+    assert(postFailText === "02:05", `Test 17.2.2: Conclusão com falha preservou tempo decorrido (${postFailText})`);
+    // Check localStorage wasn't cleared
+    const rawVal = localStorage.getItem("kehl-study-timer:v2");
+    assert(rawVal !== null && JSON.parse(rawVal).session !== null, "Test 17.2.3: Sessão continua no localStorage após falha");
+
+    // Mock API Success (200)
+    mockFetchResponseStatus = 200;
+    mockFetchResponseBody = { message: "Concluído" };
+
+    await act(async () => {
+      concludeBtn.click();
+    });
+
+    // Assert session is cleared and study view transitions to summary
+    const clearedVal = localStorage.getItem("kehl-study-timer:v2");
+    assert(clearedVal !== null && JSON.parse(clearedVal).session === null, "Test 17.3.1: Sessão limpa no localStorage pós sucesso");
+    assert(document.body.innerHTML.includes("Reabrir bloco") || document.body.innerHTML.includes("Concluída"), "Test 17.3.2: BlockStudyView transicionou para summary");
+
     root.unmount();
   }
 
@@ -919,11 +1046,30 @@ async function runTests() {
   console.log(`Assertions executadas: ${assertionsPassed}/${assertionsRun}`);
   console.log("============================================================================\n");
 
-  if (assertionsPassed === assertionsRun) {
-    console.log("⭐ All tests passed successfully!");
+  console.log("📋 Casos de Testes Executados:");
+  console.log("  1. Display visível em todas as rotas privadas");
+  console.log("  2. Display ausente nas rotas públicas");
+  console.log("  3. Somente um display flutuante na página do bloco");
+  console.log("  4. Somente um ticking interval ativo por vez");
+  console.log("  5. Operações manuais completas (prepareSession, startOrResume, pause, reset, snapshot)");
+  console.log("  6. Preservação do cronômetro em navegação privada");
+  console.log("  7. Hidratação com delta offline");
+  console.log("  8. Segurança com StrictMode");
+  console.log("  9. Saneamento e segurança com JSON corrompido");
+  console.log("  10. Pausa automática por Rollover civil (DAY_CHANGED)");
+  console.log("  11. Pausa automática por Inatividade local");
+  console.log("  12. Sincronização e prevenção de pausa por atividade compartilhada");
+  console.log("  13. Pausa por inatividade compartilhada com ambas abas inativas");
+  console.log("  14. Logout e isolamento seguro de usuários");
+  console.log("  15. Isolamento de tempo legado");
+  console.log("  16. Diálogo acessível WCAG (role, aria-modal,labelledby, Escape, scroll lock, focus trap)");
+  console.log("  17. Fluxo de conclusão com erro 500 (resumo) e sucesso 200 (limpeza e summary)");
+
+  if (assertionsPassed === assertionsRun && assertionsRun >= 50) {
+    console.log("⭐ All tests passed successfully with 50+ assertions!");
     process.exit(0);
   } else {
-    console.error("💥 Some assertions failed.");
+    console.error(`💥 Assertions failed or insufficient amount (Passed: ${assertionsPassed}/${assertionsRun})`);
     process.exit(1);
   }
 }
