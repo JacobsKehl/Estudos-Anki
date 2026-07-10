@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Play, Pause, RotateCcw, Timer, AlertCircle } from "lucide-react";
+import { Play, Pause, RotateCcw, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStudyTimer } from "@/contexts/StudyTimerContext";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,19 +28,17 @@ function formatTime(totalSeconds: number): string {
 // Component
 // ---------------------------------------------------------------------------
 
+import { useUserGlobalTimer } from "@/contexts/UserGlobalTimerContext";
+
 export function StudyTimer() {
   const {
-    session,
     elapsedSeconds,
     isRunning,
-    pauseReason,
-    legacyUnassigned,
     isHydrated,
-    resume,
+    startOrResume,
     pause,
     reset,
-    resetLegacy,
-  } = useStudyTimer();
+  } = useUserGlobalTimer();
 
   const [mounted, setMounted] = useState(false);
 
@@ -53,9 +50,9 @@ export function StudyTimer() {
     if (isRunning) {
       pause();
     } else {
-      resume();
+      startOrResume();
     }
-  }, [isRunning, pause, resume]);
+  }, [isRunning, pause, startOrResume]);
 
   if (!mounted || !isHydrated) return null;
 
@@ -79,7 +76,7 @@ export function StudyTimer() {
             )}
           />
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Tempo de estudo
+            Cronômetro geral
           </span>
         </div>
         {isRunning && (
@@ -90,22 +87,6 @@ export function StudyTimer() {
         )}
       </div>
 
-      {/* Subject and Block Info */}
-      {session ? (
-        <div className="flex flex-col gap-0.5 max-w-full overflow-hidden">
-          <span className="text-xs font-bold text-foreground truncate" title={session.subjectName}>
-            {session.subjectName}
-          </span>
-          <span className="text-[10px] text-muted-foreground truncate" title={session.blockTitle}>
-            {session.blockTitle}
-          </span>
-        </div>
-      ) : (
-        <div className="text-[10px] text-muted-foreground italic">
-          Abra um bloco para iniciar
-        </div>
-      )}
-
       {/* Timer display + controls */}
       <div className="flex items-center justify-between mt-1">
         <span
@@ -113,6 +94,7 @@ export function StudyTimer() {
             "font-mono text-xl font-bold tabular-nums tracking-tight transition-colors duration-300",
             isRunning ? "text-accent" : "text-foreground",
           )}
+          data-testid="general-timer-display"
         >
           {formatTime(elapsedSeconds)}
         </span>
@@ -122,13 +104,10 @@ export function StudyTimer() {
           <button
             type="button"
             onClick={handlePlayPause}
-            disabled={!session}
-            aria-label={isRunning ? "Pausar cronômetro" : "Iniciar cronômetro"}
+            aria-label={isRunning ? "Pausar" : "Iniciar"}
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200",
-              session
-                ? "bg-sage-light text-accent hover:brightness-95 active:scale-95 cursor-pointer"
-                : "bg-muted text-muted-foreground/40 cursor-not-allowed",
+              "bg-sage-light text-accent hover:brightness-95 active:scale-95 cursor-pointer"
             )}
           >
             {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -138,47 +117,16 @@ export function StudyTimer() {
           <button
             type="button"
             onClick={reset}
-            disabled={!session}
-            aria-label="Resetar cronômetro"
+            aria-label="Resetar"
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200",
-              session
-                ? "text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
-                : "text-muted-foreground/30 cursor-not-allowed",
+              "text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
             )}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
-
-      {/* Specific Pause Warnings */}
-      {!isRunning && pauseReason && (
-        <div className="mt-1 flex items-start gap-1 p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300">
-          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-          <span className="text-[9px] font-medium leading-normal">
-            {pauseReason === "IDLE"
-              ? "Pausado por inatividade"
-              : "Pausado por mudança de dia (estudo começou ontem)"}
-          </span>
-        </div>
-      )}
-
-      {/* Legacy/Migrated Time */}
-      {legacyUnassigned > 0 && (
-        <div className="mt-1 pt-1.5 border-t border-border/40 flex items-center justify-between">
-          <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold truncate">
-            Legado: {formatTime(legacyUnassigned)}
-          </span>
-          <button
-            type="button"
-            onClick={resetLegacy}
-            className="text-[9px] text-muted-foreground hover:text-foreground hover:underline font-bold"
-          >
-            Zerar
-          </button>
-        </div>
-      )}
     </div>
   );
 }
