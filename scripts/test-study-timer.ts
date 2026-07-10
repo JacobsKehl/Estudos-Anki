@@ -176,6 +176,7 @@ require.cache[preferencesPath] = {
 // ============================================================================
 
 import { StudyTimerProvider, useStudyTimer } from "../src/contexts/StudyTimerContext";
+import { UserGlobalTimerProvider } from "../src/contexts/UserGlobalTimerContext";
 import { BlockStudyView } from "../src/components/blocks/BlockStudyView";
 import { StudyTimer } from "../src/components/study/study-timer";
 import { getTodayRangeSP } from "../src/lib/date-utils";
@@ -246,7 +247,7 @@ async function runTests() {
     });
 
     assert(
-      rootEl.innerHTML.includes("Tempo de estudo"),
+      rootEl.innerHTML.includes("Cronômetro geral"),
       "Test 1.1: Display do cronômetro é visível em rotas privadas"
     );
     root.unmount();
@@ -270,7 +271,7 @@ async function runTests() {
     });
 
     assert(
-      !rootEl.innerHTML.includes("Tempo de estudo"),
+      !rootEl.innerHTML.includes("Cronômetro geral"),
       "Test 2.1: Display do cronômetro NÃO é montado em rotas públicas"
     );
     root.unmount();
@@ -312,10 +313,10 @@ async function runTests() {
       );
     });
 
-    const occurrences = (rootEl.innerHTML.match(/Tempo de estudo/g) || []).length;
+    const occurrences = (rootEl.innerHTML.match(/Cronômetro geral/g) || []).length;
     assert(
       occurrences === 1,
-      `Test 3.1: Somente 1 cronômetro é renderizado na página do bloco`
+      `Test 3.1: Somente 1 cronômetro geral é renderizado na página do bloco`
     );
     root.unmount();
   }
@@ -965,30 +966,33 @@ async function runTests() {
       status: "IN_PROGRESS",
     };
 
-    // Render BlockStudyView and StudyTimer inside the Provider
     await act(async () => {
       root.render(
         React.createElement(
           StudyTimerProvider,
           null,
           React.createElement(
-            "div",
+            UserGlobalTimerProvider,
             null,
-            React.createElement(BlockStudyView, {
-              block: blockMock,
-              content: [],
-              stats: { total: 0, pending: 0, approved: 0 },
-              returnTo: "/",
-              from: null,
-            }),
-            React.createElement(StudyTimer)
+            React.createElement(
+              "div",
+              null,
+              React.createElement(BlockStudyView, {
+                block: blockMock,
+                content: [],
+                stats: { total: 0, pending: 0, approved: 0 },
+                returnTo: "/",
+                from: null,
+              }),
+              React.createElement(StudyTimer)
+            )
           )
         )
       );
     });
 
-    // Find the floating play/pause button in JSDOM body
-    const playBtn = document.body.querySelector("[aria-label='Iniciar cronômetro']") as HTMLButtonElement;
+    // Find the inline block play/pause button in JSDOM body
+    const playBtn = document.body.querySelector("[aria-label='Iniciar bloco']") as HTMLButtonElement;
     assert(playBtn !== null, "Test 17.1.1: Botão de iniciar cronômetro está presente");
 
     await act(async () => {
@@ -1001,7 +1005,7 @@ async function runTests() {
     });
 
     // Assert that we have elapsed seconds >= 125
-    const elapsedText = document.body.querySelector(".font-mono")?.textContent;
+    const elapsedText = document.body.querySelector("[data-testid='block-timer-display']")?.textContent;
     assert(elapsedText === "02:05", `Test 17.1.2: Cronômetro registrou 125s decorridos (exibido: ${elapsedText})`);
 
     // Mock API Failure (500)
@@ -1018,7 +1022,7 @@ async function runTests() {
     });
 
     // Assert session is STILL PRESERVED, time is kept, and timer resumes
-    const postFailText = document.body.querySelector(".font-mono")?.textContent;
+    const postFailText = document.body.querySelector("[data-testid='block-timer-display']")?.textContent;
     assert(postFailText === "02:05", `Test 17.2.2: Conclusão com falha preservou tempo decorrido (${postFailText})`);
     // Check localStorage wasn't cleared
     const rawVal = localStorage.getItem("kehl-study-timer:v2");

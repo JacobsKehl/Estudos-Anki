@@ -12,6 +12,7 @@ import {
   BrainCircuit,
   Loader2,
   Play,
+  Pause,
   Layers,
   RotateCcw,
   Sparkles,
@@ -116,7 +117,7 @@ const getReturnIcon = (path: string) => {
   return ArrowLeft;
 };
 
-export function BlockStudyView({ block, content, stats: _stats, returnTo, from, scheduleItemId, secondPass = false }: BlockStudyViewProps) {
+export function BlockStudyView({ block, content, returnTo, from, scheduleItemId, secondPass = false }: BlockStudyViewProps) {
   const router = useRouter();
 
   // Get return target with validation (no external URL allowed to avoid open redirect)
@@ -171,6 +172,7 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
   const {
     session,
     elapsedSeconds,
+    isRunning,
     isHydrated,
     prepareSession,
     pause,
@@ -179,6 +181,9 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
     getSessionSnapshot,
     completeSession,
   } = useStudyTimer();
+
+  const isCurrentBlockSession = session?.blockId === block.id;
+  const hasOtherBlockSession = Boolean(session && session.blockId !== block.id);
 
   const [sessionDurationSeconds, setSessionDurationSeconds] = React.useState(0);
   const [showConflictModal, setShowConflictModal] = React.useState(false);
@@ -1190,6 +1195,81 @@ export function BlockStudyView({ block, content, stats: _stats, returnTo, from, 
               </Button>
             </div>
           </div>
+          {/* Cronômetro do Bloco Inline Widget */}
+          {isHydrated && step === "reading" && block.status !== "COMPLETED" && (
+            <div className="bg-card rounded-[2rem] border border-border/40 p-6 space-y-4 shadow-sm">
+              <h3 className="font-bold text-sm flex items-center gap-2 text-muted-foreground uppercase tracking-widest">
+                <Clock className="w-4 h-4 text-accent" />
+                Cronômetro do bloco
+              </h3>
+
+              {hasOtherBlockSession ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold leading-relaxed">
+                    Existe outro bloco com cronômetro ativo.
+                  </p>
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    className="w-full rounded-xl font-bold text-xs"
+                    onClick={() => setShowConflictModal(true)}
+                  >
+                    Gerenciar Conflito
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-2xl font-black tabular-nums tracking-tight text-foreground" data-testid="block-timer-display">
+                      {isCurrentBlockSession ? formatDuration(elapsedSeconds) : "00:00"}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        className="rounded-xl h-9 w-9 p-0 flex items-center justify-center text-accent bg-accent/5 hover:bg-accent/10 transition-all"
+                        disabled={!isCurrentBlockSession}
+                        onClick={() => {
+                          if (!isCurrentBlockSession) return;
+                          if (isRunning) {
+                            pause();
+                          } else {
+                            resume();
+                          }
+                        }}
+                        aria-label={isRunning ? "Pausar bloco" : "Iniciar bloco"}
+                      >
+                        {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-xl h-9 w-9 p-0 flex items-center justify-center text-muted-foreground hover:bg-muted transition-all"
+                        disabled={!isCurrentBlockSession}
+                        onClick={() => {
+                          if (isCurrentBlockSession) {
+                            reset();
+                          }
+                        }}
+                        aria-label="Resetar bloco"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {isRunning && isCurrentBlockSession && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold">
+                      <span className="flex h-1.5 w-1.5 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                      </span>
+                      Estudando bloco agora...
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           <div className="bg-accent/5 rounded-[2rem] border border-accent/10 p-6 space-y-3">
             <h4 className="text-xs font-bold text-accent uppercase tracking-widest flex items-center gap-2">
