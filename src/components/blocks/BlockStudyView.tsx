@@ -12,7 +12,6 @@ import {
   BrainCircuit,
   Loader2,
   Play,
-  Pause,
   Layers,
   RotateCcw,
   Sparkles,
@@ -30,6 +29,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PdfBlockViewer } from "./PdfBlockViewer";
 import { CardCurator } from "@/components/flashcards/CardCurator";
+import { useStudyTimer } from "@/contexts/StudyTimerContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const SUPPORT_TYPE_LABELS: Record<string, string> = {
   SUMMARY: "Resumo Teórico",
@@ -115,7 +116,7 @@ const getReturnIcon = (path: string) => {
   return ArrowLeft;
 };
 
-export function BlockStudyView({ block, content, stats, returnTo, from, scheduleItemId, secondPass = false }: BlockStudyViewProps) {
+export function BlockStudyView({ block, content, stats: _stats, returnTo, from, scheduleItemId, secondPass = false }: BlockStudyViewProps) {
   const router = useRouter();
 
   // Get return target with validation (no external URL allowed to avoid open redirect)
@@ -160,64 +161,73 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
   const [isSecondPass] = React.useState(secondPass);
 
   const [curatorCards, setCuratorCards] = React.useState<any[]>(block.flashcards || []);
-  const [timeSpent, setTimeSpent] = React.useState(0);
-  const [isTimerRunning, setIsTimerRunning] = React.useState(false);
   const [isGeneratingCards, setIsGeneratingCards] = React.useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
-  const [startedAt, setStartedAt] = React.useState<Date | null>(null);
-  const [isIdleAlertOpen, setIsIdleAlertOpen] = React.useState(false);
-  const lastActivityRef = React.useRef(0);
   const [suggestions, setSuggestions] = React.useState<ContinueSuggestion[]>([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = React.useState(false);
   const [isGeneratingMore, setIsGeneratingMore] = React.useState(false);
 
-  // Initialize lastActivityRef on mount (avoids impure Date.now() call during render)
-  React.useEffect(() => {
-    lastActivityRef.current = Date.now();
-  }, []);
+  // Global study timer hook consumption
+  const {
+    session,
+    elapsedSeconds,
+    isHydrated,
+    prepareSession,
+    pause,
+    resume,
+    reset,
+    getSessionSnapshot,
+    completeSession,
+  } = useStudyTimer();
 
-  // Capture startedAt when timer starts
+  const [sessionDurationSeconds, setSessionDurationSeconds] = React.useState(0);
+  const [showConflictModal, setShowConflictModal] = React.useState(false);
+  const [isSwapping, setIsSwapping] = React.useState(false);
+  const completedLocallyRef = React.useRef(false);
+
+  // Auto-prepare current block if no session conflict exists
   React.useEffect(() => {
-    if (isTimerRunning && !startedAt && step === "reading") {
-      setStartedAt(new Date());
+    if (!isHydrated) return;
+    if (step !== "reading") return;
+    if (block.status === "COMPLETED") return;
+    if (completedLocallyRef.current) return;
+
+    const res = prepareSession({
+      blockId: block.id,
+      subjectId: block.subjectId,
+      subjectName: block.subject.name,
+      blockTitle: block.title,
+    });
+
+    if (res.status === "CONFLICT") {
+      setShowConflictModal(true);
     }
-  }, [isTimerRunning, startedAt, step]);
+  }, [
+    block.id,
+    block.subjectId,
+    block.subject.name,
+    block.title,
+    block.status,
+    isHydrated,
+    step,
+    prepareSession,
+  ]);
 
-  // Idle Detection effect
-  React.useEffect(() => {
-    if (!isTimerRunning || step !== "reading") return;
+  function formatDuration(totalSeconds: number): string {
+    const s = Math.max(0, Math.floor(totalSeconds));
+    const hours = Math.floor(s / 3600);
+    const minutes = Math.floor((s % 3600) / 60);
+    const seconds = s % 60;
 
-    const handleActivity = () => {
-      lastActivityRef.current = Date.now();
-    };
+    const mm = String(minutes).padStart(2, "0");
+    const ss = String(seconds).padStart(2, "0");
 
-    window.addEventListener("mousemove", handleActivity);
-    window.addEventListener("keydown", handleActivity);
-    window.addEventListener("click", handleActivity);
-    window.addEventListener("scroll", handleActivity);
-
-    const checkIdleInterval = setInterval(() => {
-      const idleTime = Date.now() - lastActivityRef.current;
-      if (idleTime > 15 * 60 * 1000) { // 15 minutos
-        setIsTimerRunning(false);
-        setIsIdleAlertOpen(true);
-      }
-    }, 1000);
-
-    return () => {
-      window.removeEventListener("mousemove", handleActivity);
-      window.removeEventListener("keydown", handleActivity);
-      window.removeEventListener("click", handleActivity);
-      window.removeEventListener("scroll", handleActivity);
-      clearInterval(checkIdleInterval);
-    };
-  }, [isTimerRunning, step]);
-
-  const handleResumeFromIdle = () => {
-    lastActivityRef.current = Date.now();
-    setIsIdleAlertOpen(false);
-    setIsTimerRunning(true);
-  };
+    if (hours > 0) {
+      const hh = String(hours).padStart(2, "0");
+      return `${hh}:${mm}:${ss}`;
+    }
+    return `${mm}:${ss}`;
+  }
 
   const [activeTab, setActiveTab] = React.useState<"pdf" | "text" | "apoios">("pdf");
   const hasApoios = block.supportMaterials && block.supportMaterials.length > 0;
@@ -253,29 +263,6 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
     }
   }, []);
 
-  // Timer Tick Hook
-  React.useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isTimerRunning && step === "reading") {
-      interval = setInterval(() => {
-        setTimeSpent((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isTimerRunning, step]);
-
-  const formatTimer = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h > 0) {
-      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
   // Fetch continuation suggestions when entering summary step
   React.useEffect(() => {
     if (step !== "summary" || isSecondPass) return;
@@ -300,12 +287,13 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
 
   // Second pass completion handler
   const handleCompleteSecondPass = async () => {
-    if (startedAt === null) {
+    const snapshot = getSessionSnapshot(block.id);
+    if (snapshot.startedAt === null) {
       const proceed = window.confirm("Você quer concluir sem registrar tempo real de estudo?");
       if (!proceed) return;
     }
     setIsUpdatingStatus(true);
-    setIsTimerRunning(false);
+    pause(); // Pause timer while executing API call
     const toastId = toast.loading("Registrando segunda leitura...");
     
     try {
@@ -315,9 +303,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         body: JSON.stringify({
           studyBlockId: block.id,
           actionType: "SECOND_PASS",
-          startedAt: startedAt ? startedAt.toISOString() : null,
-          completedAt: startedAt ? new Date().toISOString() : null,
-          actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null,
+          startedAt: snapshot.startedAt,
+          completedAt: snapshot.completedAt,
+          actualDurationMinutes: snapshot.actualDurationMinutes,
         }),
       });
 
@@ -326,13 +314,17 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         throw new Error(data.error || "Erro ao registrar segunda leitura");
       }
 
+      setSessionDurationSeconds(elapsedSeconds);
+      completedLocallyRef.current = true;
+      completeSession(block.id);
+
       toast.success("Segunda leitura registrada com sucesso!", { id: toastId });
       router.push("/");
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Erro ao registrar segunda leitura.", { id: toastId });
-      if (startedAt !== null) {
-        setIsTimerRunning(true);
+      if (snapshot.startedAt !== null) {
+        resume(); // Resume timer if call failed
       }
     } finally {
       setIsUpdatingStatus(false);
@@ -353,12 +345,13 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
 
   // State 1: Action - complete reading, trigger flashcard generation, and auto-approve / complete block
   const handleCompleteReading = async () => {
-    if (startedAt === null) {
+    const snapshot = getSessionSnapshot(block.id);
+    if (snapshot.startedAt === null) {
       const proceed = window.confirm("Você quer concluir sem registrar tempo real de estudo?");
       if (!proceed) return;
     }
     setIsGeneratingCards(true);
-    setIsTimerRunning(false);
+    pause(); // Pause timer while executing API calls
     const toastId = toast.loading("Gerando flashcards com IA baseados na leitura...");
     
     try {
@@ -369,7 +362,6 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
       const data = await response.json();
 
       if (!response.ok) {
-        // If cards were already generated, we just proceed to mark the block as completed if not already done
         if (response.status === 400 && data.error?.includes("já gerou")) {
           toast.loading("Flashcards já gerados. Registrando conclusão do bloco...", { id: toastId });
           
@@ -379,13 +371,16 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
             body: JSON.stringify({ 
               step: "THEORY",
               scheduleItemId,
-              startedAt: startedAt ? startedAt.toISOString() : null,
-              completedAt: startedAt ? new Date().toISOString() : null,
-              actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null
+              startedAt: snapshot.startedAt,
+              completedAt: snapshot.completedAt,
+              actualDurationMinutes: snapshot.actualDurationMinutes
             }),
           });
 
           if (completeRes.ok) {
+            setSessionDurationSeconds(elapsedSeconds);
+            completedLocallyRef.current = true;
+            completeSession(block.id);
             toast.success("Estudo concluído! Bons estudos.", { id: toastId });
             setStep("summary");
           } else {
@@ -398,7 +393,6 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         throw new Error(data.error || "Falha ao gerar flashcards");
       }
 
-      // Now complete the block study step automatically since curation is bypassed
       toast.loading("Flashcards criados! Registrando conclusão do bloco...", { id: toastId });
       
       const completeRes = await fetch(`/api/study-blocks/${block.id}/complete-step`, {
@@ -407,9 +401,9 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         body: JSON.stringify({ 
           step: "THEORY",
           scheduleItemId,
-          startedAt: startedAt ? startedAt.toISOString() : null,
-          completedAt: startedAt ? new Date().toISOString() : null,
-          actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null
+          startedAt: snapshot.startedAt,
+          completedAt: snapshot.completedAt,
+          actualDurationMinutes: snapshot.actualDurationMinutes
         }),
       });
 
@@ -417,6 +411,10 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         const completeData = await completeRes.json();
         throw new Error(completeData.error || "Flashcards gerados, mas falha ao concluir o bloco");
       }
+
+      setSessionDurationSeconds(elapsedSeconds);
+      completedLocallyRef.current = true;
+      completeSession(block.id);
 
       toast.success("Flashcards prontos e bloco concluído!", { id: toastId });
       
@@ -428,8 +426,8 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Erro ao processar conclusão. Tente novamente.", { id: toastId });
-      if (startedAt !== null) {
-        setIsTimerRunning(true); // Resume timer on failure
+      if (snapshot.startedAt !== null) {
+        resume();
       }
     } finally {
       setIsGeneratingCards(false);
@@ -461,11 +459,13 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
 
   // State 2: Action - Curation complete, lock block as COMPLETED
   const handleCurationComplete = async () => {
-    if (startedAt === null) {
+    const snapshot = getSessionSnapshot(block.id);
+    if (snapshot.startedAt === null) {
       const proceed = window.confirm("Você quer concluir sem registrar tempo real de estudo?");
       if (!proceed) return;
     }
     setIsUpdatingStatus(true);
+    pause(); // Pause timer while executing API call
     const toastId = toast.loading("Registrando conclusão do bloco de estudo...");
     
     try {
@@ -475,21 +475,28 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         body: JSON.stringify({ 
           step: "THEORY",
           scheduleItemId,
-          startedAt: startedAt ? startedAt.toISOString() : null,
-          completedAt: startedAt ? new Date().toISOString() : null,
-          actualDurationMinutes: startedAt ? Math.max(1, Math.round(timeSpent / 60)) : null
+          startedAt: snapshot.startedAt,
+          completedAt: snapshot.completedAt,
+          actualDurationMinutes: snapshot.actualDurationMinutes
         }),
       });
       
       if (!res.ok) throw new Error("Erro ao concluir bloco");
       const data = await res.json();
       
+      setSessionDurationSeconds(elapsedSeconds);
+      completedLocallyRef.current = true;
+      completeSession(block.id);
+
       toast.success(data.message || "Bloco concluído! Parabéns pelos estudos.", { id: toastId });
       setStep("summary");
       router.refresh();
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Erro ao concluir o bloco de estudo.", { id: toastId });
+      if (snapshot.startedAt !== null) {
+        resume();
+      }
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -511,18 +518,23 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
       
       toast.success("Estudo teórico reaberto! O cronograma foi atualizado.", { id: toastId });
       
-      // Reset local flow states
       setStep("reading");
-      setTimeSpent(0);
-      setIsTimerRunning(false);
-      setStartedAt(null);
+      setSessionDurationSeconds(0);
+      completedLocallyRef.current = false;
       
-      // Update local flashcards state with latest fetched state
       const updatedBlock = await res.json();
       if (updatedBlock.flashcards) {
         setCuratorCards(updatedBlock.flashcards);
       }
       
+      // Initialize study timer context session again (prepared and paused)
+      prepareSession({
+        blockId: block.id,
+        subjectId: block.subjectId,
+        subjectName: block.subject.name,
+        blockTitle: block.title,
+      });
+
       router.refresh();
     } catch (error: any) {
       console.error(error);
@@ -608,7 +620,7 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
               </div>
               <div className="text-center">
                 <span className="block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Tempo de Leitura</span>
-                <span className="text-lg font-black text-foreground tabular-nums">{formatTimer(timeSpent || (block.estimatedStudyMinutes * 60))}</span>
+                <span className="text-lg font-black text-foreground tabular-nums">{formatDuration(sessionDurationSeconds || (block.estimatedStudyMinutes * 60))}</span>
               </div>
             </div>
 
@@ -639,7 +651,7 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
               <div className="flex items-center justify-center gap-2">
                 <Zap className="w-4 h-4 text-amber-500" />
                 <h3 className="text-sm font-bold text-foreground">
-                  {timeSpent > 0 && block.estimatedStudyMinutes && Math.round(timeSpent / 60) < block.estimatedStudyMinutes
+                  {sessionDurationSeconds > 0 && block.estimatedStudyMinutes && Math.round(sessionDurationSeconds / 60) < block.estimatedStudyMinutes
                     ? "Você terminou mais rápido! Quer aproveitar o saldo de tempo?"
                     : "Deseja continuar estudando?"}
                 </h3>
@@ -1191,83 +1203,73 @@ export function BlockStudyView({ block, content, stats, returnTo, from, schedule
         </aside>
       </div>
 
-      {isIdleAlertOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-[2rem] border border-border/40 p-8 shadow-xl max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mx-auto">
-              <Clock className="w-8 h-8 animate-pulse" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-foreground">Você ainda está estudando?</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Pausamos o cronômetro por inatividade para manter seu tempo de estudo real preciso. Clique abaixo para continuar.
-              </p>
-            </div>
+      <Dialog open={showConflictModal} onOpenChange={(open) => {
+        if (!open) {
+          router.push(returnTarget.href);
+        }
+      }}>
+        <DialogContent className="max-w-md text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mx-auto">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <DialogHeader className="space-y-2 text-center sm:text-center">
+            <DialogTitle className="text-xl font-bold text-foreground text-center w-full">Cronômetro Ativo</DialogTitle>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Você já possui uma sessão ativa para o bloco <strong>{session?.blockTitle}</strong> da matéria <strong>{session?.subjectName}</strong>.
+            </p>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
             <Button
               variant="primary"
-              size="lg"
-              className="w-full rounded-2xl font-bold shadow-md shadow-accent/15 transition-all hover:scale-[1.02]"
-              onClick={handleResumeFromIdle}
+              className="w-full rounded-2xl font-bold shadow-md shadow-accent/15 transition-all"
+              disabled={isSwapping}
+              onClick={() => {
+                if (session) {
+                  router.push(`/blocks/${session.blockId}`);
+                }
+                setShowConflictModal(false);
+              }}
             >
-              Continuar Estudando
+              Continuar bloco ativo
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full rounded-2xl font-bold border-red-200 hover:bg-red-50 text-red-700 hover:text-red-800 transition-all"
+              disabled={isSwapping}
+              onClick={() => {
+                if (isSwapping) return;
+                const confirmChange = window.confirm(
+                  "Tem certeza que deseja encerrar o cronômetro do outro bloco? O tempo acumulado lá NÃO será registrado."
+                );
+                if (confirmChange) {
+                  setIsSwapping(true);
+                  reset();
+                  prepareSession({
+                    blockId: block.id,
+                    subjectId: block.subjectId,
+                    subjectName: block.subject.name,
+                    blockTitle: block.title,
+                  });
+                  setShowConflictModal(false);
+                  setIsSwapping(false);
+                }
+              }}
+            >
+              Encerrar e trocar de bloco
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full rounded-2xl font-bold text-muted-foreground hover:text-foreground"
+              disabled={isSwapping}
+              onClick={() => {
+                router.push(returnTarget.href);
+              }}
+            >
+              Cancelar
             </Button>
           </div>
-        </div>
-      )}
-
-      {step === "reading" && (
-        <div className="fixed bottom-20 right-4 z-40 md:bottom-6 md:right-6 w-[210px] bg-background/80 backdrop-blur-xl border border-border/40 rounded-2xl p-4 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mb-1">
-              Tempo de Estudo
-            </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-lg font-black text-foreground tabular-nums leading-none">
-                {formatTimer(timeSpent)}
-              </span>
-              {isTimerRunning && (
-                <span className="flex h-2.5 w-2.5 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center shrink-0">
-            {startedAt === null ? (
-              <Button
-                variant="primary"
-                size="icon"
-                className="w-9 h-9 rounded-xl shadow-sm"
-                onClick={() => setIsTimerRunning(true)}
-                title="Iniciar Leitura"
-              >
-                <Play className="w-4 h-4 fill-current" />
-              </Button>
-            ) : isTimerRunning ? (
-              <Button
-                variant="outline"
-                size="icon"
-                className="w-9 h-9 rounded-xl border-amber-200 text-amber-700 hover:bg-amber-50"
-                onClick={() => setIsTimerRunning(false)}
-                title="Pausar"
-              >
-                <Pause className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="icon"
-                className="w-9 h-9 rounded-xl shadow-sm"
-                onClick={() => setIsTimerRunning(true)}
-                title="Retomar"
-              >
-                <Play className="w-4 h-4 fill-current" />
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
