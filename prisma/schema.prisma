@@ -19,6 +19,33 @@ enum MaterialRole {
   UNKNOWN
 }
 
+// ── Hybrid 80/20 ──────────────────────────────────────────────────────────────
+enum StudyMaterialProvider {
+  CFC // Concurseiro Fora da Caixa (âncora 80/20)
+  ESTRATEGIA // Estratégia Concursos (aprofundamento)
+  OTHER // Demais fornecedores (default para material histórico)
+}
+
+enum StudyBlockMethodology {
+  LINEAR // Bloco tradicional: faixa linear pageStart–pageEnd
+  HYBRID_8020 // Bloco híbrido: segmentos selecionados via IA 80/20
+}
+
+enum StudyBlockSourceRole {
+  ANCHOR_8020 // Material de ancoragem (ex: CFC)
+  DEEPENING // Material de aprofundamento (ex: Estratégia)
+  QUESTIONS // Banco de questões (uso futuro)
+  LAW_TEXT // Texto de lei (uso futuro)
+  SUPPORT // Apoio genérico (uso futuro)
+}
+
+enum StudyBlockSegmentDisposition {
+  READ // Leitura obrigatória — pertence ao universo analisado
+  CONSULT // Consulta opcional — pertence ao universo analisado
+  SKIP // Conscientemente depriorizado — pertence ao universo analisado
+  // NOTA: páginas não analisadas não geram segmento
+}
+
 model User {
   id                     String    @id @default(cuid())
   name                   String?
@@ -136,6 +163,12 @@ model StudyMaterial {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   studyScheduleItems StudyScheduleItem[]
+
+  // ── Hybrid 80/20 ──────────────────────────────────────────────────────────
+  // Não confundir com materialRole: provider indica a origem editorial,
+  // não o papel metodológico do material dentro do plano de estudos.
+  provider           StudyMaterialProvider @default(OTHER)
+  hybridBlockSources StudyBlockSource[]    @relation("HybridBlockSources")
 }
 
 model ExtractedContent {
@@ -218,6 +251,11 @@ model Flashcard {
 
   sourcePageStart Int?
   sourcePageEnd   Int?
+
+  // ── Hybrid 80/20 ──────────────────────────────────────────────────────────
+  // Geração do card: MANUAL, LINEAR_AI, HYBRID_AI
+  // Para cards híbridos, sourceMaterialId preserva a origem real (CFC ou Estratégia)
+  generationReason String? @db.Text
 
   reviews   FlashcardReview[]
   createdAt DateTime          @default(now())
@@ -313,7 +351,16 @@ model StudyBlock {
   questionReviewTask       QuestionReviewTask?
   weeklyReviewTopicSources WeeklyReviewTopicSource[]
 
+  // ── Hybrid 80/20 ──────────────────────────────────────────────────────────
+  // methodology e generationRunId não afetam blocos LINEAR existentes.
+  // O envelope materialId/pageStart/pageEnd é mantido para compatibilidade.
+  methodology     StudyBlockMethodology @default(LINEAR)
+  generationRunId String?               @unique
+  aiAuditMetadata Json?
+  sources         StudyBlockSource[]
+
   @@index([userId, status])
+  @@index([methodology]) // permite filtrar rapidamente por HYBRID_8020
 }
 
 model StudyBlockSupport {
@@ -590,4 +637,63 @@ model WeeklyReviewTopicSource {
   @@unique([weeklyReviewTopicId, studyBlockId])
   @@index([weeklyReviewTopicId])
   @@index([studyBlockId])
+}
+
+// ── Hybrid 80/20 Models ───────────────────────────────────────────────────────
+
+// Uma fonte de conteúdo para um bloco híbrido (ex: CFC ou Estratégia).
+// Cada bloco híbrido tem pelo menos dois StudyBlockSource:
+//   - Um ANCHOR_8020 (CFC)
+//   - Um ou mais DEEPENING (Estratégia), exatamente um com isCanonical=true
+model StudyBlockSource {
+  id           String     @id @default(cuid())
+  studyBlockId String
+  studyBlock   StudyBlock @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+
+  materialId String
+  // onDelete: Restrict — impede exclusão do material enquanto houver bloco híbrido vinculado.
+  // O DELETE de /api/materials/[id] deve checar StudyBlockSource antes de executar.
+  material   StudyMaterial @relation("HybridBlockSources", fields: [materialId], references: [id], onDelete: Restrict)
+
+  sourceRole StudyBlockSourceRole
+
+  // true somente no DEEPENING canônico (cujo materialId alimenta StudyBlock.materialId).
+  // ANCHOR_8020 NUNCA deve ter isCanonical = true.
+  // Exatamente um DEEPENING por bloco híbrido deve ter isCanonical = true.
+  isCanonical Boolean @default(false)
+
+  selectionReason String? @db.Text
+  confidence      Float? // null = "não calculado"
+  orderIndex      Int     @default(0) // apenas para ordenação visual
+
+  segments  StudyBlockSourceSegment[]
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  // Impede o mesmo material com o mesmo papel no mesmo bloco.
+  // Dois DEEPENING de materiais DIFERENTES são permitidos (materialIds distintos).
+  @@unique([studyBlockId, materialId, sourceRole])
+  @@index([studyBlockId])
+  @@index([materialId])
+}
+
+// Um intervalo de páginas com disposição dentro de um StudyBlockSource.
+// READ  = leitura obrigatória
+// CONSULT = consulta opcional (nunca origem de flashcard na v1)
+// SKIP  = analisado e conscientemente descartado
+model StudyBlockSourceSegment {
+  id       String           @id @default(cuid())
+  sourceId String
+  source   StudyBlockSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  disposition StudyBlockSegmentDisposition
+  pageStart   Int
+  pageEnd     Int
+  reason      String?                      @db.Text
+  orderIndex  Int                          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sourceId, disposition])
 }

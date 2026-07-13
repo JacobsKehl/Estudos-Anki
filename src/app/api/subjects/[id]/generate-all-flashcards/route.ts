@@ -23,9 +23,12 @@ export async function POST(
       select: { name: true }
     });
 
-    // 1. Fetch all blocks for this subject
+    // 1. Fetch all blocks for this subject (ignoring hybrid blocks)
     const blocks = await (prisma as any).studyBlock.findMany({
-      where: { subjectId },
+      where: {
+        subjectId,
+        methodology: { not: "HYBRID_8020" }
+      },
       include: {
         _count: {
           select: { flashcards: true }

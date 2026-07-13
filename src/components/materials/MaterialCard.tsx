@@ -2,7 +2,6 @@
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Trash2, Eye, RotateCw, Loader2, Sparkles, AlertCircle, Brain, BookOpen, ChevronDown } from "lucide-react";
-import { MaterialStatusBadge } from "./MaterialStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -33,12 +32,15 @@ interface MaterialCardProps {
     hasExistingBlocks?: boolean;
     blocksCount?: number;
     detectedStructure?: string | null;
+    /** Fornecedor/origem editorial: CFC, ESTRATEGIA ou OTHER */
+    provider?: "CFC" | "ESTRATEGIA" | "OTHER" | null;
   };
   isSelected?: boolean;
   onSelect?: (id: string) => void;
   isSelectionMode?: boolean;
   onOrganizeSingle?: (mode: "general" | "content_only" | "flashcards_only" | "clear_flashcards" | "unorganize") => Promise<void>;
 }
+
 
 export function MaterialCard({ 
   material, 
@@ -58,7 +60,41 @@ export function MaterialCard({
   const [selectedSubjectId, setSelectedSubjectId] = React.useState("");
 
   const [showActionsDialog, setShowActionsDialog] = React.useState(false);
-  const [showDropdown, setShowDropdown] = React.useState(false);
+
+  // ── Hybrid 80/20 ── provider state ──────────────────────────────────────────
+  const [provider, setProvider] = React.useState<"CFC" | "ESTRATEGIA" | "OTHER">(material.provider ?? "OTHER");
+  const [isUpdatingProvider, setIsUpdatingProvider] = React.useState(false);
+  const [showProviderSelector, setShowProviderSelector] = React.useState(false);
+
+  const handleProviderChange = async (newProvider: "CFC" | "ESTRATEGIA" | "OTHER") => {
+    if (newProvider === provider) return;
+    setIsUpdatingProvider(true);
+    try {
+      const res = await fetch(`/api/materials/${material.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: newProvider }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409 && data.code === "MATERIAL_PROVIDER_LOCKED_BY_HYBRID_BLOCK") {
+          toast.error("Fornecedor bloqueado: este material está vinculado a um bloco híbrido.", { duration: 6000 });
+        } else {
+          toast.error(data.error || "Erro ao atualizar fornecedor.");
+        }
+        return;
+      }
+      setProvider(newProvider);
+      toast.success(`Fornecedor atualizado para ${newProvider}`);
+      setShowProviderSelector(false);
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro de rede ao atualizar fornecedor.");
+    } finally {
+      setIsUpdatingProvider(false);
+    }
+  };
 
   const executeOrganizationAction = async (mode: string) => {
     setIsOrganizing(true);
@@ -127,7 +163,7 @@ export function MaterialCard({
         month: "short",
       });
       setFormattedDate(parsedDate);
-    } catch (e) {
+    } catch {
       setFormattedDate("");
     }
   }, [material.uploadedAt]);
@@ -139,7 +175,20 @@ export function MaterialCard({
         method: "DELETE",
       });
 
-      if (!res.ok) throw new Error("Erro ao excluir material");
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // Tratar 409 de bloco híbrido vinculado com mensagem amigável
+        if (res.status === 409 && data.code === "MATERIAL_USED_BY_HYBRID_BLOCK") {
+          toast.error(
+            `Não é possível excluir: este material está vinculado a ${data.linkedCount ?? "um ou mais"} bloco(s) híbrido(s). Exclua os blocos antes.`,
+            { duration: 8000 }
+          );
+          setShowDeleteDialog(false);
+          return;
+        }
+        throw new Error(data.error || "Erro ao excluir material");
+      }
 
       toast.success("Material excluído com sucesso");
       setShowDeleteDialog(false);
@@ -274,7 +323,7 @@ export function MaterialCard({
       toast.success("Matéria atualizada com sucesso!");
       setShowSubjectDialog(false);
       router.refresh();
-    } catch (error) {
+    } catch {
       toast.error("Erro ao atualizar matéria");
     } finally {
       setIsUpdatingSubject(false);
@@ -343,6 +392,46 @@ export function MaterialCard({
                     </button>
                   )}
                 </div>
+                {/* ── Hybrid 80/20: badge de fornecedor ── */}
+                {!isSelectionMode && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      provider === "CFC"
+                        ? "bg-sky-500/10 border-sky-500/30 text-sky-600"
+                        : provider === "ESTRATEGIA"
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
+                        : "bg-muted border-border text-muted-foreground"
+                    }`}>
+                      {provider === "CFC" ? "📌 CFC" : provider === "ESTRATEGIA" ? "📚 Estratégia" : "📄 Outro"}
+                    </span>
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowProviderSelector((v) => !v); }}
+                      className="text-[9px] text-muted-foreground hover:text-accent transition-colors font-bold"
+                    >
+                      {showProviderSelector ? "Fechar" : "Classificar"}
+                    </button>
+                  </div>
+                )}
+                {/* ── Hybrid 80/20: seletor inline de provider ── */}
+                {!isSelectionMode && showProviderSelector && (
+                  <div className="mt-2 flex gap-1.5 animate-in fade-in slide-in-from-top-1 flex-wrap">
+                    {(["CFC", "ESTRATEGIA", "OTHER"] as const).map((p) => (
+                      <button
+                        key={p}
+                        disabled={isUpdatingProvider}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleProviderChange(p); }}
+                        className={`text-[9px] font-bold uppercase px-2 py-1 rounded-lg border transition-all ${
+                          provider === p
+                            ? "bg-accent text-white border-accent"
+                            : "bg-background border-border text-muted-foreground hover:border-accent/50 hover:text-accent"
+                        } disabled:opacity-50`}
+                      >
+                        {p === "CFC" ? "📌 CFC" : p === "ESTRATEGIA" ? "📚 Estratégia" : "📄 Outro"}
+                      </button>
+                    ))}
+                    {isUpdatingProvider && <Loader2 className="w-3.5 h-3.5 animate-spin text-accent self-center" />}
+                  </div>
+                )}
                 {["ERROR", "NEEDS_RETRY", "SUBJECT_DETECTION_FAILED", "AI_UNAVAILABLE", "VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(material.organizationStatus) && (() => {
                   const isQualityFailure = ["VALIDATION_FAILED", "TOC_MAPPING_FAILED", "NO_MAIN_THEORY_FOUND"].includes(material.organizationStatus);
                   const isHardError = material.organizationStatus === "ERROR" || isQualityFailure;

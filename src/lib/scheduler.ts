@@ -1,6 +1,22 @@
 import { prisma } from "./prisma";
 import { TRT4_STRATEGY } from "./strategies/trt4";
 import { getTodayRangeSP } from "./date-utils";
+import { calculateHybridMinutes, isHybridTimeError } from "./study/hybrid-estimated-time";
+
+export class HybridScheduleIntegrityError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "HybridScheduleIntegrityError";
+    this.code = code;
+  }
+}
+
+export interface SchedulerWarning {
+  code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE";
+  blockId: string;
+  message: string;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,16 +28,6 @@ interface SmartScheduleOptions {
   subjectsPerDay?: number;
   minutesPerSubject?: number;
 }
-
-const MAIN_7_SUBJECTS = [
-  "Direito do Trabalho",
-  "Direito Processual do Trabalho",
-  "Direito Administrativo",
-  "Direito Constitucional",
-  "Direito Civil",
-  "Direito Processual Civil",
-  "Língua Portuguesa"
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,19 +43,95 @@ function isStudyDay(date: Date, studyDays: number[]): boolean {
   return studyDays.includes(day);
 }
 
-function getNextStudyDay(from: Date, studyDays: number[]): Date {
-  const d = new Date(from);
-  d.setHours(0, 0, 0, 0);
-  while (!isStudyDay(d, studyDays)) {
-    d.setDate(d.getDate() + 1);
-  }
-  return d;
-}
-
 /**
  * Calcula a estimativa de tempo de estudo do bloco baseado em palavras ou páginas
  */
 export async function getOrComputeBlockMinutes(block: any, subjectName: string): Promise<number> {
+  if (block.methodology === "HYBRID_8020") {
+    if (block.estimatedStudyMinutes && block.estimatedStudyMinutes > 0) {
+      return block.estimatedStudyMinutes;
+    }
+
+    try {
+      const meta = block.aiAuditMetadata as any;
+      const availableMinutes = meta?.timeEstimation?.availableMinutes;
+      if (!availableMinutes || availableMinutes <= 0) {
+        throw new HybridScheduleIntegrityError(
+          "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
+          `availableMinutes ausente nos metadados do bloco híbrido ${block.id}.`
+        );
+      }
+
+      const sources = await prisma.studyBlockSource.findMany({
+        where: { studyBlockId: block.id },
+        include: {
+          segments: {
+            where: { disposition: "READ" }
+          }
+        }
+      });
+
+      if (!sources || sources.length === 0) {
+        throw new HybridScheduleIntegrityError(
+          "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
+          `Nenhuma fonte encontrada no banco para o bloco híbrido ${block.id}.`
+        );
+      }
+
+      let cfcReadWords = 0;
+      let deepeningReadWords = 0;
+
+      for (const source of sources) {
+        if (!source.segments || source.segments.length === 0) continue;
+
+        const pageConditions = source.segments.map((seg: any) => ({
+          materialId: source.materialId,
+          pageNumber: {
+            gte: seg.pageStart,
+            lte: seg.pageEnd
+          }
+        }));
+
+        const pages = await prisma.extractedContent.findMany({
+          where: { OR: pageConditions },
+          select: { text: true }
+        });
+
+        const combinedText = pages.map((p: any) => p.text).join(" ");
+        const wordsCount = combinedText.trim().split(/\s+/).filter(Boolean).length;
+
+        if (source.sourceRole === "ANCHOR_8020") {
+          cfcReadWords += wordsCount;
+        } else if (source.sourceRole === "DEEPENING") {
+          deepeningReadWords += wordsCount;
+        }
+      }
+
+      const result = calculateHybridMinutes({
+        cfcReadWords,
+        deepeningReadWords,
+        availableMinutes
+      });
+
+      if (!isHybridTimeError(result)) {
+        return result.finalMinutes;
+      }
+
+      throw new HybridScheduleIntegrityError(
+        "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
+        `Erro ao calcular tempo estimado híbrido para o bloco ${block.id}: ${result.code}`
+      );
+    } catch (err) {
+      if (err instanceof HybridScheduleIntegrityError) {
+        throw err;
+      }
+      throw new HybridScheduleIntegrityError(
+        "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
+        `Erro interno ao calcular minutos do bloco híbrido ${block.id}: ${(err as Error).message}`
+      );
+    }
+  }
+
   if (block.estimatedStudyMinutes && block.estimatedStudyMinutes > 0) {
     return block.estimatedStudyMinutes;
   }
@@ -364,6 +446,7 @@ export interface ScheduleGenerationResult {
     exceededMinutes: number;
     suggestion: string;
   } | null;
+  schedulerWarnings?: SchedulerWarning[];
 }
 
 export async function generateSmartSchedule(
@@ -384,7 +467,7 @@ export async function generateSmartSchedule(
   }
 }
 
-async function generateLegacyTrt4Schedule(
+export async function generateLegacyTrt4Schedule(
   userId: string,
   options: SmartScheduleOptions,
   userPrefs: any
@@ -393,6 +476,8 @@ async function generateLegacyTrt4Schedule(
     title = "Meu Cronograma de Estudos",
     dailyMinutes = 120,
   } = options;
+
+  const schedulerWarnings: SchedulerWarning[] = [];
 
   const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
   const studyDays = studyDaysStr.split(",").map((d: any) => parseInt(d.trim(), 10)).filter((n: any) => !isNaN(n));
@@ -566,7 +651,23 @@ async function generateLegacyTrt4Schedule(
           }
 
           const blockSubject = nextBlock.subject || eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
-          const blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject.name);
+          let blockMins = 0;
+          try {
+            blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject.name);
+          } catch (err) {
+            if (err instanceof HybridScheduleIntegrityError) {
+              // Loop-prevention: add to scheduledBlockIds so this block is not retried
+              // in the current run. This does NOT represent a successful schedule entry.
+              scheduledBlockIds.add(nextBlock.id);
+              schedulerWarnings.push({
+                code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
+                blockId: nextBlock.id,
+                message: err.message,
+              });
+              continue;
+            }
+            throw err;
+          }
           const isFallback = nextBlock.subjectId !== targetSubject.id;
           const reasonText = isFallback 
             ? `Roteiro: Teoria de ${blockSubject.name} (Fallback)` 
@@ -631,7 +732,20 @@ async function generateLegacyTrt4Schedule(
 
           if (!dayBlockIds.includes(thirdBlock.id)) {
             const blockSubject = thirdBlock.subject || eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
-            const blockMins = await getOrComputeBlockMinutes(thirdBlock, blockSubject?.name || "Complementar");
+            let blockMins = 0;
+            try {
+              blockMins = await getOrComputeBlockMinutes(thirdBlock, blockSubject?.name || "Complementar");
+            } catch (err) {
+              if (err instanceof HybridScheduleIntegrityError) {
+                schedulerWarnings.push({
+                  code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
+                  blockId: thirdBlock.id,
+                  message: err.message,
+                });
+                continue;
+              }
+              throw err;
+            }
 
             // Só adiciona se o bloco complementar não estourar de forma relevante
             if (blockMins <= remainingTheoryMinutes + 15) {
@@ -667,7 +781,7 @@ async function generateLegacyTrt4Schedule(
     });
   }
 
-  return { schedule, itemsCount: scheduleItemsData.length };
+  return { schedule, itemsCount: scheduleItemsData.length, schedulerWarnings };
 }
 
 async function generateDynamicSchedule(
@@ -679,6 +793,8 @@ async function generateDynamicSchedule(
     title = "Meu Cronograma de Estudos",
     dailyMinutes = 120,
   } = options;
+
+  const schedulerWarnings: SchedulerWarning[] = [];
 
   const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
   const studyDays = studyDaysStr.split(",").map((d: any) => parseInt(d.trim(), 10)).filter((n: any) => !isNaN(n));
@@ -862,7 +978,21 @@ async function generateDynamicSchedule(
           const nextBlock = blocksBySubject[subject.id]?.[0];
           if (!nextBlock) break;
 
-          const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
+          let blockMins = 0;
+          try {
+            blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
+          } catch (err) {
+            if (err instanceof HybridScheduleIntegrityError) {
+              blocksBySubject[subject.id].shift();
+              schedulerWarnings.push({
+                code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
+                blockId: nextBlock.id,
+                message: err.message,
+              });
+              continue;
+            }
+            throw err;
+          }
 
           // Regra de limite: se já agendamos algum bloco hoje, o próximo bloco deve caber no tempo restante
           if (scheduledTodayCount > 0 && blockMins > remainingTheoryMinutes) {
@@ -917,7 +1047,20 @@ async function generateDynamicSchedule(
           title: block.title,
           subjectName: block.subject?.name
         });
-        const mins = await getOrComputeBlockMinutes(block, block.subject?.name || "");
+        let mins = 0;
+        try {
+          mins = await getOrComputeBlockMinutes(block, block.subject?.name || "");
+        } catch (err) {
+          if (err instanceof HybridScheduleIntegrityError) {
+            schedulerWarnings.push({
+              code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
+              blockId: block.id,
+              message: err.message,
+            });
+            continue;
+          }
+          throw err;
+        }
         exceededMinutes += mins;
       }
     }
@@ -933,7 +1076,8 @@ async function generateDynamicSchedule(
   return { 
     schedule, 
     itemsCount: scheduleItemsData.length,
-    warning
+    warning,
+    schedulerWarnings,
   };
 }
 
@@ -1167,10 +1311,6 @@ export async function reorganizeOverdueSchedule(
   // Atrasados: movidos para firstStudyDate (não consomem slot de teoria, não bloqueiam)
   const overdueOther = eligiblePendingOther.filter(
     item => item.scheduledDate && item.scheduledDate < todayStart
-  );
-  // Futuros: permanecem nas datas planejadas originalmente (não shiftados agressivamente)
-  const futureOther = eligiblePendingOther.filter(
-    item => item.scheduledDate && item.scheduledDate >= allocationStartDate
   );
 
   // Configurar conjunto de blocos agendados para evitar duplicações
@@ -1680,7 +1820,8 @@ export async function reorganizeOverdueSchedule(
   };
 }
 
-export async function reorganizeActiveSchedule(userId: string, daysAheadParam = 30) {
+export async function reorganizeActiveSchedule(userId: string, _daysAheadParam = 30) {
+  void _daysAheadParam;
   // Redireciona chamadas legadas de forma totalmente compatível
   const now = new Date();
   const result = await reorganizeOverdueSchedule(userId, false, false, now);

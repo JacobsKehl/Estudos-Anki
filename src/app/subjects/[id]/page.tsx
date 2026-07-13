@@ -136,6 +136,14 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
                 <h2 className="text-xl font-semibold">Blocos de Estudo</h2>
               </div>
               <div className="flex items-center gap-2">
+                {process.env.ENABLE_HYBRID_8020 === "true" && (
+                  <Button asChild variant="outline" size="sm" className="rounded-xl border-accent/30 text-accent hover:bg-accent/10 font-bold h-9">
+                    <Link href={`/subjects/${subject.id}/hybrid-8020/new`}>
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
+                      Novo Bloco Híbrido 80/20
+                    </Link>
+                  </Button>
+                )}
                 <GenerateAllFlashcardsButton subjectId={subject.id} />
               </div>
             </div>
