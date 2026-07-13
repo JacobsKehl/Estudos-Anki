@@ -1,0 +1,102 @@
+name: Hybrid 80/20 Migration Validation
+
+on:
+  push:
+    branches:
+      - feature/hybrid-8020-study-blocks
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kehl_hybrid_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Validate Prisma Schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+        run: npx prisma validate
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+        run: npx prisma generate
+
+      - name: Apply Database Migrations (Deploy)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+        run: npx prisma migrate deploy
+
+      - name: Verify Migration Status
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+        run: npx prisma migrate status
+
+      - name: Run Hybrid Migration Integration Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/kehl_hybrid_ci
+        run: npx ts-node -T -P tsconfig.scripts.json scripts/test-hybrid-migration.ts
+
+      - name: Type Check (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Lint Code
+        run: npm run lint
+
+      - name: Run Jest Test Suites
+        run: npm test -- --runInBand
+
+      - name: Verify Vercel Build Migration Policy
+        run: node scripts/test-vercel-build-policy.js
+
+      - name: Run Next.js Build Verification
+        run: npm run build
+
+      - name: Check Git Diff Guidelines
+        run: git diff --check
+
+      - name: Run Study Timer Verification Script
+        run: npx ts-node -T -P tsconfig.scripts.json scripts/test-study-timer.ts
+
+      - name: Run User Global Timer Verification Script
+        run: npx ts-node -T -P tsconfig.scripts.json scripts/test-user-global-timer.ts
+
+      - name: Run Weekly Review UI Verification Script
+        run: npx ts-node -T -P tsconfig.scripts.json scripts/test-weekly-review-ui.ts
+
+      - name: Run Weekly Review Behavior Verification Script
+        run: npx ts-node -T -P tsconfig.scripts.json scripts/test-weekly-review-behavior.ts

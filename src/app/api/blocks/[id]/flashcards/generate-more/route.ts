@@ -86,7 +86,12 @@ export async function POST(
       where: { id, userId },
       include: {
         material: true,
-        subject: true
+        subject: true,
+        sources: {
+          include: {
+            segments: true
+          }
+        }
       }
     });
 
@@ -113,24 +118,151 @@ export async function POST(
       where: { studyBlockId: id }
     });
 
-    // Validar se já atingiu o limite máximo de 18 cards por bloco
-    if (existingCards.length >= 18) {
+    // Validar se já atingiu o limite máximo de 18 cards por bloco (apenas para lineares)
+    if (block.methodology !== "HYBRID_8020" && existingCards.length >= 18) {
       return NextResponse.json({ 
         error: "Este bloco já atingiu o limite máximo de 18 flashcards. Geração bloqueada." 
       }, { status: 400 });
     }
 
     // 5. Obter páginas e conteúdo do bloco
-    const extractedContent = await prisma.extractedContent.findMany({
-      where: {
-        materialId: block.materialId,
+    let extractedContent: any[] = [];
+
+    if (block.methodology === "HYBRID_8020") {
+      const maxNewAllowed = Math.max(0, Math.min(5, 18 - existingCards.length));
+
+      if (maxNewAllowed === 0) {
+        return NextResponse.json({
+          message: "Este bloco já atingiu o limite de flashcards.",
+          count: 0,
+          flashcards: []
+        });
+      }
+
+      const { getHybridFlashcardProvider } = require("@/lib/ai/providers/hybrid-registry");
+      const provider = getHybridFlashcardProvider();
+
+      if (!provider) {
+        return NextResponse.json({
+          error: "O motor de flashcards híbridos ainda não está configurado.",
+          code: "HYBRID_FLASHCARD_ENGINE_NOT_CONFIGURED"
+        }, { status: 503 });
+      }
+
+      const readSegments = block.sources.flatMap((s: any) =>
+        (s.segments || [])
+          .filter((seg: any) => seg.disposition === "READ")
+          .map((seg: any) => ({
+            materialId: s.materialId,
+            pageStart: seg.pageStart,
+            pageEnd: seg.pageEnd
+          }))
+      );
+
+      if (readSegments.length === 0) {
+        return NextResponse.json({
+          error: "Nenhum segmento de leitura (READ) configurado para este bloco híbrido."
+        }, { status: 400 });
+      }
+
+      const pagesConditions = readSegments.map((seg: any) => ({
+        materialId: seg.materialId,
         pageNumber: {
-          gte: block.pageStart,
-          lte: block.pageEnd
+          gte: seg.pageStart,
+          lte: seg.pageEnd
         }
-      },
-      orderBy: { pageNumber: "asc" }
-    });
+      }));
+
+      const dbPages = await prisma.extractedContent.findMany({
+        where: { OR: pagesConditions },
+        orderBy: [
+          { materialId: "asc" },
+          { pageNumber: "asc" }
+        ]
+      });
+
+      if (dbPages.length === 0) {
+        return NextResponse.json({
+          error: "Texto extraído não encontrado para os segmentos de leitura do bloco."
+        }, { status: 400 });
+      }
+
+      const pagesInput = dbPages.map((p: any) => ({
+        materialId: p.materialId,
+        pageNumber: p.pageNumber,
+        text: p.text
+      }));
+
+      const existingSnapshots = existingCards.map((c: any) => ({
+        question: c.question,
+        answer: c.answer,
+        materialId: c.materialId,
+        sourcePageStart: c.sourcePageStart,
+        sourcePageEnd: c.sourcePageEnd
+      }));
+
+      const { generateMoreHybridFlashcards } = require("@/lib/ai/hybrid-flashcards");
+      const generatedSeeds = await generateMoreHybridFlashcards({
+        studyBlockId: block.id,
+        pages: pagesInput,
+        existingCards: existingSnapshots,
+        requestedAmount: maxNewAllowed
+      }, provider);
+
+      if (generatedSeeds.length === 0) {
+        return NextResponse.json({
+          message: "Não encontramos novos cards relevantes sem repetir os já existentes.",
+          count: 0,
+          flashcards: []
+        });
+      }
+
+      const savedCards = await prisma.$transaction(
+        generatedSeeds.map((seed: any) =>
+          (prisma as any).flashcard.create({
+            data: {
+              userId,
+              subjectId: block.subjectId,
+              materialId: seed.sourceMaterialId,
+              studyBlockId: block.id,
+              question: seed.question,
+              answer: seed.answer,
+              type: seed.type || "QUESTION_ANSWER",
+              status: "PENDING_APPROVAL",
+              difficulty: "NORMAL_PLUS",
+              sourcePageStart: seed.sourcePageStart,
+              sourcePageEnd: seed.sourcePageEnd,
+              generationReason: seed.generationReason,
+              reviewState: "NEW",
+              nextReviewAt: new Date(),
+              approvedAt: null,
+              learningStep: 0,
+              easeFactor: 2.5,
+              intervalDays: 0,
+              repetitionCount: 0,
+              lapseCount: 0
+            }
+          })
+        )
+      );
+
+      return NextResponse.json({
+        message: `${savedCards.length} flashcards adicionais criados com sucesso.`,
+        count: savedCards.length,
+        flashcards: savedCards
+      });
+    } else {
+      extractedContent = await prisma.extractedContent.findMany({
+        where: {
+          materialId: block.materialId,
+          pageNumber: {
+            gte: block.pageStart,
+            lte: block.pageEnd
+          }
+        },
+        orderBy: { pageNumber: "asc" }
+      });
+    }
 
     const fullText = extractedContent.map(c => c.text).join("\n\n");
     if (!fullText || fullText.trim().length < 50) {

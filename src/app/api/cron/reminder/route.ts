@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
 import { getMockUserId } from "@/lib/auth-mock";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
@@ -66,9 +65,12 @@ function generateEmailHtml(
               const pdfName = material 
                 ? (material.originalFileName || (material as any).originalName || material.fileName || (material as any).title || "PDF não identificado") 
                 : "PDF não identificado";
+              const isBlockHybrid = t.studyBlock?.methodology === "HYBRID_8020";
               const pageStart = t.studyBlock?.pageStart;
               const pageEnd = t.studyBlock?.pageEnd;
-              const pageRange = pageStart !== undefined && pageEnd !== undefined ? `Páginas: ${pageStart} - ${pageEnd}` : "";
+              const pageRange = isBlockHybrid
+                ? "Método: Híbrido 80/20"
+                : (pageStart !== undefined && pageEnd !== undefined ? `Páginas: ${pageStart} - ${pageEnd}` : "");
               const pdfHtml = material 
                 ? `<div style="font-size: 13px; color: #4a5568; margin-top: 2px;">
                      <strong>PDF:</strong> ${pdfName} ${pageRange ? `(${pageRange})` : ""}
@@ -157,9 +159,12 @@ function generateEmailHtml(
     const nextPdfName = nextMaterial 
       ? (nextMaterial.originalFileName || (nextMaterial as any).originalName || nextMaterial.fileName || (nextMaterial as any).title || "PDF não identificado") 
       : "PDF não identificado";
+    const isNextHybrid = nextTheoryItem.studyBlock?.methodology === "HYBRID_8020";
     const nextPageStart = nextTheoryItem.studyBlock?.pageStart;
     const nextPageEnd = nextTheoryItem.studyBlock?.pageEnd;
-    const nextPageRange = nextPageStart !== undefined && nextPageEnd !== undefined ? `Páginas: ${nextPageStart} - ${nextPageEnd}` : "";
+    const nextPageRange = isNextHybrid
+      ? "Método: Híbrido 80/20"
+      : (nextPageStart !== undefined && nextPageEnd !== undefined ? `Páginas: ${nextPageStart} - ${nextPageEnd}` : "");
     
     nextTheoryItemHtml = `
       <!-- Section: Sugestão de Adiantamento -->
@@ -552,7 +557,7 @@ export async function GET(req: NextRequest) {
           isAdmin = sessionUser.email === adminEmail;
         }
       }
-    } catch (err) {
+    } catch {
       // Sem sessão ativa - comum para disparos de cron
     }
 

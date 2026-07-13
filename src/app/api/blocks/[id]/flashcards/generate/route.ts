@@ -22,6 +22,16 @@ export async function POST(
       }
     });
 
+    if (!block) {
+      return NextResponse.json({ error: "Ops! Não encontramos esse bloco de estudo." }, { status: 404 });
+    }
+
+    if (block.methodology === "HYBRID_8020") {
+      return NextResponse.json({
+        error: "Geração em lote de flashcards legados não é permitida para blocos híbridos."
+      }, { status: 409 });
+    }
+
     // Bloquear geração múltipla: verificar se já existem flashcards vinculados a este bloco
     const existingCardsCount = await prisma.flashcard.count({
       where: { studyBlockId: id }
@@ -31,10 +41,6 @@ export async function POST(
       return NextResponse.json({ 
         error: "Você já gerou flashcards para este bloco. Não é possível gerar novamente para evitar duplicidade." 
       }, { status: 400 });
-    }
-
-    if (!block) {
-      return NextResponse.json({ error: "Ops! Não encontramos esse bloco de estudo." }, { status: 404 });
     }
 
     // 2. Fetch extracted content for this block's pages

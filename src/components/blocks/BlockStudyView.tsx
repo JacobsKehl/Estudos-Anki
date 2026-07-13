@@ -83,6 +83,8 @@ interface ContinueSuggestion {
 interface BlockStudyViewProps {
   block: any;
   content: any[];
+  hybridContent?: any[];
+  isHybridEnabled?: boolean;
   stats: {
     total: number;
     pending: number;
@@ -117,7 +119,16 @@ const getReturnIcon = (path: string) => {
   return ArrowLeft;
 };
 
-export function BlockStudyView({ block, content, returnTo, from, scheduleItemId, secondPass = false }: BlockStudyViewProps) {
+export function BlockStudyView({
+  block,
+  content,
+  hybridContent = [],
+  isHybridEnabled = false,
+  returnTo,
+  from,
+  scheduleItemId,
+  secondPass = false
+}: BlockStudyViewProps) {
   const router = useRouter();
 
   // Get return target with validation (no external URL allowed to avoid open redirect)
@@ -236,6 +247,11 @@ export function BlockStudyView({ block, content, returnTo, from, scheduleItemId,
 
   const [activeTab, setActiveTab] = React.useState<"pdf" | "text" | "apoios">("pdf");
   const hasApoios = block.supportMaterials && block.supportMaterials.length > 0;
+
+  // ─── INÍCIO HYBRID 80/20 HOOKS ───────────────────────────────────────────
+  const isHybrid = block.methodology === "HYBRID_8020";
+  const [hybridTab, setHybridTab] = React.useState<"anchor" | "deepening" | "deprioritized" | "cards">("anchor");
+  // ─── FIM HYBRID 80/20 HOOKS ─────────────────────────────────────────────
 
   const [pdfViewerProps, setPdfViewerProps] = React.useState({
     materialId: block.materialId,
@@ -794,6 +810,323 @@ export function BlockStudyView({ block, content, returnTo, from, scheduleItemId,
               Reabrir bloco e reestudar teoria
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isHybrid) {
+    if (!isHybridEnabled) {
+      return (
+        <div className="max-w-2xl mx-auto p-8 text-center space-y-6 bg-card rounded-3xl border border-border/80 shadow-2xl mt-10">
+          <h1 className="text-2xl font-bold text-foreground">Metodologia Híbrida 80/20</h1>
+          <p className="text-muted-foreground leading-relaxed text-sm">
+            Esta funcionalidade está temporariamente indisponível nesta versão. Ative a flag correspondente no servidor para começar.
+          </p>
+          <Button asChild className="rounded-xl font-bold">
+            <Link href={returnTarget.href}>{returnTarget.label}</Link>
+          </Button>
+        </div>
+      );
+    }
+
+    if (!block.sources || block.sources.length === 0) {
+      return (
+        <div className="max-w-2xl mx-auto p-8 text-center space-y-6 bg-card rounded-3xl border border-border/80 shadow-2xl mt-10">
+          <h1 className="text-2xl font-bold text-foreground">Bloco Híbrido Sem Fontes</h1>
+          <p className="text-muted-foreground leading-relaxed text-sm">
+            Nenhum material de origem (CFC ou Estratégia) foi vinculado a este bloco híbrido.
+          </p>
+          <Button asChild className="rounded-xl font-bold">
+            <Link href={returnTarget.href}>{returnTarget.label}</Link>
+          </Button>
+        </div>
+      );
+    }
+
+    const anchorSource = block.sources.find((s: any) => s.sourceRole === "ANCHOR_8020");
+    const justification = block.aiAuditMetadata?.justification || {};
+
+    const anchorPages = (hybridContent || []).filter(
+      (c: any) => c.sourceRole === "ANCHOR_8020" && c.disposition === "READ"
+    );
+
+    const deepeningPages = (hybridContent || []).filter(
+      (c: any) => c.sourceRole === "DEEPENING" && c.disposition === "READ"
+    );
+
+    const deprioritizedPages = (hybridContent || []).filter(
+      (c: any) => c.disposition === "CONSULT" || c.disposition === "SKIP"
+    );
+
+    return (
+      <div className="max-w-5xl mx-auto space-y-8 pb-32 animate-in fade-in duration-700">
+        <header className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="iconOnly" className="rounded-full hover:bg-accent/5" aria-label={returnTarget.label} asChild>
+              <Link href={returnTarget.href}>
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+              <Link href={`/subjects/${block.subjectId}`} className="hover:text-accent transition-colors">
+                {block.subject.name}
+              </Link>
+              <ChevronRight className="w-4 h-4 opacity-30" />
+              <span className="text-foreground/60">Bloco Híbrido 80/20</span>
+            </div>
+          </div>
+
+          <div className="bg-card p-8 rounded-[2.5rem] border border-border/40 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-6 flex-wrap">
+              <div className="space-y-1 flex-1 min-w-[280px]">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-3xl font-bold tracking-tight">{block.title}</h1>
+                  <Badge className="bg-accent text-white rounded-full px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                    Híbrido 80/20
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Cruzamento inteligente: CFC (Âncora) + Estratégia (Aprofundamento)
+                </p>
+              </div>
+
+              {/* Timer Widget para Bloco Híbrido */}
+              {isHydrated && block.status !== "COMPLETED" && (
+                <div className="bg-background/50 rounded-2xl border border-border/30 p-4 space-y-2 min-w-[240px] md:max-w-xs shrink-0">
+                  <h3 className="font-bold text-[10px] flex items-center gap-1.5 text-muted-foreground uppercase tracking-widest">
+                    <Clock className="w-3.5 h-3.5 text-accent" />
+                    Cronômetro do Bloco
+                  </h3>
+
+                  {hasOtherBlockSession ? (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold leading-relaxed">
+                        Existe outro bloco com cronômetro active.
+                      </p>
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        className="w-full rounded-xl font-bold text-[10px] h-8"
+                        onClick={() => setShowConflictModal(true)}
+                      >
+                        Gerenciar Conflito
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="font-mono text-xl font-black tabular-nums tracking-tight text-foreground" data-testid="block-timer-display">
+                        {isCurrentBlockSession ? formatDuration(elapsedSeconds) : "00:00"}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="soft"
+                          size="sm"
+                          className="rounded-xl h-8 w-8 p-0 flex items-center justify-center text-accent bg-accent/5 hover:bg-accent/10 transition-all"
+                          disabled={!isCurrentBlockSession}
+                          onClick={() => {
+                            if (!isCurrentBlockSession) return;
+                            if (isRunning) {
+                              pause();
+                            } else {
+                              resume();
+                            }
+                          }}
+                          aria-label={isRunning ? "Pausar bloco" : "Iniciar bloco"}
+                        >
+                          {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-xl h-8 w-8 p-0 flex items-center justify-center text-muted-foreground hover:bg-muted transition-all"
+                          disabled={!isCurrentBlockSession}
+                          onClick={() => {
+                            if (isCurrentBlockSession) {
+                              reset();
+                            }
+                          }}
+                          aria-label="Resetar bloco"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {justification.anchorChoice && (
+              <div className="text-xs bg-muted/30 p-4 rounded-2xl border border-border/40 space-y-2">
+                <p className="font-bold text-foreground">💡 Raciocínio de Seleção 80/20:</p>
+                <p className="text-muted-foreground leading-relaxed">{justification.anchorChoice}</p>
+                {justification.deepeningChoice && (
+                  <p className="text-muted-foreground leading-relaxed mt-1">{justification.deepeningChoice}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </header>
+
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 p-1 bg-muted/30 rounded-2xl w-fit flex-wrap">
+            <Button
+              variant={hybridTab === "anchor" ? "secondary" : "ghost"}
+              size="sm"
+              className={`rounded-xl h-9 px-6 text-xs font-bold uppercase tracking-wider ${
+                hybridTab === "anchor" ? "bg-white shadow-sm" : ""
+              }`}
+              onClick={() => setHybridTab("anchor")}
+            >
+              📌 Ancoragem ({anchorPages.length} págs)
+            </Button>
+            <Button
+              variant={hybridTab === "deepening" ? "secondary" : "ghost"}
+              size="sm"
+              className={`rounded-xl h-9 px-6 text-xs font-bold uppercase tracking-wider ${
+                hybridTab === "deepening" ? "bg-white shadow-sm" : ""
+              }`}
+              onClick={() => setHybridTab("deepening")}
+            >
+              📚 Aprofundamento ({deepeningPages.length} págs)
+            </Button>
+            <Button
+              variant={hybridTab === "deprioritized" ? "secondary" : "ghost"}
+              size="sm"
+              className={`rounded-xl h-9 px-6 text-xs font-bold uppercase tracking-wider ${
+                hybridTab === "deprioritized" ? "bg-white shadow-sm" : ""
+              }`}
+              onClick={() => setHybridTab("deprioritized")}
+            >
+              ⚠️ Depriorizado ({deprioritizedPages.length} págs)
+            </Button>
+            <Button
+              variant={hybridTab === "cards" ? "secondary" : "ghost"}
+              size="sm"
+              className={`rounded-xl h-9 px-6 text-xs font-bold uppercase tracking-wider ${
+                hybridTab === "cards" ? "bg-white shadow-sm" : ""
+              }`}
+              onClick={() => setHybridTab("cards")}
+            >
+              🧠 Flashcards ({curatorCards.length})
+            </Button>
+          </div>
+
+          <main className="bg-card border border-border/40 rounded-[2.5rem] p-6 md:p-8 min-h-[400px] flex flex-col justify-between">
+            {hybridTab === "anchor" && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-foreground">Material de Ancoragem CFC</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Origem: <span className="font-semibold">{anchorSource?.material?.fileName}</span>. Exibindo apenas páginas selecionadas como leitura obrigatória (READ).
+                  </p>
+                </div>
+                {anchorPages.length === 0 ? (
+                  <div className="text-center py-10 text-xs text-muted-foreground">
+                    Nenhuma página CFC configurada para leitura neste bloco.
+                  </div>
+                ) : (
+                  <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
+                    {anchorPages.map((p, idx) => (
+                      <div key={idx} className="p-5 rounded-2xl border border-border/80 bg-background/50 space-y-3">
+                        <div className="flex justify-between items-center text-xs font-bold text-accent">
+                          <span>PÁGINA {p.pageNumber}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase bg-muted px-2 py-0.5 rounded-md font-bold">READ</span>
+                        </div>
+                        <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line font-serif">{p.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {hybridTab === "deepening" && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-foreground">Aprofundamento Estratégia</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Exibindo apenas os trechos de aprofundamento pedagógico (READ).
+                  </p>
+                </div>
+                {deepeningPages.length === 0 ? (
+                  <div className="text-center py-10 text-xs text-muted-foreground">
+                    Nenhuma página do Estratégia configurada para leitura obrigatória neste bloco.
+                  </div>
+                ) : (
+                  <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
+                    {deepeningPages.map((p, idx) => (
+                      <div key={idx} className="p-5 rounded-2xl border border-border/80 bg-background/50 space-y-3">
+                        <div className="flex justify-between items-center text-xs font-bold text-emerald-600">
+                          <span>PÁGINA {p.pageNumber} ({p.sourceFileName})</span>
+                          <span className="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-md font-bold">READ</span>
+                        </div>
+                        <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line font-serif">{p.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {hybridTab === "deprioritized" && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-foreground">Conteúdos Depriorizados (SKIP & CONSULT)</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Páginas que foram analisadas, mas classificadas como consulta complementar ou descartadas para maximizar o 80/20.
+                  </p>
+                </div>
+                {deprioritizedPages.length === 0 ? (
+                  <div className="text-center py-10 text-xs text-muted-foreground">
+                    Nenhum conteúdo classificado como SKIP ou CONSULT neste bloco.
+                  </div>
+                ) : (
+                  <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
+                    {deprioritizedPages.map((p, idx) => {
+                      const source = block.sources.find((s: any) => s.materialId === p.materialId);
+                      const segment = source?.segments?.find((seg: any) => p.pageNumber >= seg.pageStart && p.pageNumber <= seg.pageEnd);
+                      const isSkip = p.disposition === "SKIP";
+                      return (
+                        <div key={idx} className="p-5 rounded-2xl border border-border/80 bg-background/30 space-y-3 opacity-75">
+                          <div className="flex justify-between items-center text-xs font-bold">
+                            <span className="text-muted-foreground">PÁGINA {p.pageNumber} ({p.sourceFileName})</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                              isSkip
+                                ? "bg-red-500/10 text-red-600 border border-red-500/20"
+                                : "bg-sky-500/10 text-sky-600 border border-sky-500/20"
+                            }`}>
+                              {p.disposition}
+                            </span>
+                          </div>
+                          {segment?.reason && (
+                            <p className="text-xs italic text-muted-foreground bg-muted/40 p-2.5 rounded-xl border border-border/30">
+                              <strong>Motivo da classificação:</strong> {segment.reason}
+                            </p>
+                          )}
+                          <details className="cursor-pointer">
+                            <summary className="text-xs text-accent hover:underline font-bold py-1">Ver texto da página</summary>
+                            <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-line mt-2 border-t pt-2 font-serif">{p.text}</p>
+                          </details>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {hybridTab === "cards" && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <CardCurator
+                  blockId={block.id}
+                  initialCards={curatorCards}
+                  onCurationComplete={handleCurationComplete}
+                />
+              </div>
+            )}
+          </main>
         </div>
       </div>
     );

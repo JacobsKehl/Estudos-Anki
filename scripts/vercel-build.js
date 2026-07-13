@@ -7,10 +7,17 @@ try {
   console.log('> prisma generate');
   execSync('npx prisma generate', { stdio: 'inherit' });
 
-  // 2. Run migrations only if we are building on Vercel
-  if (process.env.VERCEL === '1') {
-    console.log('> Vercel detected. Running database migrations...');
+  // 2. Run migrations only if we are building on Vercel Production
+  const { shouldRunDatabaseMigrations } = require('./vercel-build-policy');
+  if (shouldRunDatabaseMigrations(process.env)) {
+    console.log('> Vercel production deployment detected. Running database migrations...');
     execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  } else if (process.env.VERCEL === '1') {
+    if (process.env.VERCEL_ENV === 'preview') {
+      console.log('> Vercel preview deployment detected. Skipping database migrations.');
+    } else {
+      console.log(`> Vercel ${process.env.VERCEL_ENV || 'unknown'} deployment detected. Skipping database migrations.`);
+    }
   } else {
     console.log('> Local build detected. Skipping database migrations.');
   }
