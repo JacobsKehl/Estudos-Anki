@@ -80,6 +80,9 @@ jobs:
       - name: Run Jest Test Suites
         run: npm test -- --runInBand
 
+      - name: Verify Vercel Build Migration Policy
+        run: node scripts/test-vercel-build-policy.js
+
       - name: Run Next.js Build Verification
         run: npm run build
 
