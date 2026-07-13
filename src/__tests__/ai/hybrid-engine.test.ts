@@ -81,8 +81,8 @@ const BASE_SOURCES: HybridSourceSeed[] = [
 ];
 
 const BASE_SCOPE = {
-  cfcPageRanges: [{ pageStart: 1, pageEnd: 50 }],
-  deepeningMaterials: [{ materialId: "mat-strat-1", pageRanges: [{ pageStart: 1, pageEnd: 200 }] }],
+  cfcPageNumbers: [1, 2, 3, 4, 5],
+  deepeningMaterials: [{ materialId: "mat-strat-1", pageNumbers: [10, 11, 12, 13, 14, 15] }],
 };
 
 // ── validateHybridInput ───────────────────────────────────────────────────────

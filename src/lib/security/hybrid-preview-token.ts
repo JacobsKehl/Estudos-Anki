@@ -11,7 +11,7 @@
  *   - O token completo nunca deve ser logado.
  */
 
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { canonicalStringify, sha256 } from "./canonical-json";
 
 /** Duração de validade do token em milissegundos (30 minutos) */
@@ -125,12 +125,26 @@ export function validatePreviewToken(
   let wire: WireToken;
   try {
     const decoded = Buffer.from(token, "base64url").toString("utf8");
-    wire = JSON.parse(decoded) as WireToken;
+    const parsed = JSON.parse(decoded);
+    if (!parsed || typeof parsed !== "object") {
+      return { valid: false, reason: "Token malformado (não é objeto JSON)" };
+    }
+    wire = parsed as WireToken;
   } catch {
     return { valid: false, reason: "Token malformado (não é base64url JSON válido)" };
   }
 
   const { payload, signature } = wire;
+
+  if (
+    typeof signature !== "string" ||
+    !/^[a-f0-9]{64}$/i.test(signature)
+  ) {
+    return {
+      valid: false,
+      reason: "Assinatura do token inválida",
+    };
+  }
 
   if (
     !payload ||
@@ -144,9 +158,16 @@ export function validatePreviewToken(
     return { valid: false, reason: "Payload do token incompleto ou inválido" };
   }
 
-  // Verificar assinatura antes de qualquer outra coisa
+  // Verificar assinatura antes de qualquer outra coisa (usando timingSafeEqual)
   const expectedSignature = signPayload(payload, secret);
-  if (signature !== expectedSignature) {
+  const sigBuffer = Buffer.from(signature, "hex");
+  const expectedBuffer = Buffer.from(expectedSignature, "hex");
+
+  if (sigBuffer.length !== expectedBuffer.length) {
+    return { valid: false, reason: "Assinatura do token inválida" };
+  }
+
+  if (!timingSafeEqual(sigBuffer, expectedBuffer)) {
     return { valid: false, reason: "Assinatura do token inválida" };
   }
 

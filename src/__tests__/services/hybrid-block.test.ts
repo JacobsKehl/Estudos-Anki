@@ -65,8 +65,8 @@ describe("createHybridBlock - Serviço Transacional", () => {
       batchConfig: { maxInputTokensPerBatch: 12000, maxCharactersPerBatch: 50000, maxPagesPerBatch: 12 },
       analyzedScope: {
         cfcMaterialId: "cfc-1",
-        cfcPageRanges: [{ pageStart: 1, pageEnd: 3 }],
-        deepeningMaterials: [{ materialId: "strat-1", pageRanges: [{ pageStart: 1, pageEnd: 20 }] }],
+        cfcPageNumbers: [1, 2, 3],
+        deepeningMaterials: [{ materialId: "strat-1", pageNumbers: [1, 2, 3, 4, 5] }],
       },
       sourceFingerprintCfc: "hash-cfc",
       sourceFingerprintsDeepening: [{ materialId: "strat-1", fingerprint: "hash-strat" }],

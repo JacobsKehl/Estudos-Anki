@@ -9,8 +9,11 @@ import {
   DEFAULT_BATCH_CONFIG,
   type HybridBlockOutput,
   type HybridInputMaterial,
+  type HybridMappedPage,
+  type HybridCandidatePage,
 } from "@/lib/ai/hybrid-engine";
 import { getHybridProvider } from "@/lib/ai/providers/hybrid-registry";
+import { canonicalHash } from "@/lib/security/canonical-json";
 
 export async function POST(req: NextRequest) {
   // ── Feature flag ─────────────────────────────────────────────────────────
@@ -178,6 +181,25 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    const providerMetadata = provider.getMetadata();
+    if (
+      !providerMetadata ||
+      typeof providerMetadata.provider !== "string" ||
+      !providerMetadata.provider.trim() ||
+      typeof providerMetadata.model !== "string" ||
+      !providerMetadata.model.trim() ||
+      typeof providerMetadata.promptVersion !== "string" ||
+      !providerMetadata.promptVersion.trim()
+    ) {
+      return NextResponse.json(
+        {
+          error: "Metadados do provider de IA inválidos ou incompletos.",
+          code: "INVALID_PROVIDER_METADATA",
+        },
+        { status: 503 }
+      );
+    }
+
     const engineInput = {
       generationRunId,
       subject: subject.name,
@@ -188,9 +210,9 @@ export async function POST(req: NextRequest) {
       goal: goal || "",
       availableMinutes: availableMinutes || 60,
       aiConfig: {
-        provider: "gemini",
-        model: "gemini-2.5-flash",
-        promptVersion: "v1.0.0",
+        provider: providerMetadata.provider,
+        model: providerMetadata.model,
+        promptVersion: providerMetadata.promptVersion,
       },
     };
 
@@ -204,14 +226,21 @@ export async function POST(req: NextRequest) {
 
     // ── Rodar pipeline com o provider injetado ──────────────────────────────
     // Etapa A: Mapeamento de páginas do Estratégia
-    const estMappedPages: { pageNumber: number; topics: string[]; summary: string }[] = [];
+    const estMappedPages: HybridMappedPage[] = [];
     for (const estMat of estrategiaMaterialsInput) {
       const mapped = await provider.mapPages({
         materialId: estMat.id,
         pages: estMat.textByPage,
         batchConfig: DEFAULT_BATCH_CONFIG,
       });
-      estMappedPages.push(...mapped);
+      estMappedPages.push(
+        ...mapped.map((p) => ({
+          materialId: estMat.id,
+          pageNumber: p.pageNumber,
+          topics: p.topics,
+          summary: p.summary,
+        }))
+      );
     }
 
     // Etapa A (CFC): Obter tópicos do CFC
@@ -230,7 +259,12 @@ export async function POST(req: NextRequest) {
       examProfile: "FCC",
     });
 
-    if (candidatePages.length === 0) {
+    // ── Validação rigorosa das referências candidatas ────────────────────────
+    const validEstrategiaMaterialIds = estrategiaMaterials.map((m) => m.id);
+    const seenCandidates = new Set<string>();
+    const normalizedCandidates: HybridCandidatePage[] = [];
+
+    if (!Array.isArray(candidatePages) || candidatePages.length === 0) {
       return NextResponse.json(
         {
           error: "A análise 80/20 não identificou nenhuma página candidata de aprofundamento no material do Estratégia para o tema selecionado.",
@@ -240,10 +274,79 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Etapa C: Deep Analysis
-    const filteredEstPages = estPagesDb
-      .filter((p) => candidatePages.includes(p.pageNumber))
-      .map((p) => ({ materialId: p.materialId, pageNumber: p.pageNumber, text: p.text }));
+    for (const c of candidatePages) {
+      // 1. Validar estrutura básica do candidato
+      if (
+        !c ||
+        typeof c.materialId !== "string" ||
+        typeof c.pageNumber !== "number" ||
+        !Number.isInteger(c.pageNumber) ||
+        c.pageNumber <= 0
+      ) {
+        return NextResponse.json(
+          { error: "O provider retornou referências candidatas malformadas.", code: "INVALID_CANDIDATE_REFERENCES" },
+          { status: 422 }
+        );
+      }
+
+      // 2. Validar se o materialId pertence aos materiais Estratégia selecionados
+      if (!validEstrategiaMaterialIds.includes(c.materialId)) {
+        return NextResponse.json(
+          { error: `O provider retornou um materialId desconhecido: '${c.materialId}'.`, code: "INVALID_CANDIDATE_REFERENCES" },
+          { status: 422 }
+        );
+      }
+
+      // 3. Validar se a combinação materialId + pageNumber existe no banco (estPagesDb)
+      const existsInDb = estPagesDb.some(
+        (p) => p.materialId === c.materialId && p.pageNumber === c.pageNumber
+      );
+      if (!existsInDb) {
+        return NextResponse.json(
+          { error: `A página candidata ${c.pageNumber} do material '${c.materialId}' não existe no banco de dados.`, code: "INVALID_CANDIDATE_REFERENCES" },
+          { status: 422 }
+        );
+      }
+
+      // 4. Normalizar duplicatas
+      const key = `${c.materialId}:${c.pageNumber}`;
+      if (!seenCandidates.has(key)) {
+        seenCandidates.add(key);
+        normalizedCandidates.push({
+          materialId: c.materialId,
+          pageNumber: c.pageNumber,
+        });
+      }
+    }
+
+    if (normalizedCandidates.length === 0) {
+      return NextResponse.json(
+        {
+          error: "Nenhuma página candidata válida de aprofundamento foi identificada após normalização.",
+          code: "NO_CANDIDATE_PAGES_FOUND",
+        },
+        { status: 422 }
+      );
+    }
+
+    // 5. Ordenar deterministicamente por materialId e pageNumber
+    normalizedCandidates.sort((a, b) => {
+      const cmp = a.materialId.localeCompare(b.materialId);
+      if (cmp !== 0) return cmp;
+      return a.pageNumber - b.pageNumber;
+    });
+
+    // Etapa C: Deep Analysis (usando exatamente a lista normalizada e ordenada para garantir ordem determinística)
+    const filteredEstPages = normalizedCandidates.map((c) => {
+      const dbPage = estPagesDb.find(
+        (p) => p.materialId === c.materialId && p.pageNumber === c.pageNumber
+      )!;
+      return {
+        materialId: dbPage.materialId,
+        pageNumber: dbPage.pageNumber,
+        text: dbPage.text,
+      };
+    });
 
     const analysisResult = await provider.deepAnalysis({
       cfcPages: cfcMaterialInput.textByPage,
@@ -256,6 +359,18 @@ export async function POST(req: NextRequest) {
 
     // ── Montar o preview de saída real ───────────────────────────────────────
     const now = new Date().toISOString();
+
+    // Obter lista ordenada e única de páginas analisadas por material
+    const cfcFingerprintInput = cfcMaterialInput.textByPage
+      .map((p) => ({
+        materialId: cfcMaterialId,
+        pageNumber: p.pageNumber,
+        text: p.text,
+      }))
+      .sort((a, b) => a.pageNumber - b.pageNumber);
+
+    const cfcFingerprint = canonicalHash(cfcFingerprintInput);
+
     const preview: HybridBlockOutput = {
       generationRunId,
       subject: subject.name,
@@ -268,9 +383,9 @@ export async function POST(req: NextRequest) {
       fccFocusPoints: analysisResult.fccFocusPoints,
       flashcardSeeds: analysisResult.flashcardSeeds,
       aiAuditMetadata: {
-        provider: "gemini",
-        modelUsed: "gemini-2.5-flash",
-        promptVersion: "v1.0.0",
+        provider: providerMetadata.provider,
+        modelUsed: providerMetadata.model,
+        promptVersion: providerMetadata.promptVersion,
         generatedAt: now,
         generationRunId,
         confidence: analysisResult.confidence,
@@ -279,15 +394,34 @@ export async function POST(req: NextRequest) {
         batchConfig: DEFAULT_BATCH_CONFIG,
         analyzedScope: {
           cfcMaterialId,
-          cfcPageRanges: [{ pageStart: 1, pageEnd: cfcMaterial.totalPages! }],
-          deepeningMaterials: estrategiaMaterials.map((m) => ({
-            materialId: m.id,
-            pageRanges: [{ pageStart: 1, pageEnd: m.totalPages! }],
-          })),
+          cfcPageNumbers: cfcMaterialInput.textByPage.map((p) => p.pageNumber).sort((a, b) => a - b),
+          deepeningMaterials: estrategiaMaterials.map((m) => {
+            const pageNums = filteredEstPages
+              .filter((p) => p.materialId === m.id)
+              .map((p) => p.pageNumber)
+              .sort((a, b) => a - b);
+            return {
+              materialId: m.id,
+              pageNumbers: pageNums,
+            };
+          }),
         },
-        sourceFingerprintCfc: `cfc-hash-${cfcMaterialId}`,
+        sourceFingerprintCfc: cfcFingerprint,
         sourceFingerprintsDeepening: estrategiaMaterials
-          .map((m) => ({ materialId: m.id, fingerprint: `strat-hash-${m.id}` }))
+          .map((m) => {
+            const mPages = filteredEstPages
+              .filter((p) => p.materialId === m.id)
+              .map((p) => ({
+                materialId: m.id,
+                pageNumber: p.pageNumber,
+                text: p.text,
+              }))
+              .sort((a, b) => a.pageNumber - b.pageNumber);
+            return {
+              materialId: m.id,
+              fingerprint: canonicalHash(mPages),
+            };
+          })
           .sort((a, b) => a.materialId.localeCompare(b.materialId)),
         justification: analysisResult.justification,
       },

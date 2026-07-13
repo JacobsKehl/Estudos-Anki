@@ -120,10 +120,10 @@ export interface HybridBlockOutput {
     batchConfig: HybridBatchConfig;
     analyzedScope: {
       cfcMaterialId: string;
-      cfcPageRanges: { pageStart: number; pageEnd: number }[];
+      cfcPageNumbers: number[];
       deepeningMaterials: {
         materialId: string;
-        pageRanges: { pageStart: number; pageEnd: number }[];
+        pageNumbers: number[];
       }[];
     };
     sourceFingerprintCfc: string;
@@ -139,8 +139,29 @@ export interface HybridBlockOutput {
   };
 }
 
+export interface HybridMappedPage {
+  materialId: string;
+  pageNumber: number;
+  topics: string[];
+  summary: string;
+}
+
+export interface HybridCandidatePage {
+  materialId: string;
+  pageNumber: number;
+}
+
+export interface HybridProviderMetadata {
+  provider: string;
+  model: string;
+  promptVersion: string;
+}
+
 /** Interface para o provider de IA — injetável para mocks nos testes */
 export interface HybridAIProvider {
+  /** Metadados imutáveis do provider (Fase 2) */
+  getMetadata(): HybridProviderMetadata;
+
   /**
    * Etapa A: Mapeia tópicos e cria índice por página.
    * Recebe lotes; nunca o material completo em uma chamada.
@@ -156,10 +177,10 @@ export interface HybridAIProvider {
    */
   retrieveCandidates(params: {
     cfcAnchorPoints: string[];
-    estrategiaMappedPages: { pageNumber: number; topics: string[]; summary: string }[];
+    estrategiaMappedPages: HybridMappedPage[];
     targetTheme: string;
     examProfile: string;
-  }): Promise<number[]>;
+  }): Promise<HybridCandidatePage[]>;
 
   /**
    * Etapa C: Análise profunda e classificação READ/CONSULT/SKIP.
@@ -268,7 +289,7 @@ function validateMaterialPages(
  */
 export function validateHybridOutput(
   output: Pick<HybridBlockOutput, "sources" | "flashcardSeeds" | "confidence">,
-  _analyzedScope: { cfcPageRanges: { pageStart: number; pageEnd: number }[]; deepeningMaterials: { materialId: string; pageRanges: { pageStart: number; pageEnd: number }[] }[] }
+  _analyzedScope: { cfcPageNumbers: number[]; deepeningMaterials: { materialId: string; pageNumbers: number[] }[] }
 ): ValidationError[] {
   const errors: ValidationError[] = [];
   void _analyzedScope;

@@ -6,6 +6,7 @@ import {
   verifyPreviewIntegrity,
 } from "@/lib/security/hybrid-preview-token";
 import { createHybridBlock } from "@/lib/services/hybrid-block";
+import { canonicalHash } from "@/lib/security/canonical-json";
 
 export async function POST(req: NextRequest) {
   // ── Feature flag ─────────────────────────────────────────────────────────
@@ -93,7 +94,116 @@ export async function POST(req: NextRequest) {
       generationRunId: string;
       blockingWarnings?: string[];
       sources?: { materialId: string; sourceRole: string }[];
+      aiAuditMetadata?: {
+        sourceFingerprintCfc: string;
+        sourceFingerprintsDeepening: { materialId: string; fingerprint: string }[];
+        analyzedScope: {
+          cfcMaterialId: string;
+          cfcPageNumbers: number[];
+          deepeningMaterials: { materialId: string; pageNumbers: number[] }[];
+        };
+      };
     };
+
+    const aiAuditMetadata = previewObj.aiAuditMetadata;
+    if (!aiAuditMetadata || !aiAuditMetadata.analyzedScope) {
+      return NextResponse.json(
+        { error: "Metadados de auditoria de IA ausentes no preview.", code: "INVALID_PREVIEW_METADATA" },
+        { status: 400 }
+      );
+    }
+
+    const { analyzedScope } = aiAuditMetadata;
+    const cfcMaterialId = analyzedScope.cfcMaterialId;
+    const cfcPageNumbers = analyzedScope.cfcPageNumbers ?? [];
+    const deepeningMaterials = analyzedScope.deepeningMaterials ?? [];
+
+    const allMaterialIds = [cfcMaterialId, ...deepeningMaterials.map((d) => d.materialId)];
+    const allPageNumbers = Array.from(
+      new Set([...cfcPageNumbers, ...deepeningMaterials.flatMap((d) => d.pageNumbers)])
+    );
+
+    const dbPages = await prisma.extractedContent.findMany({
+      where: {
+        userId,
+        materialId: { in: allMaterialIds },
+        pageNumber: { in: allPageNumbers },
+      },
+      select: {
+        materialId: true,
+        pageNumber: true,
+        text: true,
+      },
+    });
+
+    // Validar CFC
+    const currentCfcPages = dbPages
+      .filter((p) => p.materialId === cfcMaterialId && cfcPageNumbers.includes(p.pageNumber))
+      .map((p) => ({
+        materialId: cfcMaterialId,
+        pageNumber: p.pageNumber,
+        text: p.text,
+      }))
+      .sort((a, b) => a.pageNumber - b.pageNumber);
+
+    if (currentCfcPages.length !== cfcPageNumbers.length) {
+      return NextResponse.json(
+        {
+          error: "Rastreabilidade de conteúdo corrompida: algumas páginas analisadas do CFC não foram encontradas no banco.",
+          code: "SOURCE_FINGERPRINT_MISMATCH",
+        },
+        { status: 409 }
+      );
+    }
+
+    const currentCfcHash = canonicalHash(currentCfcPages);
+    if (currentCfcHash !== aiAuditMetadata.sourceFingerprintCfc) {
+      return NextResponse.json(
+        {
+          error: "O conteúdo do material CFC foi modificado desde a geração do preview.",
+          code: "SOURCE_FINGERPRINT_MISMATCH",
+        },
+        { status: 409 }
+      );
+    }
+
+    // Validar Estratégia
+    for (const d of deepeningMaterials) {
+      const currentDeepPages = dbPages
+        .filter((p) => p.materialId === d.materialId && d.pageNumbers.includes(p.pageNumber))
+        .map((p) => ({
+          materialId: d.materialId,
+          pageNumber: p.pageNumber,
+          text: p.text,
+        }))
+        .sort((a, b) => a.pageNumber - b.pageNumber);
+
+      if (currentDeepPages.length !== d.pageNumbers.length) {
+        return NextResponse.json(
+          {
+            error: `Rastreabilidade de conteúdo corrompida: algumas páginas analisadas do material '${d.materialId}' não foram encontradas.`,
+            code: "SOURCE_FINGERPRINT_MISMATCH",
+          },
+          { status: 409 }
+        );
+      }
+
+      const currentDeepHash = canonicalHash(currentDeepPages);
+
+      const expectedObj = (aiAuditMetadata.sourceFingerprintsDeepening ?? []).find(
+        (f) => f.materialId === d.materialId
+      );
+      if (!expectedObj || currentDeepHash !== expectedObj.fingerprint) {
+        return NextResponse.json(
+          {
+            error: `O conteúdo do material '${d.materialId}' foi modificado ou é divergente desde a geração do preview.`,
+            code: "SOURCE_FINGERPRINT_MISMATCH",
+            divergentMaterialId: d.materialId,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     if (previewObj.blockingWarnings && previewObj.blockingWarnings.length > 0) {
       return NextResponse.json(

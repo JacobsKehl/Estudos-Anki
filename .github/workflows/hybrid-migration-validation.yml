@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/hybrid-8020-study-blocks
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:

@@ -159,6 +159,160 @@ describe("validatePreviewToken", () => {
     delete process.env.HYBRID_PREVIEW_SIGNING_SECRET;
     expect(() => validatePreviewToken(token)).toThrow("HYBRID_PREVIEW_SIGNING_SECRET");
   });
+
+  describe("Hardened HMAC Validation", () => {
+    let validWire: any;
+
+    beforeEach(() => {
+      const token = generatePreviewToken(defaultParams);
+      const decoded = Buffer.from(token, "base64url").toString("utf8");
+      validWire = JSON.parse(decoded);
+    });
+
+    function forgeToken(wireOverride: any): string {
+      return Buffer.from(JSON.stringify(wireOverride)).toString("base64url");
+    }
+
+    test("1. assinatura correta", () => {
+      const token = generatePreviewToken(defaultParams);
+      const result = validatePreviewToken(token);
+      expect(result.valid).toBe(true);
+    });
+
+    test("2. assinatura incorreta com o mesmo comprimento", () => {
+      const badWire = {
+        ...validWire,
+        signature: "a".repeat(64),
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("3. assinatura com comprimento menor", () => {
+      const badWire = {
+        ...validWire,
+        signature: "a".repeat(60),
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("4. assinatura com comprimento maior", () => {
+      const badWire = {
+        ...validWire,
+        signature: "a".repeat(68),
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("5. assinatura vazia", () => {
+      const badWire = {
+        ...validWire,
+        signature: "",
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("6. signature ausente", () => {
+      const badWire = { ...validWire };
+      delete (badWire as any).signature;
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("7. signature como número", () => {
+      const badWire = {
+        ...validWire,
+        signature: 12345,
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("8. signature como objeto", () => {
+      const badWire = {
+        ...validWire,
+        signature: {},
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("9. string com 64 caracteres não hexadecimais", () => {
+      const badWire = {
+        ...validWire,
+        signature: "g".repeat(64),
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+
+    test("10. token que não é base64url", () => {
+      const result = validatePreviewToken("not base64url space!");
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Token malformado");
+      }
+    });
+
+    test("11. base64url que não contém JSON", () => {
+      const badToken = Buffer.from("just plain text string").toString("base64url");
+      const result = validatePreviewToken(badToken);
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Token malformado");
+      }
+    });
+
+    test("12. JSON sem payload", () => {
+      const badWire = {
+        signature: "a".repeat(64),
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Payload do token incompleto");
+      }
+    });
+
+    test("13. payload válido com assinatura inválida", () => {
+      const badWire = {
+        ...validWire,
+        signature: "b".repeat(64),
+      };
+      const result = validatePreviewToken(forgeToken(badWire));
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.reason).toContain("Assinatura do token inválida");
+      }
+    });
+  });
 });
 
 // ── Integridade do preview ────────────────────────────────────────────────────
