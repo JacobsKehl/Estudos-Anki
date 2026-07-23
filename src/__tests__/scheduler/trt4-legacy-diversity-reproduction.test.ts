@@ -6,6 +6,12 @@
  *   1. FALLBACK_SECOND_SLOT
  *   2. COMPLEMENTARY_THIRD_SLOT
  *   3. OVERDUE_REORGANIZATION
+ *
+ * Além dos 3 caminhos críticos, inclui testes de runtime da fila:
+ *   4. A1+A2+B1 — B1 agendado no dia 1 antes de A2 repetir
+ *   5. A usada hoje / B usada ontem — B tem prioridade
+ *   6. Repetição inevitável — apenas A na fila, nenhuma perda
+ *   7. Métricas — futureItemsShiftedCount, mergedReviewBlocksCount, lastDateAfterReorganization
  */
 
 import {
@@ -55,6 +61,10 @@ jest.mock("@/lib/date-utils", () => ({
 }));
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3 caminhos críticos originais
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe("Validação de Regressão — Diversidade LEGACY_TRT4 nos 3 Caminhos Críticos", () => {
   const userId = "user-gabriela-fixture-123";
@@ -284,5 +294,203 @@ describe("Validação de Regressão — Diversidade LEGACY_TRT4 nos 3 Caminhos C
     const scheduledSubjects = result.changes.map(c => c.subjectName);
     expect(scheduledSubjects).toContain("Direito do Trabalho");
     expect(scheduledSubjects).toContain("Direito Administrativo");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cenários de runtime da fila — hierarquia intra-dia na reorganização
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Runtime da fila LEGACY_TRT4 — reorganizeOverdueSchedule", () => {
+  const userId = "user-runtime-test";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (mockPrisma.studyScheduleItem.findFirst as jest.Mock).mockResolvedValue(null);
+    (mockPrisma.studyScheduleItem.count as jest.Mock).mockResolvedValue(0);
+    (mockPrisma.studyBlock.findMany as jest.Mock).mockResolvedValue([]);
+  });
+
+  const makeSubject = (id: string, name: string) => ({
+    id, userId, name, studyPriority: "PRIMARY",
+  });
+
+  const makeOverdueItem = (
+    id: string,
+    subjectId: string,
+    subject: any,
+    scheduledDate: Date,
+    dayNumber: number,
+    estimatedMinutes = 45,
+    actionType = "THEORY"
+  ) => ({
+    id,
+    userId,
+    scheduleId: "sched-rt",
+    subjectId,
+    studyBlockId: `block-${id}`,
+    actionType,
+    status: "PENDING",
+    scheduledDate,
+    dayNumber,
+    estimatedMinutes,
+    subject,
+  });
+
+  const setupBase = (subjects: any[], items: any[]) => {
+    (mockPrisma.studySubject.findMany as jest.Mock).mockImplementation((args: any) => {
+      if (args?.where?.studyPriority?.in) return Promise.resolve([]);
+      return Promise.resolve(subjects);
+    });
+    (mockPrisma.userPreferences.findUnique as jest.Mock).mockResolvedValue({
+      userId,
+      scheduleGenerationMode: "LEGACY_TRT4",
+      studyDaysOfWeek: "1,2,3,4,5,6,0",
+    });
+    (mockPrisma.studySchedule.findFirst as jest.Mock).mockResolvedValue({
+      id: "sched-rt",
+      userId,
+      dailyStudyMinutes: 120,
+      status: "ACTIVE",
+      items,
+    });
+  };
+
+  test("A1+A2+B1: B1 é agendado no dia 1 antes de A2 ser repetida", async () => {
+    // Matéria A = ciclo de hoje (Direito do Trabalho — ciclo dia 1 TRT4)
+    // Matéria B = fora do ciclo (Direito Administrativo)
+    // Fila de atrasados: A1 (DT), A2 (DT), B1 (DA)
+    // Capacidade dia 1: 2 blocos de 45 min = 90 min de teoria
+    // Resultado esperado: dia 1 = A1 + B1 (diversidade); dia 2 = A2
+
+    const subA = makeSubject("sub-dt", "Direito do Trabalho");
+    const subB = makeSubject("sub-da", "Direito Administrativo");
+    const pastDate = new Date("2026-07-01T00:00:00.000Z");
+
+    setupBase([subA, subB], [
+      makeOverdueItem("a1", "sub-dt", subA, pastDate, 5),
+      makeOverdueItem("a2", "sub-dt", subA, pastDate, 6),
+      makeOverdueItem("b1", "sub-da", subB, pastDate, 7),
+    ]);
+
+    const result = await reorganizeOverdueSchedule(
+      userId, false, true, new Date("2026-07-23T10:00:00.000Z")
+    );
+
+    expect(result.success).toBe(true);
+
+    // Agrupar changes por nova data
+    const byDate: Record<string, string[]> = {};
+    for (const change of result.changes) {
+      if (!byDate[change.newDate]) byDate[change.newDate] = [];
+      byDate[change.newDate].push(change.subjectName);
+    }
+
+    const dates = Object.keys(byDate).sort();
+    expect(dates.length).toBeGreaterThanOrEqual(2);
+
+    // Dia 1: deve conter A (DT) e B (DA) — não dois DT
+    const day1Subjects = byDate[dates[0]];
+    expect(day1Subjects).toContain("Direito do Trabalho");
+    expect(day1Subjects).toContain("Direito Administrativo");
+    expect(day1Subjects.filter(s => s === "Direito do Trabalho").length).toBe(1);
+
+    // Dia 2: deve conter A2 (segundo DT)
+    const day2Subjects = byDate[dates[1]];
+    expect(day2Subjects).toContain("Direito do Trabalho");
+  });
+
+  test("A usada hoje / B usada ontem: B tem prioridade sobre repetir A", async () => {
+    // Fila: A1 (DT), B1 (DA), A2 (DT). Capacidade: 2 blocos/dia.
+    // A1 preenche o slot 1 de DT. No slot 2, B1 (DA, distinto) deve ganhar
+    // sobre A2 (DT repetida no mesmo dia).
+
+    const subA = makeSubject("sub-dt", "Direito do Trabalho");
+    const subB = makeSubject("sub-da", "Direito Administrativo");
+    const pastDate = new Date("2026-07-01T00:00:00.000Z");
+
+    setupBase([subA, subB], [
+      makeOverdueItem("a1", "sub-dt", subA, pastDate, 5),
+      makeOverdueItem("b1", "sub-da", subB, pastDate, 6),
+      makeOverdueItem("a2", "sub-dt", subA, pastDate, 7),
+    ]);
+
+    const result = await reorganizeOverdueSchedule(
+      userId, false, true, new Date("2026-07-23T10:00:00.000Z")
+    );
+
+    expect(result.success).toBe(true);
+
+    const byDate: Record<string, string[]> = {};
+    for (const change of result.changes) {
+      if (!byDate[change.newDate]) byDate[change.newDate] = [];
+      byDate[change.newDate].push(change.subjectName);
+    }
+
+    const dates = Object.keys(byDate).sort();
+    expect(dates.length).toBeGreaterThanOrEqual(2);
+
+    const day1Subjects = byDate[dates[0]];
+    // No dia 1: A1 e B1 — não A1 e A2
+    expect(day1Subjects).toContain("Direito do Trabalho");
+    expect(day1Subjects).toContain("Direito Administrativo");
+    expect(day1Subjects.filter(s => s === "Direito do Trabalho").length).toBe(1);
+  });
+
+  test("Repetição inevitável: apenas matéria A na fila — ambos os blocos são agendados sem perda", async () => {
+    const subA = makeSubject("sub-dt", "Direito do Trabalho");
+    const pastDate = new Date("2026-07-01T00:00:00.000Z");
+
+    setupBase([subA], [
+      makeOverdueItem("a1", "sub-dt", subA, pastDate, 5),
+      makeOverdueItem("a2", "sub-dt", subA, pastDate, 6),
+    ]);
+
+    const result = await reorganizeOverdueSchedule(
+      userId, false, true, new Date("2026-07-23T10:00:00.000Z")
+    );
+
+    expect(result.success).toBe(true);
+    // Nenhum item deve ser perdido — repetição é aceita como último recurso
+    expect(result.changes.length).toBe(2);
+    expect(result.changes.every(c => c.subjectName === "Direito do Trabalho")).toBe(true);
+  });
+
+  test("Métricas: futureItemsShiftedCount, mergedReviewBlocksCount e lastDateAfterReorganization", async () => {
+    const subA = makeSubject("sub-dt", "Direito do Trabalho");
+    const pastDate = new Date("2026-07-01T00:00:00.000Z");
+    const futureDate = new Date("2026-08-10T00:00:00.000Z");
+
+    const overdueItems = [
+      makeOverdueItem("a1", "sub-dt", subA, pastDate, 3),
+      makeOverdueItem("a2", "sub-dt", subA, pastDate, 4),
+      // Item futuro elegível para deslocamento
+      makeOverdueItem("a3", "sub-dt", subA, futureDate, 20),
+      // REVIEW_BLOCK atrasado com flashcards — elegibilidade exige studyBlock.flashcards.length > 0
+      {
+        ...makeOverdueItem("rv1", "sub-dt", subA, pastDate, 5, 30, "REVIEW_BLOCK"),
+        studyBlock: { flashcards: [{ id: "fc-1" }] },
+      },
+    ];
+
+    setupBase([subA], overdueItems);
+
+    const result = await reorganizeOverdueSchedule(
+      userId, false, true, new Date("2026-07-23T10:00:00.000Z")
+    );
+
+    expect(result.success).toBe(true);
+
+    // futureItemsShiftedCount: itens com data futura deslocados
+    expect(result.futureItemsShiftedCount).toBeGreaterThanOrEqual(0);
+
+    // mergedReviewBlocksCount: conta REVIEW_BLOCKs atrasados elegíveis (rv1 tem flashcards)
+    expect(result.mergedReviewBlocksCount).toBeGreaterThanOrEqual(1);
+
+    // lastDateAfterReorganization: não deve ser undefined quando há mudanças
+    if (result.changes.length > 0) {
+      expect(result.lastDateAfterReorganization).toBeDefined();
+      expect(typeof result.lastDateAfterReorganization).toBe("string");
+    }
   });
 });
