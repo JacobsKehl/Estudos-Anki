@@ -10,6 +10,11 @@ function anonymizeEmail(email: string): string {
   return `${anonName}@${domain}`;
 }
 
+export function maskIdentifier(id: string): string {
+  if (!id || id.length <= 8) return "***";
+  return `${id.slice(0, 4)}...${id.slice(-4)}`;
+}
+
 export type DayClassification =
   | "DIVERSE"
   | "MONOTHEMATIC_AVOIDABLE_CONFIRMED"
@@ -34,8 +39,9 @@ export async function runAudit(options: {
   from?: string;
   to?: string;
   scheduleId?: string;
+  includeIdentifiers?: boolean;
 }) {
-  const { userEmail, from, to, scheduleId } = options;
+  const { userEmail, from, to, scheduleId, includeIdentifiers = false } = options;
 
   console.log("====================================================");
   console.log("🔍 AUDITORIA DE DIVERSIDADE DE MATÉRIAS (READ-ONLY)");
@@ -53,8 +59,11 @@ export async function runAudit(options: {
     return null;
   }
 
-  console.log(`ID do Usuário:     ${user.id}`);
-  console.log(`Nome do Usuário:   ${user.name || "Não informado"}`);
+  const displayUserId = includeIdentifiers ? user.id : maskIdentifier(user.id);
+  console.log(`ID do Usuário:     ${displayUserId}`);
+  if (includeIdentifiers) {
+    console.log(`Nome do Usuário:   ${user.name || "Não informado"}`);
+  }
   console.log(`Modo de Geração:   ${user.preferences?.scheduleGenerationMode || "DYNAMIC"}`);
 
   // 2. Confirmar modo LEGACY_TRT4
@@ -80,8 +89,9 @@ export async function runAudit(options: {
     return null;
   }
 
+  const displayScheduleId = includeIdentifiers ? activeSchedule.id : maskIdentifier(activeSchedule.id);
   console.log(`\n📅 CRONOGRAMA EM ANÁLISE`);
-  console.log(`ID:           ${activeSchedule.id}`);
+  console.log(`ID:           ${displayScheduleId}`);
   console.log(`Título:       ${activeSchedule.title}`);
   console.log(`Status:       ${activeSchedule.status}`);
   console.log(`Data Início:  ${activeSchedule.startDate.toISOString().split("T")[0]}`);
@@ -104,11 +114,25 @@ export async function runAudit(options: {
   console.log(`- SECONDARY (${secondarySubjects.length}): ${secondarySubjects.map(s => s.name).join(", ") || "Nenhuma"}`);
   console.log(`- EXCLUDED (${excludedSubjects.length}):  ${excludedSubjects.map(s => s.name).join(", ") || "Nenhuma"}`);
 
-  // 5. Buscar Blocos Pendentes e Minutos por Matéria
-  const allPendingBlocks = await prisma.studyBlock.findMany({
+  // 5. Saldo Atual de Blocos Pendentes
+  const currentPendingBlocks = await prisma.studyBlock.findMany({
     where: {
       userId: user.id,
       status: { not: "COMPLETED" },
+      material: {
+        materialRole: { not: "SUPPORT_MATERIAL" }
+      }
+    },
+    include: {
+      subject: true,
+      material: true
+    }
+  });
+
+  // Reconstrução Histórica: Consultar TODOS os blocos (incluindo COMPLETED) para reconstruir a fila temporal
+  const allHistoricalBlocks = await prisma.studyBlock.findMany({
+    where: {
+      userId: user.id,
       material: {
         materialRole: { not: "SUPPORT_MATERIAL" }
       }
@@ -124,7 +148,7 @@ export async function runAudit(options: {
     pendingBySubject[sub.id] = { name: sub.name, count: 0, estimatedMinutes: 0, priority: sub.studyPriority };
   }
 
-  for (const block of allPendingBlocks) {
+  for (const block of currentPendingBlocks) {
     if (pendingBySubject[block.subjectId]) {
       pendingBySubject[block.subjectId].count++;
       pendingBySubject[block.subjectId].estimatedMinutes += block.estimatedStudyMinutes || 45;
@@ -170,7 +194,7 @@ export async function runAudit(options: {
   const supportItems = scheduleItems.filter(i => i.actionType === "SUPPORT");
 
   console.log(`\n📋 SEPARAÇÃO POR TIPO DE AÇÃO`);
-  console.log(`- Teoria (THEORY):               ${theoryItems.length} (Utilizados na análise de diversidade)`);
+  console.log(`- Teoria (THEORY):               ${theoryItems.length}`);
   console.log(`- Revisão Cards (SRS):          ${srsItems.length}`);
   console.log(`- Revisão Bloco (REVIEW_BLOCK): ${reviewBlockItems.length}`);
   console.log(`- Apoio (SUPPORT):              ${supportItems.length}`);
@@ -188,9 +212,9 @@ export async function runAudit(options: {
     console.log(`\n✔ Nenhum studyBlockId duplicado encontrado no cronograma.`);
   }
 
-  // 7. Agrupar itens de THEORY por Data/Dia
-  const daysMap: Record<string, typeof theoryItems> = {};
-  for (const item of theoryItems) {
+  // 7. Construir universo completo de datas a partir de TODOS os itens do cronograma
+  const daysMap: Record<string, typeof scheduleItems> = {};
+  for (const item of scheduleItems) {
     const dateKey = item.scheduledDate
       ? getTodayRangeSP(item.scheduledDate).dateString
       : `Day_${item.dayNumber || 0}`;
@@ -212,10 +236,11 @@ export async function runAudit(options: {
   const dayReports: AuditDayReport[] = [];
   let earliestMonothematicDate: string | null = null;
 
-  for (const [dateKey, items] of Object.entries(daysMap)) {
-    const blocksCount = items.length;
-    const subjectsInDay = Array.from(new Set(items.map(i => i.subject?.name || i.subjectId)));
-    const dayNumber = items[0]?.dayNumber || 0;
+  for (const [dateKey, allItemsInDay] of Object.entries(daysMap)) {
+    const theoryItemsInDay = allItemsInDay.filter(i => i.actionType === "THEORY");
+    const blocksCount = theoryItemsInDay.length;
+    const subjectsInDay = Array.from(new Set(theoryItemsInDay.map(i => i.subject?.name || i.subjectId)));
+    const dayNumber = allItemsInDay[0]?.dayNumber || 0;
 
     let classification: DayClassification;
     let reason = "";
@@ -224,8 +249,8 @@ export async function runAudit(options: {
 
     if (blocksCount === 0) {
       classification = "NO_THEORY";
-      reason = "Nenhum bloco de teoria agendado.";
-      evidence.push("0 itens do tipo THEORY agendados para este dia.");
+      reason = "Nenhum bloco de teoria agendado para este dia.";
+      evidence.push(`Dia contém ${allItemsInDay.length} itens (SRS/Revisão/Apoio), mas 0 do tipo THEORY.`);
     } else if (blocksCount === 1) {
       classification = "SINGLE_THEORY_BLOCK";
       reason = "Apenas 1 bloco de teoria no dia.";
@@ -239,7 +264,7 @@ export async function runAudit(options: {
         earliestMonothematicDate = dateKey;
       }
 
-      const singleSubjectId = items[0].subjectId;
+      const singleSubjectId = theoryItemsInDay[0].subjectId;
       const otherEligibleSubjects = userSubjects.filter(
         s => s.id !== singleSubjectId && (s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE")
       );
@@ -251,36 +276,32 @@ export async function runAudit(options: {
         reason = "Apenas 1 matéria elegível existia nas configurações do usuário.";
         evidence.push("Não há nenhuma outra matéria com prioridade PRIMARY ou ACTIVE cadastrada.");
       } else {
-        const dateObj = items[0].scheduledDate;
+        const dateObj = theoryItemsInDay[0].scheduledDate;
         if (!dateObj) {
           classification = "MONOTHEMATIC_INDETERMINATE";
           reason = "Data do item ausente para verificação histórica.";
           limitations.push("Data nula no registro do item do cronograma.");
         } else {
-          // Exigir EVIDÊNCIAS CONVERGENTES de disponibilidade histórica:
-          // 1. Bloco de outra matéria criado ANTES da data do agendamento (createdAt <= dateObj)
-          // 2. Não concluído antes dessa data (theoryCompletedAt seja nulo ou > dateObj)
-          // 3. Matéria elegível (PRIMARY ou ACTIVE)
+          // Reconstrução histórica com todos os blocos (incluindo os que foram concluídos posteriormente)
           const otherSubjectIds = otherEligibleSubjects.map(s => s.id);
-          const convergentOtherBlocks = allPendingBlocks.filter(b => {
+          const historicalAvailableOtherBlocks = allHistoricalBlocks.filter(b => {
             if (!otherSubjectIds.includes(b.subjectId)) return false;
             const createdBefore = b.createdAt <= dateObj;
             const notCompletedBefore = !b.theoryCompletedAt || b.theoryCompletedAt > dateObj;
             return createdBefore && notCompletedBefore;
           });
 
-          if (convergentOtherBlocks.length > 0) {
+          if (historicalAvailableOtherBlocks.length > 0) {
             classification = "MONOTHEMATIC_AVOIDABLE_CONFIRMED";
-            reason = "Evidências convergentes comprovam que outras matérias elegíveis possuíam blocos disponíveis nesta data.";
+            reason = "Evidências convergentes comprovam que outras matérias elegíveis possuíam blocos disponíveis nesta data histórica.";
             evidence.push(
-              `Encontrados ${convergentOtherBlocks.length} blocos pendentes de outras matérias elegíveis criados antes de ${dateKey} e não concluídos até essa data.`
+              `Encontrados ${historicalAvailableOtherBlocks.length} blocos históricos de outras matérias elegíveis criados antes de ${dateKey} e não concluídos até essa data.`
             );
           } else {
-            // Se faltarem dados convergentes de timestamps históricos completos:
             classification = "MONOTHEMATIC_INDETERMINATE";
             reason = "Timestamps e estados históricos de transição insuficientes para comprovar com 100% de certeza o estado da fila na data passada.";
             limitations.push(
-              `Não foi possível confirmar se os blocos atuais de outras matérias já existiam e estavam disponíveis em ${dateKey}.`
+              `Não foi possível confirmar se os blocos de outras matérias já existiam e estavam disponíveis em ${dateKey}.`
             );
             limitations.push("O banco não possui tabela de audit_log histórico de transições de status por dia.");
           }
@@ -325,8 +346,8 @@ export async function runAudit(options: {
   console.log(`4. Esta auditoria realizou APENAS consultas SELECT. Zero escritas efetuadas.\n`);
 
   return {
-    user: { id: user.id, mode },
-    scheduleId: activeSchedule.id,
+    userId: displayUserId,
+    scheduleId: displayScheduleId,
     classificationCounts,
     dayReports,
     duplicateBlockIdsCount: duplicateBlockIds.length
@@ -339,6 +360,7 @@ if (require.main === module) {
   let from: string | undefined;
   let to: string | undefined;
   let scheduleId: string | undefined;
+  let includeIdentifiers = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith("--user-email=")) {
@@ -351,6 +373,8 @@ if (require.main === module) {
       to = args[i].split("=")[1];
     } else if (args[i].startsWith("--schedule-id=")) {
       scheduleId = args[i].split("=")[1];
+    } else if (args[i] === "--include-identifiers") {
+      includeIdentifiers = true;
     }
   }
 
@@ -361,7 +385,7 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  runAudit({ userEmail, from, to, scheduleId })
+  runAudit({ userEmail, from, to, scheduleId, includeIdentifiers })
     .then(() => process.exit(0))
     .catch(err => {
       console.error("❌ Erro na execução da auditoria:", err);

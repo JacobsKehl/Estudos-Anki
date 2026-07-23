@@ -1,8 +1,8 @@
-import { prisma } from "./prisma";
+import { prisma } from "@/lib/prisma";
 import { TRT4_STRATEGY } from "./strategies/trt4";
 import { getTodayRangeSP } from "./date-utils";
 import { calculateHybridMinutes, isHybridTimeError } from "./study/hybrid-estimated-time";
-import { selectLegacySubjectCandidate, LegacySubjectCandidate } from "./scheduler/legacy-subject-diversity";
+import { selectLegacySubjectCandidate, planLegacyScheduleDiversityRepair, LegacySubjectCandidate } from "./scheduler/legacy-subject-diversity";
 
 export class HybridScheduleIntegrityError extends Error {
   code: string;
@@ -1253,6 +1253,7 @@ export async function reorganizeOverdueSchedule(
   const userPrefs = await prisma.userPreferences.findUnique({
     where: { userId }
   });
+  const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
   const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
   const studyDays = studyDaysStr.split(",").map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n));
 
@@ -1822,10 +1823,40 @@ export async function reorganizeOverdueSchedule(
     });
   }
 
-  const finalLastDateStr = getTodayRangeSP(addDays(currentDate, -1)).dateString;
   const overdueItemsCount = overdueTheory.length + overdueOther.length;
-  const futureItemsShiftedCount = futureTheory.length;
-  const mergedReviewBlocksCount = overdueOther.filter(i => i.actionType === "REVIEW_BLOCK").length;
+  const futureItemsShiftedCount = Math.max(0, updatesList.length - overdueItemsCount);
+  const finalLastDateStr = getTodayRangeSP(currentDate).dateString;
+  const mergedReviewBlocksCount = 0;
+
+  let repairPlan: any = null;
+  if (mode === "LEGACY_TRT4") {
+    repairPlan = planLegacyScheduleDiversityRepair({
+      scheduleSnapshot: {
+        scheduleId: activeSchedule.id,
+        updatedAt: activeSchedule.updatedAt || now,
+        generationMode: mode,
+        dailyMinutes: activeSchedule.dailyStudyMinutes || 120,
+        items: allItems.map(item => ({
+          id: item.id,
+          scheduleId: activeSchedule.id,
+          subjectId: item.subjectId,
+          studyBlockId: item.studyBlockId || null,
+          actionType: item.actionType || "THEORY",
+          status: item.status,
+          scheduledDate: item.scheduledDate,
+          dayNumber: item.dayNumber,
+          estimatedMinutes: item.estimatedMinutes || 45,
+          subjectName: item.subject?.name,
+        })),
+      },
+      userSubjects: eligibleSubjects.map(s => ({
+        id: s.id,
+        name: s.name,
+        studyPriority: s.studyPriority,
+      })),
+      baseDate: firstStudyDate,
+    });
+  }
 
   return {
     success: true,
@@ -1842,7 +1873,8 @@ export async function reorganizeOverdueSchedule(
     mergedReviewBlocksCount,
     changes: changesReport,
     lastDateAfterReorganization: finalLastDateStr,
-    excludedItemsPurgedCount
+    excludedItemsPurgedCount,
+    repairPlan,
   };
 }
 

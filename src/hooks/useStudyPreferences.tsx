@@ -276,12 +276,7 @@ export function StudyPreferencesProvider({ children }: { children: React.ReactNo
 export function useStudyPreferences() {
   const context = useContext(StudyPreferencesContext);
   if (context === undefined) {
-    return {
-      preferences: DEFAULT_PREFERENCES,
-      updatePreferences: async () => {},
-      isLoading: false,
-      syncWithServer: async () => {},
-    };
+    throw new Error("useStudyPreferences deve ser usado dentro de um StudyPreferencesProvider");
   }
   return context;
 }

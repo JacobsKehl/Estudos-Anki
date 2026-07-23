@@ -205,4 +205,275 @@ describe("planLegacyScheduleDiversityRepair — Testes Determinísticos de planH
 
     expect(JSON.stringify(baseInput)).toBe(inputOriginalJson);
   });
+
+  test("6. Dois itens da matéria A e um da matéria B no mesmo dia são distribuídos como A+B antes de repetir A", () => {
+    const input: RepairPlanInput = {
+      scheduleSnapshot: {
+        scheduleId: "sched-mono",
+        updatedAt: "2026-07-23T12:00:00.000Z",
+        generationMode: "LEGACY_TRT4",
+        dailyMinutes: 120,
+        items: [
+          {
+            id: "item-a1",
+            scheduleId: "sched-mono",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+          {
+            id: "item-a2",
+            scheduleId: "sched-mono",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+          {
+            id: "item-b1",
+            scheduleId: "sched-mono",
+            subjectId: "sub-lp",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+        ],
+      },
+      userSubjects: [
+        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
+        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
+      ],
+      baseDate: "2026-07-23",
+    };
+
+    const plan = planLegacyScheduleDiversityRepair(input);
+
+    expect(plan.movements.length).toBeGreaterThan(0);
+    expect(plan.movedItemsCount).toBe(plan.movements.length);
+  });
+
+  test("7. Movimentos são gerados quando o dia inicial é monotemático evitável e movedItemsCount bate", () => {
+    const input: RepairPlanInput = {
+      scheduleSnapshot: {
+        scheduleId: "sched-avoidable",
+        updatedAt: "2026-07-23T12:00:00.000Z",
+        generationMode: "LEGACY_TRT4",
+        dailyMinutes: 120,
+        items: [
+          {
+            id: "item-1",
+            scheduleId: "sched-avoidable",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+          {
+            id: "item-2",
+            scheduleId: "sched-avoidable",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+          {
+            id: "item-3",
+            scheduleId: "sched-avoidable",
+            subjectId: "sub-lp",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+        ],
+      },
+      userSubjects: [
+        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
+        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
+      ],
+      baseDate: "2026-07-23",
+    };
+
+    const plan = planLegacyScheduleDiversityRepair(input);
+
+    expect(plan.movements.length).toBeGreaterThan(0);
+    expect(plan.movedItemsCount).toBe(plan.movements.length);
+  });
+
+  test("8. unavoidableRepetitionsCount é incrementado quando só resta uma matéria com blocos pendentes", () => {
+    const input: RepairPlanInput = {
+      scheduleSnapshot: {
+        scheduleId: "sched-unavoidable",
+        updatedAt: "2026-07-23T12:00:00.000Z",
+        generationMode: "LEGACY_TRT4",
+        dailyMinutes: 120,
+        items: [
+          {
+            id: "item-1",
+            scheduleId: "sched-unavoidable",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+          {
+            id: "item-2",
+            scheduleId: "sched-unavoidable",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+        ],
+      },
+      userSubjects: [
+        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
+      ],
+      baseDate: "2026-07-23",
+    };
+
+    const plan = planLegacyScheduleDiversityRepair(input);
+
+    expect(plan.unavoidableRepetitionsCount).toBeGreaterThan(0);
+  });
+
+  test("9. Itens COMPLETED não são movidos e itens não THEORY (SRS/SUPPORT) não são alterados", () => {
+    const input: RepairPlanInput = {
+      scheduleSnapshot: {
+        scheduleId: "sched-completed",
+        updatedAt: "2026-07-23T12:00:00.000Z",
+        generationMode: "LEGACY_TRT4",
+        dailyMinutes: 120,
+        items: [
+          {
+            id: "item-completed",
+            scheduleId: "sched-completed",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "COMPLETED",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+          {
+            id: "item-srs",
+            scheduleId: "sched-completed",
+            subjectId: "sub-dt",
+            actionType: "REVIEW_FLASHCARDS",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 30,
+          },
+        ],
+      },
+      userSubjects: [
+        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
+        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
+      ],
+      baseDate: "2026-07-23",
+    };
+
+    const plan = planLegacyScheduleDiversityRepair(input);
+
+    expect(plan.movements.length).toBe(0);
+    expect(plan.preservedItemsCount).toBe(2);
+  });
+
+  test("10. Nenhum item é perdido, nenhum itemId duplicado e nenhum studyBlockId duplicado no plano", () => {
+    const input: RepairPlanInput = {
+      scheduleSnapshot: {
+        scheduleId: "sched-integrity",
+        updatedAt: "2026-07-23T12:00:00.000Z",
+        generationMode: "LEGACY_TRT4",
+        dailyMinutes: 120,
+        items: [
+          {
+            id: "item-1",
+            scheduleId: "sched-integrity",
+            subjectId: "sub-dt",
+            studyBlockId: "block-1",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+          {
+            id: "item-2",
+            scheduleId: "sched-integrity",
+            subjectId: "sub-dt",
+            studyBlockId: "block-2",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+        ],
+      },
+      userSubjects: [
+        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
+        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
+      ],
+      baseDate: "2026-07-23",
+    };
+
+    const plan = planLegacyScheduleDiversityRepair(input);
+
+    expect(plan.totalItemsCount).toBe(2);
+    expect(plan.scheduleId).toBe("sched-integrity");
+
+    const movedItemIds = plan.movements.map(m => m.itemId);
+    const uniqueItemIds = new Set(movedItemIds);
+    expect(movedItemIds.length).toBe(uniqueItemIds.size);
+  });
+
+  test("11. Modo DYNAMIC retorna plano sem movimentos (movements vazio)", () => {
+    const input: RepairPlanInput = {
+      scheduleSnapshot: {
+        scheduleId: "sched-dynamic",
+        updatedAt: "2026-07-23T12:00:00.000Z",
+        generationMode: "DYNAMIC",
+        dailyMinutes: 120,
+        items: [
+          {
+            id: "item-1",
+            scheduleId: "sched-dynamic",
+            subjectId: "sub-dt",
+            actionType: "THEORY",
+            status: "PENDING",
+            scheduledDate: "2026-07-23T00:00:00.000Z",
+            dayNumber: 1,
+            estimatedMinutes: 45,
+          },
+        ],
+      },
+      userSubjects: [
+        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
+      ],
+      baseDate: "2026-07-23",
+    };
+
+    const plan = planLegacyScheduleDiversityRepair(input);
+
+    expect(plan.movements.length).toBe(0);
+    expect(plan.movedItemsCount).toBe(0);
+  });
 });
