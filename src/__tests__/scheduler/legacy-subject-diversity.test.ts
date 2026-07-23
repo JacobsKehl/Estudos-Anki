@@ -1,9 +1,7 @@
 import {
   selectLegacySubjectCandidate,
-  planLegacyScheduleDiversityRepair,
   LegacySubjectCandidate,
   SelectLegacySubjectInput,
-  RepairPlanInput
 } from "@/lib/scheduler/legacy-subject-diversity";
 
 describe("selectLegacySubjectCandidate — Função Pura de Seleção de Diversidade", () => {
@@ -116,364 +114,149 @@ describe("selectLegacySubjectCandidate — Função Pura de Seleção de Diversi
     expect(sameDaySet.size).toBe(0);
     expect(prevDaySet.size).toBe(0);
   });
-});
 
-describe("planLegacyScheduleDiversityRepair — Testes Determinísticos de planHash", () => {
-  const baseInput: RepairPlanInput = {
-    scheduleSnapshot: {
-      scheduleId: "sched-123",
-      updatedAt: "2026-07-23T12:00:00.000Z",
-      generationMode: "LEGACY_TRT4",
-      dailyMinutes: 120,
-      items: [
-        {
-          id: "item-2",
-          scheduleId: "sched-123",
-          subjectId: "sub-lp",
-          actionType: "THEORY",
-          status: "PENDING",
-          scheduledDate: "2026-07-23T00:00:00.000Z",
-          dayNumber: 1,
-          estimatedMinutes: 45
-        },
-        {
-          id: "item-1",
-          scheduleId: "sched-123",
-          subjectId: "sub-dt",
-          actionType: "THEORY",
-          status: "PENDING",
-          scheduledDate: "2026-07-23T00:00:00.000Z",
-          dayNumber: 1,
-          estimatedMinutes: 45
-        }
-      ]
-    },
-    userSubjects: [
-      { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
-      { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" }
-    ],
-    baseDate: "2026-07-23"
-  };
+  // ── Testes de Regressão: Prioridade Intra-Dia ────────────────────────────────
 
-  test("1. Mesma entrada em ordens diferentes produz o mesmo canonicalPlanHash", () => {
-    const input1 = JSON.parse(JSON.stringify(baseInput));
-    const input2 = JSON.parse(JSON.stringify(baseInput));
+  describe("Regressão — prioridade intra-dia: evitar repetição hoje > evitar repetição ontem", () => {
+    /**
+     * Cenário: A foi estudada hoje, B foi estudada ontem.
+     * Candidatos disponíveis: A (usada hoje) e B (usada ontem) e C (nova).
+     * Regra esperada: C deve ser escolhida (nova hoje, nova ontem).
+     */
+    test("R1. Prefere matéria nova (não usada hoje nem ontem) antes de repetir qualquer anterior", () => {
+      const aCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-a",
+        subjectName: "Matéria A",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
+      const bCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-b",
+        subjectName: "Matéria B",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
+      const cCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-c",
+        subjectName: "Matéria C",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
 
-    // Inverter ordem dos itens e matérias no input2
-    input2.scheduleSnapshot.items.reverse();
-    input2.userSubjects.reverse();
+      const input: SelectLegacySubjectInput = {
+        candidates: [aCandidate, bCandidate, cCandidate],
+        preferredSubjectIds: [],
+        sameDaySubjectIds: new Set(["sub-a"]), // A já usada hoje
+        previousDaySubjectIds: new Set(["sub-b"]), // B usada ontem
+      };
 
-    const plan1 = planLegacyScheduleDiversityRepair(input1);
-    const plan2 = planLegacyScheduleDiversityRepair(input2);
+      const result = selectLegacySubjectCandidate(input);
 
-    expect(plan1.canonicalPlanHash).toBe(plan2.canonicalPlanHash);
-  });
+      // C é a única nova hoje e nova ontem — deve ser escolhida
+      expect(result.subjectId).toBe("sub-c");
+      expect(result.sameDayRepetitionUnavoidable).toBe(false);
+    });
 
-  test("2. Alteração de status altera o canonicalPlanHash", () => {
-    const inputModified = JSON.parse(JSON.stringify(baseInput));
-    inputModified.scheduleSnapshot.items[0].status = "COMPLETED";
+    /**
+     * Cenário: A foi estudada hoje. B foi estudada ontem. C não existe.
+     * Entre A e B, B deve ser preferida (ainda não usada hoje).
+     */
+    test("R2. Entre matéria usada hoje e matéria usada ontem (mas não hoje), prefere a usada ontem", () => {
+      const aCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-a",
+        subjectName: "Matéria A",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
+      const bCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-b",
+        subjectName: "Matéria B",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
 
-    const planOriginal = planLegacyScheduleDiversityRepair(baseInput);
-    const planModified = planLegacyScheduleDiversityRepair(inputModified);
+      const input: SelectLegacySubjectInput = {
+        candidates: [aCandidate, bCandidate],
+        preferredSubjectIds: [],
+        sameDaySubjectIds: new Set(["sub-a"]), // A já usada hoje
+        previousDaySubjectIds: new Set(["sub-b"]), // B usada ontem
+      };
 
-    expect(planOriginal.canonicalPlanHash).not.toBe(planModified.canonicalPlanHash);
-  });
+      const result = selectLegacySubjectCandidate(input);
 
-  test("3. Alteração de scheduledDate altera o canonicalPlanHash", () => {
-    const inputModified = JSON.parse(JSON.stringify(baseInput));
-    inputModified.scheduleSnapshot.items[0].scheduledDate = "2026-07-24T00:00:00.000Z";
+      // B é nova hoje (apenas usada ontem) — prioridade sobre repetir A hoje
+      expect(result.subjectId).toBe("sub-b");
+      expect(result.sameDayRepetitionUnavoidable).toBe(false);
+    });
 
-    const planOriginal = planLegacyScheduleDiversityRepair(baseInput);
-    const planModified = planLegacyScheduleDiversityRepair(inputModified);
+    /**
+     * Cenário crítico de regressão: A usada hoje, B usada ontem, sem C.
+     * Repetir hoje (A) só é aceitável quando não há nenhuma alternativa não usada hoje.
+     */
+    test("R3. sameDayRepetitionUnavoidable é true apenas quando todas as matérias com blocos já foram usadas hoje", () => {
+      const aCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-a",
+        subjectName: "Matéria A",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
+      const bCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-b",
+        subjectName: "Matéria B",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 0, // sem blocos — não é candidata real
+      };
 
-    expect(planOriginal.canonicalPlanHash).not.toBe(planModified.canonicalPlanHash);
-  });
+      const input: SelectLegacySubjectInput = {
+        candidates: [aCandidate, bCandidate],
+        preferredSubjectIds: [],
+        sameDaySubjectIds: new Set(["sub-a"]),
+        previousDaySubjectIds: new Set(["sub-b"]),
+      };
 
-  test("4. Alteração de scheduleUpdatedAt altera o canonicalPlanHash", () => {
-    const inputModified = JSON.parse(JSON.stringify(baseInput));
-    inputModified.scheduleSnapshot.updatedAt = "2026-07-23T15:30:00.000Z";
+      const result = selectLegacySubjectCandidate(input);
 
-    const planOriginal = planLegacyScheduleDiversityRepair(baseInput);
-    const planModified = planLegacyScheduleDiversityRepair(inputModified);
+      // A é a única com blocos — repetição inevitável
+      expect(result.subjectId).toBe("sub-a");
+      expect(result.sameDayRepetitionUnavoidable).toBe(true);
+    });
 
-    expect(planOriginal.canonicalPlanHash).not.toBe(planModified.canonicalPlanHash);
-  });
+    /**
+     * Garante que `sameDaySubjectIds` é checado antes de `previousDaySubjectIds`.
+     * C está livre. C deve ser escolhida antes de B (usada ontem) e A (usada hoje+ontem).
+     */
+    test("R4. Prioridade: nova hoje E nova ontem > nova hoje mas usada ontem > usada hoje", () => {
+      const aCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-a",
+        subjectName: "Matéria A",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
+      const bCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-b",
+        subjectName: "Matéria B",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
+      const cCandidate: LegacySubjectCandidate = {
+        subjectId: "sub-c",
+        subjectName: "Matéria C",
+        studyPriority: "PRIMARY",
+        pendingBlocksCount: 3,
+      };
 
-  test("5. Input não é modificado durante a geração do plano", () => {
-    const inputOriginalJson = JSON.stringify(baseInput);
-    planLegacyScheduleDiversityRepair(baseInput);
+      const input: SelectLegacySubjectInput = {
+        candidates: [aCandidate, bCandidate, cCandidate],
+        preferredSubjectIds: [],
+        sameDaySubjectIds: new Set(["sub-a"]), // A usada hoje
+        previousDaySubjectIds: new Set(["sub-a", "sub-b"]), // A e B usadas ontem
+      };
 
-    expect(JSON.stringify(baseInput)).toBe(inputOriginalJson);
-  });
+      const result = selectLegacySubjectCandidate(input);
 
-  test("6. Dois itens da matéria A e um da matéria B no mesmo dia são distribuídos como A+B antes de repetir A", () => {
-    const input: RepairPlanInput = {
-      scheduleSnapshot: {
-        scheduleId: "sched-mono",
-        updatedAt: "2026-07-23T12:00:00.000Z",
-        generationMode: "LEGACY_TRT4",
-        dailyMinutes: 120,
-        items: [
-          {
-            id: "item-a1",
-            scheduleId: "sched-mono",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-          {
-            id: "item-a2",
-            scheduleId: "sched-mono",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-          {
-            id: "item-b1",
-            scheduleId: "sched-mono",
-            subjectId: "sub-lp",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-        ],
-      },
-      userSubjects: [
-        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
-        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
-      ],
-      baseDate: "2026-07-23",
-    };
-
-    const plan = planLegacyScheduleDiversityRepair(input);
-
-    expect(plan.movements.length).toBeGreaterThan(0);
-    expect(plan.movedItemsCount).toBe(plan.movements.length);
-  });
-
-  test("7. Movimentos são gerados quando o dia inicial é monotemático evitável e movedItemsCount bate", () => {
-    const input: RepairPlanInput = {
-      scheduleSnapshot: {
-        scheduleId: "sched-avoidable",
-        updatedAt: "2026-07-23T12:00:00.000Z",
-        generationMode: "LEGACY_TRT4",
-        dailyMinutes: 120,
-        items: [
-          {
-            id: "item-1",
-            scheduleId: "sched-avoidable",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-          {
-            id: "item-2",
-            scheduleId: "sched-avoidable",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-          {
-            id: "item-3",
-            scheduleId: "sched-avoidable",
-            subjectId: "sub-lp",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-        ],
-      },
-      userSubjects: [
-        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
-        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
-      ],
-      baseDate: "2026-07-23",
-    };
-
-    const plan = planLegacyScheduleDiversityRepair(input);
-
-    expect(plan.movements.length).toBeGreaterThan(0);
-    expect(plan.movedItemsCount).toBe(plan.movements.length);
-  });
-
-  test("8. unavoidableRepetitionsCount é incrementado quando só resta uma matéria com blocos pendentes", () => {
-    const input: RepairPlanInput = {
-      scheduleSnapshot: {
-        scheduleId: "sched-unavoidable",
-        updatedAt: "2026-07-23T12:00:00.000Z",
-        generationMode: "LEGACY_TRT4",
-        dailyMinutes: 120,
-        items: [
-          {
-            id: "item-1",
-            scheduleId: "sched-unavoidable",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-          {
-            id: "item-2",
-            scheduleId: "sched-unavoidable",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-        ],
-      },
-      userSubjects: [
-        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
-      ],
-      baseDate: "2026-07-23",
-    };
-
-    const plan = planLegacyScheduleDiversityRepair(input);
-
-    expect(plan.unavoidableRepetitionsCount).toBeGreaterThan(0);
-  });
-
-  test("9. Itens COMPLETED não são movidos e itens não THEORY (SRS/SUPPORT) não são alterados", () => {
-    const input: RepairPlanInput = {
-      scheduleSnapshot: {
-        scheduleId: "sched-completed",
-        updatedAt: "2026-07-23T12:00:00.000Z",
-        generationMode: "LEGACY_TRT4",
-        dailyMinutes: 120,
-        items: [
-          {
-            id: "item-completed",
-            scheduleId: "sched-completed",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "COMPLETED",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-          {
-            id: "item-srs",
-            scheduleId: "sched-completed",
-            subjectId: "sub-dt",
-            actionType: "REVIEW_FLASHCARDS",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 30,
-          },
-        ],
-      },
-      userSubjects: [
-        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
-        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
-      ],
-      baseDate: "2026-07-23",
-    };
-
-    const plan = planLegacyScheduleDiversityRepair(input);
-
-    expect(plan.movements.length).toBe(0);
-    expect(plan.preservedItemsCount).toBe(2);
-  });
-
-  test("10. Nenhum item é perdido, nenhum itemId duplicado e nenhum studyBlockId duplicado no plano", () => {
-    const input: RepairPlanInput = {
-      scheduleSnapshot: {
-        scheduleId: "sched-integrity",
-        updatedAt: "2026-07-23T12:00:00.000Z",
-        generationMode: "LEGACY_TRT4",
-        dailyMinutes: 120,
-        items: [
-          {
-            id: "item-1",
-            scheduleId: "sched-integrity",
-            subjectId: "sub-dt",
-            studyBlockId: "block-1",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-          {
-            id: "item-2",
-            scheduleId: "sched-integrity",
-            subjectId: "sub-dt",
-            studyBlockId: "block-2",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-        ],
-      },
-      userSubjects: [
-        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
-        { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" },
-      ],
-      baseDate: "2026-07-23",
-    };
-
-    const plan = planLegacyScheduleDiversityRepair(input);
-
-    expect(plan.totalItemsCount).toBe(2);
-    expect(plan.scheduleId).toBe("sched-integrity");
-
-    const movedItemIds = plan.movements.map(m => m.itemId);
-    const uniqueItemIds = new Set(movedItemIds);
-    expect(movedItemIds.length).toBe(uniqueItemIds.size);
-  });
-
-  test("11. Modo DYNAMIC retorna plano sem movimentos (movements vazio)", () => {
-    const input: RepairPlanInput = {
-      scheduleSnapshot: {
-        scheduleId: "sched-dynamic",
-        updatedAt: "2026-07-23T12:00:00.000Z",
-        generationMode: "DYNAMIC",
-        dailyMinutes: 120,
-        items: [
-          {
-            id: "item-1",
-            scheduleId: "sched-dynamic",
-            subjectId: "sub-dt",
-            actionType: "THEORY",
-            status: "PENDING",
-            scheduledDate: "2026-07-23T00:00:00.000Z",
-            dayNumber: 1,
-            estimatedMinutes: 45,
-          },
-        ],
-      },
-      userSubjects: [
-        { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
-      ],
-      baseDate: "2026-07-23",
-    };
-
-    const plan = planLegacyScheduleDiversityRepair(input);
-
-    expect(plan.movements.length).toBe(0);
-    expect(plan.movedItemsCount).toBe(0);
+      // C: nova hoje E nova ontem — máxima preferência
+      expect(result.subjectId).toBe("sub-c");
+      expect(result.sameDayRepetitionUnavoidable).toBe(false);
+    });
   });
 });

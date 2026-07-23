@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { TRT4_STRATEGY } from "./strategies/trt4";
 import { getTodayRangeSP } from "./date-utils";
 import { calculateHybridMinutes, isHybridTimeError } from "./study/hybrid-estimated-time";
-import { selectLegacySubjectCandidate, planLegacyScheduleDiversityRepair, LegacySubjectCandidate } from "./scheduler/legacy-subject-diversity";
+import { selectLegacySubjectCandidate, LegacySubjectCandidate } from "./scheduler/legacy-subject-diversity";
 
 export class HybridScheduleIntegrityError extends Error {
   code: string;
@@ -1483,15 +1483,25 @@ export async function reorganizeOverdueSchedule(
           continue;
         }
 
-        const isRepeatedInPrevDay = prevDaySubjects.includes(nextItemSubjectId);
-        const isRepeatedInSameDay = sameDaySubjectIds.has(nextItemSubjectId);
-        const hasNonRepeatedInQueue = theoryQueue.slice(queueIndex).some(item => 
-          cycleSubjects.some(subName => (item.subject?.name?.toLowerCase() || "").includes(subName)) && 
-          !prevDaySubjects.includes(item.subjectId) &&
+        const isRepeatedInSameDay1 = sameDaySubjectIds.has(nextItemSubjectId);
+        // Prioridade 1: evitar repetição no mesmo dia
+        const hasNewTodayCycleInQueue = theoryQueue.slice(queueIndex).some(item =>
+          cycleSubjects.some(subName => (item.subject?.name?.toLowerCase() || "").includes(subName)) &&
           !sameDaySubjectIds.has(item.subjectId)
         );
-
-        if ((isRepeatedInPrevDay || isRepeatedInSameDay) && hasNonRepeatedInQueue) {
+        if (isRepeatedInSameDay1 && hasNewTodayCycleInQueue) {
+          queueIndex++;
+          continue;
+        }
+        // Prioridade 2: entre matérias novas hoje, preferir a que não foi usada ontem
+        const isRepeatedInPrevDay1 = prevDaySubjects.includes(nextItemSubjectId);
+        const hasNoPrevDayNewTodayCycleInQueue = !isRepeatedInSameDay1 &&
+          theoryQueue.slice(queueIndex).some(item =>
+            cycleSubjects.some(subName => (item.subject?.name?.toLowerCase() || "").includes(subName)) &&
+            !sameDaySubjectIds.has(item.subjectId) &&
+            !prevDaySubjects.includes(item.subjectId)
+          );
+        if (isRepeatedInPrevDay1 && hasNoPrevDayNewTodayCycleInQueue) {
           queueIndex++;
           continue;
         }
@@ -1533,14 +1543,23 @@ export async function reorganizeOverdueSchedule(
       const nextItem = theoryQueue[queueIndex];
       const nextItemSubjectId = nextItem.subjectId;
 
-      const isRepeatedInPrevDay = prevDaySubjects.includes(nextItemSubjectId);
-      const isRepeatedInSameDay = sameDaySubjectIds.has(nextItemSubjectId);
-      const hasNonRepeatedInQueue = theoryQueue.slice(queueIndex).some(item =>
-        !prevDaySubjects.includes(item.subjectId) &&
+      const isRepeatedInSameDay2 = sameDaySubjectIds.has(nextItemSubjectId);
+      // Prioridade 1: evitar repetição no mesmo dia
+      const hasNewTodayInQueue = theoryQueue.slice(queueIndex).some(item =>
         !sameDaySubjectIds.has(item.subjectId)
       );
-
-      if ((isRepeatedInPrevDay || isRepeatedInSameDay) && hasNonRepeatedInQueue) {
+      if (isRepeatedInSameDay2 && hasNewTodayInQueue) {
+        queueIndex++;
+        continue;
+      }
+      // Prioridade 2: entre matérias novas hoje, preferir as que não foram usadas ontem
+      const isRepeatedInPrevDay2 = prevDaySubjects.includes(nextItemSubjectId);
+      const hasNoPrevDayNewTodayInQueue = !isRepeatedInSameDay2 &&
+        theoryQueue.slice(queueIndex).some(item =>
+          !sameDaySubjectIds.has(item.subjectId) &&
+          !prevDaySubjects.includes(item.subjectId)
+        );
+      if (isRepeatedInPrevDay2 && hasNoPrevDayNewTodayInQueue) {
         queueIndex++;
         continue;
       }
@@ -1824,39 +1843,9 @@ export async function reorganizeOverdueSchedule(
   }
 
   const overdueItemsCount = overdueTheory.length + overdueOther.length;
-  const futureItemsShiftedCount = Math.max(0, updatesList.length - overdueItemsCount);
-  const finalLastDateStr = getTodayRangeSP(currentDate).dateString;
-  const mergedReviewBlocksCount = 0;
-
-  let repairPlan: any = null;
-  if (mode === "LEGACY_TRT4") {
-    repairPlan = planLegacyScheduleDiversityRepair({
-      scheduleSnapshot: {
-        scheduleId: activeSchedule.id,
-        updatedAt: activeSchedule.updatedAt || now,
-        generationMode: mode,
-        dailyMinutes: activeSchedule.dailyStudyMinutes || 120,
-        items: allItems.map(item => ({
-          id: item.id,
-          scheduleId: activeSchedule.id,
-          subjectId: item.subjectId,
-          studyBlockId: item.studyBlockId || null,
-          actionType: item.actionType || "THEORY",
-          status: item.status,
-          scheduledDate: item.scheduledDate,
-          dayNumber: item.dayNumber,
-          estimatedMinutes: item.estimatedMinutes || 45,
-          subjectName: item.subject?.name,
-        })),
-      },
-      userSubjects: eligibleSubjects.map(s => ({
-        id: s.id,
-        name: s.name,
-        studyPriority: s.studyPriority,
-      })),
-      baseDate: firstStudyDate,
-    });
-  }
+  const futureItemsShiftedCount = futureTheory.length;
+  const finalLastDateStr = getTodayRangeSP(addDays(currentDate, -1)).dateString;
+  const mergedReviewBlocksCount = overdueOther.filter(i => i.actionType === "REVIEW_BLOCK").length;
 
   return {
     success: true,
@@ -1874,7 +1863,6 @@ export async function reorganizeOverdueSchedule(
     changes: changesReport,
     lastDateAfterReorganization: finalLastDateStr,
     excludedItemsPurgedCount,
-    repairPlan,
   };
 }
 
