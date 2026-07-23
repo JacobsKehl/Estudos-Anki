@@ -139,3 +139,68 @@ export function selectLegacySubjectCandidate(
     selectionReason: "ANY_REPEATED_UNAVOIDABLE",
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Seleção de índice na fila de teoria (reorganizeOverdueSchedule)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface LegacyQueueItemCandidate {
+  subjectId: string;
+  isCycleSubject: boolean;
+  queueIndex: number;
+}
+
+/**
+ * Seleciona o índice do próximo item a ser alocado na fila de teoria do
+ * reorganizeOverdueSchedule, aplicando a hierarquia de diversidade intra-dia.
+ *
+ * Hierarquia (6 níveis, em ordem decrescente de preferência):
+ * 1. ciclo + nova hoje + nova ontem;
+ * 2. ciclo + nova hoje (usada ontem);
+ * 3. qualquer + nova hoje + nova ontem;
+ * 4. qualquer + nova hoje (usada ontem);
+ * 5. ciclo + repetida hoje (último recurso dentro do ciclo);
+ * 6. qualquer + repetida hoje (último recurso absoluto).
+ *
+ * A ordem original da fila é preservada dentro de cada nível.
+ * Retorna null se a lista de candidatos estiver vazia.
+ *
+ * A função é pura: não modifica inputs, não acessa Prisma, não acessa env.
+ */
+export function selectLegacyQueueItemIndex(input: {
+  candidates: LegacyQueueItemCandidate[];
+  sameDaySubjectIds: ReadonlySet<string>;
+  previousDaySubjectIds: ReadonlySet<string>;
+}): number | null {
+  const { candidates, sameDaySubjectIds, previousDaySubjectIds } = input;
+
+  if (candidates.length === 0) return null;
+
+  const isNewToday = (c: LegacyQueueItemCandidate) =>
+    !sameDaySubjectIds.has(c.subjectId);
+  const isNewYesterday = (c: LegacyQueueItemCandidate) =>
+    !previousDaySubjectIds.has(c.subjectId);
+
+  // Nível 1: ciclo + nova hoje + nova ontem
+  const l1 = candidates.find(c => c.isCycleSubject && isNewToday(c) && isNewYesterday(c));
+  if (l1) return l1.queueIndex;
+
+  // Nível 2: ciclo + nova hoje (foi usada ontem)
+  const l2 = candidates.find(c => c.isCycleSubject && isNewToday(c));
+  if (l2) return l2.queueIndex;
+
+  // Nível 3: qualquer + nova hoje + nova ontem
+  const l3 = candidates.find(c => isNewToday(c) && isNewYesterday(c));
+  if (l3) return l3.queueIndex;
+
+  // Nível 4: qualquer + nova hoje (foi usada ontem)
+  const l4 = candidates.find(c => isNewToday(c));
+  if (l4) return l4.queueIndex;
+
+  // Nível 5: ciclo + repetida hoje (somente quando nenhuma nova existe)
+  const l5 = candidates.find(c => c.isCycleSubject);
+  if (l5) return l5.queueIndex;
+
+  // Nível 6: qualquer + repetida hoje (último recurso)
+  return candidates[0].queueIndex;
+}

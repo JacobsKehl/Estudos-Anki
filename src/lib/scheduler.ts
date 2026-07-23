@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { TRT4_STRATEGY } from "./strategies/trt4";
 import { getTodayRangeSP } from "./date-utils";
 import { calculateHybridMinutes, isHybridTimeError } from "./study/hybrid-estimated-time";
-import { selectLegacySubjectCandidate, LegacySubjectCandidate } from "./scheduler/legacy-subject-diversity";
+import { selectLegacySubjectCandidate, LegacySubjectCandidate, selectLegacyQueueItemIndex, LegacyQueueItemCandidate } from "./scheduler/legacy-subject-diversity";
 
 export class HybridScheduleIntegrityError extends Error {
   code: string;
@@ -333,18 +333,15 @@ function getFallbackSubjectForSlot(
   const nonSameDayCandidates = fallbackCandidates.filter(s => !sameDaySubjectIds.has(s.id));
   const poolToUse = nonSameDayCandidates.length > 0 ? nonSameDayCandidates : fallbackCandidates;
 
-  // Encontrar matérias estudadas no dia anterior (em memória ou no histórico do banco)
-  let prevDayWithTheory = dayNumber - 1;
+  // Encontrar matérias estudadas no dia anterior (dayNumber - 1)
+  const prevDayNumber = dayNumber - 1;
   let prevDaySubjects: string[] = [];
-  while (prevDayWithTheory > 0 && prevDaySubjects.length === 0) {
+  if (prevDayNumber > 0) {
     prevDaySubjects = [
-      ...scheduleItemsData.filter((item: any) => item.dayNumber === prevDayWithTheory && item.actionType === "THEORY").map((item: any) => item.subjectId),
-      ...newItemsToCreate.filter((item: any) => item.dayNumber === prevDayWithTheory && item.actionType === "THEORY").map((item: any) => item.subjectId),
-      ...updatesList.filter((item: any) => item.dayNumber === prevDayWithTheory && item.actionType === "THEORY").map((item: any) => item.subjectId)
+      ...scheduleItemsData.filter((item: any) => item.dayNumber === prevDayNumber && item.actionType === "THEORY").map((item: any) => item.subjectId),
+      ...newItemsToCreate.filter((item: any) => item.dayNumber === prevDayNumber && item.actionType === "THEORY").map((item: any) => item.subjectId),
+      ...updatesList.filter((item: any) => item.dayNumber === prevDayNumber && item.actionType === "THEORY").map((item: any) => item.subjectId)
     ];
-    if (prevDaySubjects.length === 0) {
-      prevDayWithTheory--;
-    }
   }
 
   if (prevDaySubjects.length === 0) {
@@ -568,8 +565,6 @@ export async function generateLegacyTrt4Schedule(
       
       const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
 
-      const sameDaySubjectIds = new Set<string>();
-
       // A. Lembrete SRS diário (30 min)
       scheduleItemsData.push({
         userId,
@@ -604,16 +599,13 @@ export async function generateLegacyTrt4Schedule(
       for (let i = 0; i < subjectsToSchedule.length; i++) {
         const targetSubject = subjectsToSchedule[i];
 
-        // Encontra o próximo bloco se a matéria ainda não foi agendada hoje
-        let nextBlock = null;
-        if (!sameDaySubjectIds.has(targetSubject.id)) {
-          nextBlock = allPendingBlocks.find((b: any) =>
-            b.subjectId === targetSubject.id &&
-            !scheduledBlockIds.has(b.id)
-          );
-        }
+        // Encontra o próximo bloco
+        let nextBlock = allPendingBlocks.find((b: any) =>
+          b.subjectId === targetSubject.id &&
+          !scheduledBlockIds.has(b.id)
+        );
 
-        // Se não encontrar ou matéria já agendada hoje, aciona fallback balanceado evitando repetições
+        // Se não encontrar, aciona fallback balanceado para preencher o slot obrigatório
         if (!nextBlock) {
           const fallbackSubject = getFallbackSubjectForSlot(
             eligibleSubjects,
@@ -623,8 +615,7 @@ export async function generateLegacyTrt4Schedule(
             [],
             [],
             dayNumber,
-            lastCompletedSubjectIds,
-            sameDaySubjectIds
+            lastCompletedSubjectIds
           );
           if (fallbackSubject) {
             nextBlock = allPendingBlocks.find((b: any) =>
@@ -635,23 +626,14 @@ export async function generateLegacyTrt4Schedule(
         }
 
         if (nextBlock) {
-          // Evitar duplicidade de studyBlockId no mesmo dia
-          const dayBlockIds = scheduleItemsData
-            .filter((item: any) => item.dayNumber === dayNumber && item.studyBlockId)
-            .map((item: any) => item.studyBlockId);
-
-          if (dayBlockIds.includes(nextBlock.id)) {
-            // Para evitar loop infinito, marca como agendado em memória temporária
-            scheduledBlockIds.add(nextBlock.id);
-            continue;
-          }
-
           const blockSubject = nextBlock.subject || eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
           let blockMins = 0;
           try {
             blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject.name);
           } catch (err) {
             if (err instanceof HybridScheduleIntegrityError) {
+              // Loop-prevention: add to scheduledBlockIds so this block is not retried
+              // in the current run. This does NOT represent a successful schedule entry.
               scheduledBlockIds.add(nextBlock.id);
               schedulerWarnings.push({
                 code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
@@ -663,14 +645,9 @@ export async function generateLegacyTrt4Schedule(
             throw err;
           }
           const isFallback = nextBlock.subjectId !== targetSubject.id;
-          const isRepeatedSameDay = sameDaySubjectIds.has(nextBlock.subjectId);
-          let reasonText = isFallback
+          const reasonText = isFallback
             ? `Roteiro: Teoria de ${blockSubject.name} (Fallback)` 
             : `Roteiro: Teoria de ${blockSubject.name}`;
-
-          if (isRepeatedSameDay) {
-            reasonText += " — repetição intra-dia inevitável";
-          }
 
           scheduleItemsData.push({
             userId,
@@ -686,7 +663,6 @@ export async function generateLegacyTrt4Schedule(
             status: "PENDING",
           });
 
-          sameDaySubjectIds.add(nextBlock.subjectId);
           scheduledBlockIds.add(nextBlock.id);
           remainingTheoryMinutes -= blockMins;
         }
@@ -697,14 +673,14 @@ export async function generateLegacyTrt4Schedule(
         const civilSubject = eligibleSubjects.find(s => s.name.toLowerCase().includes("direito civil"));
         let thirdBlock = null;
 
-        if (civilSubject && !sameDaySubjectIds.has(civilSubject.id)) {
+        if (civilSubject) {
           thirdBlock = allPendingBlocks.find((b: any) =>
             b.subjectId === civilSubject.id &&
             !scheduledBlockIds.has(b.id)
           );
         }
 
-        // Se Direito Civil não tiver blocos ou já tiver sido estudado hoje, aciona fallback
+        // Se Direito Civil não tiver blocos, aciona fallback balanceado
         if (!thirdBlock) {
           const fallbackSubject = getFallbackSubjectForSlot(
             eligibleSubjects,
@@ -714,8 +690,7 @@ export async function generateLegacyTrt4Schedule(
             [],
             [],
             dayNumber,
-            lastCompletedSubjectIds,
-            sameDaySubjectIds
+            lastCompletedSubjectIds
           );
           if (fallbackSubject) {
             thirdBlock = allPendingBlocks.find((b: any) =>
@@ -748,38 +723,32 @@ export async function generateLegacyTrt4Schedule(
               throw err;
             }
 
+            // Só adiciona se o bloco complementar não estourar de forma relevante
             if (blockMins <= remainingTheoryMinutes + 15) {
-              const isRepeatedSameDay = sameDaySubjectIds.has(thirdBlock.subjectId);
-              let reasonText = `Roteiro: Teoria de ${blockSubject?.name || "Complementar"} (Complemento)`;
-              if (isRepeatedSameDay) {
-                reasonText += " — repetição intra-dia inevitável";
-              }
-
               scheduleItemsData.push({
                 userId,
                 scheduleId: schedule.id,
                 subjectId: thirdBlock.subjectId,
                 studyBlockId: thirdBlock.id,
                 actionType: "THEORY",
-                priorityScore: 80,
-                reason: reasonText,
+                priorityScore: 80, // prioridade complementar
+                reason: `Roteiro: Teoria de ${blockSubject?.name || "Complementar"} (Complemento)`,
                 dayNumber,
                 scheduledDate: candidateDate,
                 estimatedMinutes: blockMins,
                 status: "PENDING",
               });
 
-              sameDaySubjectIds.add(thirdBlock.subjectId);
               scheduledBlockIds.add(thirdBlock.id);
               remainingTheoryMinutes -= blockMins;
             }
           }
         }
       }
+    }
 
     currentDate = addDays(currentDate, 1);
   }
-}
 
   // 5. Salvar em batch
   if (scheduleItemsData.length > 0) {
@@ -1253,7 +1222,6 @@ export async function reorganizeOverdueSchedule(
   const userPrefs = await prisma.userPreferences.findUnique({
     where: { userId }
   });
-  const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
   const studyDaysStr = userPrefs?.studyDaysOfWeek || "1,2,3,4,5,6,0";
   const studyDays = studyDaysStr.split(",").map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n));
 
@@ -1468,130 +1436,104 @@ export async function reorganizeOverdueSchedule(
       cycleSubjects = TRT4_STRATEGY.cycle[cycleDay].map(s => s.toLowerCase());
     }
 
-    // Tentativa 1: Alocar itens da fila principal que correspondem às matérias do ciclo de hoje (prioridade)
+    // Helper: agendar um item pelo índice da fila e registrar mudança
+    const scheduleQueueItem = (idx: number) => {
+      const item = theoryQueue[idx];
+      theoryQueue.splice(idx, 1);
+      sameDaySubjectIds.add(item.subjectId);
+      const origDateStr = getTodayRangeSP(item.scheduledDate!).dateString;
+      const isDateChanged = origDateStr !== dateStr;
+      const isDayChanged = item.dayNumber !== dayNumber;
+      if (isDateChanged || isDayChanged) {
+        updatesList.push({
+          id: item.id,
+          scheduledDate: new Date(currentDate),
+          dayNumber,
+          subjectId: item.subjectId,
+          actionType: item.actionType || undefined,
+        });
+      }
+      if (isDateChanged) {
+        changesReport.push({
+          itemId: item.id,
+          actionType: "THEORY",
+          subjectName: item.subject?.name || "Sem Matéria",
+          originalDate: origDateStr,
+          newDate: dateStr,
+        });
+      }
+      theoryMinutesOnDay += item.estimatedMinutes || 45;
+    };
+
+    // Tentativa 1: Alocar itens da fila que correspondem ao ciclo de hoje (prioridade)
+    // Usa selectLegacyQueueItemIndex para garantir a hierarquia correta: qualquer
+    // matéria nova hoje tem precedência sobre repetição, mesmo que fora do ciclo.
     if (mode === "LEGACY_TRT4" && cycleSubjects.length > 0) {
-      let queueIndex = 0;
-      while (queueIndex < theoryQueue.length && theoryMinutesOnDay < targetTheoryMinutes) {
-        const nextItem = theoryQueue[queueIndex];
-        const nextItemSubjectName = nextItem.subject?.name?.toLowerCase() || "";
-        const nextItemSubjectId = nextItem.subjectId;
+      while (theoryMinutesOnDay < targetTheoryMinutes) {
+        // Construir candidatos: apenas itens do ciclo de hoje
+        const cycleCandidates: LegacyQueueItemCandidate[] = theoryQueue
+          .map((item, idx) => ({
+            subjectId: item.subjectId,
+            isCycleSubject: cycleSubjects.some(n =>
+              (item.subject?.name?.toLowerCase() || "").includes(n)
+            ),
+            queueIndex: idx,
+          }))
+          .filter(c => c.isCycleSubject);
 
-        // Verificar se pertence ao ciclo de hoje
-        const matchesCycle = cycleSubjects.some(subName => nextItemSubjectName.includes(subName));
-        if (!matchesCycle) {
-          queueIndex++;
-          continue;
-        }
+        if (cycleCandidates.length === 0) break;
 
-        const isRepeatedInSameDay1 = sameDaySubjectIds.has(nextItemSubjectId);
-        // Prioridade 1: evitar repetição no mesmo dia
-        const hasNewTodayCycleInQueue = theoryQueue.slice(queueIndex).some(item =>
-          cycleSubjects.some(subName => (item.subject?.name?.toLowerCase() || "").includes(subName)) &&
-          !sameDaySubjectIds.has(item.subjectId)
-        );
-        if (isRepeatedInSameDay1 && hasNewTodayCycleInQueue) {
-          queueIndex++;
-          continue;
-        }
-        // Prioridade 2: entre matérias novas hoje, preferir a que não foi usada ontem
-        const isRepeatedInPrevDay1 = prevDaySubjects.includes(nextItemSubjectId);
-        const hasNoPrevDayNewTodayCycleInQueue = !isRepeatedInSameDay1 &&
-          theoryQueue.slice(queueIndex).some(item =>
-            cycleSubjects.some(subName => (item.subject?.name?.toLowerCase() || "").includes(subName)) &&
-            !sameDaySubjectIds.has(item.subjectId) &&
-            !prevDaySubjects.includes(item.subjectId)
-          );
-        if (isRepeatedInPrevDay1 && hasNoPrevDayNewTodayCycleInQueue) {
-          queueIndex++;
-          continue;
-        }
+        // A hierarquia considera toda a fila para decidir se existe alternativa
+        // nova hoje (Níveis 3–4 de selectLegacyQueueItemIndex), evitando repetição
+        // mesmo quando a alternativa está fora do ciclo.
+        const allCandidates: LegacyQueueItemCandidate[] = theoryQueue.map((item, idx) => ({
+          subjectId: item.subjectId,
+          isCycleSubject: cycleSubjects.some(n =>
+            (item.subject?.name?.toLowerCase() || "").includes(n)
+          ),
+          queueIndex: idx,
+        }));
 
-        // Remover da fila e agendar
-        theoryQueue.splice(queueIndex, 1);
-        sameDaySubjectIds.add(nextItemSubjectId);
-        const origDateStr = getTodayRangeSP(nextItem.scheduledDate!).dateString;
-        const isDateChanged = origDateStr !== dateStr;
-        const isDayChanged = nextItem.dayNumber !== dayNumber;
+        const prevDaySet = new Set(prevDaySubjects);
+        const selectedIdx = selectLegacyQueueItemIndex({
+          candidates: allCandidates,
+          sameDaySubjectIds,
+          previousDaySubjectIds: prevDaySet,
+        });
 
-        if (isDateChanged || isDayChanged) {
-          updatesList.push({
-            id: nextItem.id,
-            scheduledDate: new Date(currentDate),
-            dayNumber,
-            subjectId: nextItem.subjectId,
-            actionType: nextItem.actionType || undefined
-          });
-        }
+        // Se o índice selecionado não pertence ao ciclo, encerra a Tentativa 1
+        // para que a Tentativa 2 o aloque (evita consumir a alternativa fora do ciclo
+        // antes da Tentativa 2 ter controle do slot)
+        if (selectedIdx === null) break;
+        const selectedCandidate = allCandidates.find(c => c.queueIndex === selectedIdx);
+        if (!selectedCandidate?.isCycleSubject) break;
 
-        if (isDateChanged) {
-          changesReport.push({
-            itemId: nextItem.id,
-            actionType: "THEORY",
-            subjectName: nextItem.subject?.name || "Sem Matéria",
-            originalDate: origDateStr,
-            newDate: dateStr
-          });
-        }
-
-        theoryMinutesOnDay += nextItem.estimatedMinutes || 45;
+        scheduleQueueItem(selectedIdx);
       }
     }
 
-    // Tentativa 2: Alocar qualquer outro item da fila (fallback/carryover)
-    let queueIndex = 0;
-    while (queueIndex < theoryQueue.length && theoryMinutesOnDay < targetTheoryMinutes) {
-      const nextItem = theoryQueue[queueIndex];
-      const nextItemSubjectId = nextItem.subjectId;
+    // Tentativa 2: Alocar qualquer item da fila (fallback / carryover)
+    // Usa selectLegacyQueueItemIndex sobre toda a fila restante.
+    {
+      const prevDaySet = new Set(prevDaySubjects);
+      while (theoryMinutesOnDay < targetTheoryMinutes) {
+        const allCandidates: LegacyQueueItemCandidate[] = theoryQueue.map((item, idx) => ({
+          subjectId: item.subjectId,
+          isCycleSubject: mode === "LEGACY_TRT4" && cycleSubjects.some(n =>
+            (item.subject?.name?.toLowerCase() || "").includes(n)
+          ),
+          queueIndex: idx,
+        }));
 
-      const isRepeatedInSameDay2 = sameDaySubjectIds.has(nextItemSubjectId);
-      // Prioridade 1: evitar repetição no mesmo dia
-      const hasNewTodayInQueue = theoryQueue.slice(queueIndex).some(item =>
-        !sameDaySubjectIds.has(item.subjectId)
-      );
-      if (isRepeatedInSameDay2 && hasNewTodayInQueue) {
-        queueIndex++;
-        continue;
-      }
-      // Prioridade 2: entre matérias novas hoje, preferir as que não foram usadas ontem
-      const isRepeatedInPrevDay2 = prevDaySubjects.includes(nextItemSubjectId);
-      const hasNoPrevDayNewTodayInQueue = !isRepeatedInSameDay2 &&
-        theoryQueue.slice(queueIndex).some(item =>
-          !sameDaySubjectIds.has(item.subjectId) &&
-          !prevDaySubjects.includes(item.subjectId)
-        );
-      if (isRepeatedInPrevDay2 && hasNoPrevDayNewTodayInQueue) {
-        queueIndex++;
-        continue;
-      }
-
-      // Remover da fila e agendar
-      theoryQueue.splice(queueIndex, 1);
-      sameDaySubjectIds.add(nextItemSubjectId);
-      const origDateStr = getTodayRangeSP(nextItem.scheduledDate!).dateString;
-      const isDateChanged = origDateStr !== dateStr;
-      const isDayChanged = nextItem.dayNumber !== dayNumber;
-
-      if (isDateChanged || isDayChanged) {
-        updatesList.push({
-          id: nextItem.id,
-          scheduledDate: new Date(currentDate),
-          dayNumber,
-          subjectId: nextItem.subjectId,
-          actionType: nextItem.actionType || undefined
+        const selectedIdx = selectLegacyQueueItemIndex({
+          candidates: allCandidates,
+          sameDaySubjectIds,
+          previousDaySubjectIds: prevDaySet,
         });
-      }
 
-      if (isDateChanged) {
-        changesReport.push({
-          itemId: nextItem.id,
-          actionType: "THEORY",
-          subjectName: nextItem.subject?.name || "Sem Matéria",
-          originalDate: origDateStr,
-          newDate: dateStr
-        });
+        if (selectedIdx === null) break;
+        scheduleQueueItem(selectedIdx);
       }
-
-      theoryMinutesOnDay += nextItem.estimatedMinutes || 45;
     }
 
     // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutes
