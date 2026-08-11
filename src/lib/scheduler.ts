@@ -3,6 +3,7 @@ import { TRT4_STRATEGY } from "./strategies/trt4";
 import { getTodayRangeSP } from "./date-utils";
 import { calculateHybridMinutes, isHybridTimeError } from "./study/hybrid-estimated-time";
 import { selectLegacySubjectCandidate, LegacySubjectCandidate, selectLegacyQueueItemIndex, LegacyQueueItemCandidate } from "./scheduler/legacy-subject-diversity";
+import { getLegacyTrt4NextSubjects, sortPendingBlocksForSubject } from "./scheduler/legacy-trt4-queue";
 
 export class HybridScheduleIntegrityError extends Error {
   code: string;
@@ -475,12 +476,11 @@ export async function generateLegacyTrt4Schedule(
   // Calcular dias pendentes de forma rígida até 30/11/2026
   const deadline = new Date("2026-11-30T23:59:59");
 
-  // 1. Obter matérias do usuário
+  // 1. Obter matérias do usuário (PRIMARY e ACTIVE)
   const userSubjects = await prisma.studySubject.findMany({
     where: { userId },
   });
 
-  // Filtrar apenas PRIMARY e ACTIVE
   const eligibleSubjects = userSubjects.filter(
     s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
   );
@@ -515,6 +515,21 @@ export async function generateLegacyTrt4Schedule(
     dbCompletedBlocks.map((b: any) => b.id)
   );
 
+  // Histórico real de matérias de teoria concluídas
+  const completedTheoryItems = await (prisma as any).studyScheduleItem.findMany({
+    where: {
+      userId,
+      status: "COMPLETED",
+      actionType: "THEORY",
+    },
+    orderBy: [
+      { completedAt: "asc" },
+      { scheduledDate: "asc" },
+    ],
+    select: { subjectId: true },
+  });
+  const completedSubjectHistory: string[] = completedTheoryItems.map((i: any) => i.subjectId);
+
   // Busca todos os blocos pendentes das matérias elegíveis
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
@@ -533,25 +548,13 @@ export async function generateLegacyTrt4Schedule(
     }
   });
 
-  // Ordenação natural
-  allPendingBlocks.sort((a: any, b: any) => {
-    const fileA = a.material?.fileName || "";
-    const fileB = b.material?.fileName || "";
-    const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
-    if (fileCompare !== 0) return fileCompare;
-    return a.orderIndex - b.orderIndex;
-  });
+  // Ordenação rígida por PDF (material) e depois por bloco dentro do PDF
+  const sortedPendingBlocks = sortPendingBlocksForSubject(allPendingBlocks);
 
-  let activeSecondaryIndex = 0;
-  const activeSecondarySubjects = eligibleSubjects.filter(s => s.studyPriority === "ACTIVE");
-
-  // Frente B: Buscar matérias e contagem real de dias de estudo concluídos do histórico
-  const lastCompletedSubjectIds = await getLastCompletedTheorySubjectIds(userId);
   const uniqueCompletedCount = await getUniqueCompletedTheoryDaysCount(userId);
 
   let currentDate = new Date(startDate);
   let nextStudyDayNumber = uniqueCompletedCount + 1;
-  const cycleOffset = await getCycleOffset(userId, nextStudyDayNumber);
 
   while (currentDate.getTime() <= deadline.getTime()) {
     const isStudy = isStudyDay(currentDate, studyDays);
@@ -560,10 +563,6 @@ export async function generateLegacyTrt4Schedule(
       const candidateDate = new Date(currentDate);
       const dayNumber = nextStudyDayNumber;
       nextStudyDayNumber++;
-      
-      const cycleDay = (dayNumber - 1 + cycleOffset) % TRT4_STRATEGY.cycle.length;
-      
-      const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
 
       // A. Lembrete SRS diário (30 min)
       scheduleItemsData.push({
@@ -579,61 +578,34 @@ export async function generateLegacyTrt4Schedule(
         status: "PENDING",
       });
 
-      // B. Selecionar as 2 matérias do dia (Intercalando matérias ACTIVE se houver)
-      const subName1 = subjectsTodayNames[0];
-      let subName2 = subjectsTodayNames[1];
+      // B. Selecionar as 2 matérias do dia via a fila circular determinística do TRT4
+      const nextSlots = getLegacyTrt4NextSubjects({
+        userSubjects: eligibleSubjects,
+        completedSubjectHistory,
+        hasPendingBlocks: (subjectId) =>
+          sortedPendingBlocks.some(b => b.subjectId === subjectId && !scheduledBlockIds.has(b.id)),
+        count: 2,
+      });
 
-      if (activeSecondarySubjects.length > 0 && cycleDay === 0) {
-        const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
-        subName2 = secSubject.name;
-        activeSecondaryIndex++;
-      }
-
-      const subject1 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName1.toLowerCase()));
-      const subject2 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName2.toLowerCase()));
-
-      const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
       const theoryMinutes = dailyMinutes - 30;
       let remainingTheoryMinutes = theoryMinutes;
 
-      for (let i = 0; i < subjectsToSchedule.length; i++) {
-        const targetSubject = subjectsToSchedule[i];
+      for (let i = 0; i < nextSlots.length; i++) {
+        const slotInfo = nextSlots[i];
+        const targetSubjectId = slotInfo.subjectId;
 
-        // Encontra o próximo bloco
-        let nextBlock = allPendingBlocks.find((b: any) =>
-          b.subjectId === targetSubject.id &&
-          !scheduledBlockIds.has(b.id)
+        // Encontra o próximo bloco pendente da matéria alvo seguindo a ordem dos PDFs e blocos
+        const nextBlock = sortedPendingBlocks.find(b =>
+          b.subjectId === targetSubjectId && !scheduledBlockIds.has(b.id)
         );
 
-        // Se não encontrar, aciona fallback balanceado para preencher o slot obrigatório
-        if (!nextBlock) {
-          const fallbackSubject = getFallbackSubjectForSlot(
-            eligibleSubjects,
-            allPendingBlocks,
-            scheduledBlockIds,
-            scheduleItemsData,
-            [],
-            [],
-            dayNumber,
-            lastCompletedSubjectIds
-          );
-          if (fallbackSubject) {
-            nextBlock = allPendingBlocks.find((b: any) =>
-              b.subjectId === fallbackSubject.id &&
-              !scheduledBlockIds.has(b.id)
-            );
-          }
-        }
-
         if (nextBlock) {
-          const blockSubject = nextBlock.subject || eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
+          const blockSubject = nextBlock.subject || eligibleSubjects.find(s => s.id === nextBlock.subjectId);
           let blockMins = 0;
           try {
-            blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject.name);
+            blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject?.name || "");
           } catch (err) {
             if (err instanceof HybridScheduleIntegrityError) {
-              // Loop-prevention: add to scheduledBlockIds so this block is not retried
-              // in the current run. This does NOT represent a successful schedule entry.
               scheduledBlockIds.add(nextBlock.id);
               schedulerWarnings.push({
                 code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
@@ -644,10 +616,10 @@ export async function generateLegacyTrt4Schedule(
             }
             throw err;
           }
-          const isFallback = nextBlock.subjectId !== targetSubject.id;
-          const reasonText = isFallback
-            ? `Roteiro: Teoria de ${blockSubject.name} (Fallback)` 
-            : `Roteiro: Teoria de ${blockSubject.name}`;
+
+          const reasonText = slotInfo.isFallback
+            ? `Roteiro: Teoria de ${blockSubject?.name || ""} (Fallback)` 
+            : `Roteiro: Teoria de ${blockSubject?.name || ""}`;
 
           scheduleItemsData.push({
             userId,
@@ -665,49 +637,43 @@ export async function generateLegacyTrt4Schedule(
 
           scheduledBlockIds.add(nextBlock.id);
           remainingTheoryMinutes -= blockMins;
+          completedSubjectHistory.push(nextBlock.subjectId);
         }
       }
 
-      // C. Terceiro bloco complementar por capacidade (Direito Civil ou fallback)
+      // C. Terceiro bloco complementar por capacidade (Direito Civil)
       if (remainingTheoryMinutes >= 30) {
         const civilSubject = eligibleSubjects.find(s => s.name.toLowerCase().includes("direito civil"));
         let thirdBlock = null;
 
         if (civilSubject) {
-          thirdBlock = allPendingBlocks.find((b: any) =>
-            b.subjectId === civilSubject.id &&
-            !scheduledBlockIds.has(b.id)
+          thirdBlock = sortedPendingBlocks.find(b =>
+            b.subjectId === civilSubject.id && !scheduledBlockIds.has(b.id)
           );
         }
 
-        // Se Direito Civil não tiver blocos, aciona fallback balanceado
         if (!thirdBlock) {
-          const fallbackSubject = getFallbackSubjectForSlot(
-            eligibleSubjects,
-            allPendingBlocks,
-            scheduledBlockIds,
-            scheduleItemsData,
-            [],
-            [],
-            dayNumber,
-            lastCompletedSubjectIds
-          );
-          if (fallbackSubject) {
-            thirdBlock = allPendingBlocks.find((b: any) =>
-              b.subjectId === fallbackSubject.id &&
-              !scheduledBlockIds.has(b.id)
+          const thirdSlots = getLegacyTrt4NextSubjects({
+            userSubjects: eligibleSubjects,
+            completedSubjectHistory,
+            hasPendingBlocks: (subjectId) =>
+              sortedPendingBlocks.some(b => b.subjectId === subjectId && !scheduledBlockIds.has(b.id)),
+            count: 1,
+          });
+          if (thirdSlots.length > 0) {
+            thirdBlock = sortedPendingBlocks.find(b =>
+              b.subjectId === thirdSlots[0].subjectId && !scheduledBlockIds.has(b.id)
             );
           }
         }
 
         if (thirdBlock) {
-          // Evitar duplicidade de studyBlockId no mesmo dia
           const dayBlockIds = scheduleItemsData
             .filter((item: any) => item.dayNumber === dayNumber && item.studyBlockId)
             .map((item: any) => item.studyBlockId);
 
           if (!dayBlockIds.includes(thirdBlock.id)) {
-            const blockSubject = thirdBlock.subject || eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
+            const blockSubject = thirdBlock.subject || civilSubject;
             let blockMins = 0;
             try {
               blockMins = await getOrComputeBlockMinutes(thirdBlock, blockSubject?.name || "Complementar");
@@ -723,7 +689,6 @@ export async function generateLegacyTrt4Schedule(
               throw err;
             }
 
-            // Só adiciona se o bloco complementar não estourar de forma relevante
             if (blockMins <= remainingTheoryMinutes + 15) {
               scheduleItemsData.push({
                 userId,
@@ -731,7 +696,7 @@ export async function generateLegacyTrt4Schedule(
                 subjectId: thirdBlock.subjectId,
                 studyBlockId: thirdBlock.id,
                 actionType: "THEORY",
-                priorityScore: 80, // prioridade complementar
+                priorityScore: 80,
                 reason: `Roteiro: Teoria de ${blockSubject?.name || "Complementar"} (Complemento)`,
                 dayNumber,
                 scheduledDate: candidateDate,
@@ -759,6 +724,7 @@ export async function generateLegacyTrt4Schedule(
 
   return { schedule, itemsCount: scheduleItemsData.length, schedulerWarnings };
 }
+
 
 export async function generateDynamicSchedule(
   userId: string,
