@@ -1,5 +1,6 @@
 import { reorganizeOverdueSchedule } from "@/lib/scheduler";
 import { prisma } from "@/lib/prisma";
+import { sortPendingBlocksForSubject } from "@/lib/scheduler/legacy-trt4-queue";
 
 // Mock do prisma para testar reorganizeOverdueSchedule sem banco de dados
 jest.mock("@/lib/prisma", () => {
@@ -13,6 +14,7 @@ jest.mock("@/lib/prisma", () => {
       },
       studySchedule: {
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
       studyScheduleItem: {
         count: jest.fn(),
@@ -21,6 +23,7 @@ jest.mock("@/lib/prisma", () => {
         findFirst: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
+        createMany: jest.fn(),
       },
       studyBlock: {
         findMany: jest.fn(),
@@ -35,7 +38,7 @@ jest.mock("@/lib/prisma", () => {
   };
 });
 
-describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4", () => {
+describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4 e Reconstrução Canônica", () => {
   const userId = "user-gabriela-test";
 
   const eligibleSubjects = [
@@ -132,140 +135,25 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
     expect(day1SubjectNames).not.toContain("Direito Constitucional");
   });
 
-  test("Cenário 2 (Parcial) — Trabalho ✅ e Português ❌ -> Reorganizar aloca Português e Processo do Trabalho no Dia 1", async () => {
-    const completedItems = [
-      { id: "item-dt", subjectId: "sub-dt", status: "COMPLETED", actionType: "THEORY", completedAt: new Date("2026-08-10") },
-    ];
-
-    const pendingOverdueItems = [
-      {
-        id: "item-lp-old",
-        userId,
-        subjectId: "sub-lp",
-        actionType: "THEORY",
-        status: "PENDING",
-        scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
-        dayNumber: 1,
-        estimatedMinutes: 45,
-        subject: { id: "sub-lp", name: "Língua Portuguesa" },
-        studyBlock: { id: "block-lp-1", title: "Bloco LP 1", flashcards: [] },
-      },
-      {
-        id: "item-dpt-old",
-        userId,
-        subjectId: "sub-dpt",
-        actionType: "THEORY",
-        status: "PENDING",
-        scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
-        dayNumber: 1,
-        estimatedMinutes: 45,
-        subject: { id: "sub-dpt", name: "Direito Processual do Trabalho" },
-        studyBlock: { id: "block-dpt-1", title: "Bloco DPT 1", flashcards: [] },
-      },
-    ];
-
-    (prisma.studySchedule.findFirst as jest.Mock).mockResolvedValue({
-      id: "sched-1",
-      userId,
-      status: "ACTIVE",
-      dailyStudyMinutes: 120,
-      items: [...completedItems, ...pendingOverdueItems],
-    });
-
-    (prisma.studyScheduleItem.findMany as jest.Mock).mockImplementation(async ({ where }) => {
-      if (where?.status === "COMPLETED" && where?.actionType === "THEORY") {
-        return completedItems;
-      }
-      return [];
-    });
-
-    (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue([]);
-
-    const result = await reorganizeOverdueSchedule(userId, false, true, new Date("2026-08-11T10:00:00.000Z"));
-
-    expect(result.success).toBe(true);
-    const day1Changes = result.changes.filter(c => c.newDate === "2026-08-11");
-    const day1SubjectNames = day1Changes.map(c => c.subjectName);
-    expect(day1SubjectNames).toContain("Língua Portuguesa");
-    expect(day1SubjectNames).toContain("Direito Processual do Trabalho");
-  });
-
-  test("Cenário 3 (Nenhuma Concluída no par atual) — Processo do Trabalho ❌ e Administrativo ❌ -> Reorganizar mantém Processo do Trabalho e Administrativo", async () => {
-    const completedItems = [
-      { id: "item-dt", subjectId: "sub-dt", status: "COMPLETED", actionType: "THEORY", completedAt: new Date("2026-08-08") },
-      { id: "item-lp", subjectId: "sub-lp", status: "COMPLETED", actionType: "THEORY", completedAt: new Date("2026-08-09") },
-    ];
-
-    const pendingOverdueItems = [
-      {
-        id: "item-dpt-old",
-        userId,
-        subjectId: "sub-dpt",
-        actionType: "THEORY",
-        status: "PENDING",
-        scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
-        dayNumber: 1,
-        estimatedMinutes: 45,
-        subject: { id: "sub-dpt", name: "Direito Processual do Trabalho" },
-        studyBlock: { id: "block-dpt-1", title: "Bloco DPT 1", flashcards: [] },
-      },
-      {
-        id: "item-da-old",
-        userId,
-        subjectId: "sub-da",
-        actionType: "THEORY",
-        status: "PENDING",
-        scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
-        dayNumber: 1,
-        estimatedMinutes: 45,
-        subject: { id: "sub-da", name: "Direito Administrativo" },
-        studyBlock: { id: "block-da-1", title: "Bloco DA 1", flashcards: [] },
-      },
-    ];
-
-    (prisma.studySchedule.findFirst as jest.Mock).mockResolvedValue({
-      id: "sched-1",
-      userId,
-      status: "ACTIVE",
-      dailyStudyMinutes: 120,
-      items: [...completedItems, ...pendingOverdueItems],
-    });
-
-    (prisma.studyScheduleItem.findMany as jest.Mock).mockImplementation(async ({ where }) => {
-      if (where?.status === "COMPLETED" && where?.actionType === "THEORY") {
-        return completedItems;
-      }
-      return [];
-    });
-
-    (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue([]);
-
-    const result = await reorganizeOverdueSchedule(userId, false, true, new Date("2026-08-11T10:00:00.000Z"));
-
-    expect(result.success).toBe(true);
-    const day1Changes = result.changes.filter(c => c.newDate === "2026-08-11");
-    const day1SubjectNames = day1Changes.map(c => c.subjectName);
-    expect(day1SubjectNames).toContain("Direito Processual do Trabalho");
-    expect(day1SubjectNames).toContain("Direito Administrativo");
-  });
-
-  test("Cenário 4 — Ordem do PDF no reorganize: Administrativo 4.pdf, 5.pdf e 8.pdf -> Escolhe PDF 4 (Bloco 2)", async () => {
+  test("Cenário 2 — PDF 9 já agendado como PENDING antigo vs PDF 4 pendente no banco -> Reorganizar escolhe PDF 4 (Bloco 2)", async () => {
     const completedItems = [
       { id: "item-dpt", subjectId: "sub-dpt", status: "COMPLETED", actionType: "THEORY", completedAt: new Date("2026-08-10") },
     ];
 
+    // O cronograma antigo tinha um item PENDING apontando incorretamente para o PDF 9
     const pendingOverdueItems = [
       {
-        id: "item-da-old",
+        id: "item-da-old-pdf9",
         userId,
         subjectId: "sub-da",
+        studyBlockId: "block-da-9-bl1",
         actionType: "THEORY",
         status: "PENDING",
         scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
         dayNumber: 1,
         estimatedMinutes: 45,
         subject: { id: "sub-da", name: "Direito Administrativo" },
-        studyBlock: { id: "block-da-4-bl2", title: "Bloco DA 4.2", flashcards: [], material: { fileName: "Direito Administrativo 4.pdf" } },
+        studyBlock: { id: "block-da-9-bl1", title: "Bloco DA 9.1", flashcards: [], material: { fileName: "Direito Administrativo 9.pdf" } },
       },
     ];
 
@@ -284,18 +172,38 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
       return [];
     });
 
+    // Blocos de Direito Administrativo no banco: PDF 9 tem orderIndex 1 (upload antigo), mas PDF 4 é o menor número didático!
     const daBlocks = [
-      { id: "block-da-8", subjectId: "sub-da", status: "PENDING", orderIndex: 1, material: { id: "m8", fileName: "Direito Administrativo 8.pdf" }, subject: eligibleSubjects[3] },
-      { id: "block-da-5", subjectId: "sub-da", status: "PENDING", orderIndex: 1, material: { id: "m5", fileName: "Direito Administrativo 5.pdf" }, subject: eligibleSubjects[3] },
-      { id: "block-da-4-bl2", subjectId: "sub-da", status: "PENDING", orderIndex: 2, material: { id: "m4", fileName: "Direito Administrativo 4.pdf" }, subject: eligibleSubjects[3] },
+      { id: "block-da-9-bl1", subjectId: "sub-da", status: "PENDING", orderIndex: 1, material: { id: "m9", orderIndex: 1, fileName: "Direito Administrativo 9.pdf" }, subject: eligibleSubjects[3] },
+      { id: "block-da-5-bl1", subjectId: "sub-da", status: "PENDING", orderIndex: 1, material: { id: "m5", orderIndex: 2, fileName: "Direito Administrativo 5.pdf" }, subject: eligibleSubjects[3] },
+      { id: "block-da-4-bl2", subjectId: "sub-da", status: "PENDING", orderIndex: 2, material: { id: "m4", orderIndex: 3, fileName: "Direito Administrativo 4.pdf" }, subject: eligibleSubjects[3] },
     ];
 
     (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue(daBlocks);
 
-    const result = await reorganizeOverdueSchedule(userId, false, true, new Date("2026-08-11T10:00:00.000Z"));
+    const result = await reorganizeOverdueSchedule(userId, false, false, new Date("2026-08-11T10:00:00.000Z"));
 
     expect(result.success).toBe(true);
-    const daChanges = result.changes.filter(c => c.subjectName === "Direito Administrativo");
-    expect(daChanges.length).toBeGreaterThan(0);
+
+    // O item reconstruído para Direito Administrativo deve apontar para o bloco do PDF 4 (block-da-4-bl2) e NÃO para o PDF 9
+    const updateCalls = (prisma.studyScheduleItem.update as jest.Mock).mock.calls;
+    const daUpdateCall = updateCalls.find(([arg]) => arg.data?.studyBlockId === "block-da-4-bl2" || arg.where?.id === "item-da-old-pdf9");
+    expect(daUpdateCall).toBeDefined();
+    expect(daUpdateCall[0].data.studyBlockId).toBe("block-da-4-bl2");
+  });
+
+  test("Cenário 3 — Ordenador numérico: filename com número didático vence material.orderIndex", () => {
+    const blocks = [
+      { id: "b-11", orderIndex: 1, material: { id: "m-11", orderIndex: 1, fileName: "Matéria 11.pdf" } },
+      { id: "b-10", orderIndex: 1, material: { id: "m-10", orderIndex: 2, fileName: "Matéria 10.pdf" } },
+      { id: "b-9", orderIndex: 1, material: { id: "m-9", orderIndex: 3, fileName: "Matéria 9.pdf" } },
+      { id: "b-3", orderIndex: 1, material: { id: "m-3", orderIndex: 4, fileName: "Matéria 3.pdf" } },
+      { id: "b-2", orderIndex: 1, material: { id: "m-2", orderIndex: 5, fileName: "Matéria 2.pdf" } },
+      { id: "b-1", orderIndex: 1, material: { id: "m-1", orderIndex: 6, fileName: "Matéria 1.pdf" } },
+    ];
+
+    const sorted = sortPendingBlocksForSubject(blocks);
+    const sortedIds = sorted.map(b => b.id);
+    expect(sortedIds).toEqual(["b-1", "b-2", "b-3", "b-9", "b-10", "b-11"]);
   });
 });

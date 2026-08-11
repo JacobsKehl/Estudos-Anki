@@ -76,7 +76,20 @@ export function sortPendingBlocksForSubject<T extends Record<string, any>>(block
     const matB = b.material;
 
     if (matA && matB && matA.id !== matB.id) {
-      // 1. Ordem didática explícita (orderIndex / materialOrder / position)
+      const nameA = matA.fileName || matA.originalFileName || matA.title || "";
+      const nameB = matB.fileName || matB.originalFileName || matB.title || "";
+
+      // 1. Número sequencial didático extraído do nome do material (ex: 1 -> 2 -> 3 ... -> 10)
+      const seqA = extractMaterialSequenceNumber(nameA);
+      const seqB = extractMaterialSequenceNumber(nameB);
+
+      if (seqA !== null && seqB !== null && seqA !== seqB) {
+        return seqA - seqB;
+      }
+      if (seqA !== null && seqB === null) return -1;
+      if (seqA === null && seqB !== null) return 1;
+
+      // 2. Ordem didática explícita (orderIndex / materialOrder / position) como fallback se não houver número no nome
       const orderA = matA.orderIndex ?? matA.materialOrder ?? matA.position;
       const orderB = matB.orderIndex ?? matB.materialOrder ?? matB.position;
 
@@ -84,18 +97,7 @@ export function sortPendingBlocksForSubject<T extends Record<string, any>>(block
         return orderA - orderB;
       }
 
-      const nameA = matA.fileName || matA.originalFileName || matA.title || "";
-      const nameB = matB.fileName || matB.originalFileName || matB.title || "";
-
-      // 2. Número sequencial didático extraído do nome do material (ex: 1 -> 2 -> 3 ... -> 10)
-      const seqA = extractMaterialSequenceNumber(nameA);
-      const seqB = extractMaterialSequenceNumber(nameB);
-
-      if (seqA !== null && seqB !== null && seqA !== seqB) {
-        return seqA - seqB;
-      }
-
-      // 3. Comparação numérica natural para desempate
+      // 3. Comparação numérica natural para desempate por nome
       const nameComp = naturalCompare(nameA, nameB);
       if (nameComp !== 0) return nameComp;
     }
@@ -109,7 +111,7 @@ export function sortPendingBlocksForSubject<T extends Record<string, any>>(block
     const pageB = b.pageStart ?? 0;
     if (pageA !== pageB) return pageA - pageB;
 
-    return 0;
+    return (a.id || "").localeCompare(b.id || "");
   });
 }
 

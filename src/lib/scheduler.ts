@@ -1197,8 +1197,12 @@ export async function reorganizeOverdueSchedule(
   sortItems(overdueTheory);
   sortItems(futureTheory);
 
-  // Fila principal de teoria: dívida/atrasados primeiro
-  const theoryQueue = [...overdueTheory, ...futureTheory];
+  const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
+
+  // No modo LEGACY_TRT4, itens THEORY PENDING antigos do cronograma NÃO dão a ordem dos blocos ou matérias.
+  // Eles entram em unusedPendingItemsPool para reaproveitamento de ID (ou exclusão de excedentes).
+  const theoryQueue = mode === "LEGACY_TRT4" ? [] : [...overdueTheory, ...futureTheory];
+  const unusedPendingItemsPool = mode === "LEGACY_TRT4" ? [...overdueTheory, ...futureTheory] : [];
 
   // Outros tipos (REVIEW_BLOCK / SUPPORT):
   // Atrasados: movidos para firstStudyDate (não consomem slot de teoria, não bloqueiam)
@@ -1208,15 +1212,17 @@ export async function reorganizeOverdueSchedule(
 
   // Configurar conjunto de blocos agendados para evitar duplicações
   const scheduledBlockIds = new Set<string>(
-    allItems.filter(item => item.status === "COMPLETED" && item.studyBlockId).map(item => item.studyBlockId!)
+    allItems.filter(item => (item.status === "COMPLETED" || item.status === "IN_PROGRESS") && item.studyBlockId).map(item => item.studyBlockId!)
   );
-  for (const item of theoryQueue) {
-    if (item.studyBlockId) {
-      scheduledBlockIds.add(item.studyBlockId);
+  if (mode !== "LEGACY_TRT4") {
+    for (const item of theoryQueue) {
+      if (item.studyBlockId) {
+        scheduledBlockIds.add(item.studyBlockId);
+      }
     }
   }
 
-  // Buscar todos os blocos pendentes das matérias elegíveis no banco de dados para gap-filling
+  // Buscar todos os blocos pendentes das matérias elegíveis no banco de dados
   const dbPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
@@ -1234,7 +1240,34 @@ export async function reorganizeOverdueSchedule(
     }
   });
 
-  const sortedDbPendingBlocks = sortPendingBlocksForSubject(dbPendingBlocks);
+  // Extrair blocos pendentes de eligiblePendingTheory para garantir cobertura total dos blocos existentes
+  const itemPendingBlocks: any[] = [];
+  for (const item of eligiblePendingTheory) {
+    if (item.studyBlock && item.studyBlock.status !== "COMPLETED") {
+      const blockId = item.studyBlock.id;
+      if (!dbPendingBlocks.some((b: any) => b.id === blockId)) {
+        itemPendingBlocks.push({
+          ...item.studyBlock,
+          subjectId: item.subjectId,
+          subject: item.subject || eligibleSubjects.find((s: any) => s.id === item.subjectId)
+        });
+      }
+    } else if (item.studyBlockId) {
+      if (!dbPendingBlocks.some((b: any) => b.id === item.studyBlockId)) {
+        itemPendingBlocks.push({
+          id: item.studyBlockId,
+          subjectId: item.subjectId,
+          subject: item.subject || eligibleSubjects.find((s: any) => s.id === item.subjectId),
+          orderIndex: item.dayNumber || 1,
+          material: null,
+          estimatedStudyMinutes: item.estimatedMinutes || 45
+        });
+      }
+    }
+  }
+
+  const allPendingBlocksPool = [...dbPendingBlocks, ...itemPendingBlocks];
+  const sortedDbPendingBlocks = sortPendingBlocksForSubject(allPendingBlocksPool);
 
   // Histórico de matérias de teoria concluídas para acompanhamento do ciclo TRT4
   const completedTheoryItems = await (prisma as any).studyScheduleItem.findMany({
@@ -1270,7 +1303,7 @@ export async function reorganizeOverdueSchedule(
   const uniqueCompletedCount = await getUniqueCompletedTheoryDaysCount(userId);
   const currentDayNumber = uniqueCompletedCount + 1;
 
-  const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number; subjectId?: string; actionType?: string }> = [];
+  const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number; subjectId?: string; studyBlockId?: string; actionType?: string; reason?: string; estimatedMinutes?: number }> = [];
   const newItemsToCreate: any[] = [];
   const changesReport: Array<{
     itemId: string;
@@ -1318,8 +1351,15 @@ export async function reorganizeOverdueSchedule(
     }
   }
 
+  const hasMoreTheoryToSchedule = () => {
+    if (mode === "LEGACY_TRT4") {
+      return Object.values(blocksBySubject).some(blocks => blocks.length > 0);
+    }
+    return theoryQueue.length > 0;
+  };
+
   // Loop principal de preenchimento dos dias úteis
-  while ((theoryQueue.length > 0 || currentDate.getTime() <= maxOriginalDate.getTime()) && iterations < maxIterations) {
+  while ((hasMoreTheoryToSchedule() || currentDate.getTime() <= maxOriginalDate.getTime()) && iterations < maxIterations) {
     iterations++;
     if (!isStudyDay(currentDate, studyDays)) {
       currentDate = addDays(currentDate, 1);
@@ -1528,27 +1568,50 @@ export async function reorganizeOverdueSchedule(
               ? `Roteiro: Teoria de ${blockSubject.name} (Fallback — Preenchimento de Lacuna)`
               : `Roteiro: Teoria de ${blockSubject.name} (Preenchimento de Lacuna)`;
 
-            newItemsToCreate.push({
-              userId,
-              scheduleId: activeSchedule.id,
-              subjectId: nextBlock.subjectId,
-              studyBlockId: nextBlock.id,
-              actionType: "THEORY",
-              priorityScore: 90,
-              reason: reasonText,
-              dayNumber,
-              scheduledDate: new Date(currentDate),
-              estimatedMinutes: blockMins,
-              status: "PENDING"
-            });
+            if (unusedPendingItemsPool.length > 0) {
+              const existingItem = unusedPendingItemsPool.shift()!;
+              const origDateStr = existingItem.scheduledDate ? getTodayRangeSP(existingItem.scheduledDate).dateString : dateStr;
+              updatesList.push({
+                id: existingItem.id,
+                scheduledDate: new Date(currentDate),
+                dayNumber,
+                subjectId: nextBlock.subjectId,
+                studyBlockId: nextBlock.id,
+                actionType: "THEORY",
+                reason: reasonText,
+                estimatedMinutes: blockMins
+              });
 
-            changesReport.push({
-              itemId: `NEW_${nextItemIndex++}`,
-              actionType: "THEORY",
-              subjectName: blockSubject.name,
-              originalDate: "LACUNA",
-              newDate: dateStr
-            });
+              changesReport.push({
+                itemId: existingItem.id,
+                actionType: "THEORY",
+                subjectName: blockSubject.name,
+                originalDate: origDateStr,
+                newDate: dateStr
+              });
+            } else {
+              newItemsToCreate.push({
+                userId,
+                scheduleId: activeSchedule.id,
+                subjectId: nextBlock.subjectId,
+                studyBlockId: nextBlock.id,
+                actionType: "THEORY",
+                priorityScore: 90,
+                reason: reasonText,
+                dayNumber,
+                scheduledDate: new Date(currentDate),
+                estimatedMinutes: blockMins,
+                status: "PENDING"
+              });
+
+              changesReport.push({
+                itemId: `NEW_${nextItemIndex++}`,
+                actionType: "THEORY",
+                subjectName: blockSubject.name,
+                originalDate: "LACUNA",
+                newDate: dateStr
+              });
+            }
 
             theoryMinutesOnDay += blockMins;
           }
@@ -1680,25 +1743,45 @@ export async function reorganizeOverdueSchedule(
   // Executar transações no banco se dryRun for false
   if (!dryRun) {
     await prisma.$transaction(async (tx) => {
-      // 1. Atualizar itens existentes
+      // 1. Purgar itens de teoria pendentes excedentes que não foram reaproveitados
+      if (unusedPendingItemsPool.length > 0) {
+        const unusedIds = unusedPendingItemsPool.map(i => i.id);
+        await (tx as any).studyScheduleItem.deleteMany({
+          where: { id: { in: unusedIds } }
+        });
+      }
+
+      // 2. Atualizar itens existentes
       for (const up of updatesList) {
         await (tx as any).studyScheduleItem.update({
           where: { id: up.id },
           data: {
             scheduledDate: up.scheduledDate,
-            dayNumber: up.dayNumber
+            dayNumber: up.dayNumber,
+            ...(up.subjectId ? { subjectId: up.subjectId } : {}),
+            ...(up.studyBlockId ? { studyBlockId: up.studyBlockId } : {}),
+            ...(up.reason ? { reason: up.reason } : {}),
+            ...(up.estimatedMinutes ? { estimatedMinutes: up.estimatedMinutes } : {}),
           }
         });
       }
 
-      // 2. Criar novos itens
+      // 3. Criar novos itens
       if (newItemsToCreate.length > 0) {
-        await (tx as any).studyScheduleItem.createMany({
-          data: newItemsToCreate
-        });
+        if (typeof (tx as any).studyScheduleItem.createMany === "function") {
+          await (tx as any).studyScheduleItem.createMany({
+            data: newItemsToCreate
+          });
+        } else {
+          for (const newItem of newItemsToCreate) {
+            await (tx as any).studyScheduleItem.create({
+              data: newItem
+            });
+          }
+        }
       }
 
-      // 3. Atualizar cronograma
+      // 4. Atualizar cronograma
       await (tx as any).studySchedule.update({
         where: { id: activeSchedule.id },
         data: { updatedAt: now }
