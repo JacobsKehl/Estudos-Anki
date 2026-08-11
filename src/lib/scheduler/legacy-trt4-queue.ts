@@ -248,3 +248,28 @@ export function getLegacyTrt4NextSubjects(input: SelectNextSubjectsInput): Selec
 
   return selectedSlots;
 }
+
+export interface ShouldReorganizeInput {
+  hasActiveSchedule: boolean;
+  scheduleTodayStr?: string;
+  todayStr: string;
+  hasTodayPendingTheory: boolean;
+  hasEligiblePendingTheoryBlocks: boolean;
+}
+
+/**
+ * Determina se a aplicação deve executar a reorganização do cronograma (reorganizeOverdueSchedule).
+ * 
+ * Regra:
+ * - Condição A (Rollover Diário Normal): O cronograma não foi atualizado hoje (scheduleTodayStr !== todayStr).
+ * - Condição B (Auto-Recuperação de Cronograma Vazio): O usuário possui cronograma ativo, não possui nenhuma
+ *   atividade THEORY PENDING ou IN_PROGRESS para hoje, mas ainda possui blocos teóricos elegíveis não concluídos.
+ */
+export function shouldReorganizeSchedule(input: ShouldReorganizeInput): boolean {
+  if (!input.hasActiveSchedule) return false;
+
+  const scheduleNeedsDailyRollover = input.scheduleTodayStr !== input.todayStr;
+  const scheduleNeedsRecovery = !input.hasTodayPendingTheory && input.hasEligiblePendingTheoryBlocks;
+
+  return scheduleNeedsDailyRollover || scheduleNeedsRecovery;
+}
