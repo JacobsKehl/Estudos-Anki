@@ -1173,16 +1173,20 @@ export async function reorganizeOverdueSchedule(
     item => eligibleSubjectIds.includes(item.subjectId)
   );
 
-  // Separar THEORY de outros tipos (como REVIEW_BLOCK)
-  const eligiblePendingTheory = activeEligiblePendingItems.filter(item => item.actionType === "THEORY");
+  // Separar THEORY por status: PENDING vs outros
+  const eligibleTheory = activeEligiblePendingItems.filter(item => item.actionType === "THEORY");
+  const eligiblePendingTheory = eligibleTheory.filter(item => item.status === "PENDING");
   const eligiblePendingOther = activeEligiblePendingItems.filter(item => item.actionType !== "THEORY");
 
-  // THEORY: Pendentes atrasados (< todayStart) e futuros (>= allocationStartDate)
+  // THEORY PENDING: Pendentes atrasados (< todayStart) e futuros (>= allocationStartDate)
   const overdueTheory = eligiblePendingTheory.filter(
     item => item.scheduledDate && item.scheduledDate < todayStart
   );
   const futureTheory = eligiblePendingTheory.filter(
     item => item.scheduledDate && item.scheduledDate >= allocationStartDate
+  );
+  const todayTheoryPending = eligiblePendingTheory.filter(
+    item => item.scheduledDate && getTodayRangeSP(item.scheduledDate).dateString === todayStr
   );
 
   // Ordenar de forma determinística
@@ -1196,13 +1200,19 @@ export async function reorganizeOverdueSchedule(
   };
   sortItems(overdueTheory);
   sortItems(futureTheory);
+  sortItems(todayTheoryPending);
 
   const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
 
-  // No modo LEGACY_TRT4, itens THEORY PENDING antigos do cronograma NÃO dão a ordem dos blocos ou matérias.
-  // Eles entram em unusedPendingItemsPool para reaproveitamento de ID (ou exclusão de excedentes).
+  // No modo LEGACY_TRT4, itens THEORY PENDING antigos do cronograma (que não forem preservados por preserveToday)
+  // entram em unusedPendingItemsPool para reaproveitamento de ID (ou exclusão de excedentes).
+  // IMPORTANTE: O pool contém APENAS registros com status === "PENDING". Itens IN_PROGRESS ou COMPLETED NUNCA entram no pool!
   const theoryQueue = mode === "LEGACY_TRT4" ? [] : [...overdueTheory, ...futureTheory];
-  const unusedPendingItemsPool = mode === "LEGACY_TRT4" ? [...overdueTheory, ...futureTheory] : [];
+
+  const poolCandidates = preserveToday
+    ? [...overdueTheory, ...futureTheory]
+    : [...overdueTheory, ...todayTheoryPending, ...futureTheory];
+  const unusedPendingItemsPool = mode === "LEGACY_TRT4" ? poolCandidates.filter(i => i.status === "PENDING") : [];
 
   // Outros tipos (REVIEW_BLOCK / SUPPORT):
   // Atrasados: movidos para firstStudyDate (não consomem slot de teoria, não bloqueiam)
@@ -1371,12 +1381,32 @@ export async function reorganizeOverdueSchedule(
 
     // 1. Somar teoria já agendada e preservada neste dia (se houver, ex: preserveToday)
     let theoryMinutesOnDay = 0;
-    const preservedTheoryOnDay = allItems.filter(item => 
-      item.scheduledDate && 
-      getTodayRangeSP(item.scheduledDate).dateString === dateStr &&
-      item.actionType === "THEORY" &&
-      !theoryQueue.some(q => q.id === item.id)
-    );
+    const preservedTheoryOnDay = allItems.filter(item => {
+      if (
+        !item.scheduledDate ||
+        getTodayRangeSP(item.scheduledDate).dateString !== dateStr ||
+        item.actionType !== "THEORY"
+      ) {
+        return false;
+      }
+
+      if (mode === "LEGACY_TRT4") {
+        if (item.status === "COMPLETED") return true;
+        if (item.status === "IN_PROGRESS") return true;
+
+        if (
+          preserveToday &&
+          dateStr === todayStr &&
+          item.status === "PENDING"
+        ) {
+          return true;
+        }
+
+        return false;
+      }
+
+      return !theoryQueue.some(q => q.id === item.id);
+    });
     theoryMinutesOnDay = preservedTheoryOnDay.reduce((sum, item) => sum + (item.estimatedMinutes || 45), 0);
 
     const sameDaySubjectIds = new Set<string>();
@@ -1394,7 +1424,6 @@ export async function reorganizeOverdueSchedule(
       prevDaySubjects.push(...lastCompletedSubjectIds);
     }
 
-    const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
     let cycleSubjects: string[] = [];
     let legacyNextSlots: ReturnType<typeof getLegacyTrt4NextSubjects> = [];
     if (mode === "LEGACY_TRT4") {
@@ -1743,27 +1772,44 @@ export async function reorganizeOverdueSchedule(
   // Executar transações no banco se dryRun for false
   if (!dryRun) {
     await prisma.$transaction(async (tx) => {
-      // 1. Purgar itens de teoria pendentes excedentes que não foram reaproveitados
+      // 1. Purgar itens de teoria pendentes excedentes que não foram reaproveitados (apenas status PENDING)
       if (unusedPendingItemsPool.length > 0) {
         const unusedIds = unusedPendingItemsPool.map(i => i.id);
         await (tx as any).studyScheduleItem.deleteMany({
-          where: { id: { in: unusedIds } }
+          where: {
+            id: { in: unusedIds },
+            status: "PENDING"
+          }
         });
       }
 
-      // 2. Atualizar itens existentes
+      // 2. Atualizar itens existentes (proteção contra alteração de itens que viraram IN_PROGRESS/COMPLETED)
       for (const up of updatesList) {
-        await (tx as any).studyScheduleItem.update({
-          where: { id: up.id },
-          data: {
-            scheduledDate: up.scheduledDate,
-            dayNumber: up.dayNumber,
-            ...(up.subjectId ? { subjectId: up.subjectId } : {}),
-            ...(up.studyBlockId ? { studyBlockId: up.studyBlockId } : {}),
-            ...(up.reason ? { reason: up.reason } : {}),
-            ...(up.estimatedMinutes ? { estimatedMinutes: up.estimatedMinutes } : {}),
-          }
-        });
+        if (typeof (tx as any).studyScheduleItem.updateMany === "function") {
+          await (tx as any).studyScheduleItem.updateMany({
+            where: { id: up.id, status: "PENDING" },
+            data: {
+              scheduledDate: up.scheduledDate,
+              dayNumber: up.dayNumber,
+              ...(up.subjectId ? { subjectId: up.subjectId } : {}),
+              ...(up.studyBlockId ? { studyBlockId: up.studyBlockId } : {}),
+              ...(up.reason ? { reason: up.reason } : {}),
+              ...(up.estimatedMinutes ? { estimatedMinutes: up.estimatedMinutes } : {}),
+            }
+          });
+        } else {
+          await (tx as any).studyScheduleItem.update({
+            where: { id: up.id },
+            data: {
+              scheduledDate: up.scheduledDate,
+              dayNumber: up.dayNumber,
+              ...(up.subjectId ? { subjectId: up.subjectId } : {}),
+              ...(up.studyBlockId ? { studyBlockId: up.studyBlockId } : {}),
+              ...(up.reason ? { reason: up.reason } : {}),
+              ...(up.estimatedMinutes ? { estimatedMinutes: up.estimatedMinutes } : {}),
+            }
+          });
+        }
       }
 
       // 3. Criar novos itens
