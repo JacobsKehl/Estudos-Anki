@@ -25,6 +25,7 @@ import { reorganizeOverdueSchedule } from "@/lib/scheduler";
 import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
 import { NextDayStudySession } from "@/components/today/NextDayStudySession";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { shouldReorganizeSchedule } from "@/lib/scheduler/legacy-trt4-queue";
 
 export const dynamic = "force-dynamic";
 
@@ -151,22 +152,55 @@ export default async function Dashboard() {
   let todayItems: any[] = [];
 
   try {
-    // reorganizedToday will only be set to true if a rollover actually takes place and makes changes.
+    // 1. Usar a busca prévia de initialTodayItems para checar tarefas de hoje
+    const hasTodayPendingTheory = initialTodayItems.some(
+      (item: any) => item.actionType === "THEORY" && (item.status === "PENDING" || item.status === "IN_PROGRESS")
+    );
 
-    let shouldReorganize = false;
-    if (activeSchedule) {
-      const scheduleTodayStr = getTodayRangeSP(activeSchedule.updatedAt).dateString;
-      const todayStr = todayRange.dateString;
-      if (scheduleTodayStr !== todayStr) {
-        shouldReorganize = true; // Primeiro acesso do dia — reorganiza uma vez
-      }
+    // 3. Se não houver teoria hoje, verificar de forma leve se existem blocos teóricos elegíveis não concluídos
+    let hasEligiblePendingTheoryBlocks = false;
+    if (activeSchedule && !hasTodayPendingTheory) {
+      const eligibleBlock = await (prisma as any).studyBlock.findFirst({
+        where: {
+          userId,
+          status: { not: "COMPLETED" },
+          subject: {
+            studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
+          },
+          material: {
+            materialRole: { not: "SUPPORT_MATERIAL" }
+          }
+        },
+        select: { id: true }
+      });
+      hasEligiblePendingTheoryBlocks = !!eligibleBlock;
     }
 
+    const scheduleTodayStr = activeSchedule ? getTodayRangeSP(activeSchedule.updatedAt).dateString : undefined;
+    const todayStr = todayRange.dateString;
+
+    const shouldReorganize = shouldReorganizeSchedule({
+      hasActiveSchedule: !!activeSchedule,
+      scheduleTodayStr,
+      todayStr,
+      hasTodayPendingTheory,
+      hasEligiblePendingTheoryBlocks
+    });
+
     if (shouldReorganize) {
-      console.log("Auto-reorganizando cronograma devido a tarefas pendentes no passado (primeiro carregamento do dia)...");
+      console.log("Auto-reorganizando cronograma (Rollover diário ou Recuperação de cronograma vazio)...");
       const rolloverResult = await reorganizeOverdueSchedule(userId, false, false, now);
       if (rolloverResult.success && rolloverResult.changes.length > 0) {
         reorganizedToday = true;
+      }
+
+      if (!hasTodayPendingTheory && hasEligiblePendingTheoryBlocks && rolloverResult.changes.length === 0) {
+        console.error("[LEGACY_TRT4_RECOVERY_EMPTY]", {
+          maskedUserId: userId ? `${userId.substring(0, 4)}...` : "unknown",
+          hasEligiblePendingTheoryBlocks,
+          changesCount: rolloverResult.changes.length,
+          success: rolloverResult.success
+        });
       }
       
       // Re-fetch since it has been reorganized
