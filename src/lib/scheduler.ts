@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { TRT4_STRATEGY } from "./strategies/trt4";
 import { getTodayRangeSP } from "./date-utils";
 import { calculateHybridMinutes, isHybridTimeError } from "./study/hybrid-estimated-time";
 import { selectLegacySubjectCandidate, LegacySubjectCandidate, selectLegacyQueueItemIndex, LegacyQueueItemCandidate } from "./scheduler/legacy-subject-diversity";
@@ -264,52 +263,6 @@ async function getLastCompletedTheorySubjectIds(userId: string): Promise<string[
 
   return Array.from(new Set(completedOnSameDay.map(item => item.subjectId)));
 }
-
-async function getCycleOffset(userId: string, currentDayNumber: number): Promise<number> {
-  const lastCompletedSubjects = await getLastCompletedTheorySubjectIds(userId);
-  if (lastCompletedSubjects.length === 0) return 0;
-
-  const subjects = await prisma.studySubject.findMany({
-    where: { id: { in: lastCompletedSubjects } },
-    select: { name: true }
-  });
-  const subjectNames = subjects.map(s => s.name);
-
-  let lastCycleDay = null;
-  for (const name of subjectNames) {
-    const nameLower = name.toLowerCase();
-    if (nameLower.includes("trabalho") && !nameLower.includes("processo") && !nameLower.includes("processual")) {
-      lastCycleDay = 0;
-      break;
-    }
-    if (nameLower.includes("português") || nameLower.includes("portugues")) {
-      lastCycleDay = 0;
-      break;
-    }
-    if (nameLower.includes("processual do trabalho") || nameLower.includes("processo do trabalho")) {
-      lastCycleDay = 1;
-      break;
-    }
-    if (nameLower.includes("administrativo")) {
-      lastCycleDay = 1;
-      break;
-    }
-    if (nameLower.includes("constitucional")) {
-      lastCycleDay = 2;
-      break;
-    }
-    if (nameLower.includes("processual civil") || nameLower.includes("processo civil")) {
-      lastCycleDay = 2;
-      break;
-    }
-  }
-
-  if (lastCycleDay === null) return 0;
-
-  const targetCycleDay = (lastCycleDay + 1) % 3;
-  return (targetCycleDay - (currentDayNumber - 1) % 3 + 3) % 3;
-}
-
 function getFallbackSubjectForSlot(
   eligibleSubjects: any[],
   allPendingBlocks: any[],
@@ -1214,8 +1167,6 @@ export async function reorganizeOverdueSchedule(
     s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
   );
   const eligibleSubjectIds = eligibleSubjects.map(s => s.id);
-  let activeSecondaryIndex = 0;
-  const activeSecondarySubjects = eligibleSubjects.filter(s => s.studyPriority === "ACTIVE");
 
   // Filtrar itens apenas das matérias elegíveis
   const activeEligiblePendingItems = eligiblePendingItems.filter(
@@ -1283,16 +1234,25 @@ export async function reorganizeOverdueSchedule(
     }
   });
 
-  dbPendingBlocks.sort((a: any, b: any) => {
-    const fileA = a.material?.fileName || "";
-    const fileB = b.material?.fileName || "";
-    const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
-    if (fileCompare !== 0) return fileCompare;
-    return a.orderIndex - b.orderIndex;
+  const sortedDbPendingBlocks = sortPendingBlocksForSubject(dbPendingBlocks);
+
+  // Histórico de matérias de teoria concluídas para acompanhamento do ciclo TRT4
+  const completedTheoryItems = await (prisma as any).studyScheduleItem.findMany({
+    where: {
+      userId,
+      status: "COMPLETED",
+      actionType: "THEORY",
+    },
+    orderBy: [
+      { completedAt: "asc" },
+      { scheduledDate: "asc" },
+    ],
+    select: { subjectId: true },
   });
+  const completedSubjectHistory: string[] = completedTheoryItems.map((i: any) => i.subjectId);
 
   // Blocos novos que podem ser agendados
-  const availableNewBlocks = dbPendingBlocks.filter((block: any) => !scheduledBlockIds.has(block.id));
+  const availableNewBlocks = sortedDbPendingBlocks.filter((block: any) => !scheduledBlockIds.has(block.id));
   const blocksBySubject: Record<string, typeof dbPendingBlocks> = {};
   for (const block of availableNewBlocks) {
     if (!blocksBySubject[block.subjectId]) {
@@ -1309,7 +1269,6 @@ export async function reorganizeOverdueSchedule(
   const lastCompletedSubjectIds = await getLastCompletedTheorySubjectIds(userId);
   const uniqueCompletedCount = await getUniqueCompletedTheoryDaysCount(userId);
   const currentDayNumber = uniqueCompletedCount + 1;
-  const cycleOffset = await getCycleOffset(userId, currentDayNumber);
 
   const updatesList: Array<{ id: string; scheduledDate: Date; dayNumber: number; subjectId?: string; actionType?: string }> = [];
   const newItemsToCreate: any[] = [];
@@ -1397,9 +1356,19 @@ export async function reorganizeOverdueSchedule(
 
     const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
     let cycleSubjects: string[] = [];
+    let legacyNextSlots: ReturnType<typeof getLegacyTrt4NextSubjects> = [];
     if (mode === "LEGACY_TRT4") {
-      const cycleDay = (dayNumber - 1 + cycleOffset) % TRT4_STRATEGY.cycle.length;
-      cycleSubjects = TRT4_STRATEGY.cycle[cycleDay].map(s => s.toLowerCase());
+      legacyNextSlots = getLegacyTrt4NextSubjects({
+        userSubjects: eligibleSubjects,
+        completedSubjectHistory,
+        hasPendingBlocks: (subjectId) => {
+          const inQueue = theoryQueue.some(q => q.subjectId === subjectId);
+          const inBlocks = (blocksBySubject[subjectId] || []).length > 0;
+          return inQueue || inBlocks;
+        },
+        count: 2,
+      });
+      cycleSubjects = legacyNextSlots.map(s => s.subjectName.toLowerCase());
     }
 
     // Helper: agendar um item pelo índice da fila e registrar mudança
@@ -1407,6 +1376,7 @@ export async function reorganizeOverdueSchedule(
       const item = theoryQueue[idx];
       theoryQueue.splice(idx, 1);
       sameDaySubjectIds.add(item.subjectId);
+      completedSubjectHistory.push(item.subjectId);
       const origDateStr = getTodayRangeSP(item.scheduledDate!).dateString;
       const isDateChanged = origDateStr !== dateStr;
       const isDayChanged = item.dayNumber !== dayNumber;
@@ -1478,9 +1448,8 @@ export async function reorganizeOverdueSchedule(
       }
     }
 
-    // Tentativa 2: Alocar qualquer item da fila (fallback / carryover)
-    // Usa selectLegacyQueueItemIndex sobre toda a fila restante.
-    {
+    // Tentativa 2: Alocar qualquer item da fila (fallback / carryover apenas em modo DYNAMIC)
+    if (mode !== "LEGACY_TRT4") {
       const prevDaySet = new Set(prevDaySubjects);
       while (theoryMinutesOnDay < targetTheoryMinutes) {
         const allCandidates: LegacyQueueItemCandidate[] = theoryQueue.map((item, idx) => ({
@@ -1505,23 +1474,9 @@ export async function reorganizeOverdueSchedule(
     // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutes
     if (theoryMinutesOnDay < targetTheoryMinutes) {
       if (mode === "LEGACY_TRT4") {
-        const cycleDay = (dayNumber - 1 + cycleOffset) % TRT4_STRATEGY.cycle.length;
-        const subjectsTodayNames = TRT4_STRATEGY.cycle[cycleDay];
-
-        // 1. Obter as duas matérias do ciclo
-        const subName1 = subjectsTodayNames[0];
-        let subName2 = subjectsTodayNames[1];
-
-        // Intercalação de matéria ativa se aplicável
-        if (activeSecondarySubjects.length > 0 && cycleDay === 0) {
-          const secSubject = activeSecondarySubjects[activeSecondaryIndex % activeSecondarySubjects.length];
-          subName2 = secSubject.name;
-          activeSecondaryIndex++;
-        }
-
-        const subject1 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName1.toLowerCase()));
-        const subject2 = eligibleSubjects.find(s => s.name.toLowerCase().includes(subName2.toLowerCase()));
-        const subjectsToSchedule = [subject1, subject2].filter((s): s is typeof eligibleSubjects[number] => !!s);
+        const subjectsToSchedule = legacyNextSlots
+          .map(slot => eligibleSubjects.find(s => s.id === slot.subjectId))
+          .filter((s): s is typeof eligibleSubjects[number] => !!s);
 
         // Para cada uma das duas matérias obrigatórias, tentar agendar um bloco
         for (const targetSubject of subjectsToSchedule) {
@@ -1564,6 +1519,7 @@ export async function reorganizeOverdueSchedule(
             }
 
             sameDaySubjectIds.add(nextBlock.subjectId);
+            completedSubjectHistory.push(nextBlock.subjectId);
             scheduledBlockIds.add(nextBlock.id);
             const blockSubject = nextBlock.subject || eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
             const blockMins = nextBlock.estimatedStudyMinutes || 45;
