@@ -35,6 +35,30 @@ export function getLegacyTrt4SubjectIndex(subjectName: string): number {
 }
 
 /**
+ * Extrai o número sequencial didático de um nome de arquivo / título de material.
+ * Ex: "Direito Administrativo 4.pdf" -> 4
+ * "Aula 02 - Direito do Trabalho" -> 2
+ * "PDF 10.pdf" -> 10
+ * Retorna null se nenhum número for encontrado.
+ */
+export function extractMaterialSequenceNumber(fileName: string): number | null {
+  if (!fileName) return null;
+  const match = fileName.match(/(?:aula|pdf|direit[o|a]|processo|português|portugues|legislação|módulo|modulo|\b)[\s_-]*(\d+)/i);
+  if (match && match[1]) {
+    const parsed = parseInt(match[1], 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  
+  const genericMatch = fileName.match(/(\d+)/);
+  if (genericMatch && genericMatch[1]) {
+    const parsed = parseInt(genericMatch[1], 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+
+  return null;
+}
+
+/**
  * Comparador numérico natural para ordenação de PDFs/arquivos (ex: "PDF 2" < "PDF 10").
  */
 export function naturalCompare(a: string, b: string): number {
@@ -42,8 +66,9 @@ export function naturalCompare(a: string, b: string): number {
 }
 
 /**
- * Ordena os blocos pendentes de uma matéria priorizando a ordem didática dos PDFs (material)
+ * Ordena os blocos pendentes de uma matéria priorizando a ORDEM DIDÁTICA NUMÉRICA dos PDFs (material)
  * e, em seguida, a ordem interna dos blocos (orderIndex / pageStart).
+ * NUNCA utiliza createdAt/data de criação como critério primário.
  */
 export function sortPendingBlocksForSubject<T extends Record<string, any>>(blocks: T[]): T[] {
   return [...blocks].sort((a, b) => {
@@ -51,6 +76,7 @@ export function sortPendingBlocksForSubject<T extends Record<string, any>>(block
     const matB = b.material;
 
     if (matA && matB && matA.id !== matB.id) {
+      // 1. Ordem didática explícita (orderIndex / materialOrder / position)
       const orderA = matA.orderIndex ?? matA.materialOrder ?? matA.position;
       const orderB = matB.orderIndex ?? matB.materialOrder ?? matB.position;
 
@@ -60,16 +86,21 @@ export function sortPendingBlocksForSubject<T extends Record<string, any>>(block
 
       const nameA = matA.fileName || matA.originalFileName || matA.title || "";
       const nameB = matB.fileName || matB.originalFileName || matB.title || "";
+
+      // 2. Número sequencial didático extraído do nome do material (ex: 1 -> 2 -> 3 ... -> 10)
+      const seqA = extractMaterialSequenceNumber(nameA);
+      const seqB = extractMaterialSequenceNumber(nameB);
+
+      if (seqA !== null && seqB !== null && seqA !== seqB) {
+        return seqA - seqB;
+      }
+
+      // 3. Comparação numérica natural para desempate
       const nameComp = naturalCompare(nameA, nameB);
       if (nameComp !== 0) return nameComp;
-
-      if (matA.createdAt && matB.createdAt) {
-        const timeA = new Date(matA.createdAt).getTime();
-        const timeB = new Date(matB.createdAt).getTime();
-        if (timeA !== timeB) return timeA - timeB;
-      }
     }
 
+    // 4. Ordem interna do bloco dentro do mesmo PDF
     const bOrderA = a.orderIndex ?? 0;
     const bOrderB = b.orderIndex ?? 0;
     if (bOrderA !== bOrderB) return bOrderA - bOrderB;
@@ -103,13 +134,11 @@ export interface SelectedSubjectSlot {
 export function getLegacyTrt4NextSubjects(input: SelectNextSubjectsInput): SelectedSubjectSlot[] {
   const { userSubjects, completedSubjectHistory, hasPendingBlocks, count = 2 } = input;
 
-  // Filtrar apenas matérias do usuário que pertençam à sequência de 6 matérias
   const coreUserSubjects = userSubjects
     .map(s => ({ ...s, canonicalIndex: getLegacyTrt4SubjectIndex(s.name) }))
     .filter(s => s.canonicalIndex >= 0);
 
   if (coreUserSubjects.length === 0) {
-    // Fallback de segurança se o usuário não tiver nenhuma das 6 matérias core
     return userSubjects.slice(0, count).map(s => ({
       subjectId: s.id,
       subjectName: s.name,
@@ -120,7 +149,6 @@ export function getLegacyTrt4NextSubjects(input: SelectNextSubjectsInput): Selec
 
   const availableCoreIndices = Array.from(new Set(coreUserSubjects.map(s => s.canonicalIndex)));
 
-  // Reconstruir o conjunto de matérias concluídas no ciclo atual
   const currentCycleSet = new Set<number>();
   for (const subjectId of completedSubjectHistory) {
     const matchedSubject = userSubjects.find(s => s.id === subjectId);
@@ -142,7 +170,6 @@ export function getLegacyTrt4NextSubjects(input: SelectNextSubjectsInput): Selec
   for (let slot = 0; slot < count; slot++) {
     let chosenCanonicalIndex = -1;
 
-    // Procura o próximo índice na sequência circular a partir de searchPointer
     for (let offset = 0; offset < 6; offset++) {
       const candidateIndex = (searchPointer + offset) % 6;
       if (availableCoreIndices.includes(candidateIndex) && !simulatedCycleSet.has(candidateIndex)) {
@@ -151,7 +178,6 @@ export function getLegacyTrt4NextSubjects(input: SelectNextSubjectsInput): Selec
       }
     }
 
-    // Se todas as matérias ativas já foram concluídas no ciclo simulado, reinicia o ciclo em 0
     if (chosenCanonicalIndex === -1) {
       simulatedCycleSet.clear();
       searchPointer = 0;
@@ -186,7 +212,6 @@ export function getLegacyTrt4NextSubjects(input: SelectNextSubjectsInput): Selec
         searchPointer = (chosenCanonicalIndex + 1) % 6;
       }
     } else {
-      // Fallback temporário: avançar na fila até achar uma matéria com blocos pendentes
       let fallbackCanonicalIndex = -1;
       for (let offset = 1; offset < 6; offset++) {
         const nextCand = (chosenCanonicalIndex + offset) % 6;
@@ -207,9 +232,7 @@ export function getLegacyTrt4NextSubjects(input: SelectNextSubjectsInput): Selec
           canonicalIndex: fallbackCanonicalIndex,
           isFallback: true,
         });
-        // IMPORTANTE: NÃO marcamos a matéria pulada (chosenCanonicalIndex) como concluída!
       } else {
-        // Sem alternativa
         selectedSlots.push({
           subjectId: matchedSubject.id,
           subjectName: matchedSubject.name,
