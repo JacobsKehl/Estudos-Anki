@@ -109,7 +109,7 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
 
     gabrielaMetrics = {
       userId: gabrielaUser.id,
-      email: gabrielaUser.email,
+      email: gabrielaUser.email || "",
       totalStudyBlocks: totalBlocks,
       completedTheoryBlocksTotal: completedTotal,
       completedTheoryBlocksWeight2: completedWeight2,
@@ -182,7 +182,7 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
   });
   const flashcardsByReviewState: Record<string, number> = {};
   for (const f of flashcardsReviewStateRaw) {
-    flashcardsByReviewState[f.reviewState] = f._count;
+    flashcardsByReviewState[f.reviewState || "UNKNOWN"] = f._count;
   }
 
   const totalFlashcards = await prisma.flashcard.count();

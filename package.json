@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck && jest",
     "test:hybrid": "jest --testPathPattern='src/__tests__/(security|study|ai)/'"
   },
   "dependencies": {

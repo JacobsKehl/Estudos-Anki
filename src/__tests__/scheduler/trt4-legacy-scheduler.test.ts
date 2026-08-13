@@ -175,7 +175,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
     (mockPrisma.studyScheduleItem.findFirst as jest.Mock).mockResolvedValue(null);
     (mockPrisma.studyScheduleItem.createMany as jest.Mock).mockResolvedValue({});
     (mockPrisma.studyBlock.update as jest.Mock).mockResolvedValue({});
-    (mockPrisma.studyBlockSource.findMany as jest.Mock).mockResolvedValue([]);
+    ((mockPrisma as any).studyBlockSource?.findMany as jest.Mock)?.mockResolvedValue([]);
     (mockPrisma.extractedContent.findMany as jest.Mock).mockResolvedValue([]);
   });
 

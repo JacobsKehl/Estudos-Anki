@@ -316,8 +316,8 @@ export async function generateSmartSchedule(
 
 export async function generateLegacyTrt4Schedule(
   userId: string,
-  options: SmartScheduleOptions,
-  userPrefs: any
+  options: SmartScheduleOptions = {},
+  userPrefs: any = null
 ): Promise<ScheduleGenerationResult> {
   const {
     title = "Meu Cronograma de Estudos",

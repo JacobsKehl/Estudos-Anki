@@ -42,8 +42,8 @@ async function runDryRun() {
 
   const allItemsA = scheduleA?.items || [];
   // Agrupar primeiros 5 dias de estudo
-  const uniqueDatesA = Array.from(new Set(allItemsA.map((i) => i.scheduledDate.toISOString().split("T")[0]))).slice(0, 5);
-  const itemsA = allItemsA.filter((i) => uniqueDatesA.includes(i.scheduledDate.toISOString().split("T")[0]));
+  const uniqueDatesA = Array.from(new Set(allItemsA.map((i) => (i.scheduledDate ? i.scheduledDate.toISOString().split("T")[0] : "")))).filter(Boolean).slice(0, 5);
+  const itemsA = allItemsA.filter((i) => i.scheduledDate && uniqueDatesA.includes(i.scheduledDate.toISOString().split("T")[0]));
 
   // ── CENÁRIO B: ESCOPO RESTRITO (PORTUGUÊS/DISCURSIVA DEFERRED, CIVIL ARCHIVED) ─────
   console.log("\n[2/3] Aplicando escopo real: Português/Discursiva DEFERRED, Civil ARCHIVED...");
@@ -73,8 +73,8 @@ async function runDryRun() {
   });
 
   const allItemsB = scheduleB?.items || [];
-  const uniqueDatesB = Array.from(new Set(allItemsB.map((i) => i.scheduledDate.toISOString().split("T")[0]))).slice(0, 5);
-  const itemsB = allItemsB.filter((i) => uniqueDatesB.includes(i.scheduledDate.toISOString().split("T")[0]));
+  const uniqueDatesB = Array.from(new Set(allItemsB.map((i) => (i.scheduledDate ? i.scheduledDate.toISOString().split("T")[0] : "")))).filter(Boolean).slice(0, 5);
+  const itemsB = allItemsB.filter((i) => i.scheduledDate && uniqueDatesB.includes(i.scheduledDate.toISOString().split("T")[0]));
 
   // ── EXIBIÇÃO E COMPARAÇÃO LADO A LADO ──────────────────────────────────────────────
   console.log("\n=======================================================================");
@@ -85,11 +85,12 @@ async function runDryRun() {
   let totalMinsA: Record<string, number> = {};
   for (const item of itemsA) {
     const subName = item.subject?.name || "SRS Review (Geral)";
-    totalMinsA[subName] = (totalMinsA[subName] || 0) + item.estimatedMinutes;
-    const dateStr = item.scheduledDate.toISOString().split("T")[0];
+    const mins = item.estimatedMinutes || 0;
+    totalMinsA[subName] = (totalMinsA[subName] || 0) + mins;
+    const dateStr = item.scheduledDate ? item.scheduledDate.toISOString().split("T")[0] : "";
     const blockTitle = item.studyBlock?.title ? ` - ${item.studyBlock.title.slice(0, 35)}` : "";
     console.log(
-      `${dateStr} (Dia ${String(item.dayNumber).padStart(2)}) | ${item.actionType.padEnd(18)} | ${subName.padEnd(32)} | ${String(item.estimatedMinutes).padStart(3)} min${blockTitle}`
+      `${dateStr} (Dia ${String(item.dayNumber).padStart(2)}) | ${(item.actionType || "").padEnd(18)} | ${subName.padEnd(32)} | ${String(mins).padStart(3)} min${blockTitle}`
     );
   }
 
@@ -106,8 +107,9 @@ async function runDryRun() {
 
   for (const item of itemsB) {
     const subName = item.subject?.name || "SRS Review (Geral)";
-    totalMinsB[subName] = (totalMinsB[subName] || 0) + item.estimatedMinutes;
-    const dateStr = item.scheduledDate.toISOString().split("T")[0];
+    const mins = item.estimatedMinutes || 0;
+    totalMinsB[subName] = (totalMinsB[subName] || 0) + mins;
+    const dateStr = item.scheduledDate ? item.scheduledDate.toISOString().split("T")[0] : "";
     const blockTitle = item.studyBlock?.title ? ` - ${item.studyBlock.title.slice(0, 35)}` : "";
 
     if (
@@ -122,7 +124,7 @@ async function runDryRun() {
     }
 
     console.log(
-      `${dateStr} (Dia ${String(item.dayNumber).padStart(2)}) | ${item.actionType.padEnd(18)} | ${subName.padEnd(32)} | ${String(item.estimatedMinutes).padStart(3)} min${blockTitle}`
+      `${dateStr} (Dia ${String(item.dayNumber).padStart(2)}) | ${(item.actionType || "").padEnd(18)} | ${subName.padEnd(32)} | ${String(mins).padStart(3)} min${blockTitle}`
     );
   }
 
