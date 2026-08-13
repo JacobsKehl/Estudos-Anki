@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 import { PrismaClient } from "@prisma/client";
 
-// Carregar .env
 require("dotenv").config();
 
 const prisma = new PrismaClient();
@@ -14,6 +13,17 @@ interface CheckpointData {
   pgDumpVersion: string;
   pgServerVersion: string;
   metrics: {
+    // Métricas Escopadas da Gabriela Furtado (Usuária Oficial de Produção)
+    gabrielaMetrics: {
+      userId: string;
+      email: string;
+      totalStudyBlocks: number;
+      completedTheoryBlocksTotal: number;
+      completedTheoryBlocksWeight2: number;
+      totalFlashcards: number;
+      orphanedFlashcards: number;
+    };
+    // Métricas Globais do Banco de Dados
     blocksByTheoryStatus: Record<string, number>;
     blocksByQuestionsStatus: Record<string, number>;
     blocksByFlashcardsStatus: Record<string, number>;
@@ -30,7 +40,7 @@ interface CheckpointData {
     totalQuestionReviewTasks: number;
     totalExtractedContent: number;
     totalStudySessionLogs: number;
-    // Campos resilientes a alterações futuras no schema (nulos se a coluna/tabela ainda não existir)
+    // Campos resilientes a alterações futuras no schema
     materialsByRole?: Record<string, number> | null;
     subjectsBySourceMode?: Record<string, number> | null;
     totalTopicGapNotes?: number | null;
@@ -38,61 +48,6 @@ interface CheckpointData {
 }
 
 async function collectMetrics(rotulo: string): Promise<CheckpointData> {
-  // 1. StudyBlocks por theoryStatus
-  const blocksTheoryRaw = await prisma.studyBlock.groupBy({
-    by: ["theoryStatus"],
-    _count: true,
-  });
-  const blocksByTheoryStatus: Record<string, number> = {};
-  for (const b of blocksTheoryRaw) {
-    blocksByTheoryStatus[b.theoryStatus] = b._count;
-  }
-
-  // 2. StudyBlocks por questionsStatus
-  const blocksQuestionsRaw = await prisma.studyBlock.groupBy({
-    by: ["questionsStatus"],
-    _count: true,
-  });
-  const blocksByQuestionsStatus: Record<string, number> = {};
-  for (const b of blocksQuestionsRaw) {
-    blocksByQuestionsStatus[b.questionsStatus] = b._count;
-  }
-
-  // 3. StudyBlocks por flashcardsStatus
-  const blocksFlashcardsRaw = await prisma.studyBlock.groupBy({
-    by: ["flashcardsStatus"],
-    _count: true,
-  });
-  const blocksByFlashcardsStatus: Record<string, number> = {};
-  for (const b of blocksFlashcardsRaw) {
-    blocksByFlashcardsStatus[b.flashcardsStatus] = b._count;
-  }
-
-  // 4. StudyBlocks por methodology
-  const blocksMethodologyRaw = await prisma.studyBlock.groupBy({
-    by: ["methodology"],
-    _count: true,
-  });
-  const blocksByMethodology: Record<string, number> = {};
-  for (const b of blocksMethodologyRaw) {
-    blocksByMethodology[b.methodology] = b._count;
-  }
-
-  // 5. StudyBlocks por subjectId
-  const blocksSubjectRaw = await prisma.studyBlock.groupBy({
-    by: ["subjectId"],
-    _count: true,
-  });
-  const blocksBySubject: Record<string, number> = {};
-  for (const b of blocksSubjectRaw) {
-    blocksBySubject[b.subjectId] = b._count;
-  }
-
-  const totalStudyBlocks = await prisma.studyBlock.count();
-  const completedTheoryBlocksTotal = await prisma.studyBlock.count({
-    where: { theoryStatus: "COMPLETED" },
-  });
-
   // Matérias de Peso 2 do TRT4
   const weight2SubjectNames = [
     "Direito Constitucional",
@@ -107,6 +62,107 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
   });
   const weight2Ids = weight2Subjects.map((s) => s.id);
 
+  // 1. Escopo Específico da Gabriela Furtado
+  const gabrielaUser = await prisma.user.findFirst({
+    where: { email: "gabriela.furtado.p@gmail.com" },
+    select: { id: true, email: true },
+  });
+
+  let gabrielaMetrics = {
+    userId: gabrielaUser?.id ?? "N/A",
+    email: "gabriela.furtado.p@gmail.com",
+    totalStudyBlocks: 0,
+    completedTheoryBlocksTotal: 0,
+    completedTheoryBlocksWeight2: 0,
+    totalFlashcards: 0,
+    orphanedFlashcards: 0,
+  };
+
+  if (gabrielaUser) {
+    const totalBlocks = await prisma.studyBlock.count({ where: { userId: gabrielaUser.id } });
+    const completedTotal = await prisma.studyBlock.count({ where: { userId: gabrielaUser.id, theoryStatus: "COMPLETED" } });
+    const completedWeight2 = await prisma.studyBlock.count({
+      where: { userId: gabrielaUser.id, theoryStatus: "COMPLETED", subjectId: { in: weight2Ids } },
+    });
+    const totalFc = await prisma.flashcard.count({ where: { userId: gabrielaUser.id } });
+
+    const gabrielaCards = await prisma.flashcard.findMany({
+      where: { userId: gabrielaUser.id },
+      select: { id: true, studyBlockId: true },
+    });
+    const gabrielaBlockIds = new Set(
+      (await prisma.studyBlock.findMany({ where: { userId: gabrielaUser.id }, select: { id: true } })).map((b) => b.id)
+    );
+
+    let gabrielaOrphans = 0;
+    for (const fc of gabrielaCards) {
+      if (fc.studyBlockId && !gabrielaBlockIds.has(fc.studyBlockId)) {
+        gabrielaOrphans++;
+      }
+    }
+
+    gabrielaMetrics = {
+      userId: gabrielaUser.id,
+      email: gabrielaUser.email,
+      totalStudyBlocks: totalBlocks,
+      completedTheoryBlocksTotal: completedTotal,
+      completedTheoryBlocksWeight2: completedWeight2,
+      totalFlashcards: totalFc,
+      orphanedFlashcards: gabrielaOrphans,
+    };
+  }
+
+  // 2. Métricas Globais
+  const blocksTheoryRaw = await prisma.studyBlock.groupBy({
+    by: ["theoryStatus"],
+    _count: true,
+  });
+  const blocksByTheoryStatus: Record<string, number> = {};
+  for (const b of blocksTheoryRaw) {
+    blocksByTheoryStatus[b.theoryStatus] = b._count;
+  }
+
+  const blocksQuestionsRaw = await prisma.studyBlock.groupBy({
+    by: ["questionsStatus"],
+    _count: true,
+  });
+  const blocksByQuestionsStatus: Record<string, number> = {};
+  for (const b of blocksQuestionsRaw) {
+    blocksByQuestionsStatus[b.questionsStatus] = b._count;
+  }
+
+  const blocksFlashcardsRaw = await prisma.studyBlock.groupBy({
+    by: ["flashcardsStatus"],
+    _count: true,
+  });
+  const blocksByFlashcardsStatus: Record<string, number> = {};
+  for (const b of blocksFlashcardsRaw) {
+    blocksByFlashcardsStatus[b.flashcardsStatus] = b._count;
+  }
+
+  const blocksMethodologyRaw = await prisma.studyBlock.groupBy({
+    by: ["methodology"],
+    _count: true,
+  });
+  const blocksByMethodology: Record<string, number> = {};
+  for (const b of blocksMethodologyRaw) {
+    blocksByMethodology[b.methodology] = b._count;
+  }
+
+  const blocksSubjectRaw = await prisma.studyBlock.groupBy({
+    by: ["subjectId"],
+    _count: true,
+  });
+  const blocksBySubject: Record<string, number> = {};
+  for (const b of blocksSubjectRaw) {
+    blocksBySubject[b.subjectId] = b._count;
+  }
+
+  const totalStudyBlocks = await prisma.studyBlock.count();
+  const completedTheoryBlocksTotal = await prisma.studyBlock.count({
+    where: { theoryStatus: "COMPLETED" },
+  });
+
   const completedTheoryBlocksWeight2 = await prisma.studyBlock.count({
     where: {
       theoryStatus: "COMPLETED",
@@ -114,7 +170,6 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
     },
   });
 
-  // 6. Flashcards por reviewState
   const flashcardsReviewStateRaw = await prisma.flashcard.groupBy({
     by: ["reviewState"],
     _count: true,
@@ -126,23 +181,18 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
 
   const totalFlashcards = await prisma.flashcard.count();
 
-  // Flashcards órfãos (dangling references: studyBlockId apontando para bloco que não existe)
   const allFlashcards = await prisma.flashcard.findMany({
-    select: { id: true, studyBlockId: true, materialId: true, contentId: true },
+    select: { id: true, studyBlockId: true },
   });
   const allBlockIds = new Set((await prisma.studyBlock.findMany({ select: { id: true } })).map((b) => b.id));
   let orphanedFlashcards = 0;
-  let flashcardsWithoutBlockId = 0;
 
   for (const fc of allFlashcards) {
-    if (!fc.studyBlockId) {
-      flashcardsWithoutBlockId++;
-    } else if (!allBlockIds.has(fc.studyBlockId)) {
-      orphanedFlashcards++; // Canário do F1: link quebrado para bloco inexistente
+    if (fc.studyBlockId && !allBlockIds.has(fc.studyBlockId)) {
+      orphanedFlashcards++;
     }
   }
 
-  // 7. StudyMaterial por processingStatus e materialRole
   const materialsStatusRaw = await prisma.studyMaterial.groupBy({
     by: ["processingStatus"],
     _count: true,
@@ -151,23 +201,12 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
   for (const m of materialsStatusRaw) {
     materialsByStatus[m.processingStatus] = m._count;
   }
-
-  const materialsRoleRaw = await prisma.studyMaterial.groupBy({
-    by: ["materialRole"],
-    _count: true,
-  });
-  const materialsByRoleRecorded: Record<string, number> = {};
-  for (const m of materialsRoleRaw) {
-    materialsByRoleRecorded[m.materialRole] = m._count;
-  }
   const totalMaterials = await prisma.studyMaterial.count();
 
-  // 8. Demais tabelas
   const totalQuestionReviewTasks = await prisma.questionReviewTask.count();
   const totalExtractedContent = await prisma.extractedContent.count();
   const totalStudySessionLogs = await prisma.studySessionLog.count();
 
-  // Coleta resiliente de campos futuros (role, sourceMode, TopicGapNote)
   let materialsByRole: Record<string, number> | null = null;
   try {
     const raw = await (prisma.studyMaterial as any).groupBy({
@@ -203,7 +242,6 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
     totalTopicGapNotes = null;
   }
 
-  // Obter versão do Postgres
   let pgServerVersion = "PostgreSQL (Supabase Cloud)";
   try {
     const versionRes = await prisma.$queryRaw<Array<{ version: string }>>`SELECT version();`;
@@ -222,6 +260,7 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
     pgDumpVersion,
     pgServerVersion,
     metrics: {
+      gabrielaMetrics,
       blocksByTheoryStatus,
       blocksByQuestionsStatus,
       blocksByFlashcardsStatus,
@@ -279,21 +318,36 @@ function compareJSONs(fileA: string, fileB: string) {
       }
     }
 
-    console.log(` - ${name.padEnd(35)} | Antigo: ${strA.padEnd(16)} | Novo: ${strB.padEnd(16)} | Delta: ${deltaStr}${alert}`);
+    console.log(` - ${name.padEnd(38)} | Antigo: ${strA.padEnd(16)} | Novo: ${strB.padEnd(16)} | Delta: ${deltaStr}${alert}`);
   };
 
-  console.log("--- METRICAS CHAVE ---");
-  checkNumericMetric("Total StudyBlocks", metricsA.totalStudyBlocks, metricsB.totalStudyBlocks);
-  checkNumericMetric("Blocos Teoria COMPLETED (Total)", metricsA.completedTheoryBlocksTotal, metricsB.completedTheoryBlocksTotal, true);
-  checkNumericMetric("Blocos Teoria COMPLETED (Peso 2)", metricsA.completedTheoryBlocksWeight2, metricsB.completedTheoryBlocksWeight2, true);
-  checkNumericMetric("Total Flashcards", metricsA.totalFlashcards, metricsB.totalFlashcards, true);
+  console.log("--- MÉTRICAS ESCOPADAS DA GABRIELA FURTADO ---");
+  const gA = metricsA.gabrielaMetrics;
+  const gB = metricsB.gabrielaMetrics;
+  if (gA && gB) {
+    checkNumericMetric("Gabriela: Total StudyBlocks", gA.totalStudyBlocks, gB.totalStudyBlocks);
+    checkNumericMetric("Gabriela: Teoria COMPLETED (Total)", gA.completedTheoryBlocksTotal, gB.completedTheoryBlocksTotal, true);
+    checkNumericMetric("Gabriela: Teoria COMPLETED (Peso 2)", gA.completedTheoryBlocksWeight2, gB.completedTheoryBlocksWeight2, true);
+    checkNumericMetric("Gabriela: Total Flashcards", gA.totalFlashcards, gB.totalFlashcards, true);
+    
+    const gOrphanA = gA.orphanedFlashcards ?? 0;
+    const gOrphanB = gB.orphanedFlashcards ?? 0;
+    const gOrphanAlert = gOrphanB > 0 ? " ❌ [ALERT - FLASHCARDS ÓRFÃOS DETECTADOS!]" : " ✅ (Ok)";
+    if (gOrphanB > 0) regressionsFound = true;
+    console.log(` - ${"Gabriela: Flashcards Órfãos (Canário)".padEnd(38)} | Antigo: ${String(gOrphanA).padEnd(16)} | Novo: ${String(gOrphanB).padEnd(16)} | Delta: ${gOrphanB - gOrphanA}${gOrphanAlert}`);
+  }
 
-  // Flashcards órfãos
+  console.log("\n--- MÉTRICAS GLOBAIS DO BANCO ---");
+  checkNumericMetric("Global: Total StudyBlocks", metricsA.totalStudyBlocks, metricsB.totalStudyBlocks);
+  checkNumericMetric("Global: Teoria COMPLETED (Total)", metricsA.completedTheoryBlocksTotal, metricsB.completedTheoryBlocksTotal, true);
+  checkNumericMetric("Global: Teoria COMPLETED (Peso 2)", metricsA.completedTheoryBlocksWeight2, metricsB.completedTheoryBlocksWeight2, true);
+  checkNumericMetric("Global: Total Flashcards", metricsA.totalFlashcards, metricsB.totalFlashcards, true);
+
   const orphanA = metricsA.orphanedFlashcards ?? 0;
   const orphanB = metricsB.orphanedFlashcards ?? 0;
   const orphanAlert = orphanB > 0 ? " ❌ [ALERT - FLASHCARDS ÓRFÃOS DETECTADOS!]" : " ✅ (Ok)";
   if (orphanB > 0) regressionsFound = true;
-  console.log(` - ${"Flashcards Órfãos (Canário)".padEnd(35)} | Antigo: ${String(orphanA).padEnd(16)} | Novo: ${String(orphanB).padEnd(16)} | Delta: ${orphanB - orphanA}${orphanAlert}`);
+  console.log(` - ${"Global: Flashcards Órfãos (Canário)".padEnd(38)} | Antigo: ${String(orphanA).padEnd(16)} | Novo: ${String(orphanB).padEnd(16)} | Delta: ${orphanB - orphanA}${orphanAlert}`);
 
   console.log("\n--- DEMAIS METRICAS ---");
   checkNumericMetric("Total Materials", metricsA.totalMaterials, metricsB.totalMaterials);
@@ -343,7 +397,6 @@ async function main() {
   console.log(`  GERANDO CHECKPOINT DE BANCO & DISTRIBUIÇÃO: [${rotulo}]`);
   console.log(`======================================================================\n`);
 
-  // Criar pastas backups e docs/checkpoints se não existirem
   const backupsDir = path.join(process.cwd(), "backups");
   const jsonDir = path.join(process.cwd(), "docs", "checkpoints");
 
@@ -354,15 +407,12 @@ async function main() {
   const dumpFilePath = path.join(backupsDir, `${rotulo}-${timestamp}.dump`);
   const jsonFilePath = path.join(jsonDir, `${rotulo}.json`);
 
-  // 1. Coletar distribuição de dados via Prisma
-  console.log("[1/3] Coletando métricas e distribuição dos dados...");
+  console.log("[1/3] Coletando métricas e distribuição dos dados (Global + Gabriela)...");
   const checkpointData = await collectMetrics(rotulo);
 
-  // Salvar JSON no caminho docs/checkpoints/<rotulo>.json
   fs.writeFileSync(jsonFilePath, JSON.stringify(checkpointData, null, 2), "utf-8");
   console.log(`  -> JSON de distribuição salvo em: docs/checkpoints/${rotulo}.json`);
 
-  // 2. Executar dump via npx supabase db dump
   console.log("[2/3] Executando dump do schema public via Supabase CLI...");
   console.log(`  -> Versão pg_dump/CLI: ${checkpointData.pgDumpVersion}`);
   console.log(`  -> Versão Servidor Postgres: ${checkpointData.pgServerVersion}`);
@@ -374,24 +424,26 @@ async function main() {
     console.error("\n⚠️ AVISO: supabase db dump gerou aviso ou erro.", err.message);
   }
 
-  // 3. Exibir resumo e confirmação
   let dumpSizeMB = "N/A";
   if (fs.existsSync(dumpFilePath)) {
     const stats = fs.statSync(dumpFilePath);
     dumpSizeMB = (stats.size / (1024 * 1024)).toFixed(2) + " MB";
   }
 
+  const g = checkpointData.metrics.gabrielaMetrics;
+
   console.log("\n[3/3] RESUMO DO CHECKPOINT GERADO:");
   console.log(`----------------------------------------------------------------------`);
   console.log(` Rótulo:                                ${checkpointData.rotulo}`);
   console.log(` Dump Postgres (Local/Ignorado no Git): ${dumpFilePath} (${dumpSizeMB})`);
   console.log(` Distribuição JSON (Commitado no Git):  ${jsonFilePath}`);
-  console.log(` Total StudyBlocks:                     ${checkpointData.metrics.totalStudyBlocks}`);
-  console.log(` Teoria COMPLETED (Total):              ${checkpointData.metrics.completedTheoryBlocksTotal}`);
-  console.log(` Teoria COMPLETED (Peso 2 TRT4):        ${checkpointData.metrics.completedTheoryBlocksWeight2}`);
-  console.log(` Total Flashcards:                      ${checkpointData.metrics.totalFlashcards}`);
-  console.log(` Flashcards Órfãos:                     ${checkpointData.metrics.orphanedFlashcards}`);
-  console.log(` Total History Logs:                    ${checkpointData.metrics.totalStudySessionLogs}`);
+  console.log(` Gabriela: Total StudyBlocks:          ${g.totalStudyBlocks}`);
+  console.log(` Gabriela: Teoria COMPLETED (Total):   ${g.completedTheoryBlocksTotal}`);
+  console.log(` Gabriela: Teoria COMPLETED (Peso 2):  ${g.completedTheoryBlocksWeight2}`);
+  console.log(` Gabriela: Total Flashcards:           ${g.totalFlashcards}`);
+  console.log(` Gabriela: Flashcards Órfãos:          ${g.orphanedFlashcards}`);
+  console.log(` Global: Total StudyBlocks:            ${checkpointData.metrics.totalStudyBlocks}`);
+  console.log(` Global: Teoria COMPLETED (Total):     ${checkpointData.metrics.completedTheoryBlocksTotal}`);
   console.log(`----------------------------------------------------------------------\n`);
 
   await prisma.$disconnect();

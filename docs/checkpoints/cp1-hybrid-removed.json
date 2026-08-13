@@ -1,9 +1,18 @@
 {
   "rotulo": "cp1-hybrid-removed",
-  "timestamp": "2026-08-13T02:11:32.862Z",
+  "timestamp": "2026-08-13T02:23:01.366Z",
   "pgDumpVersion": "npx supabase db dump (v2.114.0)",
   "pgServerVersion": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
   "metrics": {
+    "gabrielaMetrics": {
+      "userId": "cmp8od0wz0000iybklaotfqbs",
+      "email": "gabriela.furtado.p@gmail.com",
+      "totalStudyBlocks": 348,
+      "completedTheoryBlocksTotal": 115,
+      "completedTheoryBlocksWeight2": 98,
+      "totalFlashcards": 862,
+      "orphanedFlashcards": 0
+    },
     "blocksByTheoryStatus": {
       "COMPLETED": 117,
       "NOT_STARTED": 291

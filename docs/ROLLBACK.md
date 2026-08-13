@@ -43,13 +43,13 @@ A ordem de restauração **DEVE** ser:
 Para restaurar em um banco descartável (Docker ou projeto de teste):
 
 ```bash
-npx tsx scripts/restore.ts backups/cp1-hybrid-removed-<timestamp>.dump --target-url postgresql://usuario:senha@localhost:5432/meubanco_teste
+npx tsx scripts/restore.ts backups/cp1-hybrid-removed-<timestamp>.dump --target-env TEST_TARGET_URL
 ```
 
 Se por um motivo emergencial for necessário restaurar no banco de produção:
 
 ```bash
-npx tsx scripts/restore.ts backups/cp1-hybrid-removed-<timestamp>.dump --target-url "$DIRECT_URL" --target-is-production
+npx tsx scripts/restore.ts backups/cp1-hybrid-removed-<timestamp>.dump --target-env DIRECT_URL --target-is-production
 ```
 
 O script exigirá a confirmação textual digitando `RESTAURAR` no terminal.
