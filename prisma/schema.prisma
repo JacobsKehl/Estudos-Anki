@@ -312,6 +312,10 @@ model StudyBlock {
   needsManualReview Boolean   @default(false)
   confidence        Float?
 
+  // Pré-crédito conservador (F1 / Taxonomia Versionada)
+  possiblyAlreadyStudied Boolean @default(false)
+  sourceV1BlockId        String?
+
   // Study cycle lifecycle
   theoryStatus     String @default("NOT_STARTED") // NOT_STARTED | COMPLETED
   questionsStatus  String @default("NOT_STARTED") // NOT_STARTED | COMPLETED

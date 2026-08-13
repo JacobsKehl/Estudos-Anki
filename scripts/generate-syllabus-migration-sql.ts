@@ -375,8 +375,17 @@ function generateSQL() {
   const migration5File = path.join(outDir, "migration_5_add_study_block_official_topic_fk.sql");
   fs.writeFileSync(migration5File, migration5Sql, "utf-8");
 
+  // Migration 6 (Campos de pré-crédito conservador em StudyBlock)
+  let migration6Sql = `-- MIGRATION 6: add_study_block_conservative_precredit_fields\n`;
+  migration6Sql += `-- 1. Adicionar campos para pré-crédito conservador e aviso de 1-clique na UI\n`;
+  migration6Sql += `ALTER TABLE "StudyBlock" ADD COLUMN IF NOT EXISTS "possiblyAlreadyStudied" BOOLEAN NOT NULL DEFAULT false;\n`;
+  migration6Sql += `ALTER TABLE "StudyBlock" ADD COLUMN IF NOT EXISTS "sourceV1BlockId" TEXT;\n`;
+
+  const migration6File = path.join(outDir, "migration_6_add_study_block_conservative_precredit_fields.sql");
+  fs.writeFileSync(migration6File, migration6Sql, "utf-8");
+
   // ═══ RESUMO ═══
-  console.log(`✅ SQLs gerados com sucesso em:\n - ${migration3File}\n - ${migration4File}\n - ${migration5File}`);
+  console.log(`✅ SQLs gerados com sucesso em:\n - ${migration3File}\n - ${migration4File}\n - ${migration5File}\n - ${migration6File}`);
   console.log(`\nVersão 1 (ESTRATEGIA_COURSE_GRID): ${v1Subjects.length} matérias, ${OFFICIAL_TOPICS.length} tópicos (ATIVA)`);
   console.log(`Versão 2 (TRT4_2026_PROJETADO): ${v2Subjects.length} matérias, ${TRT4_2026_PROJETADO_TOPICS.length} tópicos (INATIVA)`);
   console.log(`Total: ${OFFICIAL_TOPICS.length + TRT4_2026_PROJETADO_TOPICS.length} tópicos`);
