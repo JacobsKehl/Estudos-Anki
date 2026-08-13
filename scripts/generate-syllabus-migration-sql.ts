@@ -2,16 +2,16 @@ import fs from "fs";
 import path from "path";
 import { OFFICIAL_TOPICS } from "../src/lib/constants/official-topics";
 
-// Mapeamento De-Para explícito de nome de matéria -> canonicalKey
+// Mapeamento De-Para explícito: subjectName em OFFICIAL_TOPICS -> subjectCanonicalKey na tabela SyllabusTopic
+// Corresponde 1:1 com as 7 matérias distintas presentes em official-topics.ts
 const SUBJECT_CANONICAL_MAP: Record<string, string> = {
   "Língua Portuguesa": "PORTUGUESE",
-  "Raciocínio Lógico-Matemático": "LOGIC_MATH",
-  "Noções de Tecnologia da Informação": "TECH_INFO",
   "Direito Constitucional": "DIREITO_CONSTITUCIONAL",
   "Direito Processual do Trabalho": "DIREITO_PROCESSUAL_TRABALHO",
   "Direito do Trabalho": "DIREITO_TRABALHO",
   "Direito Processual Civil": "DIREITO_PROCESSUAL_CIVIL",
   "Direito Administrativo": "DIREITO_ADMINISTRATIVO",
+  "Direito Civil": "DIREITO_CIVIL",
 };
 
 function escapeSQLString(str: string): string {

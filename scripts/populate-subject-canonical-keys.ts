@@ -2,16 +2,20 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// TABELA DE-PARA EXPLÍCITA E DETERMINÍSTICA
-export const SUBJECT_CANONICAL_MAP: Record<string, string> = {
+// Mapeamento De-Para explícito e determinístico
+// Fonte: as 10 matérias reais da Gabriela no banco (reconciliação de agosto/2026)
+// Matérias sem correspondência na taxonomia de tópicos ficam com canonicalKey = NULL (não listadas aqui)
+//   - Discursiva: matéria de redação, sem tópicos de conteúdo jurídico
+//   - Revisão Geral: container de flashcards avulsos (0 blocos)
+//   - Revisão Geral TRT: container de flashcards avulsos (0 blocos)
+const SUBJECT_CANONICAL_MAP: Record<string, string> = {
   "Língua Portuguesa": "PORTUGUESE",
-  "Raciocínio Lógico-Matemático": "LOGIC_MATH",
-  "Noções de Tecnologia da Informação": "TECH_INFO",
   "Direito Constitucional": "DIREITO_CONSTITUCIONAL",
   "Direito Processual do Trabalho": "DIREITO_PROCESSUAL_TRABALHO",
   "Direito do Trabalho": "DIREITO_TRABALHO",
   "Direito Processual Civil": "DIREITO_PROCESSUAL_CIVIL",
   "Direito Administrativo": "DIREITO_ADMINISTRATIVO",
+  "Direito Civil": "DIREITO_CIVIL",
 };
 
 async function main() {

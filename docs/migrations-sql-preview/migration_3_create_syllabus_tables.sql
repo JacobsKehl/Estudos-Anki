@@ -242,43 +242,43 @@ INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectN
 VALUES ('work_t13', 'cm01_estrategia_grid_v1', 'DIREITO_TRABALHO', 'Direito do Trabalho', 'Tópico 13', 'Trabalho doméstico.', 'trabalho domestico lei complementar 150', 13, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t0', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 00', 'Lei de Introdução às Normas do Direito Brasileiro.', 'lindb lei de introducao normas do direito brasileiro vigencia eficacia leis', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t0', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 00', 'Lei de Introdução às Normas do Direito Brasileiro.', 'lindb lei de introducao normas do direito brasileiro vigencia eficacia leis', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t1', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 01', 'Pessoas naturais.', 'pessoas naturais personalidade capacidade emancipacao ausencia morte', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t1', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 01', 'Pessoas naturais.', 'pessoas naturais personalidade capacidade emancipacao ausencia morte', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t2', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 02', 'Pessoas jurídicas.', 'pessoas juridicas associacoes fundacoes desconsideracao personalidade', 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t2', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 02', 'Pessoas jurídicas.', 'pessoas juridicas associacoes fundacoes desconsideracao personalidade', 2, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t3', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 03', 'Bens.', 'bens moveis imoveis fungiveis consumiveis publicos', 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t3', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 03', 'Bens.', 'bens moveis imoveis fungiveis consumiveis publicos', 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t4', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 04', 'Fatos jurídicos.', 'fatos juridicos negocios juridicos validade defeitos erros dolo coacao fraude', 4, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t4', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 04', 'Fatos jurídicos.', 'fatos juridicos negocios juridicos validade defeitos erros dolo coacao fraude', 4, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t5', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 05', 'Atos jurídicos.', 'atos juridicos lícitos ilicitos', 5, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t5', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 05', 'Atos jurídicos.', 'atos juridicos lícitos ilicitos', 5, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t6', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 06', 'Prescrição e decadência.', 'prescricao decadencia prazos civil', 6, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t6', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 06', 'Prescrição e decadência.', 'prescricao decadencia prazos civil', 6, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t7', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 07', 'Direito das obrigações — Parte I.', 'direito das obrigacoes parte 1 dar fazer nao fazer solidarias', 7, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t7', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 07', 'Direito das obrigações — Parte I.', 'direito das obrigacoes parte 1 dar fazer nao fazer solidarias', 7, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t8', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 08', 'Direito das obrigações — Parte II.', 'direito das obrigacoes parte 2 adimplemento inadimplemento perdas danos', 8, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t8', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 08', 'Direito das obrigações — Parte II.', 'direito das obrigacoes parte 2 adimplemento inadimplemento perdas danos', 8, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t9', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 09', 'Teoria geral dos contratos.', 'teoria geral dos contratos principios interpretacao', 9, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t9', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 09', 'Teoria geral dos contratos.', 'teoria geral dos contratos principios interpretacao', 9, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t10', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 10', 'Responsabilidade civil.', 'responsabilidade civil dano nexo causalidade culpa objetiva subjetiva', 10, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t10', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 10', 'Responsabilidade civil.', 'responsabilidade civil dano nexo causalidade culpa objetiva subjetiva', 10, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t11', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 11', 'Posse e propriedade.', 'posse propriedade aquisicao perda usucapiao', 11, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t11', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 11', 'Posse e propriedade.', 'posse propriedade aquisicao perda usucapiao', 11, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
-VALUES ('civil_t12', 'cm01_estrategia_grid_v1', 'OUTROS', 'Direito Civil', 'Tópico 12', 'Direitos reais.', 'direitos reais superficie usufruto hipoteca alienacao fiduciaria', 12, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('civil_t12', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'Tópico 12', 'Direitos reais.', 'direitos reais superficie usufruto hipoteca alienacao fiduciaria', 12, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title", "subjectCanonicalKey" = EXCLUDED."subjectCanonicalKey", "updatedAt" = CURRENT_TIMESTAMP;
 INSERT INTO "SyllabusTopic" ("id", "versionId", "subjectCanonicalKey", "subjectName", "topicCode", "title", "normalizedTitle", "orderIndex", "weight", "createdAt", "updatedAt")
 VALUES ('proc_civil_t0', 'cm01_estrategia_grid_v1', 'DIREITO_PROCESSUAL_CIVIL', 'Direito Processual Civil', 'Tópico 00', 'Normas Fundamentais do Processo Civil.', 'normas fundamentais do processo civil principios cpc', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
