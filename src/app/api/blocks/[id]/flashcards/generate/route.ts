@@ -26,6 +26,12 @@ export async function POST(
       return NextResponse.json({ error: "Ops! Não encontramos esse bloco de estudo." }, { status: 404 });
     }
 
+    if (block.subject?.schedulingStatus === "DEFERRED" || block.subject?.schedulingStatus === "ARCHIVED") {
+      return NextResponse.json({ 
+        error: "Não é possível gerar novos flashcards para matérias pausadas (DEFERRED) ou arquivadas (ARCHIVED)." 
+      }, { status: 400 });
+    }
+
     // Bloquear geração múltipla: verificar se já existem flashcards vinculados a este bloco
     const existingCardsCount = await prisma.flashcard.count({
       where: { studyBlockId: id }

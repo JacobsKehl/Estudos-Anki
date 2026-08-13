@@ -335,7 +335,9 @@ export async function generateLegacyTrt4Schedule(
   });
 
   const eligibleSubjects = userSubjects.filter(
-    s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
+    s => (s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE") &&
+         s.schedulingStatus !== "DEFERRED" &&
+         s.schedulingStatus !== "ARCHIVED"
   );
   const eligibleSubjectIds = eligibleSubjects.map(s => s.id);
 
@@ -575,7 +577,9 @@ export async function generateDynamicSchedule(
     where: { userId },
   });
   const eligibleSubjects = userSubjects.filter(
-    s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
+    s => (s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE") &&
+         s.schedulingStatus !== "DEFERRED" &&
+         s.schedulingStatus !== "ARCHIVED"
   );
 
   // 2. Buscar todos os blocos pendentes das matérias elegíveis
@@ -832,12 +836,19 @@ export async function reorganizeOverdueSchedule(
   const todayStart = todayRange.start; // 00:00 SP time in UTC
   const todayStr = todayRange.dateString; // "YYYY-MM-DD"
 
-  // Buscar matérias EXCLUDED ou SECONDARY do usuário para purga
-  const excludedSubjects = await prisma.studySubject.findMany({
-    where: { userId, studyPriority: { in: ["EXCLUDED", "SECONDARY"] } },
-    select: { id: true }
+  // Buscar matérias EXCLUDED, SECONDARY, DEFERRED ou ARCHIVED do usuário para purga
+  const allUserSubjectsForPurge = await prisma.studySubject.findMany({
+    where: { userId },
+    select: { id: true, studyPriority: true, schedulingStatus: true }
   });
-  const excludedSubjectIds = excludedSubjects.map(s => s.id);
+  const excludedSubjectIds = allUserSubjectsForPurge
+    .filter(s =>
+      s.studyPriority === "EXCLUDED" ||
+      s.studyPriority === "SECONDARY" ||
+      s.schedulingStatus === "DEFERRED" ||
+      s.schedulingStatus === "ARCHIVED"
+    )
+    .map(s => s.id);
 
   let excludedItemsPurgedCount = 0;
   if (excludedSubjectIds.length > 0) {
@@ -1010,7 +1021,9 @@ export async function reorganizeOverdueSchedule(
     where: { userId }
   });
   const eligibleSubjects = userSubjects.filter(
-    s => s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE"
+    s => (s.studyPriority === "PRIMARY" || s.studyPriority === "ACTIVE") &&
+         s.schedulingStatus !== "DEFERRED" &&
+         s.schedulingStatus !== "ARCHIVED"
   );
   const eligibleSubjectIds = eligibleSubjects.map(s => s.id);
 

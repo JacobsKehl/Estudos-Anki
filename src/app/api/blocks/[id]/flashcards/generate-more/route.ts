@@ -94,10 +94,14 @@ export async function POST(
       return NextResponse.json({ error: "Bloco de estudo não encontrado ou pertence a outro usuário." }, { status: 404 });
     }
 
-    // 2. Validar matéria excluída
-    if (block.subject?.studyPriority === "EXCLUDED") {
+    // 2. Validar matéria excluída ou pausada/arquivada
+    if (
+      block.subject?.studyPriority === "EXCLUDED" ||
+      block.subject?.schedulingStatus === "DEFERRED" ||
+      block.subject?.schedulingStatus === "ARCHIVED"
+    ) {
       return NextResponse.json({ 
-        error: "Não é possível gerar flashcards para matérias excluídas (EXCLUDED)." 
+        error: "Não é possível gerar flashcards para matérias pausadas (DEFERRED), arquivadas (ARCHIVED) ou excluídas (EXCLUDED)." 
       }, { status: 400 });
     }
 

@@ -100,6 +100,8 @@ model StudySubject {
   examWeight          Float                @default(1.0)
   progress            Float                @default(0)
   studyPriority       String               @default("PRIMARY")
+  schedulingStatus    SchedulingStatus     @default(ACTIVE)
+  deferredUntil       DateTime?
   userId              String
   user                User                 @relation(fields: [userId], references: [id])
   materials           StudyMaterial[]
@@ -113,6 +115,12 @@ model StudySubject {
   weeklyReviewTopics  WeeklyReviewTopic[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+}
+
+enum SchedulingStatus {
+  ACTIVE
+  DEFERRED
+  ARCHIVED
 }
 
 model StudyMaterial {
