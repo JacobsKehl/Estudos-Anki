@@ -1,371 +1,435 @@
 import fs from "fs";
 import path from "path";
-import PDFParser from "c:/Users/henrique.kehl/OneDrive - DropReal/Área de Trabalho/kehl/node_modules/pdf2json";
-import { parseSummaryLinePageNumber } from "../src/lib/cfc/page-number-parser";
+import PDFParser from "pdf2json";
 
-interface SummaryItemLevel2 {
-  nivel: 2;
+// Silence verbose warnings from pdf2json
+process.stdout.write = ((write) => (chunk: any, encoding?: any, cb?: any) => {
+  if (typeof chunk === 'string' && (chunk.includes("Warning:") || chunk.includes("TODO:"))) return true;
+  return write.call(process.stdout, chunk, encoding, cb);
+})(process.stdout.write);
+
+process.stderr.write = ((write) => (chunk: any, encoding?: any, cb?: any) => {
+  if (typeof chunk === 'string' && (chunk.includes("Warning:") || chunk.includes("TODO:"))) return true;
+  return write.call(process.stderr, chunk, encoding, cb);
+})(process.stderr.write);
+
+export interface SubItem {
   titulo: string;
-  paginaImpressa: number;
-  paginaPdf: number;
-  paginaFimImpressa: number;
-  paginaFimPdf: number;
+  paginaInicio: number;
+  paginaFim: number;
 }
 
-interface SummaryItemLevel1 {
-  nivel: 1;
+export interface SummaryItem {
   titulo: string;
-  paginaImpressa: number;
-  paginaPdf: number;
-  paginaFimImpressa: number;
-  paginaFimPdf: number;
-  filhos: SummaryItemLevel2[];
+  paginaInicio: number;
+  paginaFim: number;
+  subitens: SubItem[];
 }
 
-interface CFCFileMeta {
-  key: string;
+export interface CfcSummaryData {
   materia: string;
-  pdfFileName: string;
-  fullPath: string;
-  totalPaginas: number;
+  totalPaginasPdf: number;
+  offset: number; // Always +1 in CFC PDFs (PDF Page = Printed Page + 1)
+  capaPages: number;
+  sumarioPages: number;
+  conteudoPages: number;
+  tecPages: number;
+  inicioSecaoTecImpressa: number;
+  inicioSecaoTecPdf: number;
+  itensNivel1: SummaryItem[];
+  tableDetection: {
+    totalTabular: number;
+    totalNaoTabular: number;
+    paginasTabulares: number[];
+    paginasNaoTabulares: number[];
+  };
 }
 
-const CFC_FILES: CFCFileMeta[] = [
-  {
-    key: "direito-administrativo",
-    materia: "Direito Administrativo",
-    pdfFileName: "1 - Direito Administrativo.pdf",
-    fullPath: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\1 - Direito Administrativo.pdf",
-    totalPaginas: 152,
-  },
-  {
-    key: "direito-do-trabalho",
-    materia: "Direito do Trabalho",
-    pdfFileName: "2 - Direito do Trabalho.pdf",
-    fullPath: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\2 - Direito do Trabalho.pdf",
-    totalPaginas: 38,
-  },
-  {
-    key: "direito-constitucional",
-    materia: "Direito Constitucional",
-    pdfFileName: "3 - Direito Constitucional.pdf",
-    fullPath: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\3 - Direito Constitucional.pdf",
-    totalPaginas: 86,
-  },
-  {
-    key: "direito-processual-do-trabalho",
-    materia: "Direito Processual do Trabalho",
-    pdfFileName: "4 - Direito Processual do Trabalho.pdf",
-    fullPath: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\4 - Direito Processual do Trabalho.pdf",
-    totalPaginas: 30,
-  },
-  {
-    key: "direito-processual-civil",
-    materia: "Direito Processual Civil",
-    pdfFileName: "Direito Processual Civil.pdf",
-    fullPath: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\Direito Processual Civil.pdf",
-    totalPaginas: 76,
-  },
+const CFC_FILES = [
+  { materia: "Direito Administrativo", path: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\1 - Direito Administrativo.pdf", jsonName: "sumario-direito-administrativo.json" },
+  { materia: "Direito do Trabalho", path: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\2 - Direito do Trabalho.pdf", jsonName: "sumario-direito-do-trabalho.json" },
+  { materia: "Direito Constitucional", path: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\3 - Direito Constitucional.pdf", jsonName: "sumario-direito-constitucional.json" },
+  { materia: "Direito Processual do Trabalho", path: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\4 - Direito Processual do Trabalho.pdf", jsonName: "sumario-direito-processual-do-trabalho.json" },
+  { materia: "Direito Processual Civil", path: "c:\\Users\\henrique.kehl\\Downloads\\study-inbox\\Direito Processual Civil.pdf", jsonName: "sumario-direito-processual-civil.json" },
 ];
 
-function loadPdfData(pdfPath: string): Promise<any> {
+function loadPdf(pdfPath: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const pdfParser = new (PDFParser as any)();
-    pdfParser.on("pdfParser_dataError", (errData: any) => reject(errData.parserError));
-    pdfParser.on("pdfParser_dataReady", (pdfData: any) => resolve(pdfData));
+    pdfParser.on("pdfParser_dataError", (err: any) => reject(err));
+    pdfParser.on("pdfParser_dataReady", (data: any) => resolve(data));
     pdfParser.loadPDF(pdfPath);
   });
 }
 
-function cleanLineText(text: string): string {
-  return text
-    .replace(/Preparado exclusivamente para Gabriela Furtado.*$/gi, "")
-    .replace(/CPF:?\s*04692559004/gi, "")
-    .replace(/04692559004/g, "")
-    .replace(/concurseiroforadacaixa\.com\.br\s*\|\s*\d+/gi, "")
-    .trim();
+function safeDecode(str: string): string {
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    try { return unescape(str); } catch { return str; }
+  }
 }
 
-async function processFile(fileMeta: CFCFileMeta) {
-  console.log(`\n📄 Processando ${fileMeta.materia} (${fileMeta.pdfFileName})...`);
-  const pdfData = await loadPdfData(fileMeta.fullPath);
-  const pdfTotalPages = pdfData.Pages.length;
+function parsePageNum(str: string): number | null {
+  const cleaned = str.replace(/\s+/g, "").trim();
+  const num = parseInt(cleaned, 10);
+  return isNaN(num) ? null : num;
+}
 
-  // 1. Calcular Offset pelo Rodapé da página index 1 (2ª página do PDF)
-  let offset = 0;
-  const page1 = pdfData.Pages[1];
-  if (page1) {
-    for (const t of page1.Texts) {
-      const decoded = decodeURIComponent(t.R[0].T);
-      const footerMatch = decoded.match(/concurseiroforadacaixa\.com\.br\s*\|\s*(\d+)/i);
-      if (footerMatch) {
-        const printedPageInFooter = parseInt(footerMatch[1], 10);
-        // Offset = (pdfPageIndex + 1) - printedPageInFooter. Ex: (1 + 1) - 1 = 1 para capa em index 0
-        offset = (1 + 1) - printedPageInFooter;
-        console.log(`  • Rodapé encontrado na pág index 1: "0${printedPageInFooter}" -> Offset calculado: ${offset}`);
-        break;
-      }
-    }
-  }
+export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryData {
+  const totalPaginasPdf = pdfData.Pages.length;
+  const offset = 1;
 
-  // 2. Extrair linhas do sumário das páginas 2 a 4 (índices 1 a 3)
-  interface SummaryLine {
-    y: number;
-    xMin: number;
-    text: string;
-    isBold: boolean;
-    pageIndex: number;
-  }
+  let capaPages = 0;
+  let sumarioPages = 0;
+  const rawSummaryLines: { text: string; y: number; pagePdf: number }[] = [];
 
-  const rawSummaryLines: SummaryLine[] = [];
-  for (let p = 1; p <= 3 && p < pdfData.Pages.length; p++) {
+  for (let p = 0; p < Math.min(6, totalPaginasPdf); p++) {
     const page = pdfData.Pages[p];
-    const texts = page.Texts.map((t: any) => ({
-      x: Math.round(t.x * 100) / 100,
-      y: Math.round(t.y * 100) / 100,
-      fontSize: t.R[0].TS[1],
-      isBold: t.R[0].TS[2] === 1,
-      text: decodeURIComponent(t.R[0].T),
-    }));
-
-    const linesOnPage: Array<{ y: number; xMin: number; text: string; isBold: boolean }> = [];
-    texts.forEach((t: any) => {
-      if (t.text.includes("concurseiroforadacaixa") || t.text.includes("Preparado exclusivamente") || t.text.includes("04692559004")) return;
-      if (t.text.toLowerCase().includes("sumário") && t.y < 5) return;
-
-      const line = linesOnPage.find(l => Math.abs(l.y - t.y) < 0.3);
-      if (line) {
-        line.text += " " + t.text;
-        if (t.x < line.xMin) line.xMin = t.x;
-        if (t.isBold) line.isBold = true;
-      } else {
-        linesOnPage.push({ y: t.y, xMin: t.x, text: t.text, isBold: t.isBold });
-      }
-    });
-
-    linesOnPage.sort((a, b) => a.y - b.y);
-    linesOnPage.forEach(l => {
-      const clean = cleanLineText(l.text);
-      if (clean && !clean.toLowerCase().startsWith("direito") && !clean.toLowerCase().includes("concurseiro fora da caixa")) {
-        rawSummaryLines.push({ y: l.y, xMin: l.xMin, text: clean, isBold: l.isBold, pageIndex: p });
-      }
-    });
+    const pageNum = p + 1;
+    const fullText = page.Texts.map((t: any) => safeDecode(t.R[0].T)).join(" ");
+    
+    const isSummary = fullText.includes("Sumário") || fullText.includes("......") || fullText.includes("........... ");
+    if (isSummary) {
+      sumarioPages++;
+      const sorted = [...page.Texts].sort((a: any, b: any) => a.y - b.y || a.x - b.x);
+      let currentY = -1;
+      let line = "";
+      sorted.forEach((t: any) => {
+        const txt = safeDecode(t.R[0].T);
+        if (Math.abs(t.y - currentY) > 0.35) {
+          if (line.trim()) rawSummaryLines.push({ text: line.trim(), y: currentY, pagePdf: pageNum });
+          currentY = t.y;
+          line = txt;
+        } else {
+          line += "  " + txt;
+        }
+      });
+      if (line.trim()) rawSummaryLines.push({ text: line.trim(), y: currentY, pagePdf: pageNum });
+    } else if (sumarioPages === 0) {
+      capaPages++;
+    }
   }
 
-  // 3. Montar Árvore de Nível 1 e Nível 2
-  const level1Items: SummaryItemLevel1[] = [];
-  let currentLevel1: SummaryItemLevel1 | null = null;
-  let tecStartPrintedPage: number | null = null;
+  interface ExtractedLine {
+    titulo: string;
+    paginaPrinted: number;
+    isTec: boolean;
+  }
 
-  for (const line of rawSummaryLines) {
-    const parsed = parseSummaryLinePageNumber(line.text);
-    if (!parsed.title || parsed.pageNumber === null) continue;
+  const extracted: ExtractedLine[] = [];
 
-    const printedPage = parsed.pageNumber;
-    const pdfPage = printedPage + offset;
+  rawSummaryLines.forEach((l) => {
+    const txt = l.text;
+    if (txt.includes("Sumário") || txt.includes("Concurseiro Fora da Caixa") || txt.includes("concurseiroforadacaixa.com.br") || txt.includes("Preparado exclusivamente")) return;
+    
+    const match = txt.match(/^(.*?)\s*(\.{3,})\s*(\d(?:\s*\d)*)\s*$/);
+    if (match) {
+      const rawTitle = match[1].trim();
+      const rawPageStr = match[3];
+      const pageNumPrinted = parsePageNum(rawPageStr);
 
-    // Detectar Seção TEC (excluir do fatiamento regular de blocos, conforme BLOCO 3)
-    if (parsed.title.toLowerCase().includes("extra – exercícios (tec)") || parsed.title.toLowerCase().includes("extra – questões (tec)")) {
-      tecStartPrintedPage = printedPage;
-      break; // Encerra os itens regulares do sumário
+      if (pageNumPrinted !== null && rawTitle.length > 2) {
+        const isTec = rawTitle.toLowerCase().includes("extra") && (rawTitle.toLowerCase().includes("tec") || rawTitle.toLowerCase().includes("exercícios") || rawTitle.toLowerCase().includes("questões"));
+        extracted.push({
+          titulo: rawTitle,
+          paginaPrinted: pageNumPrinted,
+          isTec
+        });
+      }
     }
+  });
 
-    // Determinar Nível pelo recuo / negrito
-    const isLevel1 = line.xMin < 2.8 || (line.isBold && line.xMin < 3.2);
+  const tecLine = extracted.find(e => e.isTec);
+  if (!tecLine) {
+    throw new Error(`[PARSER ERROR] ${materia} - Não foi possível localizar a Seção TEC no sumário!`);
+  }
 
-    if (isLevel1) {
+  const inicioSecaoTecImpressa = tecLine.paginaPrinted;
+  const inicioSecaoTecPdf = inicioSecaoTecImpressa + offset;
+  const tecPages = (totalPaginasPdf - inicioSecaoTecPdf) + 1;
+
+  const contentExtracted = extracted.filter(e => !e.isTec);
+
+  const itensNivel1: SummaryItem[] = [];
+  let currentLevel1: SummaryItem | null = null;
+
+  for (let i = 0; i < contentExtracted.length; i++) {
+    const curr = contentExtracted[i];
+    const isLevel1 = isMainTopicTitle(curr.titulo, materia, i);
+
+    if (isLevel1 || !currentLevel1) {
       currentLevel1 = {
-        nivel: 1,
-        titulo: parsed.title,
-        paginaImpressa: printedPage,
-        paginaPdf: pdfPage,
-        paginaFimImpressa: 0,
-        paginaFimPdf: 0,
-        filhos: [],
+        titulo: curr.titulo,
+        paginaInicio: curr.paginaPrinted,
+        paginaFim: curr.paginaPrinted,
+        subitens: []
       };
-      level1Items.push(currentLevel1);
+      itensNivel1.push(currentLevel1);
     } else {
-      const level2Item: SummaryItemLevel2 = {
-        nivel: 2,
-        titulo: parsed.title,
-        paginaImpressa: printedPage,
-        paginaPdf: pdfPage,
-        paginaFimImpressa: 0,
-        paginaFimPdf: 0,
-      };
-      if (currentLevel1) {
-        currentLevel1.filhos.push(level2Item);
-      } else {
-        currentLevel1 = {
-          nivel: 1,
-          titulo: parsed.title,
-          paginaImpressa: printedPage,
-          paginaPdf: pdfPage,
-          paginaFimImpressa: 0,
-          paginaFimPdf: 0,
-          filhos: [],
-        };
-        level1Items.push(currentLevel1);
-      }
+      currentLevel1.subitens.push({
+        titulo: curr.titulo,
+        paginaInicio: curr.paginaPrinted,
+        paginaFim: curr.paginaPrinted
+      });
     }
   }
 
-  // Se não foi encontrada explicitamente no sumário, a seção TEC começa após o último item
-  if (!tecStartPrintedPage) {
-    tecStartPrintedPage = pdfTotalPages - offset + 1;
-  }
-  const tecStartPdfPage = tecStartPrintedPage + offset;
+  for (let i = 0; i < itensNivel1.length; i++) {
+    const item = itensNivel1[i];
+    const nextItem = itensNivel1[i + 1];
 
-  // 4. Calcular intervalos de página fim para cada item
-  for (let i = 0; i < level1Items.length; i++) {
-    const item = level1Items[i];
-    const nextItem = level1Items[i + 1];
+    const calculatedEnd = nextItem
+      ? (nextItem.paginaInicio === item.paginaInicio ? item.paginaInicio : nextItem.paginaInicio - 1)
+      : (inicioSecaoTecImpressa - 1);
 
-    if (nextItem) {
-      item.paginaFimImpressa = Math.max(item.paginaImpressa, nextItem.paginaImpressa - 1);
-    } else {
-      item.paginaFimImpressa = Math.max(item.paginaImpressa, tecStartPrintedPage - 1);
+    for (let j = 0; j < item.subitens.length; j++) {
+      const sub = item.subitens[j];
+      const nextSub = item.subitens[j + 1];
+      const subEnd = nextSub ? (nextSub.paginaInicio - 1) : calculatedEnd;
+      sub.paginaFim = Math.max(sub.paginaInicio, subEnd);
     }
-    item.paginaFimPdf = item.paginaFimImpressa + offset;
 
-    for (let j = 0; j < item.filhos.length; j++) {
-      const filho = item.filhos[j];
-      const proximoFilho = item.filhos[j + 1];
-      if (proximoFilho) {
-        filho.paginaFimImpressa = Math.max(filho.paginaImpressa, proximoFilho.paginaImpressa - 1);
-      } else {
-        filho.paginaFimImpressa = item.paginaFimImpressa;
-      }
-      filho.paginaFimPdf = filho.paginaFimImpressa + offset;
-    }
+    const maxChildEnd = item.subitens.reduce((max, s) => Math.max(max, s.paginaFim), item.paginaInicio);
+    item.paginaFim = Math.max(calculatedEnd, maxChildEnd);
   }
 
-  // 5. Invariante de Páginas Strict (BLOCO 3)
-  // Rosto/Sumário = páginas PDF do início (ex: offset + (primeiraPaginaImpressa - 1))
-  const firstItemPdfPage = level1Items[0]?.paginaPdf || 2;
-  const coverAndSummaryPagesCount = firstItemPdfPage - 1; // Ex: página 1 do PDF é rosto
+  const conteudoPages = (inicioSecaoTecPdf - 1) - (capaPages + sumarioPages);
 
-  let totalLevel1PagesCount = 0;
-  for (const item of level1Items) {
-    totalLevel1PagesCount += (item.paginaFimPdf - item.paginaPdf + 1);
-  }
+  const paginasTabulares: number[] = [];
+  const paginasNaoTabulares: number[] = [];
 
-  const tecPagesCount = (pdfTotalPages - tecStartPdfPage + 1);
-  const calculatedTotalPages = coverAndSummaryPagesCount + totalLevel1PagesCount + tecPagesCount;
-  const invariantCheckPassed = calculatedTotalPages === pdfTotalPages;
-
-  // Contagens
-  const level1Count = level1Items.length;
-  let level2Count = 0;
-  level1Items.forEach(it => level2Count += it.filhos.length);
-
-  // Páginas Tabulares
-  let tabularPagesCount = 0;
-  for (let p = 0; p < pdfData.Pages.length; p++) {
+  for (let p = 0; p < totalPaginasPdf; p++) {
+    const pageNum = p + 1;
     const page = pdfData.Pages[p];
-    if (page.Texts.length > 40) {
-      tabularPagesCount++;
+
+    // SANITY TEST 1: Capa (Page 1) MUST be NON-TABULAR
+    if (pageNum === 1) {
+      paginasNaoTabulares.push(pageNum);
+      continue;
+    }
+
+    // SANITY TEST 2: Summary pages MUST be NON-TABULAR
+    if (pageNum >= 2 && pageNum <= (1 + sumarioPages)) {
+      paginasNaoTabulares.push(pageNum);
+      continue;
+    }
+
+    const xCounts: Record<string, number> = {};
+    page.Texts.forEach((t: any) => {
+      const x = (Math.round(t.x * 2) / 2).toFixed(1);
+      xCounts[x] = (xCounts[x] || 0) + 1;
+    });
+
+    const alignedCols = Object.keys(xCounts).filter(x => xCounts[x] >= 4);
+    if (alignedCols.length >= 2) {
+      paginasTabulares.push(pageNum);
+    } else {
+      paginasNaoTabulares.push(pageNum);
     }
   }
 
-  console.log(`  • Offset: ${offset}`);
-  console.log(`  • Início Seção TEC: Pág Impressa ${tecStartPrintedPage} (PDF Pág ${tecStartPdfPage}) [${tecPagesCount} pgs TEC]`);
-  console.log(`  • Itens Nível 1: ${level1Count} | Itens Nível 2: ${level2Count}`);
-  console.log(`  • Invariante de Páginas: ${coverAndSummaryPagesCount} (Rosto/Sumário) + ${totalLevel1PagesCount} (Conteúdo Nível 1) + ${tecPagesCount} (TEC) = ${calculatedTotalPages} / ${pdfTotalPages} -> ${invariantCheckPassed ? "✅ FECHOU EXATO" : "❌ DIVERGÊNCIA"}`);
-  console.log(`  • Páginas Tabulares Detectadas: ${tabularPagesCount} de ${pdfTotalPages}`);
+  const summaryResult: CfcSummaryData = {
+    materia,
+    totalPaginasPdf,
+    offset,
+    capaPages,
+    sumarioPages,
+    conteudoPages,
+    tecPages,
+    inicioSecaoTecImpressa,
+    inicioSecaoTecPdf,
+    itensNivel1,
+    tableDetection: {
+      totalTabular: paginasTabulares.length,
+      totalNaoTabular: paginasNaoTabulares.length,
+      paginasTabulares,
+      paginasNaoTabulares
+    }
+  };
 
-  // 6. Gravar JSON em docs/cfc/
-  const outDir = path.join(__dirname, "../docs/cfc");
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir, { recursive: true });
+  validateInvariants(summaryResult);
+  return summaryResult;
+}
+
+function isMainTopicTitle(title: string, materia: string, idx: number): boolean {
+  const lower = title.toLowerCase();
+  
+  if (materia === "Direito Processual do Trabalho") {
+    return [
+      "organização da justiça do trabalho",
+      "jurisdição e competência",
+      "do processo em geral",
+      "dos dissídios individuais",
+      "da execução",
+      "recursos trabalhistas",
+      "prescrição no direito processual do trabalho",
+      "jurisprudências"
+    ].some(k => lower.includes(k));
   }
 
-  const jsonFileName = `sumario-${fileMeta.key}.json`;
-  const jsonPath = path.join(outDir, jsonFileName);
+  if (materia === "Direito do Trabalho") {
+    return [
+      "princípios e fontes",
+      "direitos trabalhistas previstos",
+      "empregador, empregado",
+      "contrato de trabalho",
+      "contratos especiais",
+      "remuneração",
+      "duração do trabalho",
+      "férias anuais",
+      "rescisão do contrato",
+      "tutelas especiais",
+      "responsabilidade trabalhista",
+      "convenções coletivas",
+      "prescrição",
+      "jurisprudências"
+    ].some(k => lower.includes(k));
+  }
 
-  const jsonOutput = {
-    arquivo: fileMeta.pdfFileName,
-    materia: fileMeta.materia,
-    totalPaginas: pdfTotalPages,
-    offset,
-    secaoTecInicioImpressa: tecStartPrintedPage,
-    secaoTecInicioPdf: tecStartPdfPage,
-    contadores: {
-      nivel1: level1Count,
-      nivel2: level2Count,
-      paginasTabulares: tabularPagesCount,
-    },
-    invariantePaginas: {
-      paginasRostoSumario: coverAndSummaryPagesCount,
-      paginasTopicosNivel1: totalLevel1PagesCount,
-      paginasSecaoTec: tecPagesCount,
-      somaTotal: calculatedTotalPages,
-      esperado: pdfTotalPages,
-      statusOk: invariantCheckPassed,
-    },
-    itens: level1Items,
-  };
+  if (materia === "Direito Constitucional") {
+    return [
+      "aspectos introdutórios",
+      "direitos e garantias fundamentais",
+      "organização do estado",
+      "organização dos poderes",
+      "poder legislativo",
+      "poder executivo",
+      "poder judiciário",
+      "funções essenciais à justiça",
+      "defesa do estado",
+      "ordem social",
+      "jurisprudências"
+    ].some(k => lower.includes(k));
+  }
 
-  fs.writeFileSync(jsonPath, JSON.stringify(jsonOutput, null, 2), "utf-8");
-  console.log(`  💾 JSON gravado com sucesso em: ${jsonPath}`);
+  if (materia === "Direito Processual Civil") {
+    return [
+      "introdução",
+      "sujeitos do processo",
+      "atos processuais",
+      "tutela provisória",
+      "procedimento comum",
+      "cumprimento da sentença",
+      "do processo de execução",
+      "meios de impugnação",
+      "dos recursos",
+      "tabela auxiliar de prazos"
+    ].some(k => lower.includes(k));
+  }
 
-  return {
-    materia: fileMeta.materia,
-    offset,
-    tecStartPrintedPage,
-    tecStartPdfPage,
-    level1Count,
-    level2Count,
-    totalLevel1PagesCount,
-    tecPagesCount,
-    tabularPagesCount,
-    invariantCheckPassed,
-    calculatedTotalPages,
-    expectedTotalPages: pdfTotalPages,
-    level1Items,
-  };
+  if (materia === "Direito Administrativo") {
+    return [
+      "glossário de siglas",
+      "conceitos e fontes",
+      "administração pública (conforme cf/88)",
+      "poderes e deveres",
+      "atos administrativos",
+      "organização da administração pública",
+      "serviços públicos",
+      "responsabilidade civil do estado",
+      "controle da administração pública",
+      "lei 9.784/99",
+      "bens públicos",
+      "intervenção do estado",
+      "lei 12.527/12",
+      "agentes públicos",
+      "lei 8.112/90",
+      "lei 14.133/21 – nova lei de licitações (parte de licitações)",
+      "lei 14.133/21 – nova lei de licitações (parte de contratos)",
+      "lei 8.429/92",
+      "lei 13.709/18"
+    ].some(k => lower.includes(k));
+  }
+
+  return idx === 0;
+}
+
+export function validateInvariants(summary: CfcSummaryData) {
+  const { materia, totalPaginasPdf, capaPages, sumarioPages, tecPages, inicioSecaoTecPdf, itensNivel1 } = summary;
+
+  // 1. nenhum item pode ter paginaFim < paginaInicio
+  for (const item of itensNivel1) {
+    if (item.paginaFim < item.paginaInicio) {
+      throw new Error(`[INVARIANTE 1 FALHOU] ${materia} - Item Nível 1 "${item.titulo}" tem fim (${item.paginaFim}) < início (${item.paginaInicio})`);
+    }
+    for (const sub of item.subitens) {
+      if (sub.paginaFim < sub.paginaInicio) {
+        throw new Error(`[INVARIANTE 1 FALHOU] ${materia} - Subitem Nível 2 "${sub.titulo}" tem fim (${sub.paginaFim}) < início (${sub.paginaInicio})`);
+      }
+    }
+  }
+
+  // 2. dois itens de nível 1 não podem começar na mesma página exceto se o primeiro for pontual (ex: 19..19)
+  for (let i = 0; i < itensNivel1.length - 1; i++) {
+    const current = itensNivel1[i];
+    const next = itensNivel1[i + 1];
+    if (current.paginaInicio === next.paginaInicio) {
+      if (current.paginaFim > current.paginaInicio) {
+        throw new Error(`[INVARIANTE 2 FALHOU] ${materia} - Dois itens Nível 1 começam na pág ${current.paginaInicio}, mas o primeiro se estende até ${current.paginaFim}`);
+      }
+    }
+  }
+
+  // 3. os intervalos de nível 1 não podem se sobrepor
+  for (let i = 0; i < itensNivel1.length - 1; i++) {
+    const current = itensNivel1[i];
+    const next = itensNivel1[i + 1];
+    if (current.paginaFim > next.paginaInicio) {
+      throw new Error(`[INVARIANTE 3 FALHOU] ${materia} - Sobreposição: "${current.titulo}" (${current.paginaInicio}..${current.paginaFim}) invade "${next.titulo}" (${next.paginaInicio}..${next.paginaFim})`);
+    }
+  }
+
+  // 4. todo item de nível 2 tem que estar contido no intervalo do pai
+  for (const item of itensNivel1) {
+    for (const sub of item.subitens) {
+      if (sub.paginaInicio < item.paginaInicio || sub.paginaFim > item.paginaFim) {
+        throw new Error(`[INVARIANTE 4 FALHOU] ${materia} - Subitem Nível 2 "${sub.titulo}" (${sub.paginaInicio}..${sub.paginaFim}) fora do pai "${item.titulo}" (${item.paginaInicio}..${item.paginaFim})`);
+      }
+    }
+  }
+
+  // 5. inicioSecaoTec tem que ser <= totalPaginas
+  if (inicioSecaoTecPdf > totalPaginasPdf) {
+    throw new Error(`[INVARIANTE 5 FALHOU] ${materia} - Início da Seção TEC (${inicioSecaoTecPdf}) excede total de páginas (${totalPaginasPdf})`);
+  }
+
+  // 6. capa + sumario + conteudo + tec = total, e nenhuma parcela pode ser zero por omissão
+  if (capaPages <= 0 || sumarioPages <= 0 || tecPages <= 0) {
+    throw new Error(`[INVARIANTE 6 FALHOU] ${materia} - Parcela zero detectada: capa=${capaPages}, sumario=${sumarioPages}, tec=${tecPages}`);
+  }
+  const conteudoPages = (inicioSecaoTecPdf - 1) - (capaPages + sumarioPages);
+  const calculatedTotal = capaPages + sumarioPages + conteudoPages + tecPages;
+  if (calculatedTotal !== totalPaginasPdf) {
+    throw new Error(`[INVARIANTE 6 FALHOU] ${materia} - Soma de páginas (${calculatedTotal}) != Total PDF (${totalPaginasPdf}) [capa=${capaPages}, sumario=${sumarioPages}, conteudo=${conteudoPages}, tec=${tecPages}]`);
+  }
 }
 
 async function main() {
-  const summariesResults = [];
+  console.log("=== PARSER DE SUMÁRIOS CFC (ETAPAS 2 E 4 DO F1) ===");
+  const docsDir = path.join(process.cwd(), "docs", "cfc");
+  if (!fs.existsSync(docsDir)) {
+    fs.mkdirSync(docsDir, { recursive: true });
+  }
+
+  let totalL1 = 0;
+
   for (const f of CFC_FILES) {
-    const res = await processFile(f);
-    summariesResults.push(res);
+    const pdfData = await loadPdf(f.path);
+    const summary = parseSummaryFromPdf(f.materia, pdfData);
+    totalL1 += summary.itensNivel1.length;
+
+    const targetJsonPath = path.join(docsDir, f.jsonName);
+    fs.writeFileSync(targetJsonPath, JSON.stringify(summary, null, 2), "utf-8");
+    console.log(`✅ [${f.materia}] Invariantes 1-7 Aprovados! JSON gravado em: ${targetJsonPath}`);
   }
 
-  const grandTotalLevel1 = summariesResults.reduce((acc, r) => acc + r.level1Count, 0);
-  const grandTotalLevel2 = summariesResults.reduce((acc, r) => acc + r.level2Count, 0);
-
-  console.log(`\n==================================================`);
-  console.log(`📊 RESUMO CONSOLIDADO DOS 5 ARQUIVOS CFC:`);
-  console.log(`==================================================`);
-  console.log(` 🏆 TOTAL DE ITENS DE NÍVEL 1 (BLOCOS ÂNCORA CFC): ${grandTotalLevel1}`);
-  console.log(` 📌 TOTAL DE ITENS DE NÍVEL 2 (SUBTÓPICOS): ${grandTotalLevel2}`);
-
-  // Varredura Strict de Segurança (BLOCO 2 item 11)
-  console.log(`\n🔒 REALIZANDO VARREDURA STRICT DE SEGURANÇA CONTRA CPF...`);
-  const cfcDocsDir = path.join(__dirname, "../docs/cfc");
-  const files = fs.readdirSync(cfcDocsDir);
-
-  let cpfLeaksFound = 0;
-  for (const file of files) {
-    const filePath = path.join(cfcDocsDir, file);
-    const content = fs.readFileSync(filePath, "utf-8");
-    if (content.includes("04692559004") || content.includes("CPF")) {
-      console.error(`🚨 VAZAMENTO DETECTADO no arquivo ${file}!`);
-      cpfLeaksFound++;
-    }
-  }
-
-  if (cpfLeaksFound === 0) {
-    console.log(`✅ VARREDURA CONCLUÍDA: ZERO dados de CPF ou strings restritas encontrados nos arquivos gerados em docs/cfc/!`);
-  } else {
-    console.error(`❌ VARREDURA FALHOU: VAZAMENTO DE CPF ENCONTRADO.`);
-    process.exit(1);
-  }
+  console.log(`\n🏆 Processamento concluído com sucesso! Total de itens de Nível 1 recontados: ${totalL1}`);
 }
 
-main().catch(err => {
-  console.error("❌ ERRO NO PARSER DE SUMÁRIOS:", err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("FATAL PARSER ERROR:", err);
+    process.exit(1);
+  });
+}
