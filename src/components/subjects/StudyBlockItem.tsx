@@ -272,15 +272,9 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
       <div className="flex items-center justify-between gap-4 text-sm mt-2 pt-4 border-t border-border/30">
         <div className="flex items-center gap-4">
           <div className="flex flex-col gap-1">
-            {block.methodology === "HYBRID_8020" ? (
-              <span className="font-bold text-accent/80 bg-accent/5 px-3 py-1 rounded-full text-xs w-fit">
-                Híbrido 80/20
-              </span>
-            ) : (
               <span className="font-bold text-accent/80 bg-accent/5 px-3 py-1 rounded-full text-xs w-fit">
                 Págs {block.pageStart} a {block.pageEnd}
               </span>
-            )}
             {block._count?.flashcards > 0 && (
               <span className="text-[10px] text-muted-foreground font-medium px-1">
                 {block._count.flashcards} flashcards gerados
@@ -317,22 +311,16 @@ export function StudyBlockItem({ block }: StudyBlockItemProps) {
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Descrição</label>
               <Textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} className="rounded-2xl min-h-[100px]" />
             </div>
-            {block.methodology !== "HYBRID_8020" ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Pág. Inicial</label>
-                  <Input type="number" value={editPageStart} onChange={e => setEditPageStart(parseInt(e.target.value))} className="rounded-2xl h-12" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Pág. Final</label>
-                  <Input type="number" value={editPageEnd} onChange={e => setEditPageEnd(parseInt(e.target.value))} className="rounded-2xl h-12" />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Pág. Inicial</label>
+                <Input type="number" value={editPageStart} onChange={e => setEditPageStart(parseInt(e.target.value))} className="rounded-2xl h-12" />
               </div>
-            ) : (
-              <div className="p-3 bg-muted/40 rounded-2xl border border-border/30 text-xs text-muted-foreground text-center">
-                Este é um bloco Híbrido 80/20. As páginas são selecionadas de forma dinâmica e não podem ser editadas de forma linear.
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">Pág. Final</label>
+                <Input type="number" value={editPageEnd} onChange={e => setEditPageEnd(parseInt(e.target.value))} className="rounded-2xl h-12" />
               </div>
-            )}
+            </div>
           </div>
           <DialogFooter className="gap-3 sm:gap-0 mt-6">
             <Button variant="ghost" onClick={() => setIsEditing(false)} className="rounded-xl">Cancelar</Button>

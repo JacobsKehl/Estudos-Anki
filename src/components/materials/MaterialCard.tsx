@@ -77,11 +77,7 @@ export function MaterialCard({
       });
       const data = await res.json();
       if (!res.ok) {
-        if (res.status === 409 && data.code === "MATERIAL_PROVIDER_LOCKED_BY_HYBRID_BLOCK") {
-          toast.error("Fornecedor bloqueado: este material está vinculado a um bloco híbrido.", { duration: 6000 });
-        } else {
-          toast.error(data.error || "Erro ao atualizar fornecedor.");
-        }
+        toast.error(data.error || "Erro ao atualizar fornecedor.");
         return;
       }
       setProvider(newProvider);
@@ -178,15 +174,6 @@ export function MaterialCard({
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // Tratar 409 de bloco híbrido vinculado com mensagem amigável
-        if (res.status === 409 && data.code === "MATERIAL_USED_BY_HYBRID_BLOCK") {
-          toast.error(
-            `Não é possível excluir: este material está vinculado a ${data.linkedCount ?? "um ou mais"} bloco(s) híbrido(s). Exclua os blocos antes.`,
-            { duration: 8000 }
-          );
-          setShowDeleteDialog(false);
-          return;
-        }
         throw new Error(data.error || "Erro ao excluir material");
       }
 

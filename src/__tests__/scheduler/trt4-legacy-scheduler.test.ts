@@ -105,7 +105,7 @@ function makeLinearBlock(
   };
 }
 
-/** Bloco HYBRID com estimatedStudyMinutes persistido válido */
+/** Bloco ANCHOR_BASED com estimatedStudyMinutes persistido válido */
 function makeHybridBlockValid(
   id: string,
   subjectId: string,
@@ -115,7 +115,7 @@ function makeHybridBlockValid(
   return {
     id,
     subjectId,
-    methodology: "HYBRID_8020",
+    methodology: "ANCHOR_BASED",
     status: "PENDING",
     estimatedStudyMinutes,
     orderIndex: 0,
@@ -127,7 +127,7 @@ function makeHybridBlockValid(
   };
 }
 
-/** Bloco HYBRID inválido (estimatedStudyMinutes=0, sem metadados) */
+/** Bloco ANCHOR_BASED inválido (estimatedStudyMinutes=0, sem metadados) */
 function makeHybridBlockInvalid(
   id: string,
   subjectId: string,
@@ -136,7 +136,7 @@ function makeHybridBlockInvalid(
   return {
     id,
     subjectId,
-    methodology: "HYBRID_8020",
+    methodology: "ANCHOR_BASED",
     status: "PENDING",
     estimatedStudyMinutes: 0,
     orderIndex: 0,
