@@ -28,12 +28,9 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
     prisma.studySubject.findFirst({
       where: { id: subjectId, userId },
       include: {
-        _count: {
-          select: {
-            materials: true,
-            studyBlocks: true,
-            flashcards: true,
-          }
+        materials: {
+          where: { userId },
+          select: { id: true }
         },
         studyBlocks: {
           where: { userId },
@@ -58,8 +55,8 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
       orderBy: { reviewedAt: 'desc' },
       take: 100 // Last 100 reviews for health calculation
     }),
-    (prisma as any).studyBlock.findFirst({
-      where: { subjectId, theoryStatus: 'COMPLETED' },
+    prisma.studyBlock.findFirst({
+      where: { subjectId, userId, theoryStatus: 'COMPLETED' },
       orderBy: { updatedAt: 'desc' },
       select: { updatedAt: true }
     })
@@ -104,10 +101,10 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
   ).length;
 
   return {
-    totalMaterials: subject._count.materials,
-    totalBlocks: subject._count.studyBlocks,
+    totalMaterials: subject.materials.length,
+    totalBlocks: subject.studyBlocks.length,
     completedBlocks,
-    totalFlashcards: subject._count.flashcards,
+    totalFlashcards: subject.flashcards.length,
     approvedFlashcards,
     pendingFlashcards,
     dueReviews,

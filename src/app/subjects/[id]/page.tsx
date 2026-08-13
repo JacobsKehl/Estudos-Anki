@@ -13,6 +13,8 @@ import { SupportBlockItem } from "@/components/subjects/SupportBlockItem";
 import { getSubjectMetrics } from "@/lib/services/subject-metrics";
 import { SubjectPerformancePanel } from "@/components/subjects/SubjectPerformancePanel";
 
+import { SubjectPossiblyStudiedBanner } from "@/components/study/SubjectPossiblyStudiedBanner";
+
 export const dynamic = "force-dynamic";
 
 export default async function SubjectDetailsPage({ params }: { params: { id: string } }) {
@@ -82,6 +84,8 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
     }))
   );
 
+  const possiblyCount = subject.studyBlocks.filter((b: any) => b.possiblyAlreadyStudied).length;
+
   return (
     <div className="space-y-8 max-w-6xl animate-in fade-in duration-700 slide-in-from-bottom-4 pb-20">
       
@@ -139,6 +143,8 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
                 <GenerateAllFlashcardsButton subjectId={subject.id} />
               </div>
             </div>
+
+            <SubjectPossiblyStudiedBanner count={possiblyCount} />
 
             <div className="space-y-4">
               {subject.studyBlocks.length === 0 ? (

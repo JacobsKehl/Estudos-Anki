@@ -17,7 +17,12 @@ if (fs.existsSync(envPath)) {
 
 const supabaseUrl = envVars["NEXT_PUBLIC_SUPABASE_URL"];
 const anonKey = envVars["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
-const serviceKey = envVars["SUPABASE_SERVICE_ROLE_KEY"];
+let serviceKey = envVars["SUPABASE_SERVICE_ROLE_KEY"];
+
+// Se a serviceKey for um sb_secret (CLI secret), usa a anonKey (JWT válido) para a API REST
+if (serviceKey && serviceKey.startsWith("sb_secret_")) {
+  serviceKey = anonKey;
+}
 
 const apiKey = serviceKey || anonKey;
 
@@ -76,6 +81,10 @@ async function fetchTablePostgREST(tableName: string): Promise<any[]> {
     });
 
     if (!res.ok) {
+      if (res.status === 404) {
+        // Tabela ainda não existe fisicamente no banco de produção
+        return [];
+      }
       const errText = await res.text();
       throw new Error(`[POSTGREST ERROR] Tabela '${tableName}' retornou HTTP ${res.status}: ${errText}`);
     }
@@ -103,7 +112,6 @@ export function computeSha256(content: string): string {
 }
 
 export function scanForSensitiveData(text: string): { clean: boolean; matchesCount: number } {
-  // Check for CPF pattern or specific CPF 04692559004
   const cpfRegex = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g;
   const matches = text.match(cpfRegex) || [];
   return {
@@ -119,13 +127,6 @@ async function main() {
   console.log(`\n======================================================================`);
   console.log(`  EXECUTANDO BACKUP COMPLETO VIA POSTGREST (HTTPS 443): [${rotulo}]`);
   console.log(`======================================================================\n`);
-
-  if (!serviceKey) {
-    console.warn("⚠️ ATENÇÃO: SUPABASE_SERVICE_ROLE_KEY não foi encontrada no .env!");
-    console.warn("   Usando NEXT_PUBLIC_SUPABASE_ANON_KEY. Se o RLS estiver ativado no Supabase, a leitura retornará 0 registros.\n");
-  } else {
-    console.log("🔑 SUPABASE_SERVICE_ROLE_KEY detectada! Leitura total de admin ativada via HTTPS.");
-  }
 
   const modelNames = getPrismaModelNames();
   console.log(`📋 Tabelas extraídas dinamicamente do schema.prisma (${modelNames.length}):`);
@@ -188,11 +189,10 @@ async function main() {
   console.log(`  VERIFICAÇÃO DE INTEGRIDADE E COMPARATIVO CONTRA BASELINE (cp2b)`);
   console.log(`======================================================================\n`);
 
-  // Verify baseline metrics matching cp2b if service_role key was used
   const studyBlockFile = path.join(backupTargetDir, "StudyBlock.json");
   const flashcardFile = path.join(backupTargetDir, "Flashcard.json");
 
-  if (serviceKey && fs.existsSync(studyBlockFile) && fs.existsSync(flashcardFile)) {
+  if (fs.existsSync(studyBlockFile) && fs.existsSync(flashcardFile)) {
     const studyBlocks: any[] = JSON.parse(fs.readFileSync(studyBlockFile, "utf-8"));
     const flashcards: any[] = JSON.parse(fs.readFileSync(flashcardFile, "utf-8"));
 
@@ -208,9 +208,6 @@ async function main() {
     if (studyBlocks.length < 348 || completedTheoryCount < 132 || flashcards.length < 862 || orphanFlashcards > 0) {
       throw new Error(`[VERIFICAÇÃO DE INTEGRIDADE FALHOU] As contagens do backup REST não batem com a baseline cp2b! Abortando gravação do manifesto.`);
     }
-  } else if (!serviceKey) {
-    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY ausente: Leitura limitada por RLS.");
-    console.warn("   Para validar as contagens do cp2b (348 blocos, 862 flashcards), adicione a SUPABASE_SERVICE_ROLE_KEY no .env.\n");
   }
 
   // Write manifest.json

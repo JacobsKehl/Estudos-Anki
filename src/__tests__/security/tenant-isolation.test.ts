@@ -48,6 +48,7 @@ describe("Tenant Isolation Behavioral Security Tests", () => {
     name: "Direito Constitucional",
     userId: userA_id,
     _count: { materials: 1, studyBlocks: 5, flashcards: 10 },
+    materials: [{ id: "mat_A_1" }],
     studyBlocks: [
       { theoryStatus: "COMPLETED" },
       { theoryStatus: "COMPLETED" },
@@ -65,6 +66,7 @@ describe("Tenant Isolation Behavioral Security Tests", () => {
     name: "Direito Constitucional",
     userId: userB_id,
     _count: { materials: 2, studyBlocks: 3, flashcards: 6 },
+    materials: [{ id: "mat_B_1" }, { id: "mat_B_2" }],
     studyBlocks: [
       { theoryStatus: "COMPLETED" },
       { theoryStatus: "NOT_STARTED" },

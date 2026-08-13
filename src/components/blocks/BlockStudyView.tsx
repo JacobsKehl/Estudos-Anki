@@ -80,6 +80,8 @@ interface ContinueSuggestion {
   scheduledDate?: string;
 }
 
+import { PossiblyStudiedCard } from "@/components/study/PossiblyStudiedCard";
+
 interface BlockStudyViewProps {
   block: any;
   content: any[];
@@ -92,6 +94,7 @@ interface BlockStudyViewProps {
   from: string | null;
   scheduleItemId?: string | null;
   secondPass?: boolean;
+  sourceV1Info?: { sourceTitle: string; totalV2Topics: number } | null;
 }
 
 // Helper functions moved outside of render to prevent ESLint static-components warnings and fix missing dependency warnings
@@ -123,7 +126,8 @@ export function BlockStudyView({
   returnTo,
   from,
   scheduleItemId,
-  secondPass = false
+  secondPass = false,
+  sourceV1Info
 }: BlockStudyViewProps) {
   const router = useRouter();
 
@@ -811,6 +815,14 @@ export function BlockStudyView({
   // ==========================================
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-32 animate-in fade-in duration-700">
+      {block.possiblyAlreadyStudied && (
+        <PossiblyStudiedCard
+          blockId={block.id}
+          sourceV1Title={sourceV1Info?.sourceTitle}
+          totalV2TopicsCovered={sourceV1Info?.totalV2Topics}
+          currentOfficialTopicId={block.officialTopicId}
+        />
+      )}
       {/* Header Focado */}
       <header className="space-y-6">
         <div className="flex items-center gap-4">

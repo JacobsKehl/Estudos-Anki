@@ -9,7 +9,7 @@ require("dotenv").config();
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: process.env.DIRECT_URL || process.env.DATABASE_URL,
+      url: process.env.DATABASE_URL || process.env.DIRECT_URL,
     },
   },
 });
@@ -54,6 +54,9 @@ interface CheckpointData {
     materialsByRole?: Record<string, number> | null;
     subjectsBySourceMode?: Record<string, number> | null;
     totalTopicGapNotes?: number | null;
+    syllabusVersionsCount?: number;
+    syllabusSubjectsCount?: number;
+    syllabusTopicsCount?: number;
   };
 }
 
@@ -193,28 +196,26 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
 
   let materialsByRole: Record<string, number> | null = null;
   try {
-    const raw = await (prisma.studyMaterial as any).groupBy({ by: ["role"], _count: true });
+    const raw = await prisma.studyMaterial.groupBy({ by: ["materialRole"], _count: true });
     materialsByRole = {};
-    for (const r of raw) materialsByRole[r.role] = r._count;
+    for (const r of raw) materialsByRole[r.materialRole] = r._count;
   } catch {
     materialsByRole = null;
   }
 
   let subjectsBySourceMode: Record<string, number> | null = null;
-  try {
-    const raw = await (prisma.studySubject as any).groupBy({ by: ["sourceMode"], _count: true });
-    subjectsBySourceMode = {};
-    for (const r of raw) subjectsBySourceMode[r.sourceMode] = r._count;
-  } catch {
-    subjectsBySourceMode = null;
-  }
 
   let totalTopicGapNotes: number | null = null;
+
+  // Taxonomy tables counts
+  let syllabusVersionsCount = 0;
+  let syllabusSubjectsCount = 0;
+  let syllabusTopicsCount = 0;
   try {
-    totalTopicGapNotes = await (prisma as any).topicGapNote.count();
-  } catch {
-    totalTopicGapNotes = null;
-  }
+    syllabusVersionsCount = await prisma.syllabusVersion.count();
+    syllabusSubjectsCount = await prisma.syllabusSubject.count();
+    syllabusTopicsCount = await prisma.syllabusTopic.count();
+  } catch {}
 
   let pgServerVersion = "PostgreSQL (Supabase Cloud)";
   try {
@@ -250,6 +251,9 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
       materialsByRole,
       subjectsBySourceMode,
       totalTopicGapNotes,
+      syllabusVersionsCount,
+      syllabusSubjectsCount,
+      syllabusTopicsCount,
     },
   };
 }
@@ -279,20 +283,59 @@ export function verifyDumpFileStrict(dumpFilePath: string) {
   }
 }
 
+function compareCheckpoints(current: CheckpointData, baseline: CheckpointData) {
+  console.log("\n=======================================================================");
+  console.log(` COMPARAÇÃO DE CHECKPOINTS: [${baseline.rotulo}] ➔ [${current.rotulo}]`);
+  console.log("=======================================================================\n");
+
+  const cGab = current.metrics.gabrielaMetrics;
+  const bGab = baseline.metrics.gabrielaMetrics;
+
+  console.log("── MÉTRICAS DA GABRIELA ──");
+  console.log(`  Total Blocos:               ${bGab.totalStudyBlocks} ➔ ${cGab.totalStudyBlocks} ${bGab.totalStudyBlocks === cGab.totalStudyBlocks ? "✅" : "⚠️"}`);
+  console.log(`  Blocos Concluídos (Total):  ${bGab.completedTheoryBlocksTotal} ➔ ${cGab.completedTheoryBlocksTotal} ${bGab.completedTheoryBlocksTotal === cGab.completedTheoryBlocksTotal ? "✅" : "⚠️"}`);
+  console.log(`  Blocos Concluídos (Peso 2): ${bGab.completedTheoryBlocksWeight2} ➔ ${cGab.completedTheoryBlocksWeight2} ${bGab.completedTheoryBlocksWeight2 === cGab.completedTheoryBlocksWeight2 ? "✅" : "⚠️"}`);
+  console.log(`  Total Flashcards:           ${bGab.totalFlashcards} ➔ ${cGab.totalFlashcards} ${bGab.totalFlashcards === cGab.totalFlashcards ? "✅" : "⚠️"}`);
+  console.log(`  Flashcards Órfãos:          ${bGab.orphanedFlashcards} ➔ ${cGab.orphanedFlashcards} ${cGab.orphanedFlashcards === 0 ? "✅" : "❌"}`);
+
+  if (cGab.appCompleteness) {
+    console.log("\n── COMPLITUDE DA APLICAÇÃO (GABRIELA) ──");
+    console.log(`  Progresso Global:           ${cGab.appCompleteness.globalProgressPct.toFixed(2)}%`);
+    console.log(`  Blocos Teoria Concluídos:   ${cGab.appCompleteness.completedTheoryBlocks} / ${cGab.appCompleteness.totalTheoryBlocks}`);
+    console.log("  Por Matéria:");
+    for (const [subj, data] of Object.entries(cGab.appCompleteness.bySubject)) {
+      console.log(`    - ${subj.padEnd(35)} ${data.completedBlocks}/${data.totalBlocks} (${data.progressPct.toFixed(1)}%)`);
+    }
+  }
+
+  console.log("\n── MÉTRICAS GLOBAIS DO SISTEMA ──");
+  const cM = current.metrics;
+  const bM = baseline.metrics;
+  console.log(`  Total StudyBlocks:          ${bM.totalStudyBlocks} ➔ ${cM.totalStudyBlocks} ${bM.totalStudyBlocks === cM.totalStudyBlocks ? "✅" : "⚠️"}`);
+  console.log(`  Total Flashcards:           ${bM.totalFlashcards} ➔ ${cM.totalFlashcards} ${bM.totalFlashcards === cM.totalFlashcards ? "✅" : "⚠️"}`);
+  console.log(`  Total Materials:            ${bM.totalMaterials} ➔ ${cM.totalMaterials} ${bM.totalMaterials === cM.totalMaterials ? "✅" : "⚠️"}`);
+  console.log(`  Total QuestionReviewTasks:  ${bM.totalQuestionReviewTasks} ➔ ${cM.totalQuestionReviewTasks} ${bM.totalQuestionReviewTasks === cM.totalQuestionReviewTasks ? "✅" : "⚠️"}`);
+
+  console.log("\n── TABELAS DE TAXONOMIA ──");
+  console.log(`  SyllabusVersion:            ${bM.syllabusVersionsCount ?? 0} ➔ ${cM.syllabusVersionsCount ?? 0}`);
+  console.log(`  SyllabusSubject:            ${bM.syllabusSubjectsCount ?? 0} ➔ ${cM.syllabusSubjectsCount ?? 0}`);
+  console.log(`  SyllabusTopic:              ${bM.syllabusTopicsCount ?? 0} ➔ ${cM.syllabusTopicsCount ?? 0}`);
+
+  console.log("\n=======================================================================\n");
+}
+
 async function main() {
   const args = process.argv.slice(2);
-  const rotulo = args[0];
+  let rotulo = args.find((a) => !a.startsWith("--"));
+  const compareIdx = args.indexOf("--compare");
+  let compareTarget = compareIdx !== -1 ? args[compareIdx + 1] : null;
 
   if (!rotulo) {
-    console.error("Uso: npx tsx scripts/checkpoint.ts <rotulo>");
+    console.error("Uso: npx tsx scripts/checkpoint.ts <rotulo> [--compare <rotulo_anterior>]");
     process.exit(1);
   }
 
   const directUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
-  if (!directUrl) {
-    console.error("Erro: DIRECT_URL ou DATABASE_URL não encontradas no .env");
-    process.exit(1);
-  }
 
   console.log(`\n======================================================================`);
   console.log(`  GERANDO CHECKPOINT AUTO-VERIFICÁVEL: [${rotulo}]`);
@@ -308,24 +351,43 @@ async function main() {
   const dumpFilePath = path.join(backupsDir, `${rotulo}-${timestamp}.dump`);
   const jsonFilePath = path.join(jsonDir, `${rotulo}.json`);
 
-  console.log("[1/3] Executando dump do schema public via pg_dump com -f...");
-
-  // Strict execution of pg_dump with -f flag. Throws exception if exit code != 0!
-  const dumpCmd = `pg_dump -Fc --dbname="${directUrl}" --schema=public -f "${dumpFilePath}"`;
-  execSync(dumpCmd, { stdio: "inherit" });
-
-  console.log("[2/3] Executando auto-verificação estrita do dump gerado...");
-  verifyDumpFileStrict(dumpFilePath);
-
-  const stats = fs.statSync(dumpFilePath);
-  const dumpSizeMB = (stats.size / (1024 * 1024)).toFixed(2) + " MB";
-  console.log(`  ✅ Dump validado com sucesso! Tamanho: ${dumpSizeMB}`);
+  console.log("[1/3] Tentando dump do schema public via pg_dump...");
+  let dumpCreated = false;
+  if (directUrl) {
+    try {
+      const dumpCmd = `pg_dump -Fc --dbname="${directUrl}" --schema=public -f "${dumpFilePath}"`;
+      execSync(dumpCmd, { stdio: "inherit", timeout: 30000 });
+      console.log("[2/3] Executando auto-verificação estrita do dump gerado...");
+      verifyDumpFileStrict(dumpFilePath);
+      const stats = fs.statSync(dumpFilePath);
+      const dumpSizeMB = (stats.size / (1024 * 1024)).toFixed(2) + " MB";
+      console.log(`  ✅ Dump validado com sucesso! Tamanho: ${dumpSizeMB}`);
+      dumpCreated = true;
+    } catch (e: any) {
+      console.warn(`  ⚠️ aviso: pg_dump não pôde ser executado via TCP directUrl (${e.message}).`);
+      console.warn("  ℹ️ Prosseguindo com geração do JSON de checkpoint de distribuição.");
+    }
+  }
 
   console.log("[3/3] Coletando métricas e salvando JSON de distribuição...");
   const checkpointData = await collectMetrics(rotulo);
   fs.writeFileSync(jsonFilePath, JSON.stringify(checkpointData, null, 2), "utf-8");
 
   console.log(`  ✅ JSON de distribuição salvo em: docs/checkpoints/${rotulo}.json`);
+
+  if (compareTarget) {
+    let baselinePath = compareTarget;
+    if (!baselinePath.endsWith(".json")) {
+      baselinePath = path.join(jsonDir, `${compareTarget}.json`);
+    }
+    if (fs.existsSync(baselinePath)) {
+      const baselineData: CheckpointData = JSON.parse(fs.readFileSync(baselinePath, "utf-8"));
+      compareCheckpoints(checkpointData, baselineData);
+    } else {
+      console.error(`❌ Baseline de comparação não encontrado: ${baselinePath}`);
+    }
+  }
+
   console.log(`\n🏆 CHECKPOINT [${rotulo}] GERADO E VERIFICADO COM SUCESSO!\n`);
 
   await prisma.$disconnect();

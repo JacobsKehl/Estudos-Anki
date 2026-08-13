@@ -307,6 +307,7 @@ model StudyBlock {
   sourceHeading     String?
   sourceSection     String?
   officialTopicId   String?
+  officialTopic     SyllabusTopic? @relation(fields: [officialTopicId], references: [id], onDelete: SetNull)
   officialTopicName String?
   topicCode         String?
   needsManualReview Boolean   @default(false)
@@ -695,10 +696,32 @@ model SyllabusTopic {
   orderIndex          Int
   weight              Float           @default(1.0) // Peso individual do tópico. Na V1, vem do arquivo de constantes (1.0 para Português, 1.2 para as demais).
 
+  studyBlocks StudyBlock[]
+
+  v1Mappings SyllabusTopicMapping[] @relation("V1TopicMappings")
+  v2Mappings SyllabusTopicMapping[] @relation("V2TopicMappings")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([versionId, topicCode])
+  @@unique([versionId, subjectCanonicalKey, topicCode])
   @@index([versionId])
   @@index([subjectCanonicalKey])
 }
+
+model SyllabusTopicMapping {
+  id           String        @id @default(cuid())
+  v1TopicId    String
+  v1Topic      SyllabusTopic @relation("V1TopicMappings", fields: [v1TopicId], references: [id], onDelete: Cascade)
+  v2TopicId    String
+  v2Topic      SyllabusTopic @relation("V2TopicMappings", fields: [v2TopicId], references: [id], onDelete: Cascade)
+  relationType String        // EXATO | V1_MAIS_AMPLO | V1_MAIS_ESTREITO | PARCIAL | NENHUM
+  notes        String?       @db.Text
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([v1TopicId, v2TopicId])
+  @@index([v1TopicId])
+  @@index([v2TopicId])
+}
+

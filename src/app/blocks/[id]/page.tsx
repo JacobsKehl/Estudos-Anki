@@ -68,6 +68,27 @@ export default async function BlockPage({
   const pendingCount = block.flashcards.filter((f: any) => f.status === "PENDING_APPROVAL").length;
   const approvedCount = block.flashcards.filter((f: any) => f.status === "APPROVED").length;
 
+  let sourceV1Info: { sourceTitle: string; totalV2Topics: number } | null = null;
+  if (block.possiblyAlreadyStudied && block.sourceV1BlockId) {
+    const sourceBlock = await prisma.studyBlock.findUnique({
+      where: { id: block.sourceV1BlockId },
+      select: { title: true, officialTopicId: true }
+    });
+
+    if (sourceBlock) {
+      let v2Count = 1;
+      if (sourceBlock.officialTopicId) {
+        v2Count = await prisma.syllabusTopicMapping.count({
+          where: { v1TopicId: sourceBlock.officialTopicId }
+        });
+      }
+      sourceV1Info = {
+        sourceTitle: sourceBlock.title,
+        totalV2Topics: Math.max(v2Count, 1)
+      };
+    }
+  }
+
   return (
     <BlockStudyView 
       block={block} 
@@ -81,6 +102,7 @@ export default async function BlockPage({
       from={from || null}
       scheduleItemId={scheduleItemId || null}
       secondPass={secondPass === "true"}
+      sourceV1Info={sourceV1Info}
     />
   );
 }

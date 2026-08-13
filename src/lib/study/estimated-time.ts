@@ -14,7 +14,9 @@ export interface ReadingTimeInput {
   wordsPerMinute?: number;
   /** Minutos por página (se palavras não fornecidas). Default: 3 */
   minutesPerPage?: number;
-  /** Tempo mínimo do bloco (minutos). Default: 30 */
+  /** Indica se o bloco é do tipo âncora (CFC). Se true, piso default é 15 min em vez de 30 min */
+  isAnchorBased?: boolean;
+  /** Tempo mínimo do bloco (minutos). Default: 15 se isAnchorBased, senão 30 */
   minimumBlockMinutes?: number;
   /** Teto máximo disponível (minutos) */
   availableMinutes?: number;
@@ -31,7 +33,8 @@ export interface ReadingTimeResult {
 export function calculateEstimatedStudyMinutes(input: ReadingTimeInput): ReadingTimeResult {
   const wordsPerMinute = input.wordsPerMinute ?? 150;
   const minutesPerPage = input.minutesPerPage ?? 3;
-  const minimumBlockMinutes = input.minimumBlockMinutes ?? 30;
+  const defaultMinimum = input.isAnchorBased ? 15 : 30;
+  const minimumBlockMinutes = input.minimumBlockMinutes ?? defaultMinimum;
 
   let rawMinutes = minimumBlockMinutes;
   let method: "WORDS" | "PAGES" | "DEFAULT" = "DEFAULT";

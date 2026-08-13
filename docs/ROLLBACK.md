@@ -52,3 +52,40 @@ Limpamos todas as tabelas em ordem estrita de FK e reinserimos do zero os dados 
 - **NÃO use** se o problema for apenas um erro de cálculo de UI ou front-end (corrija no código).
 - **NÃO use** se tiverem se passado dias e a usuária tiver gerado novo histórico de estudos válido que seria perdido (nesse caso, use restauração cirúrgica por tabela).
 - **NÃO use** sem antes validar a integridade SHA-256 do manifesto de origem.
+
+---
+
+## 5. FK `StudyBlock.officialTopicId → SyllabusTopic.id` — Regra de Deleção
+
+> [!CAUTION]
+> **NUNCA apague linhas de `SyllabusVersion` ou `SyllabusTopic`.**
+
+A FK foi criada com `ON DELETE SET NULL`. Isso significa que apagar um `SyllabusTopic` **não** gera erro — o Postgres silenciosamente seta `officialTopicId = NULL` em todos os `StudyBlock` que apontavam para aquele tópico. O mapeamento bloco→tópico se perde sem aviso.
+
+**Regra operacional:**
+- Versão de taxonomia sai de circulação com `isActive = false`, **nunca** com `DELETE`.
+- Tópicos individuais **nunca** são deletados. Se um tópico mudar de nome ou escopo numa nova versão do edital, cria-se uma nova `SyllabusVersion` com os tópicos corrigidos.
+- Qualquer script que execute `DELETE FROM "SyllabusTopic"` ou `DELETE FROM "SyllabusVersion"` em produção é um incidente.
+
+---
+
+## 6. Pendência Bloqueante do F1: `backup-via-rest.ts`
+
+> [!WARNING]
+> O script `scripts/backup-via-rest.ts` **está quebrado** e não consegue gerar backups por HTTPS.
+
+Sem ele, backup só é possível com TCP na porta 5432 liberada — o que depende de janelas de conectividade imprevisíveis. **O F1 não deve rodar sem um mecanismo de backup funcional**, pois o pre-snapshot obrigatório do `restore-production.ts` depende de conseguir extrair dados antes de qualquer escrita.
+
+**Ação necessária antes do F1:** corrigir o `backup-via-rest.ts` ou implementar alternativa equivalente por HTTPS/PostgREST.
+
+---
+
+## 7. Scripts de Verificação Disponíveis
+
+| Script | Propósito |
+|---|---|
+| `scripts/check-migration-state.ts` | Verifica estado de todas as migrations no banco |
+| `scripts/apply-official-topic-fk.ts` | Aplica FK officialTopicId (dry-run por padrão) |
+| `scripts/check-orphan-official-topics.ts` | Audita órfãos na FK officialTopicId |
+| `scripts/verify-gabriela-subjects.ts` | Confirma contagens 348/132/862 |
+| `scripts/check-not-null-prod.ts` | Verifica constraints NOT NULL no banco |

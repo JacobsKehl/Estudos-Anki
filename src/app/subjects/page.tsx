@@ -10,14 +10,20 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 import { getAllSubjectsMetrics } from "@/lib/services/subject-metrics";
 
+import { SubjectPossiblyStudiedBanner } from "@/components/study/SubjectPossiblyStudiedBanner";
+
 export default async function SubjectsPage() {
   const userId = await getMockUserId();
 
   let subjects: any[] = [];
   let scheduleMode = "DYNAMIC";
   let userPrefsCreatedAt: string | undefined = undefined;
+  let totalPossibly = 0;
 
   try {
+    totalPossibly = await prisma.studyBlock.count({
+      where: { userId, possiblyAlreadyStudied: true }
+    });
     const userPrefs = await prisma.userPreferences.findUnique({
       where: { userId },
       select: { scheduleGenerationMode: true, createdAt: true }
@@ -61,6 +67,8 @@ export default async function SubjectsPage() {
       >
         <CreateSubjectDialog />
       </PageHeader>
+
+      <SubjectPossiblyStudiedBanner count={totalPossibly} />
 
       {subjects.length === 0 ? (
         <EmptyState 
