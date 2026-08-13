@@ -2,61 +2,53 @@
 
 > [!CAUTION]
 > **Aviso de Privacidade e Versionamento**
-> - Os arquivos de dump binário (`backups/*.dump`) contêm dados de estudo reais da usuária (incluindo materiais e notas de estudo) e **NUNCA** devem ser commitados no Git. Eles estão ignorados no `.gitignore`.
-> - Os arquivos JSON em `docs/checkpoints/<rotulo>.json` contêm exclusivamente métricas agregadas e IDs anônimos de matérias. Eles são o **registro de verdade oficial** do sistema e são versionados no Git junto às tags.
+> - Os arquivos de backup JSON (`backups/json/`) contêm dados de estudo reais da usuária e **NUNCA** devem ser commitados no Git. Eles estão protegidos no `.gitignore`.
+> - Os arquivos de manifesto em `docs/backups/<rotulo>-manifest.json` contêm exclusivamente métricas agregadas, hashes SHA-256 e IDs anônimos. Eles são o **registro de verdade oficial** do sistema e são versionados no Git.
 
 ---
 
 ## 1. Conectividade e Formas de Conexão (Supabase)
 
-| Forma | Host | Porta | Rede | `pg_restore` | Uso Recomendado |
+| Forma | Host | Porta | Rede | `pg_restore` / PostgREST | Uso Recomendado |
 |---|---|---:|---|---|---|
 | **Direta** | `db.<ref>.supabase.co` | 5432 | **Apenas IPv6 (AAAA)** | ✅ Suporta | Ambientes com suporte nativo IPv6 |
-| **Session Pooler** | `aws-…pooler.supabase.com` | **5432** | IPv4 (A) | ✅ Suporta | **Recomendado para Restauração / Migração em IPv4** |
+| **Session Pooler** | `aws-…pooler.supabase.com` | **5432** | IPv4 (A) | ✅ Suporta | Recomendado para Restauração / Migração em IPv4 |
 | **Transaction Pooler** | `aws-…pooler.supabase.com` | **6543** | IPv4 (A) | ❌ Incompatível | Apenas para queries curtas da aplicação (Prisma) |
-
-> ⚠️ **NUNCA use a porta 6543 (Transaction Pooler) para `pg_restore` ou `prisma migrate`**. O modo transação não fornece persistência de sessão e causa falha de intspecção/DDL.
+| **HTTPS PostgREST** | `<ref>.supabase.co` | **443** | **IPv4 & IPv6** | ✅ Suporta (REST Engine) | **Recomendado para Ambientes sem Acesso a Portas TCP 5432/6543** |
 
 ---
 
 ## 2. Trava de Segurança por Project Ref
 
-O script `scripts/restore.ts` implementa trava automática por **Project Ref**:
-- **Conexão Direta:** Extrai o ref do host (`db.<ref>.supabase.co`).
-- **Connection Pooler:** Extrai o ref do usuário (`postgres.<ref>`).
-
-Se o ref extraído da variável de destino for idêntico ao ref de produção (`DATABASE_URL`/`DIRECT_URL`), a restauração é **ABORTADA imediatamente**, exigindo a flag explícita `--target-is-production` e confirmação textual por extenso. Se o ref não puder ser extraído de alguma URL, a restauração é abortada por padrão.
+Os scripts de restauração (`scripts/restore-from-json.ts` e `scripts/restore-production.ts`) implementam trava automática por **Project Ref**:
+- Extraem o ref de produção (`msmdekjetxajcwuxmxps`).
+- Se a URL de destino apontar para a produção, o script de restauração genérico **ABORTA imediatamente por padrão**.
 
 ---
 
-## 3. Ordem de Execução do Rollback
+## 3. Procedimento de Restauração em Produção (`scripts/restore-production.ts`)
 
-1. **Restaurar Banco de Dados**: Executar `pg_restore` contra o projeto de destino via **Session Pooler (porta 5432)**.
-2. **Git Checkout**: Fazer checkout do código na tag correspondente (`git checkout <tag>`).
-3. **Validação por Distribuição (`--compare`)**: Coletar métricas do banco restaurado e comparar contra o JSON oficial do checkpoint.
+Caso ocorra um incidente grave durante a execução do F1 e seja necessário restaurar a produção para o estado pré-incidente:
 
----
+### Condições Obrigatórias e Inegociáveis:
+1. **Flag Explícita de Linha de Comando:** `--i-am-restoring-production`
+2. **Variável de Ambiente Confirmada:** `PRODUCTION_RESTORE_CONFIRMED=true`
+3. **Pre-Snapshot Automático:** O script tira um backup completo do estado atual (pós-incidente) antes de apagar qualquer linha, salvando em `backups/json/pre-restore-snapshot-<timestamp>/`.
+4. **Verificação de Hash SHA-256:** O manifesto do backup de origem (`docs/backups/<rotulo>-manifest.json`) deve ter seus hashes SHA-256 validados em 100% das tabelas antes da primeira escrita.
 
-## 4. Comando Exato de Restauração (`pg_restore`)
-
+### Comando Exato:
 ```bash
-# 1. Restauração em banco descartável/teste:
-npx tsx scripts/restore.ts backups/cp2b-escopo-peso2-2026-08-13T02-56-04-249Z.dump --target-env TEST_TARGET_URL
-
-# Comando pg_restore executado internamente (Flags oficiais):
-pg_restore --schema=public --clean --if-exists --no-owner --no-privileges -d "<URL_SESSION_POOLER_5432>" "<ARQUIVO.dump>"
+PRODUCTION_RESTORE_CONFIRMED=true npx tsx scripts/restore-production.ts cp2b-rest --i-am-restoring-production
 ```
 
 ---
 
-## 5. Validação com `--compare`
+## 4. Análise de Estratégia de Restauração e Contraindicações
 
-```bash
-# Coletar o estado do banco restaurado
-npx tsx scripts/checkpoint.ts cp2b-restored-verification
+### Estratégia Escolhida: Limpeza Transacional com Pre-Snapshot
+Limpamos todas as tabelas em ordem estrita de FK e reinserimos do zero os dados do backup. Essa abordagem elimina duplicatas e sujeira criadas pelo incidente. O risco de perda é mitigado 100% pelo **Pre-Snapshot automático obrigatório**.
 
-# Comparar exatamente com o JSON oficial versionado no Git
-npx tsx scripts/checkpoint.ts --compare docs/checkpoints/cp2b-escopo-peso2.json docs/checkpoints/cp2b-restored-verification.json
-```
-
-O teste é considerado aprovado quando as contagens de `StudyBlock`, `Flashcard`, `FlashcardReview` e `StudySessionLog` baterem **100% sem nenhuma regressão de blocos concluídos ou cartões órfãos**.
+### 🛑 CONTRAINDICAÇÕES (Quando NÃO Usar o Rollback em Produção):
+- **NÃO use** se o problema for apenas um erro de cálculo de UI ou front-end (corrija no código).
+- **NÃO use** se tiverem se passado dias e a usuária tiver gerado novo histórico de estudos válido que seria perdido (nesse caso, use restauração cirúrgica por tabela).
+- **NÃO use** sem antes validar a integridade SHA-256 do manifesto de origem.

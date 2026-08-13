@@ -1,0 +1,123 @@
+{
+  "rotulo": "cp2b-rest",
+  "timestamp": "2026-08-13T18:24:36.579Z",
+  "supabaseUrl": "https://msmdekjetxajcwuxmxps.supabase.co",
+  "usedServiceRoleKey": true,
+  "totalTables": 22,
+  "totalRecords": 18524,
+  "totalSizeBytes": 31579006,
+  "cpfScanClean": false,
+  "cpfOccurrencesCount": 73,
+  "tables": {
+    "User": {
+      "recordCount": 3,
+      "sizeBytes": 1267,
+      "sha256": "c69385cf35f36a96892ee097bcc901cfa98334b178c2c1ad6c8a83fc1520cdb1"
+    },
+    "UserPreferences": {
+      "recordCount": 3,
+      "sizeBytes": 3001,
+      "sha256": "0099ec439728c6c8306d871d93be56c4a36d8f553c5f6c344b4deaaab50eeac0"
+    },
+    "StudySubject": {
+      "recordCount": 14,
+      "sizeBytes": 5479,
+      "sha256": "0b3a1884e0b4f18093cba1653ffc5177e615b35499699837060e7da10a247cbb"
+    },
+    "StudyMaterial": {
+      "recordCount": 109,
+      "sizeBytes": 1489951,
+      "sha256": "8fab33d5d2f9c30947e74a13473773069d26efe246145b7d5de794c316cc6865"
+    },
+    "ExtractedContent": {
+      "recordCount": 9414,
+      "sizeBytes": 24515078,
+      "sha256": "0d5a98844806c279054602ea837e82de906bdea0fb6a471a0ea604b0c97692af"
+    },
+    "StudyPlan": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "StudyPlanDay": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "Flashcard": {
+      "recordCount": 874,
+      "sizeBytes": 876388,
+      "sha256": "b18672d3fb7b1437282d7f2b59fac14dc4274a071e2c8a84ad8153f6486da8e5"
+    },
+    "FlashcardReview": {
+      "recordCount": 4253,
+      "sizeBytes": 1974729,
+      "sha256": "0ae1a8e320895fb99e96f284773da1f770396da14652407d53df55f378c55169"
+    },
+    "StudyNote": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "StudyBlock": {
+      "recordCount": 408,
+      "sizeBytes": 667949,
+      "sha256": "cd781b8bb5fa63e141b888abecee0081432435c0375adc342e9d1dc7b3a5db9d"
+    },
+    "StudyBlockSupport": {
+      "recordCount": 621,
+      "sizeBytes": 176967,
+      "sha256": "a5bd7389c64745b2b6b8e8ae4d80065463ba57f147af5a2c215c55c906d5db0b"
+    },
+    "StudySchedule": {
+      "recordCount": 22,
+      "sizeBytes": 8267,
+      "sha256": "5a2846cfd7b8e60db68ceeb28643733c4b658135d4a1dba3cbdb62860e17ec24"
+    },
+    "StudyScheduleItem": {
+      "recordCount": 2679,
+      "sizeBytes": 1767788,
+      "sha256": "48ee129a09157aa2fa5514ab8841502444d5ed2076a73875f56d91cadd5e3397"
+    },
+    "StudySessionLog": {
+      "recordCount": 63,
+      "sizeBytes": 30252,
+      "sha256": "229c7afa2a0b9d5d080c97de6d445f0a2067e67108ee8f262b0ee35885b35125"
+    },
+    "QuestionReviewTask": {
+      "recordCount": 61,
+      "sizeBytes": 61872,
+      "sha256": "916ad3ad4fff47b6ec13b9c68155978ca3f15cc6df644dfdb6f88bc18eaa953c"
+    },
+    "WeeklyReviewSession": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "WeeklyReviewTopic": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "WeeklyReviewTopicSource": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "SyllabusVersion": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "SyllabusSubject": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "SyllabusTopic": {
+      "recordCount": 0,
+      "sizeBytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  }
+}
