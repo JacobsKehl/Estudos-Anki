@@ -888,14 +888,14 @@ export function classifyTOCHeading(heading: string): "MAIN_THEORY" | "QUESTIONS"
 export function findBestOfficialTopic(
   text: string,
   officialTopics: { id: string; topicCode: string; title: string }[]
-): { id: string; topicCode: string; title: string } | null {
+): { id: string; topicCode: string; title: string; confidence: number } | null {
   if (officialTopics.length === 0) return null;
 
   const cleanText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const words = cleanText.split(/[^\w]+/i).filter(w => w.length > 3);
 
-  let bestTopic = officialTopics[0];
-  let maxScore = -1;
+  let bestTopic: { id: string; topicCode: string; title: string } | null = null;
+  let maxScore = 0;
 
   for (const topic of officialTopics) {
     const topicTitleClean = topic.title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -913,7 +913,14 @@ export function findBestOfficialTopic(
     }
   }
 
-  return bestTopic;
+  // Normalizar score para limiar de confiança entre 0.0 e 1.0 (ex: score de 15 caracteres correspondentes ~ 0.75)
+  const confidence = Math.min(1.0, maxScore / 20.0);
+
+  if (!bestTopic || maxScore <= 0 || confidence < 0.7) {
+    return null;
+  }
+
+  return { ...bestTopic, confidence };
 }
 
 export function buildBlocksFromTOC(

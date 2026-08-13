@@ -306,23 +306,26 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
       if (subjectTopics.length > 0) {
         const combinedText = `${block.title} ${block.description || ""} ${block.sourceHeading || ""}`;
         const bestTopic = findBestOfficialTopic(combinedText, subjectTopics);
-        if (bestTopic) {
+        if (bestTopic && bestTopic.confidence >= 0.7) {
           block.officialTopicId = bestTopic.id;
           block.topicCode = bestTopic.topicCode;
           block.officialTopicName = bestTopic.title;
-          console.log(`[Validation Fallback] Mapeado bloco "${block.title}" com sucesso para o tópico "${bestTopic.title}"`);
+          (block as any).needsManualReview = false;
+          console.log(`[Validation Fallback] Mapeado bloco "${block.title}" com sucesso para o tópico "${bestTopic.title}" (conf: ${bestTopic.confidence})`);
         } else {
-          // Se nenhum for melhor, usa o primeiro tópico como fallback
-          block.officialTopicId = subjectTopics[0].id;
-          block.topicCode = subjectTopics[0].topicCode;
-          block.officialTopicName = subjectTopics[0].title;
-          console.log(`[Validation Fallback] Nenhum tópico ideal para bloco "${block.title}". Fallback para primeiro tópico: "${subjectTopics[0].title}"`);
+          // Sem correspondência confiável (confiança < 0.7): registra como não identificado e marca para revisão manual
+          block.officialTopicId = null;
+          block.topicCode = "GERAL";
+          block.officialTopicName = "Tópico não identificado (Requer revisão)";
+          (block as any).needsManualReview = true;
+          console.log(`[Validation Fallback] Tópico não confiável para bloco "${block.title}". Marcado como precisa de revisão manual (needsManualReview = true).`);
         }
       } else {
         // Caso a disciplina não possua tópicos cadastrados na matriz
         block.officialTopicId = null;
         block.topicCode = "GERAL";
         block.officialTopicName = "Tópico não identificado";
+        (block as any).needsManualReview = true;
       }
     }
 
