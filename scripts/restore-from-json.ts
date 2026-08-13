@@ -17,23 +17,30 @@ if (fs.existsSync(envPath)) {
 
 const prodDbUrl = envVars["DIRECT_URL"] || envVars["DATABASE_URL"] || envVars["NEXT_PUBLIC_SUPABASE_URL"];
 
-// FK Dependency Order
+// FK Dependency Order (Strict)
 const FK_ORDERED_TABLES = [
   "User",
+  "UserPreferences",
   "SyllabusVersion",
   "SyllabusSubject",
   "SyllabusTopic",
   "StudySubject",
   "StudyMaterial",
+  "StudyPlan",
+  "StudyPlanDay",
   "StudyBlock",
+  "StudyBlockSupport",
   "Flashcard",
   "FlashcardReview",
   "ExtractedContent",
   "QuestionReviewTask",
+  "StudySchedule",
+  "StudyScheduleItem",
   "StudySessionLog",
-  "WeeklyStudyConfig",
-  "WeeklyStudyTarget",
-  "StudyBlockSupport",
+  "StudyNote",
+  "WeeklyReviewSession",
+  "WeeklyReviewTopic",
+  "WeeklyReviewTopicSource",
 ];
 
 async function insertRowsPostgREST(targetUrl: string, targetApiKey: string, tableName: string, rows: any[]) {
@@ -73,7 +80,7 @@ async function main() {
   const args = process.argv.slice(2);
   const rotulo = args[0] || "cp2b-rest";
   const targetUrl = args[1] || envVars["TEST_TARGET_URL"] || envVars["NEXT_PUBLIC_SUPABASE_URL"];
-  const targetApiKey = args[2] || envVars["SUPABASE_SERVICE_ROLE_KEY"] || envVars["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+  const targetApiKey = args[2] || envVars["TEST_SUPABASE_SERVICE_ROLE_KEY"] || envVars["SUPABASE_SERVICE_ROLE_KEY"] || envVars["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
 
   console.log(`\n======================================================================`);
   console.log(`  EXECUTANDO RESTAURAÇÃO VIA POSTGREST (HTTPS 443): [${rotulo}]`);
