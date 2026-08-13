@@ -1,0 +1,62 @@
+{
+  "rotulo": "cp1c-pos-backfill",
+  "timestamp": "2026-08-13T02:38:19.693Z",
+  "pgDumpVersion": "npx supabase db dump (v2.114.0)",
+  "pgServerVersion": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+  "metrics": {
+    "gabrielaMetrics": {
+      "userId": "cmp8od0wz0000iybklaotfqbs",
+      "email": "gabriela.furtado.p@gmail.com",
+      "totalStudyBlocks": 348,
+      "completedTheoryBlocksTotal": 132,
+      "completedTheoryBlocksWeight2": 115,
+      "totalFlashcards": 862,
+      "orphanedFlashcards": 0
+    },
+    "blocksByTheoryStatus": {
+      "COMPLETED": 134,
+      "NOT_STARTED": 274
+    },
+    "blocksByQuestionsStatus": {
+      "NOT_STARTED": 408
+    },
+    "blocksByFlashcardsStatus": {
+      "NOT_STARTED": 408
+    },
+    "blocksByMethodology": {
+      "LINEAR": 408
+    },
+    "blocksBySubject": {
+      "cmpa0b45602ehl204puoh0x06": 51,
+      "cmpa1224d04ecl204k3bmfm7m": 83,
+      "cmpl7gtyb0034lh04wkfsz0x2": 12,
+      "cmp9zspkj0059l204sz3mezxt": 62,
+      "cmp992nry0001l404o53vsbkj": 46,
+      "cmpahxvj70001l1049idzyjav": 12,
+      "cmp99p5ow0001l804mwt2as5f": 35,
+      "cmq6offdz0001jm04t72axxy1": 58,
+      "cmpa1pdl705r8l204pwm2dafz": 49
+    },
+    "totalStudyBlocks": 408,
+    "completedTheoryBlocksTotal": 134,
+    "completedTheoryBlocksWeight2": 116,
+    "flashcardsByReviewState": {
+      "RELEARNING": 24,
+      "LEARNING": 30,
+      "REVIEW": 809,
+      "NEW": 11
+    },
+    "totalFlashcards": 874,
+    "orphanedFlashcards": 0,
+    "materialsByStatus": {
+      "PENDING": 109
+    },
+    "totalMaterials": 109,
+    "totalQuestionReviewTasks": 61,
+    "totalExtractedContent": 9414,
+    "totalStudySessionLogs": 63,
+    "materialsByRole": null,
+    "subjectsBySourceMode": null,
+    "totalTopicGapNotes": null
+  }
+}
