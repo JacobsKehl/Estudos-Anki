@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
       blocks: blocks.map(b => ({
         id: b.id,
         title: b.title,
-        status: b.status,
+        theoryStatus: b.theoryStatus,
         pageStart: b.pageStart,
         pageEnd: b.pageEnd,
         officialTopicName: b.officialTopicName,

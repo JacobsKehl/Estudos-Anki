@@ -35,7 +35,7 @@ export async function POST(
     
     // Obter o último orderIndex existente para esta matéria (escopado por usuário)
     const lastBlock = await prisma.studyBlock.findFirst({
-      where: { subjectId: material.subjectId as string, userId },
+      where: { subjectId: material.subjectId as string, userId: mockUserId },
       orderBy: { orderIndex: 'desc' },
       select: { orderIndex: true }
     });
@@ -70,7 +70,7 @@ export async function POST(
           pageEnd: Math.min(block.pageEnd, maxPages),
           estimatedStudyMinutes: block.estimatedStudyMinutes || 30,
           orderIndex: currentOrderIndex++,
-          status: "NOT_STARTED",
+          theoryStatus: "NOT_STARTED",
         }
       });
       results.push(created);

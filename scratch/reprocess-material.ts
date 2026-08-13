@@ -87,7 +87,7 @@ async function main() {
           pageStart: block.pageStart,
           pageEnd: block.pageEnd,
           estimatedStudyMinutes: block.estimatedStudyMinutes || 30,
-          status: "NOT_STARTED"
+          theoryStatus: "NOT_STARTED"
         }
       });
     }

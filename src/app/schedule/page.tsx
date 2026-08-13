@@ -81,7 +81,7 @@ export default async function SchedulePage() {
       where: {
         userId: mockUserId,
         subjectId: { in: activeSubjectIds },
-        status: { not: "COMPLETED" },
+        theoryStatus: { not: "COMPLETED" },
         material: {
           materialRole: { not: "SUPPORT_MATERIAL" }
         }

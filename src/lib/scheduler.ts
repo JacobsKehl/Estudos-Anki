@@ -5,6 +5,12 @@ import { getLegacyTrt4NextSubjects, sortPendingBlocksForSubject } from "./schedu
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface SchedulerWarning {
+  code: string;
+  message: string;
+  details?: any;
+}
+
 interface SmartScheduleOptions {
   title?: string;
   dailyMinutes?: number;    // default: 120 (2 matérias × 60 min)
@@ -1112,7 +1118,7 @@ export async function reorganizeOverdueSchedule(
   // Extrair blocos pendentes de eligiblePendingTheory para garantir cobertura total dos blocos existentes
   const itemPendingBlocks: any[] = [];
   for (const item of eligiblePendingTheory) {
-    if (item.studyBlock && item.studyBlock.status !== "COMPLETED") {
+    if (item.studyBlock && item.studyBlock.theoryStatus !== "COMPLETED") {
       const blockId = item.studyBlock.id;
       if (!dbPendingBlocks.some((b: any) => b.id === blockId)) {
         itemPendingBlocks.push({

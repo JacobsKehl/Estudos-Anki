@@ -177,7 +177,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     if (!subject) {
       const allSubjects = await prisma.studySubject.findMany({
         where: { userId },
-        select: { id: true, name: true, createdAt: true, updatedAt: true, description: true, priority: true, examWeight: true, progress: true, studyPriority: true, userId: true }
+        select: { id: true, name: true, createdAt: true, updatedAt: true, description: true, priority: true, examWeight: true, progress: true, studyPriority: true, schedulingStatus: true, deferredUntil: true, userId: true }
       });
       subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;
     }
@@ -412,7 +412,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
             officialTopicId: blockDef.officialTopicId,
             officialTopicName: blockDef.officialTopicName,
             topicCode: blockDef.topicCode,
-            status: "NOT_STARTED",
+            theoryStatus: "NOT_STARTED",
             nextActionType: "THEORY",
           }
         });

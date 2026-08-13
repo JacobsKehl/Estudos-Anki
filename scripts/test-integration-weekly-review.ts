@@ -224,8 +224,8 @@ async function runTestFlow() {
       const blockIdB = "block-mig-b";
       await prisma.studyBlock.createMany({
         data: [
-          { id: blockIdA, userId: userIdA, subjectId: subjectIdA, materialId: materialIdA, title: "Bloco Mig A", status: "COMPLETED", theoryStatus: "COMPLETED", theoryCompletedAt: new Date("2026-07-01T10:00:00Z"), pageStart: 1, pageEnd: 5 },
-          { id: blockIdB, userId: userIdB, subjectId: subjectIdB, materialId: materialIdB, title: "Bloco Mig B", status: "COMPLETED", theoryStatus: "COMPLETED", theoryCompletedAt: new Date("2026-07-01T10:00:00Z"), pageStart: 1, pageEnd: 5 }
+          { id: blockIdA, userId: userIdA, subjectId: subjectIdA, materialId: materialIdA, title: "Bloco Mig A", theoryStatus: "COMPLETED", theoryCompletedAt: new Date("2026-07-01T10:00:00Z"), pageStart: 1, pageEnd: 5 },
+          { id: blockIdB, userId: userIdB, subjectId: subjectIdB, materialId: materialIdB, title: "Bloco Mig B", theoryStatus: "COMPLETED", theoryCompletedAt: new Date("2026-07-01T10:00:00Z"), pageStart: 1, pageEnd: 5 }
         ]
       });
 
@@ -350,7 +350,6 @@ async function runTestFlow() {
           subjectId: subjectIdA,
           materialId: materialIdA,
           title: "Bloco Mig C",
-          status: "COMPLETED",
           theoryStatus: "COMPLETED",
           theoryCompletedAt: new Date("2026-06-10T10:00:00Z"),
           pageStart: 1,

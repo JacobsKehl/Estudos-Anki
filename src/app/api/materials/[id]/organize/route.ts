@@ -604,7 +604,6 @@ export async function POST(
               officialTopicId: blockDef.officialTopicId,
               officialTopicName: blockDef.officialTopicName,
               topicCode: blockDef.topicCode,
-              status: "NOT_STARTED",
               theoryStatus: "NOT_STARTED",
               questionsStatus: "NOT_STARTED",
               flashcardsStatus: "NOT_STARTED",

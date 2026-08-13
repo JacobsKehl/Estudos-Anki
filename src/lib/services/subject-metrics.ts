@@ -202,7 +202,7 @@ export async function getGlobalMetrics(userId: string) {
         }
       },
       select: {
-        status: true
+        theoryStatus: true
       }
     })
   ]);
@@ -247,7 +247,7 @@ export async function getGlobalMetrics(userId: string) {
 
   // 3. Porcentagem de progresso de teoria real (apenas teoria de matérias PRIMARY/ACTIVE)
   const totalTheory = eligibleBlocks.length;
-  const completedTheory = eligibleBlocks.filter(b => b.status === "COMPLETED").length;
+  const completedTheory = eligibleBlocks.filter(b => b.theoryStatus === "COMPLETED").length;
   const globalProgress = totalTheory > 0 ? Math.round((completedTheory / totalTheory) * 100) : 0;
   
   // Total summary

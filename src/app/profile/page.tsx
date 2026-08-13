@@ -42,7 +42,7 @@ export default async function ProfilePage() {
   });
 
   const completedBlocks = await prisma.studyBlock.count({
-    where: { userId, status: "COMPLETED" }
+    where: { userId, theoryStatus: "COMPLETED" }
   });
 
   // 3. Buscar blocos pendentes para cálculo de viabilidade (ignorando material de suporte) das matérias do ciclo ativo
@@ -59,7 +59,7 @@ export default async function ProfilePage() {
     where: {
       userId,
       subjectId: { in: activeSubjectIds },
-      status: { not: "COMPLETED" },
+      theoryStatus: { not: "COMPLETED" },
       material: {
         materialRole: {
           not: "SUPPORT_MATERIAL"
