@@ -627,3 +627,69 @@ model WeeklyReviewTopicSource {
   @@index([weeklyReviewTopicId])
   @@index([studyBlockId])
 }
+
+// ═══ VERSIONAMENTO DE TAXONOMIA DO EDITAL ═══
+// Permite manter múltiplas versões de taxonomia convivendo no banco.
+// - Versão ativa: usada pelo scheduler e métricas (apenas uma por vez, via índice parcial).
+// - Versões inativas: para inspeção, comparação cross-version, e preparação do F4.
+// - Regra de IDs de SyllabusTopic:
+//     • PRIMEIRA versão (ESTRATEGIA_COURSE_GRID) mantém IDs legados (e.g. "const_t1")
+//     • Versões futuras usam IDs prefixados (e.g. "trt4_2026p__const_t1")
+//     • @@unique([versionId, topicCode]) garante integridade DENTRO de cada versão
+
+model SyllabusVersion {
+  id          String @id
+  label       String @unique // e.g. "ESTRATEGIA_COURSE_GRID", "TRT4_2026_PROJETADO"
+  source      String         // Origem da taxonomia (nome do curso, edital, etc.)
+  description String?
+  isActive    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subjects SyllabusSubject[]
+  topics   SyllabusTopic[]
+
+  // Garante que no máximo UMA versão esteja ativa no banco
+  @@unique([isActive], name: "SyllabusVersion_single_active", map: "SyllabusVersion_single_active")
+}
+
+// Camada intermediária: representa uma MATÉRIA dentro de uma versão específica.
+// Guarda atributos que são por-matéria (não por-tópico): questoesDaMateria, blocoConhecimento, weight.
+// Evita redundância de repetir "30 questões" em cada um dos 20 tópicos de Processual do Trabalho.
+model SyllabusSubject {
+  id                String          @id @default(cuid())
+  versionId         String
+  version           SyllabusVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  canonicalKey      String          // e.g. DIREITO_CONSTITUCIONAL, RACIOCINIO_LOGICO_MATEMATICO
+  displayName       String          // Nome de exibição: "Direito Constitucional"
+  blocoConhecimento String          // "ESPECIFICOS" | "GERAIS"
+  questoesDaMateria Int?            // Número de questões do bloco de conhecimento (30 para TRT4 AJAJ). NULL para versões sem dado de edital.
+  weight            Float           @default(1.0) // Peso padrão da matéria nesta versão (2.0 para Específicos, 1.0 para Gerais)
+  orderIndex        Int             @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([versionId, canonicalKey])
+}
+
+model SyllabusTopic {
+  id                  String          @id
+  versionId           String
+  version             SyllabusVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  subjectCanonicalKey String          // Chave canônica da matéria (vínculo implícito com SyllabusSubject via versionId + canonicalKey)
+  subjectName         String          // Nome legível da matéria (denormalizado para conveniência)
+  topicCode           String          // e.g. "Tópico 01" (único dentro da versão+matéria)
+  title               String
+  normalizedTitle     String          // Título normalizado para comparação fuzzy
+  orderIndex          Int
+  weight              Float           @default(1.0) // Peso individual do tópico (herda do SyllabusSubject por padrão, pode ser sobrescrito)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([versionId, topicCode])
+  @@index([versionId])
+  @@index([subjectCanonicalKey])
+}
