@@ -76,13 +76,75 @@ function parsePageNum(str: string): number | null {
   return isNaN(num) ? null : num;
 }
 
+export function isPageTabularStrict(pageData: any): boolean {
+  const sorted = [...pageData.Texts].sort((a: any, b: any) => a.y - b.y || a.x - b.x);
+  const lines: { y: number; tokens: { x: number; w: number; txt: string }[] }[] = [];
+  let currentY = -1;
+  let currentTokens: { x: number; w: number; txt: string }[] = [];
+
+  sorted.forEach((t: any) => {
+    const txt = safeDecode(t.R[0].T).trim();
+    if (!txt) return;
+    const x = t.x;
+    const w = (t.w || 1);
+
+    if (Math.abs(t.y - currentY) > 0.35) {
+      if (currentTokens.length > 0) lines.push({ y: currentY, tokens: currentTokens });
+      currentY = t.y;
+      currentTokens = [{ x, w, txt }];
+    } else {
+      currentTokens.push({ x, w, txt });
+    }
+  });
+  if (currentTokens.length > 0) lines.push({ y: currentY, tokens: currentTokens });
+
+  let consecutiveMultiColumnRows = 0;
+  let maxConsecutive = 0;
+
+  for (const line of lines) {
+    const tokens = line.tokens;
+    if (tokens.length < 2) {
+      consecutiveMultiColumnRows = 0;
+      continue;
+    }
+
+    let gaps = 0;
+    for (let i = 0; i < tokens.length - 1; i++) {
+      const tokenEnd = tokens[i].x + tokens[i].w;
+      const nextStart = tokens[i + 1].x;
+      const gap = nextStart - tokenEnd;
+
+      const textConcat = tokens[i].txt + tokens[i + 1].txt;
+      if (textConcat.includes("...") || textConcat.includes(".....")) continue;
+
+      if (gap >= 3.5) gaps++;
+    }
+
+    if (gaps >= 1) {
+      consecutiveMultiColumnRows++;
+      if (consecutiveMultiColumnRows > maxConsecutive) maxConsecutive = consecutiveMultiColumnRows;
+    } else {
+      consecutiveMultiColumnRows = 0;
+    }
+  }
+
+  return maxConsecutive >= 3;
+}
+
 export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryData {
   const totalPaginasPdf = pdfData.Pages.length;
   const offset = 1;
 
   let capaPages = 0;
   let sumarioPages = 0;
-  const rawSummaryLines: { text: string; y: number; pagePdf: number }[] = [];
+
+  interface RawSummaryLine {
+    text: string;
+    firstX: number;
+    pagePdf: number;
+  }
+
+  const rawSummaryLines: RawSummaryLine[] = [];
 
   for (let p = 0; p < Math.min(6, totalPaginasPdf); p++) {
     const page = pdfData.Pages[p];
@@ -94,18 +156,29 @@ export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryDa
       sumarioPages++;
       const sorted = [...page.Texts].sort((a: any, b: any) => a.y - b.y || a.x - b.x);
       let currentY = -1;
-      let line = "";
+      let lineTokens: { txt: string; x: number }[] = [];
+
       sorted.forEach((t: any) => {
         const txt = safeDecode(t.R[0].T);
         if (Math.abs(t.y - currentY) > 0.35) {
-          if (line.trim()) rawSummaryLines.push({ text: line.trim(), y: currentY, pagePdf: pageNum });
+          if (lineTokens.length > 0) {
+            const combinedStr = lineTokens.map(l => l.txt).join(" ").trim();
+            if (combinedStr.includes("...") && !combinedStr.includes("Sumário") && !combinedStr.includes("Concurseiro")) {
+              rawSummaryLines.push({ text: combinedStr, firstX: lineTokens[0].x, pagePdf: pageNum });
+            }
+          }
           currentY = t.y;
-          line = txt;
+          lineTokens = [{ txt, x: t.x }];
         } else {
-          line += "  " + txt;
+          lineTokens.push({ txt, x: t.x });
         }
       });
-      if (line.trim()) rawSummaryLines.push({ text: line.trim(), y: currentY, pagePdf: pageNum });
+      if (lineTokens.length > 0) {
+        const combinedStr = lineTokens.map(l => l.txt).join(" ").trim();
+        if (combinedStr.includes("...") && !combinedStr.includes("Sumário") && !combinedStr.includes("Concurseiro")) {
+          rawSummaryLines.push({ text: combinedStr, firstX: lineTokens[0].x, pagePdf: pageNum });
+        }
+      }
     } else if (sumarioPages === 0) {
       capaPages++;
     }
@@ -114,16 +187,14 @@ export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryDa
   interface ExtractedLine {
     titulo: string;
     paginaPrinted: number;
+    firstX: number;
     isTec: boolean;
   }
 
   const extracted: ExtractedLine[] = [];
 
   rawSummaryLines.forEach((l) => {
-    const txt = l.text;
-    if (txt.includes("Sumário") || txt.includes("Concurseiro Fora da Caixa") || txt.includes("concurseiroforadacaixa.com.br") || txt.includes("Preparado exclusivamente")) return;
-    
-    const match = txt.match(/^(.*?)\s*(\.{3,})\s*(\d(?:\s*\d)*)\s*$/);
+    const match = l.text.match(/^(.*?)\s*(\.{3,})\s*(\d(?:\s*\d)*)\s*$/);
     if (match) {
       const rawTitle = match[1].trim();
       const rawPageStr = match[3];
@@ -134,6 +205,7 @@ export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryDa
         extracted.push({
           titulo: rawTitle,
           paginaPrinted: pageNumPrinted,
+          firstX: l.firstX,
           isTec
         });
       }
@@ -156,7 +228,8 @@ export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryDa
 
   for (let i = 0; i < contentExtracted.length; i++) {
     const curr = contentExtracted[i];
-    const isLevel1 = isMainTopicTitle(curr.titulo, materia, i);
+    // PURE LAYOUT SIGNAL: Level 1 topics start at x <= 2.6 (no indentation)
+    const isLevel1 = curr.firstX <= 2.6;
 
     if (isLevel1 || !currentLevel1) {
       currentLevel1 = {
@@ -202,27 +275,8 @@ export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryDa
   for (let p = 0; p < totalPaginasPdf; p++) {
     const pageNum = p + 1;
     const page = pdfData.Pages[p];
-
-    // SANITY TEST 1: Capa (Page 1) MUST be NON-TABULAR
-    if (pageNum === 1) {
-      paginasNaoTabulares.push(pageNum);
-      continue;
-    }
-
-    // SANITY TEST 2: Summary pages MUST be NON-TABULAR
-    if (pageNum >= 2 && pageNum <= (1 + sumarioPages)) {
-      paginasNaoTabulares.push(pageNum);
-      continue;
-    }
-
-    const xCounts: Record<string, number> = {};
-    page.Texts.forEach((t: any) => {
-      const x = (Math.round(t.x * 2) / 2).toFixed(1);
-      xCounts[x] = (xCounts[x] || 0) + 1;
-    });
-
-    const alignedCols = Object.keys(xCounts).filter(x => xCounts[x] >= 4);
-    if (alignedCols.length >= 2) {
+    const isTabular = isPageTabularStrict(page);
+    if (isTabular) {
       paginasTabulares.push(pageNum);
     } else {
       paginasNaoTabulares.push(pageNum);
@@ -252,101 +306,8 @@ export function parseSummaryFromPdf(materia: string, pdfData: any): CfcSummaryDa
   return summaryResult;
 }
 
-function isMainTopicTitle(title: string, materia: string, idx: number): boolean {
-  const lower = title.toLowerCase();
-  
-  if (materia === "Direito Processual do Trabalho") {
-    return [
-      "organização da justiça do trabalho",
-      "jurisdição e competência",
-      "do processo em geral",
-      "dos dissídios individuais",
-      "da execução",
-      "recursos trabalhistas",
-      "prescrição no direito processual do trabalho",
-      "jurisprudências"
-    ].some(k => lower.includes(k));
-  }
-
-  if (materia === "Direito do Trabalho") {
-    return [
-      "princípios e fontes",
-      "direitos trabalhistas previstos",
-      "empregador, empregado",
-      "contrato de trabalho",
-      "contratos especiais",
-      "remuneração",
-      "duração do trabalho",
-      "férias anuais",
-      "rescisão do contrato",
-      "tutelas especiais",
-      "responsabilidade trabalhista",
-      "convenções coletivas",
-      "prescrição",
-      "jurisprudências"
-    ].some(k => lower.includes(k));
-  }
-
-  if (materia === "Direito Constitucional") {
-    return [
-      "aspectos introdutórios",
-      "direitos e garantias fundamentais",
-      "organização do estado",
-      "organização dos poderes",
-      "poder legislativo",
-      "poder executivo",
-      "poder judiciário",
-      "funções essenciais à justiça",
-      "defesa do estado",
-      "ordem social",
-      "jurisprudências"
-    ].some(k => lower.includes(k));
-  }
-
-  if (materia === "Direito Processual Civil") {
-    return [
-      "introdução",
-      "sujeitos do processo",
-      "atos processuais",
-      "tutela provisória",
-      "procedimento comum",
-      "cumprimento da sentença",
-      "do processo de execução",
-      "meios de impugnação",
-      "dos recursos",
-      "tabela auxiliar de prazos"
-    ].some(k => lower.includes(k));
-  }
-
-  if (materia === "Direito Administrativo") {
-    return [
-      "glossário de siglas",
-      "conceitos e fontes",
-      "administração pública (conforme cf/88)",
-      "poderes e deveres",
-      "atos administrativos",
-      "organização da administração pública",
-      "serviços públicos",
-      "responsabilidade civil do estado",
-      "controle da administração pública",
-      "lei 9.784/99",
-      "bens públicos",
-      "intervenção do estado",
-      "lei 12.527/12",
-      "agentes públicos",
-      "lei 8.112/90",
-      "lei 14.133/21 – nova lei de licitações (parte de licitações)",
-      "lei 14.133/21 – nova lei de licitações (parte de contratos)",
-      "lei 8.429/92",
-      "lei 13.709/18"
-    ].some(k => lower.includes(k));
-  }
-
-  return idx === 0;
-}
-
 export function validateInvariants(summary: CfcSummaryData) {
-  const { materia, totalPaginasPdf, capaPages, sumarioPages, tecPages, inicioSecaoTecPdf, itensNivel1 } = summary;
+  const { materia, totalPaginasPdf, capaPages, sumarioPages, tecPages, inicioSecaoTecImpressa, inicioSecaoTecPdf, itensNivel1 } = summary;
 
   // 1. nenhum item pode ter paginaFim < paginaInicio
   for (const item of itensNivel1) {
@@ -403,10 +364,21 @@ export function validateInvariants(summary: CfcSummaryData) {
   if (calculatedTotal !== totalPaginasPdf) {
     throw new Error(`[INVARIANTE 6 FALHOU] ${materia} - Soma de páginas (${calculatedTotal}) != Total PDF (${totalPaginasPdf}) [capa=${capaPages}, sumario=${sumarioPages}, conteudo=${conteudoPages}, tec=${tecPages}]`);
   }
+
+  // 7. INVARIANTE DE LACUNAS: Os intervalos de nível 1 têm que cobrir a faixa de conteúdo inteira (sem páginas órfãs)
+  const startContentPage = sumarioPages + 1; // Primeira página impressa do conteúdo (ex: pág 1 se sumário for 1 pág, pág 2 se for 2)
+  const endContentPage = inicioSecaoTecImpressa - 1;
+
+  for (let page = startContentPage; page <= endContentPage; page++) {
+    const isCovered = itensNivel1.some(item => page >= item.paginaInicio && page <= item.paginaFim);
+    if (!isCovered) {
+      throw new Error(`[INVARIANTE DE LACUNA FALHOU] ${materia} - Página de conteúdo impressa ${page} (PDF pág ${page + 1}) não pertence a nenhum bloco Nível 1!`);
+    }
+  }
 }
 
 async function main() {
-  console.log("=== PARSER DE SUMÁRIOS CFC (ETAPAS 2 E 4 DO F1) ===");
+  console.log("=== PARSER DE SUMÁRIOS CFC (ETAPAS 2 E 4 DO F1 - HIERARQUIA PURA DE LAYOUT) ===");
   const docsDir = path.join(process.cwd(), "docs", "cfc");
   if (!fs.existsSync(docsDir)) {
     fs.mkdirSync(docsDir, { recursive: true });
@@ -421,10 +393,10 @@ async function main() {
 
     const targetJsonPath = path.join(docsDir, f.jsonName);
     fs.writeFileSync(targetJsonPath, JSON.stringify(summary, null, 2), "utf-8");
-    console.log(`✅ [${f.materia}] Invariantes 1-7 Aprovados! JSON gravado em: ${targetJsonPath}`);
+    console.log(`✅ [${f.materia}] Todos os 7 Invariantes (incluindo Lacunas) Aprovados! Nível 1: ${summary.itensNivel1.length} blocos. JSON: ${targetJsonPath}`);
   }
 
-  console.log(`\n🏆 Processamento concluído com sucesso! Total de itens de Nível 1 recontados: ${totalL1}`);
+  console.log(`\n🏆 Processamento concluído com sucesso! Total de itens de Nível 1 extraídos por layout puro: ${totalL1}`);
 }
 
 if (require.main === module) {
