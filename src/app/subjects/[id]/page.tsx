@@ -23,8 +23,8 @@ export default async function SubjectDetailsPage({ params }: { params: { id: str
   let metrics: any = null;
 
   try {
-    subject = await prisma.studySubject.findUnique({
-      where: { id },
+    subject = await prisma.studySubject.findFirst({
+      where: { id, userId },
       include: {
         materials: {
           orderBy: { createdAt: "desc" },

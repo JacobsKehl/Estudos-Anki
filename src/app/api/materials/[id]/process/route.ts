@@ -97,8 +97,8 @@ export async function POST(
     let subjectId = material.subjectId;
     let subjectExists = false;
     if (subjectId) {
-      const subject = await prisma.studySubject.findUnique({
-        where: { id: subjectId }
+      const subject = await prisma.studySubject.findFirst({
+        where: { id: subjectId, userId: mockUserId }
       });
       if (subject) {
         subjectExists = true;

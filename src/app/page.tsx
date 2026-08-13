@@ -259,7 +259,7 @@ export default async function Dashboard() {
                 }
               },
             }),
-            prisma.studySubject.findUnique({ where: { id: task.subjectId } })
+            prisma.studySubject.findFirst({ where: { id: task.subjectId, userId } })
           ]);
           return { task, block, subject };
         })

@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
+  // Retorna 404 se diagnósticos estiverem desabilitados
+  if (process.env.ENABLE_DIAGNOSTICS !== "true") {
+    return new NextResponse(null, { status: 404 });
+  }
+
   try {
     const extractedPagesCount = await prisma.extractedContent.count();
     const materialsCount = await prisma.studyMaterial.count();

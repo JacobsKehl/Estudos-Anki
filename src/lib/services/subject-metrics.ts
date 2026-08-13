@@ -25,8 +25,8 @@ export interface SubjectMetrics {
 export async function getSubjectMetrics(subjectId: string, userId: string): Promise<SubjectMetrics> {
   // Fetch subject counts/details, reviews, and last studied block in parallel to avoid sequential query waterfall
   const [subject, reviews, lastBlock] = await Promise.all([
-    prisma.studySubject.findUnique({
-      where: { id: subjectId },
+    prisma.studySubject.findFirst({
+      where: { id: subjectId, userId },
       include: {
         _count: {
           select: {
@@ -36,9 +36,11 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
           }
         },
         studyBlocks: {
-          select: { status: true }
+          where: { userId },
+          select: { theoryStatus: true }
         },
         flashcards: {
+          where: { userId },
           select: { 
             status: true,
             nextReviewAt: true,
@@ -68,7 +70,7 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
   const now = new Date();
   
   // 2. Process metrics
-  const completedBlocks = subject.studyBlocks.filter(b => b.status === 'COMPLETED').length;
+  const completedBlocks = subject.studyBlocks.filter(b => b.theoryStatus === 'COMPLETED').length;
   const approvedFlashcards = subject.flashcards.filter(f => f.status === 'APPROVED').length;
   const pendingFlashcards = subject.flashcards.filter(f => f.status === 'PENDING_APPROVAL').length;
   const dueReviews = subject.flashcards.filter(f => 

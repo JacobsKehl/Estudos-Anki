@@ -33,9 +33,9 @@ export async function POST(
     // Validação de segurança: páginas devem estar dentro do limite do material
     const maxPages = material.totalPages || 999;
     
-    // Obter o último orderIndex existente para esta matéria
+    // Obter o último orderIndex existente para esta matéria (escopado por usuário)
     const lastBlock = await prisma.studyBlock.findFirst({
-      where: { subjectId: material.subjectId as string },
+      where: { subjectId: material.subjectId as string, userId },
       orderBy: { orderIndex: 'desc' },
       select: { orderIndex: true }
     });

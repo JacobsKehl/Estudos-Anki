@@ -108,12 +108,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Matéria não encontrada" }, { status: 404 });
     }
 
-    // Check for dependencies before allowing deletion
+    // Check for dependencies before allowing deletion (escopado por usuário)
     const [materialsCount, blocksCount, flashcardsCount, scheduleItemsCount] = await Promise.all([
-      prisma.studyMaterial.count({ where: { subjectId: id } }),
-      (prisma as any).studyBlock.count({ where: { subjectId: id } }),
-      (prisma as any).flashcard.count({ where: { subjectId: id } }),
-      (prisma as any).studyScheduleItem.count({ where: { subjectId: id } }),
+      prisma.studyMaterial.count({ where: { subjectId: id, userId } }),
+      (prisma as any).studyBlock.count({ where: { subjectId: id, userId } }),
+      (prisma as any).flashcard.count({ where: { subjectId: id, userId } }),
+      (prisma as any).studyScheduleItem.count({ where: { subjectId: id, userId } }),
     ]);
 
     const hasData = materialsCount > 0 || blocksCount > 0 || flashcardsCount > 0 || scheduleItemsCount > 0;

@@ -18,15 +18,20 @@ export async function POST(
       where: { userId: mockUserId },
       select: { examGoal: true, focusArea: true }
     });
-    const subject = await prisma.studySubject.findUnique({
-      where: { id: subjectId },
+    const subject = await prisma.studySubject.findFirst({
+      where: { id: subjectId, userId: mockUserId },
       select: { name: true }
     });
 
-    // 1. Fetch all blocks for this subject
+    if (!subject) {
+      return NextResponse.json({ error: "Matéria não encontrada ou acesso não autorizado." }, { status: 404 });
+    }
+
+    // 1. Fetch all blocks for this subject (escopado por usuário)
     const blocks = await (prisma as any).studyBlock.findMany({
       where: {
         subjectId,
+        userId: mockUserId,
       },
       include: {
         _count: {

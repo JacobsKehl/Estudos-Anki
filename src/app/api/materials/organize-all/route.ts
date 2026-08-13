@@ -160,7 +160,7 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
   let detectedSubject = material.detectedSubjectName || "";
 
   if (subjectId && !detectedSubject) {
-    const existingSubject = await prisma.studySubject.findUnique({ where: { id: subjectId } });
+    const existingSubject = await prisma.studySubject.findFirst({ where: { id: subjectId, userId } });
     if (existingSubject) detectedSubject = existingSubject.name;
   }
 

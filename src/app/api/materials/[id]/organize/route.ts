@@ -154,7 +154,7 @@ export async function POST(
     // ==========================================
     if (mode === "flashcards_only") {
       const blocks = await prisma.studyBlock.findMany({
-        where: { materialId: material.id },
+        where: { materialId: material.id, userId },
         orderBy: { orderIndex: "asc" }
       });
 
@@ -169,9 +169,9 @@ export async function POST(
         data: { organizationStatus: "GENERATING_FLASHCARDS" }
       });
 
-      // Extrair ou recuperar as páginas
+      // Extrair ou recuperar as páginas (escopado por usuário)
       let extractedPages = await prisma.extractedContent.findMany({
-        where: { materialId: material.id },
+        where: { materialId: material.id, userId },
         orderBy: { pageNumber: "asc" }
       });
 
@@ -182,7 +182,7 @@ export async function POST(
         let subjectId = material.subjectId;
         if (!subjectId) {
           const firstBlock = await prisma.studyBlock.findFirst({
-            where: { materialId: material.id }
+            where: { materialId: material.id, userId }
           });
           if (firstBlock) {
             subjectId = firstBlock.subjectId;
