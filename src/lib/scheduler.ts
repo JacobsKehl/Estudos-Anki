@@ -360,7 +360,7 @@ export async function generateLegacyTrt4Schedule(
   const scheduleItemsData: any[] = [];
   
   const dbCompletedBlocks = await (prisma as any).studyBlock.findMany({
-    where: { userId, status: "COMPLETED" },
+    where: { userId, theoryStatus: "COMPLETED" },
     select: { id: true }
   });
   
@@ -387,7 +387,7 @@ export async function generateLegacyTrt4Schedule(
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
-      status: { not: "COMPLETED" },
+      theoryStatus: { not: "COMPLETED" },
       subjectId: { in: eligibleSubjectIds },
       material: {
         materialRole: {
@@ -582,7 +582,7 @@ export async function generateDynamicSchedule(
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
-      status: { not: "COMPLETED" },
+      theoryStatus: { not: "COMPLETED" },
       subjectId: { in: eligibleSubjects.map(s => s.id) },
       material: {
         materialRole: {
@@ -1082,7 +1082,7 @@ export async function reorganizeOverdueSchedule(
   const dbPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
-      status: { not: "COMPLETED" },
+      theoryStatus: { not: "COMPLETED" },
       subjectId: { in: eligibleSubjectIds },
       material: {
         materialRole: {

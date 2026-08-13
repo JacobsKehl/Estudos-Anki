@@ -57,7 +57,7 @@ export async function getSubjectMetrics(subjectId: string, userId: string): Prom
       take: 100 // Last 100 reviews for health calculation
     }),
     (prisma as any).studyBlock.findFirst({
-      where: { subjectId, status: 'COMPLETED' },
+      where: { subjectId, theoryStatus: 'COMPLETED' },
       orderBy: { updatedAt: 'desc' },
       select: { updatedAt: true }
     })

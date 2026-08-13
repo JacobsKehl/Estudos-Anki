@@ -21,7 +21,6 @@ export async function completeStudyBlock(
     const block = await tx.studyBlock.update({
       where: { id: blockId },
       data: {
-        status: "COMPLETED",
         theoryStatus: "COMPLETED",
         theoryCompletedAt: now,
         lastStudiedAt: now,
@@ -131,7 +130,7 @@ export async function completeStudyBlock(
         where: {
           userId,
           subjectId: { in: eligibleSubjectIds },
-          status: "NOT_STARTED",
+          theoryStatus: "NOT_STARTED",
           id: { notIn: [...scheduledBlockIds, blockId] },
           material: {
             materialRole: { not: "SUPPORT_MATERIAL" }
@@ -413,7 +412,6 @@ export async function reopenStudyBlock(userId: string, blockId: string, targetSt
     const block = await tx.studyBlock.update({
       where: { id: blockId },
       data: {
-        status: blockStatus,
         theoryStatus: "NOT_STARTED",
         theoryCompletedAt: null,
         nextActionType: "THEORY",

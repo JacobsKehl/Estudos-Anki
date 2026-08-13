@@ -288,7 +288,6 @@ model StudyBlock {
   pageEnd               Int
   orderIndex            Int     @default(0)
   estimatedStudyMinutes Int?
-  status                String  @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, SKIPPED
 
   // AI organization metadata
   createdBy         String  @default("MANUAL") // MANUAL, AI
@@ -335,7 +334,7 @@ model StudyBlock {
   methodology     StudyBlockMethodology @default(LINEAR)
   generationRunId String?               @unique
 
-  @@index([userId, status])
+  @@index([userId, theoryStatus])
   @@index([methodology])
 }
 

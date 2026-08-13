@@ -218,7 +218,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       const findManyCalls = (mockPrisma.studyBlock.findMany as jest.Mock).mock.calls;
       const pendingCall = findManyCalls.find(
-        (call: any[]) => call[0]?.where?.status?.not === "COMPLETED"
+        (call: any[]) => call[0]?.where?.theoryStatus?.not === "COMPLETED"
       );
       expect(pendingCall).toBeDefined();
       expect(pendingCall[0].where.userId).toBe(userId);
@@ -272,7 +272,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -305,7 +305,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -338,7 +338,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -374,7 +374,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -409,7 +409,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -438,7 +438,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -472,7 +472,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([completedBlock]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([completedBlock]);
           // Prisma filtra status: { not: "COMPLETED" } — só retorna pendentes
           return Promise.resolve([pendingBlock, makeLinearBlock("b-lp", "sub-lp", "Língua Portuguesa")]);
         }
@@ -507,7 +507,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -539,7 +539,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
 
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve(blocks);
         }
       );
@@ -575,7 +575,7 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
       (mockPrisma.studySubject.findMany as jest.Mock).mockResolvedValue(makeSubjects());
       (mockPrisma.studyBlock.findMany as jest.Mock).mockImplementation(
         (args: any) => {
-          if (args?.where?.status === "COMPLETED") return Promise.resolve([]);
+          if (args?.where?.theoryStatus === "COMPLETED") return Promise.resolve([]);
           return Promise.resolve([makeLinearBlock("b-dt", "sub-dt", "Direito do Trabalho")]);
         }
       );
