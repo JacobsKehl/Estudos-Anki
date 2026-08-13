@@ -83,8 +83,6 @@ interface ContinueSuggestion {
 interface BlockStudyViewProps {
   block: any;
   content: any[];
-  hybridContent?: any[];
-  isHybridEnabled?: boolean;
   stats: {
     total: number;
     pending: number;
@@ -122,8 +120,6 @@ const getReturnIcon = (path: string) => {
 export function BlockStudyView({
   block,
   content,
-  hybridContent = [],
-  isHybridEnabled = false,
   returnTo,
   from,
   scheduleItemId,
@@ -247,11 +243,6 @@ export function BlockStudyView({
 
   const [activeTab, setActiveTab] = React.useState<"pdf" | "text" | "apoios">("pdf");
   const hasApoios = block.supportMaterials && block.supportMaterials.length > 0;
-
-  // ─── INÍCIO HYBRID 80/20 HOOKS ───────────────────────────────────────────
-  const isHybrid = block.methodology === "HYBRID_8020";
-  const [hybridTab, setHybridTab] = React.useState<"anchor" | "deepening" | "deprioritized" | "cards">("anchor");
-  // ─── FIM HYBRID 80/20 HOOKS ─────────────────────────────────────────────
 
   const [pdfViewerProps, setPdfViewerProps] = React.useState({
     materialId: block.materialId,
@@ -813,64 +804,6 @@ export function BlockStudyView({
         </div>
       </div>
     );
-  }
-
-  if (isHybrid) {
-    if (!isHybridEnabled) {
-      return (
-        <div className="max-w-2xl mx-auto p-8 text-center space-y-6 bg-card rounded-3xl border border-border/80 shadow-2xl mt-10">
-          <h1 className="text-2xl font-bold text-foreground">Metodologia Híbrida 80/20</h1>
-          <p className="text-muted-foreground leading-relaxed text-sm">
-            Esta funcionalidade está temporariamente indisponível nesta versão. Ative a flag correspondente no servidor para começar.
-          </p>
-          <Button asChild className="rounded-xl font-bold">
-            <Link href={returnTarget.href}>{returnTarget.label}</Link>
-          </Button>
-        </div>
-      );
-    }
-
-    if (!block.sources || block.sources.length === 0) {
-      return (
-        <div className="max-w-2xl mx-auto p-8 text-center space-y-6 bg-card rounded-3xl border border-border/80 shadow-2xl mt-10">
-          <h1 className="text-2xl font-bold text-foreground">Bloco Híbrido Sem Fontes</h1>
-          <p className="text-muted-foreground leading-relaxed text-sm">
-            Nenhum material de origem (CFC ou Estratégia) foi vinculado a este bloco híbrido.
-          </p>
-          <Button asChild className="rounded-xl font-bold">
-            <Link href={returnTarget.href}>{returnTarget.label}</Link>
-          </Button>
-        </div>
-      );
-    }
-
-    const anchorSource = block.sources.find((s: any) => s.sourceRole === "ANCHOR_8020");
-    const justification = block.aiAuditMetadata?.justification || {};
-
-    const anchorPages = (hybridContent || []).filter(
-      (c: any) => c.sourceRole === "ANCHOR_8020" && c.disposition === "READ"
-    );
-
-    const deepeningPages = (hybridContent || []).filter(
-      (c: any) => c.sourceRole === "DEEPENING" && c.disposition === "READ"
-    );
-
-    const deprioritizedPages = (hybridContent || []).filter(
-      (c: any) => c.disposition === "CONSULT" || c.disposition === "SKIP"
-    );
-
-    return (
-      <div className="max-w-5xl mx-auto space-y-8 pb-32 animate-in fade-in duration-700">
-        <header className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="iconOnly" className="rounded-full hover:bg-accent/5" aria-label={returnTarget.label} asChild>
-              <Link href={returnTarget.href}>
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-            </Button>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-              <Link href={`/subjects/${block.subjectId}`} className="hover:text-accent transition-colors">
-                {block.subject.name}
               </Link>
               <ChevronRight className="w-4 h-4 opacity-30" />
               <span className="text-foreground/60">Bloco Híbrido 80/20</span>

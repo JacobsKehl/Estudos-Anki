@@ -26,4 +26,6 @@ prisma/dev.db-journal
 
 # Backups e relatórios locais temporários
 scratch/
+backups/*.dump
+
 

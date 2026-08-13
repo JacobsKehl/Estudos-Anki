@@ -92,28 +92,7 @@ export async function PATCH(
       );
     }
 
-    // 3. Verificar se o material já está vinculado a um bloco híbrido
-    // Se estiver, o provider está bloqueado para evitar inconsistências semânticas.
-    const linkedSourcesCount = await prisma.studyBlockSource.count({
-      where: {
-        materialId: id,
-        // Somente verificamos vínculos do usuário autenticado
-        studyBlock: { userId },
-      },
-    });
-
-    if (linkedSourcesCount > 0) {
-      return NextResponse.json(
-        {
-          error: "O fornecedor deste material não pode ser alterado porque ele está vinculado a um bloco híbrido.",
-          code: "MATERIAL_PROVIDER_LOCKED_BY_HYBRID_BLOCK",
-          linkedCount: linkedSourcesCount,
-        },
-        { status: 409 }
-      );
-    }
-
-    // 4. Atualizar somente `provider` — materialRole nunca é alterado
+    // 3. Atualizar somente `provider` — materialRole nunca é alterado
     const updated = await prisma.studyMaterial.update({
       where: { id },
       data: { provider: provider as ValidProvider },
@@ -150,21 +129,20 @@ export async function DELETE(
       return NextResponse.json({ error: "Material não encontrado ou acesso não autorizado." }, { status: 404 });
     }
 
-    // 2. Verificar vínculos híbridos ANTES de qualquer exclusão
-    // Somente conta vínculos do usuário autenticado (não expõe dados de outros)
-    const hybridLinksCount = await prisma.studyBlockSource.count({
+    // 2. Verificar vínculo com blocos de estudo ANTES de qualquer exclusão
+    const linkedBlocksCount = await prisma.studyBlock.count({
       where: {
         materialId: id,
-        studyBlock: { userId },
+        userId,
       },
     });
 
-    if (hybridLinksCount > 0) {
+    if (linkedBlocksCount > 0) {
       return NextResponse.json(
         {
-          error: `Este material está vinculado a ${hybridLinksCount} bloco(s) híbrido(s) e não pode ser excluído. Exclua os blocos híbridos vinculados primeiro.`,
-          code: "MATERIAL_USED_BY_HYBRID_BLOCK",
-          linkedCount: hybridLinksCount,
+          error: `Este material está vinculado a ${linkedBlocksCount} bloco(s) de estudo e não pode ser excluído. Exclua os blocos vinculados primeiro.`,
+          code: "MATERIAL_USED_BY_BLOCK",
+          linkedCount: linkedBlocksCount,
         },
         { status: 409 }
       );
@@ -215,8 +193,8 @@ export async function DELETE(
     ) {
       return NextResponse.json(
         {
-          error: "Este material está vinculado a blocos híbridos e não pode ser excluído.",
-          code: "MATERIAL_USED_BY_HYBRID_BLOCK",
+          error: "Este material possui vínculos no sistema e não pode ser excluído.",
+          code: "MATERIAL_IN_USE",
         },
         { status: 409 }
       );

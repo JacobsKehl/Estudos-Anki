@@ -1,23 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "./date-utils";
-import { calculateHybridMinutes, isHybridTimeError } from "./study/hybrid-estimated-time";
 import { selectLegacySubjectCandidate, LegacySubjectCandidate, selectLegacyQueueItemIndex, LegacyQueueItemCandidate } from "./scheduler/legacy-subject-diversity";
 import { getLegacyTrt4NextSubjects, sortPendingBlocksForSubject } from "./scheduler/legacy-trt4-queue";
-
-export class HybridScheduleIntegrityError extends Error {
-  code: string;
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = "HybridScheduleIntegrityError";
-    this.code = code;
-  }
-}
-
-export interface SchedulerWarning {
-  code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE";
-  blockId: string;
-  message: string;
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,90 +32,6 @@ function isStudyDay(date: Date, studyDays: number[]): boolean {
  * Calcula a estimativa de tempo de estudo do bloco baseado em palavras ou páginas
  */
 export async function getOrComputeBlockMinutes(block: any, subjectName: string): Promise<number> {
-  if (block.methodology === "HYBRID_8020") {
-    if (block.estimatedStudyMinutes && block.estimatedStudyMinutes > 0) {
-      return block.estimatedStudyMinutes;
-    }
-
-    try {
-      const meta = block.aiAuditMetadata as any;
-      const availableMinutes = meta?.timeEstimation?.availableMinutes;
-      if (!availableMinutes || availableMinutes <= 0) {
-        throw new HybridScheduleIntegrityError(
-          "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
-          `availableMinutes ausente nos metadados do bloco híbrido ${block.id}.`
-        );
-      }
-
-      const sources = await prisma.studyBlockSource.findMany({
-        where: { studyBlockId: block.id },
-        include: {
-          segments: {
-            where: { disposition: "READ" }
-          }
-        }
-      });
-
-      if (!sources || sources.length === 0) {
-        throw new HybridScheduleIntegrityError(
-          "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
-          `Nenhuma fonte encontrada no banco para o bloco híbrido ${block.id}.`
-        );
-      }
-
-      let cfcReadWords = 0;
-      let deepeningReadWords = 0;
-
-      for (const source of sources) {
-        if (!source.segments || source.segments.length === 0) continue;
-
-        const pageConditions = source.segments.map((seg: any) => ({
-          materialId: source.materialId,
-          pageNumber: {
-            gte: seg.pageStart,
-            lte: seg.pageEnd
-          }
-        }));
-
-        const pages = await prisma.extractedContent.findMany({
-          where: { OR: pageConditions },
-          select: { text: true }
-        });
-
-        const combinedText = pages.map((p: any) => p.text).join(" ");
-        const wordsCount = combinedText.trim().split(/\s+/).filter(Boolean).length;
-
-        if (source.sourceRole === "ANCHOR_8020") {
-          cfcReadWords += wordsCount;
-        } else if (source.sourceRole === "DEEPENING") {
-          deepeningReadWords += wordsCount;
-        }
-      }
-
-      const result = calculateHybridMinutes({
-        cfcReadWords,
-        deepeningReadWords,
-        availableMinutes
-      });
-
-      if (!isHybridTimeError(result)) {
-        return result.finalMinutes;
-      }
-
-      throw new HybridScheduleIntegrityError(
-        "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
-        `Erro ao calcular tempo estimado híbrido para o bloco ${block.id}: ${result.code}`
-      );
-    } catch (err) {
-      if (err instanceof HybridScheduleIntegrityError) {
-        throw err;
-      }
-      throw new HybridScheduleIntegrityError(
-        "HYBRID_ESTIMATED_MINUTES_UNAVAILABLE",
-        `Erro interno ao calcular minutos do bloco híbrido ${block.id}: ${(err as Error).message}`
-      );
-    }
-  }
 
   if (block.estimatedStudyMinutes && block.estimatedStudyMinutes > 0) {
     return block.estimatedStudyMinutes;
@@ -554,21 +454,7 @@ export async function generateLegacyTrt4Schedule(
 
         if (nextBlock) {
           const blockSubject = nextBlock.subject || eligibleSubjects.find(s => s.id === nextBlock.subjectId);
-          let blockMins = 0;
-          try {
-            blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject?.name || "");
-          } catch (err) {
-            if (err instanceof HybridScheduleIntegrityError) {
-              scheduledBlockIds.add(nextBlock.id);
-              schedulerWarnings.push({
-                code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
-                blockId: nextBlock.id,
-                message: err.message,
-              });
-              continue;
-            }
-            throw err;
-          }
+          const blockMins = await getOrComputeBlockMinutes(nextBlock, blockSubject?.name || "");
 
           const reasonText = slotInfo.isFallback
             ? `Roteiro: Teoria de ${blockSubject?.name || ""} (Fallback)` 
@@ -627,20 +513,7 @@ export async function generateLegacyTrt4Schedule(
 
           if (!dayBlockIds.includes(thirdBlock.id)) {
             const blockSubject = thirdBlock.subject || civilSubject;
-            let blockMins = 0;
-            try {
-              blockMins = await getOrComputeBlockMinutes(thirdBlock, blockSubject?.name || "Complementar");
-            } catch (err) {
-              if (err instanceof HybridScheduleIntegrityError) {
-                schedulerWarnings.push({
-                  code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
-                  blockId: thirdBlock.id,
-                  message: err.message,
-                });
-                continue;
-              }
-              throw err;
-            }
+            const blockMins = await getOrComputeBlockMinutes(thirdBlock, blockSubject?.name || "Complementar");
 
             if (blockMins <= remainingTheoryMinutes + 15) {
               scheduleItemsData.push({
@@ -873,21 +746,7 @@ export async function generateDynamicSchedule(
           const nextBlock = blocksBySubject[subject.id]?.[0];
           if (!nextBlock) break;
 
-          let blockMins = 0;
-          try {
-            blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
-          } catch (err) {
-            if (err instanceof HybridScheduleIntegrityError) {
-              blocksBySubject[subject.id].shift();
-              schedulerWarnings.push({
-                code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
-                blockId: nextBlock.id,
-                message: err.message,
-              });
-              continue;
-            }
-            throw err;
-          }
+          const blockMins = await getOrComputeBlockMinutes(nextBlock, subject.name);
 
           // Regra de limite: se já agendamos algum bloco hoje, o próximo bloco deve caber no tempo restante
           if (scheduledTodayCount > 0 && blockMins > remainingTheoryMinutes) {
@@ -942,20 +801,7 @@ export async function generateDynamicSchedule(
           title: block.title,
           subjectName: block.subject?.name
         });
-        let mins = 0;
-        try {
-          mins = await getOrComputeBlockMinutes(block, block.subject?.name || "");
-        } catch (err) {
-          if (err instanceof HybridScheduleIntegrityError) {
-            schedulerWarnings.push({
-              code: "HYBRID_BLOCK_SKIPPED_INVALID_ESTIMATE",
-              blockId: block.id,
-              message: err.message,
-            });
-            continue;
-          }
-          throw err;
-        }
+        const mins = await getOrComputeBlockMinutes(block, block.subject?.name || "");
         exceededMinutes += mins;
       }
     }

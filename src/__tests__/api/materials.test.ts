@@ -16,13 +16,11 @@ jest.mock("@/lib/prisma", () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
-    studyBlockSource: {
-      count: jest.fn(),
-    },
     extractedContent: {
       deleteMany: jest.fn(),
     },
     studyBlock: {
+      count: jest.fn(),
       deleteMany: jest.fn(),
     },
     studyScheduleItem: {
@@ -56,10 +54,8 @@ describe("API /api/materials/[id] — PATCH & DELETE", () => {
   // ── Testes do PATCH ────────────────────────────────────────────────────────
 
   describe("PATCH", () => {
-    test("atualiza provider com sucesso para material existente e não vinculado", async () => {
-      // Setup
+    test("atualiza provider com sucesso para material existente", async () => {
       (prisma.studyMaterial.findFirst as jest.Mock).mockResolvedValue({ id: "mat-abc", userId: "user-123", provider: "OTHER" });
-      (prisma.studyBlockSource.count as jest.Mock).mockResolvedValue(0);
       (prisma.studyMaterial.update as jest.Mock).mockResolvedValue({ id: "mat-abc", provider: "CFC" });
 
       const req = new NextRequest("http://localhost/api/materials/mat-abc", {
@@ -94,24 +90,6 @@ describe("API /api/materials/[id] — PATCH & DELETE", () => {
       expect(data.code).toBe("INVALID_PROVIDER_VALUE");
     });
 
-    test("retorna 409 se o material já estiver vinculado a um bloco híbrido", async () => {
-      (prisma.studyMaterial.findFirst as jest.Mock).mockResolvedValue({ id: "mat-abc", userId: "user-123" });
-      // Vinculado a 2 blocos híbridos
-      (prisma.studyBlockSource.count as jest.Mock).mockResolvedValue(2);
-
-      const req = new NextRequest("http://localhost/api/materials/mat-abc", {
-        method: "PATCH",
-        body: JSON.stringify({ provider: "ESTRATEGIA" }),
-      });
-
-      const res = await PATCH(req, { params: mockParams });
-      const data = await res.json();
-
-      expect(res.status).toBe(409);
-      expect(data.code).toBe("MATERIAL_PROVIDER_LOCKED_BY_HYBRID_BLOCK");
-      expect(prisma.studyMaterial.update).not.toHaveBeenCalled();
-    });
-
     test("retorna 404 se o material não for do usuário ou não existir", async () => {
       (prisma.studyMaterial.findFirst as jest.Mock).mockResolvedValue(null);
 
@@ -128,9 +106,9 @@ describe("API /api/materials/[id] — PATCH & DELETE", () => {
   // ── Testes do DELETE ───────────────────────────────────────────────────────
 
   describe("DELETE", () => {
-    test("exclui material com sucesso quando não há vínculos híbridos", async () => {
+    test("exclui material com sucesso quando não há blocos vinculados", async () => {
       (prisma.studyMaterial.findFirst as jest.Mock).mockResolvedValue({ id: "mat-abc", userId: "user-123", sourcePath: null });
-      (prisma.studyBlockSource.count as jest.Mock).mockResolvedValue(0);
+      (prisma.studyBlock.count as jest.Mock).mockResolvedValue(0);
 
       const req = new NextRequest("http://localhost/api/materials/mat-abc", { method: "DELETE" });
       const res = await DELETE(req, { params: mockParams });
@@ -139,24 +117,22 @@ describe("API /api/materials/[id] — PATCH & DELETE", () => {
       expect(prisma.studyMaterial.delete).toHaveBeenCalledWith({ where: { id: "mat-abc" } });
     });
 
-    test("retorna 409 (MATERIAL_USED_BY_HYBRID_BLOCK) se houver vínculo com bloco híbrido", async () => {
+    test("retorna 409 (MATERIAL_USED_BY_BLOCK) se houver vínculo com bloco de estudo", async () => {
       (prisma.studyMaterial.findFirst as jest.Mock).mockResolvedValue({ id: "mat-abc", userId: "user-123" });
-      // 1 vínculo híbrido
-      (prisma.studyBlockSource.count as jest.Mock).mockResolvedValue(1);
+      (prisma.studyBlock.count as jest.Mock).mockResolvedValue(1);
 
       const req = new NextRequest("http://localhost/api/materials/mat-abc", { method: "DELETE" });
       const res = await DELETE(req, { params: mockParams });
       const data = await res.json();
 
       expect(res.status).toBe(409);
-      expect(data.code).toBe("MATERIAL_USED_BY_HYBRID_BLOCK");
+      expect(data.code).toBe("MATERIAL_USED_BY_BLOCK");
       expect(prisma.studyMaterial.delete).not.toHaveBeenCalled();
     });
 
     test("trata erro P2003 (foreign key constraint) do Prisma retornando 409", async () => {
       (prisma.studyMaterial.findFirst as jest.Mock).mockResolvedValue({ id: "mat-abc", userId: "user-123" });
-      (prisma.studyBlockSource.count as jest.Mock).mockResolvedValue(0); // passa na checagem manual
-      // Simula erro concorrente de FK ao executar deleção no banco
+      (prisma.studyBlock.count as jest.Mock).mockResolvedValue(0);
       const prismaError = new Error("Foreign key constraint failed");
       (prismaError as any).code = "P2003";
       (prisma.studyMaterial.delete as jest.Mock).mockRejectedValue(prismaError);
@@ -166,7 +142,7 @@ describe("API /api/materials/[id] — PATCH & DELETE", () => {
       const data = await res.json();
 
       expect(res.status).toBe(409);
-      expect(data.code).toBe("MATERIAL_USED_BY_HYBRID_BLOCK");
+      expect(data.code).toBe("MATERIAL_IN_USE");
     });
   });
 });
