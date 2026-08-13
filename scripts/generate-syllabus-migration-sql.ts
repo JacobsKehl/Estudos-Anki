@@ -88,17 +88,23 @@ function generateSQL() {
   const migration3File = path.join(outDir, "migration_3_create_syllabus_tables.sql");
   fs.writeFileSync(migration3File, sql, "utf-8");
 
-  // Migration 4 SQL Preview
-  let migration4Sql = `-- MIGRATION 4: add_official_topic_fk\n`;
+  // Migration 4 SQL Preview (Adicionar coluna canonicalKey em StudySubject)
+  let migration4Sql = `-- MIGRATION 4: add_study_subject_canonical_key\n`;
   migration4Sql += `-- 1. Adicionar coluna canonicalKey em StudySubject\n`;
-  migration4Sql += `ALTER TABLE "StudySubject" ADD COLUMN IF NOT EXISTS "canonicalKey" TEXT;\n\n`;
-  migration4Sql += `-- 2. Adicionar Foreign Key entre StudyBlock.officialTopicId e SyllabusTopic.id\n`;
-  migration4Sql += `ALTER TABLE "StudyBlock" ADD CONSTRAINT "StudyBlock_officialTopicId_fkey" FOREIGN KEY ("officialTopicId") REFERENCES "SyllabusTopic"("id") ON DELETE SET NULL ON UPDATE CASCADE;\n`;
+  migration4Sql += `ALTER TABLE "StudySubject" ADD COLUMN IF NOT EXISTS "canonicalKey" TEXT;\n`;
 
-  const migration4File = path.join(outDir, "migration_4_add_official_topic_fk.sql");
+  const migration4File = path.join(outDir, "migration_4_add_study_subject_canonical_key.sql");
   fs.writeFileSync(migration4File, migration4Sql, "utf-8");
 
-  console.log(`✅ SQL gerado com sucesso em: ${migration3File} e ${migration4File}`);
+  // Migration 5 SQL Preview (Adicionar FK de officialTopicId em StudyBlock)
+  let migration5Sql = `-- MIGRATION 5: add_study_block_official_topic_fk\n`;
+  migration5Sql += `-- 1. Adicionar Foreign Key entre StudyBlock.officialTopicId e SyllabusTopic.id\n`;
+  migration5Sql += `ALTER TABLE "StudyBlock" ADD CONSTRAINT "StudyBlock_officialTopicId_fkey" FOREIGN KEY ("officialTopicId") REFERENCES "SyllabusTopic"("id") ON DELETE SET NULL ON UPDATE CASCADE;\n`;
+
+  const migration5File = path.join(outDir, "migration_5_add_study_block_official_topic_fk.sql");
+  fs.writeFileSync(migration5File, migration5Sql, "utf-8");
+
+  console.log(`✅ SQLs gerados com sucesso em:\n - ${migration3File}\n - ${migration4File}\n - ${migration5File}`);
   console.log(`Total de tópicos exportados: ${OFFICIAL_TOPICS.length}`);
 }
 
