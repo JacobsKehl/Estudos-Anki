@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "MaterialRole" ADD VALUE 'REFERENCE_MATERIAL';
