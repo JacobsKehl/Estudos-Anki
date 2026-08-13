@@ -310,7 +310,6 @@ model StudyBlock {
   officialTopicName String?
   topicCode         String?
   needsManualReview Boolean   @default(false)
-  topicSyllabusVersion String @default("TRT4_2022")
   confidence        Float?
 
   // Study cycle lifecycle

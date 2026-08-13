@@ -61,6 +61,8 @@ async function main() {
   }
 
   console.log("--- 1. DISTRIBUIÇÃO DE CONFIANÇA DE MAPEAMENTO (PESO 2) ---");
+  console.log("  ⚠️ NOTA: Os valores de confidence no banco refletem a fórmula LEGADA da ingestão original.");
+  console.log("  O novo limiar de 0.7 (normalizado pelo novo findBestOfficialTopic) será aplicado apenas a remapeamentos/novas ingestões.\n");
   console.log(` - Alta Confiança (> 0.8):       ${confHigh} blocos`);
   console.log(` - Média Confiança (0.5 - 0.8):  ${confMed} blocos`);
   console.log(` - Baixa Confiança (< 0.5):      ${confLow} blocos`);
