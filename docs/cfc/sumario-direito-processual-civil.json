@@ -1,0 +1,633 @@
+{
+  "arquivo": "Direito Processual Civil.pdf",
+  "materia": "Direito Processual Civil",
+  "totalPaginas": 76,
+  "offset": 0,
+  "secaoTecInicioImpressa": 77,
+  "secaoTecInicioPdf": 77,
+  "contadores": {
+    "nivel1": 14,
+    "nivel2": 59,
+    "paginasTabulares": 76
+  },
+  "invariantePaginas": {
+    "paginasRostoSumario": 2,
+    "paginasTopicosNivel1": 74,
+    "paginasSecaoTec": 0,
+    "somaTotal": 76,
+    "esperado": 76,
+    "statusOk": true
+  },
+  "itens": [
+    {
+      "nivel": 1,
+      "titulo": "Introdução",
+      "paginaImpressa": 3,
+      "paginaPdf": 3,
+      "paginaFimImpressa": 4,
+      "paginaFimPdf": 4,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Tópicos Introdutórios",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 3,
+          "paginaFimPdf": 3
+        },
+        {
+          "nivel": 2,
+          "titulo": "Normas Fundamentais e Aplicação das Normas Processuais (arts. 1º a 15)",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 4,
+          "paginaFimPdf": 4
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Função Jurisdicional",
+      "paginaImpressa": 5,
+      "paginaPdf": 5,
+      "paginaFimImpressa": 9,
+      "paginaFimPdf": 9,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Jurisdição e Ação (art. 16 a 20)",
+          "paginaImpressa": 5,
+          "paginaPdf": 5,
+          "paginaFimImpressa": 5,
+          "paginaFimPdf": 5
+        },
+        {
+          "nivel": 2,
+          "titulo": "Cooperação Internacional",
+          "paginaImpressa": 5,
+          "paginaPdf": 5,
+          "paginaFimImpressa": 6,
+          "paginaFimPdf": 6
+        },
+        {
+          "nivel": 2,
+          "titulo": "Competência Interna (arts. 42 a 69)",
+          "paginaImpressa": 7,
+          "paginaPdf": 7,
+          "paginaFimImpressa": 9,
+          "paginaFimPdf": 9
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Partes e dos Procuradores  -   Sujeitos do Processo",
+      "paginaImpressa": 10,
+      "paginaPdf": 10,
+      "paginaFimImpressa": 16,
+      "paginaFimPdf": 16,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Capacidade Processual (arts. 70 a 76)",
+          "paginaImpressa": 10,
+          "paginaPdf": 10,
+          "paginaFimImpressa": 10,
+          "paginaFimPdf": 10
+        },
+        {
+          "nivel": 2,
+          "titulo": "Deveres das Partes e de seus Procuradores (arts. 77 a 102)",
+          "paginaImpressa": 11,
+          "paginaPdf": 11,
+          "paginaFimImpressa": 12,
+          "paginaFimPdf": 12
+        },
+        {
+          "nivel": 2,
+          "titulo": "Procuradores (arts. 103 a 107)",
+          "paginaImpressa": 13,
+          "paginaPdf": 13,
+          "paginaFimImpressa": 13,
+          "paginaFimPdf": 13
+        },
+        {
+          "nivel": 2,
+          "titulo": "Sucessão das Partes e dos Procuradores (arts. 108 a 112)",
+          "paginaImpressa": 13,
+          "paginaPdf": 13,
+          "paginaFimImpressa": 13,
+          "paginaFimPdf": 13
+        },
+        {
+          "nivel": 2,
+          "titulo": "Litisconsórcio (arts. 113 a 118)",
+          "paginaImpressa": 14,
+          "paginaPdf": 14,
+          "paginaFimImpressa": 14,
+          "paginaFimPdf": 14
+        },
+        {
+          "nivel": 2,
+          "titulo": "Intervenção de Terceiros (arts. 119 a 138)",
+          "paginaImpressa": 15,
+          "paginaPdf": 15,
+          "paginaFimImpressa": 16,
+          "paginaFimPdf": 16
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Juiz e dos Auxiliares da Justiça",
+      "paginaImpressa": 17,
+      "paginaPdf": 17,
+      "paginaFimImpressa": 21,
+      "paginaFimPdf": 21,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Impedimentos e Suspeição (arts. 144 a 148)",
+          "paginaImpressa": 17,
+          "paginaPdf": 17,
+          "paginaFimImpressa": 18,
+          "paginaFimPdf": 18
+        },
+        {
+          "nivel": 2,
+          "titulo": "Poderes, dos Deveres e da Responsabilidade do Juiz (arts. 139 a 143)",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 19,
+          "paginaFimPdf": 19
+        },
+        {
+          "nivel": 2,
+          "titulo": "Ministério Público (arts. 176 a 181)",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 19,
+          "paginaFimPdf": 19
+        },
+        {
+          "nivel": 2,
+          "titulo": "Auxiliares da Justiça (art. 149 a 175)",
+          "paginaImpressa": 20,
+          "paginaPdf": 20,
+          "paginaFimImpressa": 20,
+          "paginaFimPdf": 20
+        },
+        {
+          "nivel": 2,
+          "titulo": "Advocacia Pública (arts. 182 a 184)",
+          "paginaImpressa": 21,
+          "paginaPdf": 21,
+          "paginaFimImpressa": 21,
+          "paginaFimPdf": 21
+        },
+        {
+          "nivel": 2,
+          "titulo": "Defensoria Pública (arts. 185 a 187)",
+          "paginaImpressa": 21,
+          "paginaPdf": 21,
+          "paginaFimImpressa": 21,
+          "paginaFimPdf": 21
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Atos Processuais",
+      "paginaImpressa": 22,
+      "paginaPdf": 22,
+      "paginaFimImpressa": 30,
+      "paginaFimPdf": 30,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Forma, do Tempo e do Lugar dos Atos Processuais (Art. 188 a 235)",
+          "paginaImpressa": 22,
+          "paginaPdf": 22,
+          "paginaFimImpressa": 23,
+          "paginaFimPdf": 23
+        },
+        {
+          "nivel": 2,
+          "titulo": "Dos Prazos (arts. 218 a 235)",
+          "paginaImpressa": 24,
+          "paginaPdf": 24,
+          "paginaFimImpressa": 24,
+          "paginaFimPdf": 24
+        },
+        {
+          "nivel": 2,
+          "titulo": "Comunicação dos Atos Processuais (art. 236 a 275)",
+          "paginaImpressa": 25,
+          "paginaPdf": 25,
+          "paginaFimImpressa": 28,
+          "paginaFimPdf": 28
+        },
+        {
+          "nivel": 2,
+          "titulo": "Nulidades (arts. 276 a 283)",
+          "paginaImpressa": 29,
+          "paginaPdf": 29,
+          "paginaFimImpressa": 29,
+          "paginaFimPdf": 29
+        },
+        {
+          "nivel": 2,
+          "titulo": "Distribuição e Registro (arts. 284 a 290)",
+          "paginaImpressa": 30,
+          "paginaPdf": 30,
+          "paginaFimImpressa": 30,
+          "paginaFimPdf": 30
+        },
+        {
+          "nivel": 2,
+          "titulo": "Valor da Causa (Arts. 291 a 293)",
+          "paginaImpressa": 30,
+          "paginaPdf": 30,
+          "paginaFimImpressa": 30,
+          "paginaFimPdf": 30
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Tutela Provisória (arts. 294 a 311)",
+      "paginaImpressa": 31,
+      "paginaPdf": 31,
+      "paginaFimImpressa": 32,
+      "paginaFimPdf": 32,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 31,
+          "paginaPdf": 31,
+          "paginaFimImpressa": 31,
+          "paginaFimPdf": 31
+        },
+        {
+          "nivel": 2,
+          "titulo": "Tutela de Evidência",
+          "paginaImpressa": 31,
+          "paginaPdf": 31,
+          "paginaFimImpressa": 31,
+          "paginaFimPdf": 31
+        },
+        {
+          "nivel": 2,
+          "titulo": "Tutela de Urgência",
+          "paginaImpressa": 32,
+          "paginaPdf": 32,
+          "paginaFimImpressa": 32,
+          "paginaFimPdf": 32
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Formação, Suspensão e Extinção do Processo (arts. 312 a 317)",
+      "paginaImpressa": 33,
+      "paginaPdf": 33,
+      "paginaFimImpressa": 33,
+      "paginaFimPdf": 33,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Procedimento Comum",
+      "paginaImpressa": 34,
+      "paginaPdf": 34,
+      "paginaFimImpressa": 46,
+      "paginaFimPdf": 46,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 34,
+          "paginaPdf": 34,
+          "paginaFimImpressa": 34,
+          "paginaFimPdf": 34
+        },
+        {
+          "nivel": 2,
+          "titulo": "Petição Inicial (arts. 319 a 331)",
+          "paginaImpressa": 35,
+          "paginaPdf": 35,
+          "paginaFimImpressa": 35,
+          "paginaFimPdf": 35
+        },
+        {
+          "nivel": 2,
+          "titulo": "Improcedência Liminar do Pedido (art. 332)",
+          "paginaImpressa": 36,
+          "paginaPdf": 36,
+          "paginaFimImpressa": 36,
+          "paginaFimPdf": 36
+        },
+        {
+          "nivel": 2,
+          "titulo": "Audiência de Conciliação ou de Mediação (art. 334)",
+          "paginaImpressa": 37,
+          "paginaPdf": 37,
+          "paginaFimImpressa": 37,
+          "paginaFimPdf": 37
+        },
+        {
+          "nivel": 2,
+          "titulo": "Contestação (arts. 335 a 342)",
+          "paginaImpressa": 37,
+          "paginaPdf": 37,
+          "paginaFimImpressa": 37,
+          "paginaFimPdf": 37
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 1,
+          "paginaPdf": 1,
+          "paginaFimImpressa": 38,
+          "paginaFimPdf": 38
+        },
+        {
+          "nivel": 2,
+          "titulo": "Reconvenção (art. 343)",
+          "paginaImpressa": 39,
+          "paginaPdf": 39,
+          "paginaFimImpressa": 39,
+          "paginaFimPdf": 39
+        },
+        {
+          "nivel": 2,
+          "titulo": "Revelia (arts. 344 a 346)",
+          "paginaImpressa": 39,
+          "paginaPdf": 39,
+          "paginaFimImpressa": 39,
+          "paginaFimPdf": 39
+        },
+        {
+          "nivel": 2,
+          "titulo": "Provas (arts. 369 a 484)",
+          "paginaImpressa": 39,
+          "paginaPdf": 39,
+          "paginaFimImpressa": 43,
+          "paginaFimPdf": 43
+        },
+        {
+          "nivel": 2,
+          "titulo": "Sentença e Coisa Julgada (arts. 485 a 508)",
+          "paginaImpressa": 44,
+          "paginaPdf": 44,
+          "paginaFimImpressa": 45,
+          "paginaFimPdf": 45
+        },
+        {
+          "nivel": 2,
+          "titulo": "Liquidação da Sentença (arts. 509 a 512)",
+          "paginaImpressa": 46,
+          "paginaPdf": 46,
+          "paginaFimImpressa": 46,
+          "paginaFimPdf": 46
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Cumprimento da Sentença (arts. 513 a 538)",
+      "paginaImpressa": 47,
+      "paginaPdf": 47,
+      "paginaFimImpressa": 50,
+      "paginaFimPdf": 50,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 47,
+          "paginaPdf": 47,
+          "paginaFimImpressa": 47,
+          "paginaFimPdf": 47
+        },
+        {
+          "nivel": 2,
+          "titulo": "Obrigação De Pagar Quantia Certa (definitivo)",
+          "paginaImpressa": 48,
+          "paginaPdf": 48,
+          "paginaFimImpressa": 48,
+          "paginaFimPdf": 48
+        },
+        {
+          "nivel": 2,
+          "titulo": "Obrigação De Pagar Quantia Certa (provisório)",
+          "paginaImpressa": 48,
+          "paginaPdf": 48,
+          "paginaFimImpressa": 48,
+          "paginaFimPdf": 48
+        },
+        {
+          "nivel": 2,
+          "titulo": "Obrigação de Pagar Quantia Certa Pela Fazenda Pública",
+          "paginaImpressa": 49,
+          "paginaPdf": 49,
+          "paginaFimImpressa": 49,
+          "paginaFimPdf": 49
+        },
+        {
+          "nivel": 2,
+          "titulo": "Obrigação de Prestar Alimentos",
+          "paginaImpressa": 49,
+          "paginaPdf": 49,
+          "paginaFimImpressa": 49,
+          "paginaFimPdf": 49
+        },
+        {
+          "nivel": 2,
+          "titulo": "Obrigação de Fazer ou Não Fazer",
+          "paginaImpressa": 49,
+          "paginaPdf": 49,
+          "paginaFimImpressa": 49,
+          "paginaFimPdf": 49
+        },
+        {
+          "nivel": 2,
+          "titulo": "Obrigação de Entregar Coisa",
+          "paginaImpressa": 50,
+          "paginaPdf": 50,
+          "paginaFimImpressa": 50,
+          "paginaFimPdf": 50
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Do Processo de Execução",
+      "paginaImpressa": 51,
+      "paginaPdf": 51,
+      "paginaFimImpressa": 53,
+      "paginaFimPdf": 53,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Execução em Geral (arts. 771 a 796)",
+          "paginaImpressa": 51,
+          "paginaPdf": 51,
+          "paginaFimImpressa": 51,
+          "paginaFimPdf": 51
+        },
+        {
+          "nivel": 2,
+          "titulo": "Embargos à Execução (arts. 914 a 920)",
+          "paginaImpressa": 52,
+          "paginaPdf": 52,
+          "paginaFimImpressa": 53,
+          "paginaFimPdf": 53
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Meios de Impugnação das Decisões Judiciais",
+      "paginaImpressa": 54,
+      "paginaPdf": 54,
+      "paginaFimImpressa": 58,
+      "paginaFimPdf": 58,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Incidentes de Assunção de Competência (art. 947)",
+          "paginaImpressa": 54,
+          "paginaPdf": 54,
+          "paginaFimImpressa": 54,
+          "paginaFimPdf": 54
+        },
+        {
+          "nivel": 2,
+          "titulo": "Incidente de Arguição de Inconstitucionalidade (arts. 948 a 950)",
+          "paginaImpressa": 54,
+          "paginaPdf": 54,
+          "paginaFimImpressa": 54,
+          "paginaFimPdf": 54
+        },
+        {
+          "nivel": 2,
+          "titulo": "Ação Rescisória (arts. 966 a 975)",
+          "paginaImpressa": 55,
+          "paginaPdf": 55,
+          "paginaFimImpressa": 55,
+          "paginaFimPdf": 55
+        },
+        {
+          "nivel": 2,
+          "titulo": "Incidente de Resolução de Demandas Repetitivas (arts. 976 a 987)",
+          "paginaImpressa": 56,
+          "paginaPdf": 56,
+          "paginaFimImpressa": 56,
+          "paginaFimPdf": 56
+        },
+        {
+          "nivel": 2,
+          "titulo": "Reclamação (arts. 988 a 993)",
+          "paginaImpressa": 57,
+          "paginaPdf": 57,
+          "paginaFimImpressa": 58,
+          "paginaFimPdf": 58
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Dos Recursos",
+      "paginaImpressa": 59,
+      "paginaPdf": 59,
+      "paginaFimImpressa": 65,
+      "paginaFimPdf": 65,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais (arts. 994 a 1.008)",
+          "paginaImpressa": 59,
+          "paginaPdf": 59,
+          "paginaFimImpressa": 59,
+          "paginaFimPdf": 59
+        },
+        {
+          "nivel": 2,
+          "titulo": "Apelação (arts. 1.009 a 1.014)",
+          "paginaImpressa": 60,
+          "paginaPdf": 60,
+          "paginaFimImpressa": 60,
+          "paginaFimPdf": 60
+        },
+        {
+          "nivel": 2,
+          "titulo": "Agravo de Instrumento (arts. 1.015 a 1.020)",
+          "paginaImpressa": 61,
+          "paginaPdf": 61,
+          "paginaFimImpressa": 61,
+          "paginaFimPdf": 61
+        },
+        {
+          "nivel": 2,
+          "titulo": "Agravo Interno (art. 1.021)",
+          "paginaImpressa": 61,
+          "paginaPdf": 61,
+          "paginaFimImpressa": 61,
+          "paginaFimPdf": 61
+        },
+        {
+          "nivel": 2,
+          "titulo": "Embargos de Declaração (arts. 1.022 a 1.026)",
+          "paginaImpressa": 62,
+          "paginaPdf": 62,
+          "paginaFimImpressa": 62,
+          "paginaFimPdf": 62
+        },
+        {
+          "nivel": 2,
+          "titulo": "Recursos para o STF e para o STJ (arts. 1.027 a 1.044)",
+          "paginaImpressa": 63,
+          "paginaPdf": 63,
+          "paginaFimImpressa": 65,
+          "paginaFimPdf": 65
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Tabela Auxiliar de Prazos",
+      "paginaImpressa": 66,
+      "paginaPdf": 66,
+      "paginaFimImpressa": 74,
+      "paginaFimPdf": 74,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Extra  –   Questões (TEC)",
+      "paginaImpressa": 75,
+      "paginaPdf": 75,
+      "paginaFimImpressa": 76,
+      "paginaFimPdf": 76,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 76,
+          "paginaFimPdf": 76
+        }
+      ]
+    }
+  ]
+}

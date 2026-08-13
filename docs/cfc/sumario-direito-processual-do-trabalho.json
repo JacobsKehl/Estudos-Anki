@@ -1,0 +1,360 @@
+{
+  "arquivo": "4 - Direito Processual do Trabalho.pdf",
+  "materia": "Direito Processual do Trabalho",
+  "totalPaginas": 30,
+  "offset": 0,
+  "secaoTecInicioImpressa": 31,
+  "secaoTecInicioPdf": 31,
+  "contadores": {
+    "nivel1": 9,
+    "nivel2": 31,
+    "paginasTabulares": 29
+  },
+  "invariantePaginas": {
+    "paginasRostoSumario": 1,
+    "paginasTopicosNivel1": 30,
+    "paginasSecaoTec": 0,
+    "somaTotal": 31,
+    "esperado": 30,
+    "statusOk": false
+  },
+  "itens": [
+    {
+      "nivel": 1,
+      "titulo": "Organização da Justiça do Trabalho",
+      "paginaImpressa": 2,
+      "paginaPdf": 2,
+      "paginaFimImpressa": 2,
+      "paginaFimPdf": 2,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Organização Geral (art. 111 da CF/88)",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        },
+        {
+          "nivel": 2,
+          "titulo": "TST  –   Tribunal Superior do Trabalho (art. 111 - A da CF/88)",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        },
+        {
+          "nivel": 2,
+          "titulo": "TRT  –   Tribunais Regionais do Trabalho (arts. 112 e 115 da CF/88)",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        },
+        {
+          "nivel": 2,
+          "titulo": "Competência Territorial (art. 651 da CLT)",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Jurisdição e Competência da Justiça do Trabalho",
+      "paginaImpressa": 3,
+      "paginaPdf": 3,
+      "paginaFimImpressa": 4,
+      "paginaFimPdf": 4,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Competências da Justiça do Trabalho (Art. 114 da CF/88)",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 3,
+          "paginaFimPdf": 3
+        },
+        {
+          "nivel": 2,
+          "titulo": "Jurisprudências cobradas em prova",
+          "paginaImpressa": 4,
+          "paginaPdf": 4,
+          "paginaFimImpressa": 4,
+          "paginaFimPdf": 4
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Do Processo em Geral",
+      "paginaImpressa": 5,
+      "paginaPdf": 5,
+      "paginaFimImpressa": 9,
+      "paginaFimPdf": 9,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Atos, Termos e Prazos Processuais (arts. 770 a 782)",
+          "paginaImpressa": 5,
+          "paginaPdf": 5,
+          "paginaFimImpressa": 5,
+          "paginaFimPdf": 5
+        },
+        {
+          "nivel": 2,
+          "titulo": "Custas e Emolumentos (arts. 789 a 790 - B)",
+          "paginaImpressa": 6,
+          "paginaPdf": 6,
+          "paginaFimImpressa": 6,
+          "paginaFimPdf": 6
+        },
+        {
+          "nivel": 2,
+          "titulo": "Partes e Procuradores (arts. 791 a 793)",
+          "paginaImpressa": 6,
+          "paginaPdf": 6,
+          "paginaFimImpressa": 6,
+          "paginaFimPdf": 6
+        },
+        {
+          "nivel": 2,
+          "titulo": "Responsabilidade por Dano Processual (arts. 793 - A a 793 - D)",
+          "paginaImpressa": 7,
+          "paginaPdf": 7,
+          "paginaFimImpressa": 7,
+          "paginaFimPdf": 7
+        },
+        {
+          "nivel": 2,
+          "titulo": "Exceções (arts. 799 a 802)",
+          "paginaImpressa": 7,
+          "paginaPdf": 7,
+          "paginaFimImpressa": 7,
+          "paginaFimPdf": 7
+        },
+        {
+          "nivel": 2,
+          "titulo": "Provas (arts. 818 a 830)",
+          "paginaImpressa": 8,
+          "paginaPdf": 8,
+          "paginaFimImpressa": 8,
+          "paginaFimPdf": 8
+        },
+        {
+          "nivel": 2,
+          "titulo": "Decisão e Sua Eficácia (arts. 831 a 836)",
+          "paginaImpressa": 9,
+          "paginaPdf": 9,
+          "paginaFimImpressa": 9,
+          "paginaFimPdf": 9
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Dos Dissídios Individuais",
+      "paginaImpressa": 10,
+      "paginaPdf": 10,
+      "paginaFimImpressa": 13,
+      "paginaFimPdf": 13,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Forma de Reclamação e Notificação (arts. 837 a 842)",
+          "paginaImpressa": 10,
+          "paginaPdf": 10,
+          "paginaFimImpressa": 10,
+          "paginaFimPdf": 10
+        },
+        {
+          "nivel": 2,
+          "titulo": "Audiência de Julgamento (arts. 843 a 852)",
+          "paginaImpressa": 10,
+          "paginaPdf": 10,
+          "paginaFimImpressa": 10,
+          "paginaFimPdf": 10
+        },
+        {
+          "nivel": 2,
+          "titulo": "Procedimentos Sumaríssimo (arts. 852 - A a 852 - I)",
+          "paginaImpressa": 11,
+          "paginaPdf": 11,
+          "paginaFimImpressa": 11,
+          "paginaFimPdf": 11
+        },
+        {
+          "nivel": 2,
+          "titulo": "Inquérito para Apuração de Falta Grave (arts. 853 a 855 - A)",
+          "paginaImpressa": 12,
+          "paginaPdf": 12,
+          "paginaFimImpressa": 12,
+          "paginaFimPdf": 12
+        },
+        {
+          "nivel": 2,
+          "titulo": "Jurisdição Voluntária (arts. 855 - B a 855 - E)",
+          "paginaImpressa": 13,
+          "paginaPdf": 13,
+          "paginaFimImpressa": 13,
+          "paginaFimPdf": 13
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Execução",
+      "paginaImpressa": 14,
+      "paginaPdf": 14,
+      "paginaFimImpressa": 15,
+      "paginaFimPdf": 15,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Execução em geral (arts. 876 a 878)",
+          "paginaImpressa": 14,
+          "paginaPdf": 14,
+          "paginaFimImpressa": 14,
+          "paginaFimPdf": 14
+        },
+        {
+          "nivel": 2,
+          "titulo": "Liquidação da Sentença (art. 879)",
+          "paginaImpressa": 14,
+          "paginaPdf": 14,
+          "paginaFimImpressa": 14,
+          "paginaFimPdf": 14
+        },
+        {
+          "nivel": 2,
+          "titulo": "Mandado e Penhora (arts. 880 a 883 - A)",
+          "paginaImpressa": 14,
+          "paginaPdf": 14,
+          "paginaFimImpressa": 14,
+          "paginaFimPdf": 14
+        },
+        {
+          "nivel": 2,
+          "titulo": "Embargos à execução e sua Impugnação (art. 884)",
+          "paginaImpressa": 15,
+          "paginaPdf": 15,
+          "paginaFimImpressa": 15,
+          "paginaFimPdf": 15
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Recursos Trabalhistas",
+      "paginaImpressa": 16,
+      "paginaPdf": 16,
+      "paginaFimImpressa": 18,
+      "paginaFimPdf": 18,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Regras Gerais (art. 899)",
+          "paginaImpressa": 16,
+          "paginaPdf": 16,
+          "paginaFimImpressa": 16,
+          "paginaFimPdf": 16
+        },
+        {
+          "nivel": 2,
+          "titulo": "Recursos em Espécie no Processo do Trabalho (arts. 893 a 902)",
+          "paginaImpressa": 17,
+          "paginaPdf": 17,
+          "paginaFimImpressa": 18,
+          "paginaFimPdf": 18
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Prescrição no Direito Processual do Trabalho",
+      "paginaImpressa": 19,
+      "paginaPdf": 19,
+      "paginaFimImpressa": 19,
+      "paginaFimPdf": 19,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Jurisprudências",
+      "paginaImpressa": 19,
+      "paginaPdf": 19,
+      "paginaFimImpressa": 28,
+      "paginaFimPdf": 28,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Súmulas do STF",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 21,
+          "paginaFimPdf": 21
+        },
+        {
+          "nivel": 2,
+          "titulo": "Súmulas do STJ",
+          "paginaImpressa": 22,
+          "paginaPdf": 22,
+          "paginaFimImpressa": 22,
+          "paginaFimPdf": 22
+        },
+        {
+          "nivel": 2,
+          "titulo": "Súmulas do TST",
+          "paginaImpressa": 23,
+          "paginaPdf": 23,
+          "paginaFimImpressa": 27,
+          "paginaFimPdf": 27
+        },
+        {
+          "nivel": 2,
+          "titulo": "Orientações Jurisprudenciais do TST (OJ)",
+          "paginaImpressa": 28,
+          "paginaPdf": 28,
+          "paginaFimImpressa": 28,
+          "paginaFimPdf": 28
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Extra  –   Exercícios (TEC)",
+      "paginaImpressa": 29,
+      "paginaPdf": 29,
+      "paginaFimImpressa": 30,
+      "paginaFimPdf": 30,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 1,
+          "paginaPdf": 1,
+          "paginaFimImpressa": 1,
+          "paginaFimPdf": 1
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 30,
+          "paginaFimPdf": 30
+        }
+      ]
+    }
+  ]
+}

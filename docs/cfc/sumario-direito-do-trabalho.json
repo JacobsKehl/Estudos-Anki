@@ -1,0 +1,459 @@
+{
+  "arquivo": "2 - Direito do Trabalho.pdf",
+  "materia": "Direito do Trabalho",
+  "totalPaginas": 38,
+  "offset": 0,
+  "secaoTecInicioImpressa": 39,
+  "secaoTecInicioPdf": 39,
+  "contadores": {
+    "nivel1": 16,
+    "nivel2": 35,
+    "paginasTabulares": 37
+  },
+  "invariantePaginas": {
+    "paginasRostoSumario": 2,
+    "paginasTopicosNivel1": 36,
+    "paginasSecaoTec": 0,
+    "somaTotal": 38,
+    "esperado": 38,
+    "statusOk": true
+  },
+  "itens": [
+    {
+      "nivel": 1,
+      "titulo": "Princípios e Fontes do Direito do Trabalho",
+      "paginaImpressa": 3,
+      "paginaPdf": 3,
+      "paginaFimImpressa": 5,
+      "paginaFimPdf": 5,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Princípios",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 3,
+          "paginaFimPdf": 3
+        },
+        {
+          "nivel": 2,
+          "titulo": "Fontes",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 5,
+          "paginaFimPdf": 5
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Empregador, Empregado e Relação de Emprego",
+      "paginaImpressa": 6,
+      "paginaPdf": 6,
+      "paginaFimImpressa": 6,
+      "paginaFimPdf": 6,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Empregador e Empregado",
+          "paginaImpressa": 6,
+          "paginaPdf": 6,
+          "paginaFimImpressa": 6,
+          "paginaFimPdf": 6
+        },
+        {
+          "nivel": 2,
+          "titulo": "Relação de Emprego",
+          "paginaImpressa": 6,
+          "paginaPdf": 6,
+          "paginaFimImpressa": 6,
+          "paginaFimPdf": 6
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Contrato de Trabalho",
+      "paginaImpressa": 7,
+      "paginaPdf": 7,
+      "paginaFimImpressa": 9,
+      "paginaFimPdf": 9,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 7,
+          "paginaPdf": 7,
+          "paginaFimImpressa": 7,
+          "paginaFimPdf": 7
+        },
+        {
+          "nivel": 2,
+          "titulo": "Alteração Contratual",
+          "paginaImpressa": 8,
+          "paginaPdf": 8,
+          "paginaFimImpressa": 8,
+          "paginaFimPdf": 8
+        },
+        {
+          "nivel": 2,
+          "titulo": "Suspensão e Interrupção",
+          "paginaImpressa": 9,
+          "paginaPdf": 9,
+          "paginaFimImpressa": 9,
+          "paginaFimPdf": 9
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Contratos Especiais de Trabalho",
+      "paginaImpressa": 10,
+      "paginaPdf": 10,
+      "paginaFimImpressa": 10,
+      "paginaFimPdf": 10,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Emprego Doméstico (LC 150/2015)",
+          "paginaImpressa": 10,
+          "paginaPdf": 10,
+          "paginaFimImpressa": 10,
+          "paginaFimPdf": 10
+        },
+        {
+          "nivel": 2,
+          "titulo": "Trabalho Temporário (Lei 6.019/74)",
+          "paginaImpressa": 10,
+          "paginaPdf": 10,
+          "paginaFimImpressa": 10,
+          "paginaFimPdf": 10
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Remuneração",
+      "paginaImpressa": 11,
+      "paginaPdf": 11,
+      "paginaFimImpressa": 13,
+      "paginaFimPdf": 13,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Parcelas integrantes e Não Integrantes",
+          "paginaImpressa": 11,
+          "paginaPdf": 11,
+          "paginaFimImpressa": 11,
+          "paginaFimPdf": 11
+        },
+        {
+          "nivel": 2,
+          "titulo": "Equiparação Salarial",
+          "paginaImpressa": 12,
+          "paginaPdf": 12,
+          "paginaFimImpressa": 12,
+          "paginaFimPdf": 12
+        },
+        {
+          "nivel": 2,
+          "titulo": "Proteção ao Salário",
+          "paginaImpressa": 12,
+          "paginaPdf": 12,
+          "paginaFimImpressa": 12,
+          "paginaFimPdf": 12
+        },
+        {
+          "nivel": 2,
+          "titulo": "Gratificação Natalina (13º Salário)",
+          "paginaImpressa": 12,
+          "paginaPdf": 12,
+          "paginaFimImpressa": 12,
+          "paginaFimPdf": 12
+        },
+        {
+          "nivel": 2,
+          "titulo": "Insalubridade e Periculosidade",
+          "paginaImpressa": 13,
+          "paginaPdf": 13,
+          "paginaFimImpressa": 13,
+          "paginaFimPdf": 13
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Duração do Trabalho",
+      "paginaImpressa": 14,
+      "paginaPdf": 14,
+      "paginaFimImpressa": 15,
+      "paginaFimPdf": 15,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Jornada De Trabalho",
+          "paginaImpressa": 14,
+          "paginaPdf": 14,
+          "paginaFimImpressa": 14,
+          "paginaFimPdf": 14
+        },
+        {
+          "nivel": 2,
+          "titulo": "Períodos de Descanso",
+          "paginaImpressa": 15,
+          "paginaPdf": 15,
+          "paginaFimImpressa": 15,
+          "paginaFimPdf": 15
+        },
+        {
+          "nivel": 2,
+          "titulo": "Trabalho Noturno",
+          "paginaImpressa": 15,
+          "paginaPdf": 15,
+          "paginaFimImpressa": 15,
+          "paginaFimPdf": 15
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Teletrabalho",
+      "paginaImpressa": 16,
+      "paginaPdf": 16,
+      "paginaFimImpressa": 16,
+      "paginaFimPdf": 16,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Férias Anuais",
+      "paginaImpressa": 17,
+      "paginaPdf": 17,
+      "paginaFimImpressa": 18,
+      "paginaFimPdf": 18,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Concessão e Época das Férias",
+          "paginaImpressa": 17,
+          "paginaPdf": 17,
+          "paginaFimImpressa": 17,
+          "paginaFimPdf": 17
+        },
+        {
+          "nivel": 2,
+          "titulo": "Remuneração e Abono de Férias",
+          "paginaImpressa": 18,
+          "paginaPdf": 18,
+          "paginaFimImpressa": 18,
+          "paginaFimPdf": 18
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Rescisão do Contrato de Trabalho",
+      "paginaImpressa": 19,
+      "paginaPdf": 19,
+      "paginaFimImpressa": 20,
+      "paginaFimPdf": 20,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 19,
+          "paginaFimPdf": 19
+        },
+        {
+          "nivel": 2,
+          "titulo": "Justa Causa",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 19,
+          "paginaFimPdf": 19
+        },
+        {
+          "nivel": 2,
+          "titulo": "Rescisão Indireta",
+          "paginaImpressa": 20,
+          "paginaPdf": 20,
+          "paginaFimImpressa": 20,
+          "paginaFimPdf": 20
+        },
+        {
+          "nivel": 2,
+          "titulo": "Quadro - Reesumo das Verbas Devidas na Rescisão",
+          "paginaImpressa": 20,
+          "paginaPdf": 20,
+          "paginaFimImpressa": 20,
+          "paginaFimPdf": 20
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Aviso Prévio",
+      "paginaImpressa": 21,
+      "paginaPdf": 21,
+      "paginaFimImpressa": 21,
+      "paginaFimPdf": 21,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Tutelas Especiais",
+      "paginaImpressa": 22,
+      "paginaPdf": 22,
+      "paginaFimImpressa": 23,
+      "paginaFimPdf": 23,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Proteção do Trabalho da Mulher",
+          "paginaImpressa": 22,
+          "paginaPdf": 22,
+          "paginaFimImpressa": 22,
+          "paginaFimPdf": 22
+        },
+        {
+          "nivel": 2,
+          "titulo": "Proteção do Trabalho do Menor",
+          "paginaImpressa": 23,
+          "paginaPdf": 23,
+          "paginaFimImpressa": 23,
+          "paginaFimPdf": 23
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Responsabilidade Trabalhista",
+      "paginaImpressa": 24,
+      "paginaPdf": 24,
+      "paginaFimImpressa": 24,
+      "paginaFimPdf": 24,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 1,
+          "paginaPdf": 1,
+          "paginaFimImpressa": 23,
+          "paginaFimPdf": 23
+        },
+        {
+          "nivel": 2,
+          "titulo": "Quadro - Resumo",
+          "paginaImpressa": 24,
+          "paginaPdf": 24,
+          "paginaFimImpressa": 24,
+          "paginaFimPdf": 24
+        },
+        {
+          "nivel": 2,
+          "titulo": "Grupo Econômico",
+          "paginaImpressa": 24,
+          "paginaPdf": 24,
+          "paginaFimImpressa": 24,
+          "paginaFimPdf": 24
+        },
+        {
+          "nivel": 2,
+          "titulo": "Sucessão Trabalhista",
+          "paginaImpressa": 24,
+          "paginaPdf": 24,
+          "paginaFimImpressa": 24,
+          "paginaFimPdf": 24
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Convenções Coletivas de Trabalho",
+      "paginaImpressa": 25,
+      "paginaPdf": 25,
+      "paginaFimImpressa": 25,
+      "paginaFimPdf": 25,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Prescrição",
+      "paginaImpressa": 26,
+      "paginaPdf": 26,
+      "paginaFimImpressa": 26,
+      "paginaFimPdf": 26,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Jurisprudências",
+      "paginaImpressa": 27,
+      "paginaPdf": 27,
+      "paginaFimImpressa": 36,
+      "paginaFimPdf": 36,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Súmulas do STF",
+          "paginaImpressa": 27,
+          "paginaPdf": 27,
+          "paginaFimImpressa": 28,
+          "paginaFimPdf": 28
+        },
+        {
+          "nivel": 2,
+          "titulo": "Súmulas do STJ",
+          "paginaImpressa": 29,
+          "paginaPdf": 29,
+          "paginaFimImpressa": 29,
+          "paginaFimPdf": 29
+        },
+        {
+          "nivel": 2,
+          "titulo": "Súmulas do TST",
+          "paginaImpressa": 30,
+          "paginaPdf": 30,
+          "paginaFimImpressa": 34,
+          "paginaFimPdf": 34
+        },
+        {
+          "nivel": 2,
+          "titulo": "Orientações Jurisprudenciais do TST (OJ)",
+          "paginaImpressa": 35,
+          "paginaPdf": 35,
+          "paginaFimImpressa": 36,
+          "paginaFimPdf": 36
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Extra  –   Exercícios (TEC)",
+      "paginaImpressa": 37,
+      "paginaPdf": 37,
+      "paginaFimImpressa": 38,
+      "paginaFimPdf": 38,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 38,
+          "paginaFimPdf": 38
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1032 @@
+{
+  "arquivo": "1 - Direito Administrativo.pdf",
+  "materia": "Direito Administrativo",
+  "totalPaginas": 152,
+  "offset": 0,
+  "secaoTecInicioImpressa": 153,
+  "secaoTecInicioPdf": 153,
+  "contadores": {
+    "nivel1": 17,
+    "nivel2": 105,
+    "paginasTabulares": 151
+  },
+  "invariantePaginas": {
+    "paginasRostoSumario": 4,
+    "paginasTopicosNivel1": 148,
+    "paginasSecaoTec": 0,
+    "somaTotal": 152,
+    "esperado": 152,
+    "statusOk": true
+  },
+  "itens": [
+    {
+      "nivel": 1,
+      "titulo": "Glossário de Siglas",
+      "paginaImpressa": 5,
+      "paginaPdf": 5,
+      "paginaFimImpressa": 6,
+      "paginaFimPdf": 6,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Conceitos e Fontes do Direito Administrativo",
+      "paginaImpressa": 7,
+      "paginaPdf": 7,
+      "paginaFimImpressa": 8,
+      "paginaFimPdf": 8,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Conceitos Introdutórios do Direito Administrativo",
+          "paginaImpressa": 7,
+          "paginaPdf": 7,
+          "paginaFimImpressa": 8,
+          "paginaFimPdf": 8
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Administração Pública (conforme CF/88)",
+      "paginaImpressa": 9,
+      "paginaPdf": 9,
+      "paginaFimImpressa": 12,
+      "paginaFimPdf": 12,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 9,
+          "paginaPdf": 9,
+          "paginaFimImpressa": 12,
+          "paginaFimPdf": 12
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Poderes e Deveres da Administração Pública",
+      "paginaImpressa": 13,
+      "paginaPdf": 13,
+      "paginaFimImpressa": 15,
+      "paginaFimPdf": 15,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Deveres",
+          "paginaImpressa": 13,
+          "paginaPdf": 13,
+          "paginaFimImpressa": 13,
+          "paginaFimPdf": 13
+        },
+        {
+          "nivel": 2,
+          "titulo": "Poderes",
+          "paginaImpressa": 13,
+          "paginaPdf": 13,
+          "paginaFimImpressa": 14,
+          "paginaFimPdf": 14
+        },
+        {
+          "nivel": 2,
+          "titulo": "Abuso de Poder",
+          "paginaImpressa": 15,
+          "paginaPdf": 15,
+          "paginaFimImpressa": 15,
+          "paginaFimPdf": 15
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Atos Administrativos",
+      "paginaImpressa": 16,
+      "paginaPdf": 16,
+      "paginaFimImpressa": 24,
+      "paginaFimPdf": 24,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Conceitos",
+          "paginaImpressa": 16,
+          "paginaPdf": 16,
+          "paginaFimImpressa": 16,
+          "paginaFimPdf": 16
+        },
+        {
+          "nivel": 2,
+          "titulo": "Elementos / Requisitos / Pressupostos do Ato Administrativo",
+          "paginaImpressa": 17,
+          "paginaPdf": 17,
+          "paginaFimImpressa": 17,
+          "paginaFimPdf": 17
+        },
+        {
+          "nivel": 2,
+          "titulo": "Mérito Administrativo",
+          "paginaImpressa": 18,
+          "paginaPdf": 18,
+          "paginaFimImpressa": 18,
+          "paginaFimPdf": 18
+        },
+        {
+          "nivel": 2,
+          "titulo": "Vícios nos Elementos de Formação",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 19,
+          "paginaFimPdf": 19
+        },
+        {
+          "nivel": 2,
+          "titulo": "Atributos Do Ato Administrativo",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 19,
+          "paginaFimPdf": 19
+        },
+        {
+          "nivel": 2,
+          "titulo": "Extinção e retirada dos Atos Administrativos",
+          "paginaImpressa": 20,
+          "paginaPdf": 20,
+          "paginaFimImpressa": 20,
+          "paginaFimPdf": 20
+        },
+        {
+          "nivel": 2,
+          "titulo": "Anulação dos Atos Administrativos",
+          "paginaImpressa": 20,
+          "paginaPdf": 20,
+          "paginaFimImpressa": 20,
+          "paginaFimPdf": 20
+        },
+        {
+          "nivel": 2,
+          "titulo": "Revogação dos Atos Administrativos",
+          "paginaImpressa": 21,
+          "paginaPdf": 21,
+          "paginaFimImpressa": 21,
+          "paginaFimPdf": 21
+        },
+        {
+          "nivel": 2,
+          "titulo": "Convalidação dos Atos Administrativos",
+          "paginaImpressa": 21,
+          "paginaPdf": 21,
+          "paginaFimImpressa": 21,
+          "paginaFimPdf": 21
+        },
+        {
+          "nivel": 2,
+          "titulo": "Convalidação  x   Anulação  x   Revogação",
+          "paginaImpressa": 22,
+          "paginaPdf": 22,
+          "paginaFimImpressa": 22,
+          "paginaFimPdf": 22
+        },
+        {
+          "nivel": 2,
+          "titulo": "Repristinação",
+          "paginaImpressa": 22,
+          "paginaPdf": 22,
+          "paginaFimImpressa": 22,
+          "paginaFimPdf": 22
+        },
+        {
+          "nivel": 2,
+          "titulo": "Perfeição, Vigência, Validade, Eficácia e Exequibilidade",
+          "paginaImpressa": 22,
+          "paginaPdf": 22,
+          "paginaFimImpressa": 22,
+          "paginaFimPdf": 22
+        },
+        {
+          "nivel": 2,
+          "titulo": "Classificações dos atos Administrativos",
+          "paginaImpressa": 23,
+          "paginaPdf": 23,
+          "paginaFimImpressa": 23,
+          "paginaFimPdf": 23
+        },
+        {
+          "nivel": 2,
+          "titulo": "Espécies De Atos Administrativos (Hely Lopes)",
+          "paginaImpressa": 24,
+          "paginaPdf": 24,
+          "paginaFimImpressa": 24,
+          "paginaFimPdf": 24
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Organização da Administração Pública e Terceiro Setor",
+      "paginaImpressa": 25,
+      "paginaPdf": 25,
+      "paginaFimImpressa": 29,
+      "paginaFimPdf": 29,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Desconcentração (Administração Direta  –   Órgãos)",
+          "paginaImpressa": 25,
+          "paginaPdf": 25,
+          "paginaFimImpressa": 25,
+          "paginaFimPdf": 25
+        },
+        {
+          "nivel": 2,
+          "titulo": "Descentralização",
+          "paginaImpressa": 25,
+          "paginaPdf": 25,
+          "paginaFimImpressa": 25,
+          "paginaFimPdf": 25
+        },
+        {
+          "nivel": 2,
+          "titulo": "Autonomia",
+          "paginaImpressa": 25,
+          "paginaPdf": 25,
+          "paginaFimImpressa": 25,
+          "paginaFimPdf": 25
+        },
+        {
+          "nivel": 2,
+          "titulo": "Entidades da Administração Indireta",
+          "paginaImpressa": 26,
+          "paginaPdf": 26,
+          "paginaFimImpressa": 27,
+          "paginaFimPdf": 27
+        },
+        {
+          "nivel": 2,
+          "titulo": "Entidades Paraestatais e Terceiro Setor",
+          "paginaImpressa": 28,
+          "paginaPdf": 28,
+          "paginaFimImpressa": 29,
+          "paginaFimPdf": 29
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Serviços Públicos",
+      "paginaImpressa": 30,
+      "paginaPdf": 30,
+      "paginaFimImpressa": 38,
+      "paginaFimPdf": 38,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Critério de Serviço Público (Doutrinário)",
+          "paginaImpressa": 30,
+          "paginaPdf": 30,
+          "paginaFimImpressa": 30,
+          "paginaFimPdf": 30
+        },
+        {
+          "nivel": 2,
+          "titulo": "Serviço Público na CF/88",
+          "paginaImpressa": 30,
+          "paginaPdf": 30,
+          "paginaFimImpressa": 30,
+          "paginaFimPdf": 30
+        },
+        {
+          "nivel": 2,
+          "titulo": "Classificações de Serviços Públicos",
+          "paginaImpressa": 31,
+          "paginaPdf": 31,
+          "paginaFimImpressa": 31,
+          "paginaFimPdf": 31
+        },
+        {
+          "nivel": 2,
+          "titulo": "Competência",
+          "paginaImpressa": 31,
+          "paginaPdf": 31,
+          "paginaFimImpressa": 31,
+          "paginaFimPdf": 31
+        },
+        {
+          "nivel": 2,
+          "titulo": "Concessão   x   Permissão  x   Autorização",
+          "paginaImpressa": 32,
+          "paginaPdf": 32,
+          "paginaFimImpressa": 32,
+          "paginaFimPdf": 32
+        },
+        {
+          "nivel": 2,
+          "titulo": "Concessão de Serviços Públicos",
+          "paginaImpressa": 33,
+          "paginaPdf": 33,
+          "paginaFimImpressa": 35,
+          "paginaFimPdf": 35
+        },
+        {
+          "nivel": 2,
+          "titulo": "Formas de Extinção da Concessão",
+          "paginaImpressa": 36,
+          "paginaPdf": 36,
+          "paginaFimImpressa": 36,
+          "paginaFimPdf": 36
+        },
+        {
+          "nivel": 2,
+          "titulo": "Lei 11.079/04   –   Parcerias Público - Privadas (PPP)",
+          "paginaImpressa": 36,
+          "paginaPdf": 36,
+          "paginaFimImpressa": 36,
+          "paginaFimPdf": 36
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 1,
+          "paginaPdf": 1,
+          "paginaFimImpressa": 38,
+          "paginaFimPdf": 38
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Responsabilidade Civil do Estado",
+      "paginaImpressa": 39,
+      "paginaPdf": 39,
+      "paginaFimImpressa": 41,
+      "paginaFimPdf": 41,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Evolução Histórica",
+          "paginaImpressa": 39,
+          "paginaPdf": 39,
+          "paginaFimImpressa": 39,
+          "paginaFimPdf": 39
+        },
+        {
+          "nivel": 2,
+          "titulo": "Responsabilidade Subjetiva x Responsabilidade Objetiva",
+          "paginaImpressa": 39,
+          "paginaPdf": 39,
+          "paginaFimImpressa": 39,
+          "paginaFimPdf": 39
+        },
+        {
+          "nivel": 2,
+          "titulo": "Excludentes de Responsabilidade (Risco ADM)",
+          "paginaImpressa": 40,
+          "paginaPdf": 40,
+          "paginaFimImpressa": 40,
+          "paginaFimPdf": 40
+        },
+        {
+          "nivel": 2,
+          "titulo": "Responsabilidade Civil na CF/88",
+          "paginaImpressa": 40,
+          "paginaPdf": 40,
+          "paginaFimImpressa": 40,
+          "paginaFimPdf": 40
+        },
+        {
+          "nivel": 2,
+          "titulo": "Ações Indenizatórias",
+          "paginaImpressa": 40,
+          "paginaPdf": 40,
+          "paginaFimImpressa": 40,
+          "paginaFimPdf": 40
+        },
+        {
+          "nivel": 2,
+          "titulo": "Responsabilidade por Pessoas sob a Custódia do Estado",
+          "paginaImpressa": 41,
+          "paginaPdf": 41,
+          "paginaFimImpressa": 41,
+          "paginaFimPdf": 41
+        },
+        {
+          "nivel": 2,
+          "titulo": "Responsabilidade Por Atos Legislativos E Judiciais",
+          "paginaImpressa": 41,
+          "paginaPdf": 41,
+          "paginaFimImpressa": 41,
+          "paginaFimPdf": 41
+        },
+        {
+          "nivel": 2,
+          "titulo": "Jurisprudências",
+          "paginaImpressa": 41,
+          "paginaPdf": 41,
+          "paginaFimImpressa": 41,
+          "paginaFimPdf": 41
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Controle da Administração Pública",
+      "paginaImpressa": 42,
+      "paginaPdf": 42,
+      "paginaFimImpressa": 48,
+      "paginaFimPdf": 48,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Classificações do Controle",
+          "paginaImpressa": 42,
+          "paginaPdf": 42,
+          "paginaFimImpressa": 42,
+          "paginaFimPdf": 42
+        },
+        {
+          "nivel": 2,
+          "titulo": "Controle Administrativo",
+          "paginaImpressa": 42,
+          "paginaPdf": 42,
+          "paginaFimImpressa": 42,
+          "paginaFimPdf": 42
+        },
+        {
+          "nivel": 2,
+          "titulo": "Controle Legislativo",
+          "paginaImpressa": 43,
+          "paginaPdf": 43,
+          "paginaFimImpressa": 48,
+          "paginaFimPdf": 48
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Lei 9.784/99  –   Processo Administrativo Federal",
+      "paginaImpressa": 49,
+      "paginaPdf": 49,
+      "paginaFimImpressa": 55,
+      "paginaFimPdf": 55,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais (Art. 1º)",
+          "paginaImpressa": 49,
+          "paginaPdf": 49,
+          "paginaFimImpressa": 49,
+          "paginaFimPdf": 49
+        },
+        {
+          "nivel": 2,
+          "titulo": "Princípios (Art. 2º)  –   Rol Exemplificativo",
+          "paginaImpressa": 49,
+          "paginaPdf": 49,
+          "paginaFimImpressa": 49,
+          "paginaFimPdf": 49
+        },
+        {
+          "nivel": 2,
+          "titulo": "Interessados no Processo Administrativo (Art. 9º ao Art. 10º)",
+          "paginaImpressa": 50,
+          "paginaPdf": 50,
+          "paginaFimImpressa": 50,
+          "paginaFimPdf": 50
+        },
+        {
+          "nivel": 2,
+          "titulo": "Competência (Art. 11 ao 17)",
+          "paginaImpressa": 50,
+          "paginaPdf": 50,
+          "paginaFimImpressa": 50,
+          "paginaFimPdf": 50
+        },
+        {
+          "nivel": 2,
+          "titulo": "Impedimento e Suspeição",
+          "paginaImpressa": 51,
+          "paginaPdf": 51,
+          "paginaFimImpressa": 51,
+          "paginaFimPdf": 51
+        },
+        {
+          "nivel": 2,
+          "titulo": "Forma, Tempo e Lugar dos Atos do Processo (Art. 22 ao 25)",
+          "paginaImpressa": 51,
+          "paginaPdf": 51,
+          "paginaFimImpressa": 51,
+          "paginaFimPdf": 51
+        },
+        {
+          "nivel": 2,
+          "titulo": "Comunicação dos Atos  –   Art. 26 ao Art. 28",
+          "paginaImpressa": 52,
+          "paginaPdf": 52,
+          "paginaFimImpressa": 52,
+          "paginaFimPdf": 52
+        },
+        {
+          "nivel": 2,
+          "titulo": "Fases do Processo administrativo",
+          "paginaImpressa": 52,
+          "paginaPdf": 52,
+          "paginaFimImpressa": 54,
+          "paginaFimPdf": 54
+        },
+        {
+          "nivel": 2,
+          "titulo": "Motivação (Art. 50)",
+          "paginaImpressa": 55,
+          "paginaPdf": 55,
+          "paginaFimImpressa": 55,
+          "paginaFimPdf": 55
+        },
+        {
+          "nivel": 2,
+          "titulo": "Desistência e Outros Casos de Extinção (Art. 51 e 52)",
+          "paginaImpressa": 55,
+          "paginaPdf": 55,
+          "paginaFimImpressa": 55,
+          "paginaFimPdf": 55
+        },
+        {
+          "nivel": 2,
+          "titulo": "Preferência",
+          "paginaImpressa": 55,
+          "paginaPdf": 55,
+          "paginaFimImpressa": 55,
+          "paginaFimPdf": 55
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Bens Públicos",
+      "paginaImpressa": 56,
+      "paginaPdf": 56,
+      "paginaFimImpressa": 57,
+      "paginaFimPdf": 57,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Classificação dos Bens Públicos",
+          "paginaImpressa": 56,
+          "paginaPdf": 56,
+          "paginaFimImpressa": 56,
+          "paginaFimPdf": 56
+        },
+        {
+          "nivel": 2,
+          "titulo": "Característica dos Bens Público",
+          "paginaImpressa": 57,
+          "paginaPdf": 57,
+          "paginaFimImpressa": 57,
+          "paginaFimPdf": 57
+        },
+        {
+          "nivel": 2,
+          "titulo": "Aquisição dos Bens Públicos",
+          "paginaImpressa": 57,
+          "paginaPdf": 57,
+          "paginaFimImpressa": 57,
+          "paginaFimPdf": 57
+        },
+        {
+          "nivel": 2,
+          "titulo": "Uso de Bens Públicos por Particulares",
+          "paginaImpressa": 57,
+          "paginaPdf": 57,
+          "paginaFimImpressa": 57,
+          "paginaFimPdf": 57
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Intervenção do Estado na Propriedade Privada",
+      "paginaImpressa": 58,
+      "paginaPdf": 58,
+      "paginaFimImpressa": 62,
+      "paginaFimPdf": 62,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Intervenção Restritiva",
+          "paginaImpressa": 58,
+          "paginaPdf": 58,
+          "paginaFimImpressa": 58,
+          "paginaFimPdf": 58
+        },
+        {
+          "nivel": 2,
+          "titulo": "Intervenção Supressiva",
+          "paginaImpressa": 59,
+          "paginaPdf": 59,
+          "paginaFimImpressa": 60,
+          "paginaFimPdf": 60
+        },
+        {
+          "nivel": 2,
+          "titulo": "Política Urbana",
+          "paginaImpressa": 61,
+          "paginaPdf": 61,
+          "paginaFimImpressa": 61,
+          "paginaFimPdf": 61
+        },
+        {
+          "nivel": 2,
+          "titulo": "Política Agrícola e Fundiária e da Reforma Agrária",
+          "paginaImpressa": 61,
+          "paginaPdf": 61,
+          "paginaFimImpressa": 61,
+          "paginaFimPdf": 61
+        },
+        {
+          "nivel": 2,
+          "titulo": "Desapropriação Confiscatória",
+          "paginaImpressa": 62,
+          "paginaPdf": 62,
+          "paginaFimImpressa": 62,
+          "paginaFimPdf": 62
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Lei 12.527/12  –   Acesso à Informação",
+      "paginaImpressa": 63,
+      "paginaPdf": 63,
+      "paginaFimImpressa": 66,
+      "paginaFimPdf": 66,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Abrangência (Arts. 1º e 2º)",
+          "paginaImpressa": 63,
+          "paginaPdf": 63,
+          "paginaFimImpressa": 63,
+          "paginaFimPdf": 63
+        },
+        {
+          "nivel": 2,
+          "titulo": "Diretrizes",
+          "paginaImpressa": 63,
+          "paginaPdf": 63,
+          "paginaFimImpressa": 63,
+          "paginaFimPdf": 63
+        },
+        {
+          "nivel": 2,
+          "titulo": "Definições Contidas na LAI",
+          "paginaImpressa": 64,
+          "paginaPdf": 64,
+          "paginaFimImpressa": 64,
+          "paginaFimPdf": 64
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 63,
+          "paginaFimPdf": 63
+        },
+        {
+          "nivel": 2,
+          "titulo": "Procedimento de Acesso (Art. 10 ao 20)",
+          "paginaImpressa": 64,
+          "paginaPdf": 64,
+          "paginaFimImpressa": 66,
+          "paginaFimPdf": 66
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Agentes Públicos  –   Parte Constitucional",
+      "paginaImpressa": 67,
+      "paginaPdf": 67,
+      "paginaFimImpressa": 74,
+      "paginaFimPdf": 74,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Conceito e Espécies",
+          "paginaImpressa": 67,
+          "paginaPdf": 67,
+          "paginaFimImpressa": 67,
+          "paginaFimPdf": 67
+        },
+        {
+          "nivel": 2,
+          "titulo": "Cargo, emprego e função pública",
+          "paginaImpressa": 68,
+          "paginaPdf": 68,
+          "paginaFimImpressa": 68,
+          "paginaFimPdf": 68
+        },
+        {
+          "nivel": 2,
+          "titulo": "Dos Servidores Públicos",
+          "paginaImpressa": 68,
+          "paginaPdf": 68,
+          "paginaFimImpressa": 74,
+          "paginaFimPdf": 74
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Lei 8.112/90  –   Estatuto Dos Servidores Públicos Federais",
+      "paginaImpressa": 75,
+      "paginaPdf": 75,
+      "paginaFimImpressa": 88,
+      "paginaFimPdf": 88,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Abrangência",
+          "paginaImpressa": 75,
+          "paginaPdf": 75,
+          "paginaFimImpressa": 75,
+          "paginaFimPdf": 75
+        },
+        {
+          "nivel": 2,
+          "titulo": "Provimento, Vacância, Remoção, Redistribuição e Substituição",
+          "paginaImpressa": 75,
+          "paginaPdf": 75,
+          "paginaFimImpressa": 76,
+          "paginaFimPdf": 76
+        },
+        {
+          "nivel": 2,
+          "titulo": "Posse e Exercício",
+          "paginaImpressa": 77,
+          "paginaPdf": 77,
+          "paginaFimImpressa": 77,
+          "paginaFimPdf": 77
+        },
+        {
+          "nivel": 2,
+          "titulo": "Estágio Probatório",
+          "paginaImpressa": 78,
+          "paginaPdf": 78,
+          "paginaFimImpressa": 78,
+          "paginaFimPdf": 78
+        },
+        {
+          "nivel": 2,
+          "titulo": "Estabilidade",
+          "paginaImpressa": 78,
+          "paginaPdf": 78,
+          "paginaFimImpressa": 83,
+          "paginaFimPdf": 83
+        },
+        {
+          "nivel": 2,
+          "titulo": "Regime Disciplinar",
+          "paginaImpressa": 84,
+          "paginaPdf": 84,
+          "paginaFimImpressa": 85,
+          "paginaFimPdf": 85
+        },
+        {
+          "nivel": 2,
+          "titulo": "Apuração de Responsabilidade (PAD e Sindicância)",
+          "paginaImpressa": 86,
+          "paginaPdf": 86,
+          "paginaFimImpressa": 88,
+          "paginaFimPdf": 88
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Lei 14.133/21  –   Nova Lei de Licitações (Parte de Licitações)",
+      "paginaImpressa": 89,
+      "paginaPdf": 89,
+      "paginaFimImpressa": 115,
+      "paginaFimPdf": 115,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Preliminares",
+          "paginaImpressa": 89,
+          "paginaPdf": 89,
+          "paginaFimImpressa": 90,
+          "paginaFimPdf": 90
+        },
+        {
+          "nivel": 2,
+          "titulo": "Processo Licitatório",
+          "paginaImpressa": 91,
+          "paginaPdf": 91,
+          "paginaFimImpressa": 92,
+          "paginaFimPdf": 92
+        },
+        {
+          "nivel": 2,
+          "titulo": "Fases do Processo Licitatório",
+          "paginaImpressa": 93,
+          "paginaPdf": 93,
+          "paginaFimImpressa": 101,
+          "paginaFimPdf": 101
+        },
+        {
+          "nivel": 2,
+          "titulo": "Modalidades de Licitação",
+          "paginaImpressa": 102,
+          "paginaPdf": 102,
+          "paginaFimImpressa": 103,
+          "paginaFimPdf": 103
+        },
+        {
+          "nivel": 2,
+          "titulo": "Critérios de Julgamento",
+          "paginaImpressa": 104,
+          "paginaPdf": 104,
+          "paginaFimImpressa": 104,
+          "paginaFimPdf": 104
+        },
+        {
+          "nivel": 2,
+          "titulo": "Disposições Setoriais",
+          "paginaImpressa": 105,
+          "paginaPdf": 105,
+          "paginaFimImpressa": 107,
+          "paginaFimPdf": 107
+        },
+        {
+          "nivel": 2,
+          "titulo": "Contratação Direta",
+          "paginaImpressa": 108,
+          "paginaPdf": 108,
+          "paginaFimImpressa": 111,
+          "paginaFimPdf": 111
+        },
+        {
+          "nivel": 2,
+          "titulo": "Alienações",
+          "paginaImpressa": 112,
+          "paginaPdf": 112,
+          "paginaFimImpressa": 112,
+          "paginaFimPdf": 112
+        },
+        {
+          "nivel": 2,
+          "titulo": "Instrumentos Auxiliares",
+          "paginaImpressa": 113,
+          "paginaPdf": 113,
+          "paginaFimImpressa": 115,
+          "paginaFimPdf": 115
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Lei 14.133/21  –   Nova Lei de Licitações (Parte de Contratos)",
+      "paginaImpressa": 116,
+      "paginaPdf": 116,
+      "paginaFimImpressa": 152,
+      "paginaFimPdf": 152,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Aceitação do Contrato",
+          "paginaImpressa": 116,
+          "paginaPdf": 116,
+          "paginaFimImpressa": 116,
+          "paginaFimPdf": 116
+        },
+        {
+          "nivel": 2,
+          "titulo": "Formalização dos Contratos",
+          "paginaImpressa": 116,
+          "paginaPdf": 116,
+          "paginaFimImpressa": 116,
+          "paginaFimPdf": 116
+        },
+        {
+          "nivel": 2,
+          "titulo": "Divulgação dos Contratos",
+          "paginaImpressa": 116,
+          "paginaPdf": 116,
+          "paginaFimImpressa": 116,
+          "paginaFimPdf": 116
+        },
+        {
+          "nivel": 2,
+          "titulo": "Dispensa de Contrato",
+          "paginaImpressa": 116,
+          "paginaPdf": 116,
+          "paginaFimImpressa": 116,
+          "paginaFimPdf": 116
+        },
+        {
+          "nivel": 2,
+          "titulo": "Cláusulas Necessárias",
+          "paginaImpressa": 117,
+          "paginaPdf": 117,
+          "paginaFimImpressa": 117,
+          "paginaFimPdf": 117
+        },
+        {
+          "nivel": 2,
+          "titulo": "Garantia",
+          "paginaImpressa": 118,
+          "paginaPdf": 118,
+          "paginaFimImpressa": 118,
+          "paginaFimPdf": 118
+        },
+        {
+          "nivel": 2,
+          "titulo": "Prerrogativas Da Administração (Cláusulas Exorbitantes)",
+          "paginaImpressa": 118,
+          "paginaPdf": 118,
+          "paginaFimImpressa": 118,
+          "paginaFimPdf": 118
+        },
+        {
+          "nivel": 2,
+          "titulo": "Duração Dos Contratos",
+          "paginaImpressa": 119,
+          "paginaPdf": 119,
+          "paginaFimImpressa": 119,
+          "paginaFimPdf": 119
+        },
+        {
+          "nivel": 2,
+          "titulo": "Execução Dos Contratos",
+          "paginaImpressa": 119,
+          "paginaPdf": 119,
+          "paginaFimImpressa": 120,
+          "paginaFimPdf": 120
+        },
+        {
+          "nivel": 2,
+          "titulo": "Alteração Dos Contratos E Dos Preços",
+          "paginaImpressa": 121,
+          "paginaPdf": 121,
+          "paginaFimImpressa": 122,
+          "paginaFimPdf": 122
+        },
+        {
+          "nivel": 2,
+          "titulo": "Extinção Dos Contratos",
+          "paginaImpressa": 123,
+          "paginaPdf": 123,
+          "paginaFimImpressa": 124,
+          "paginaFimPdf": 124
+        },
+        {
+          "nivel": 2,
+          "titulo": "Recebimento Do Objeto Do Contrato",
+          "paginaImpressa": 125,
+          "paginaPdf": 125,
+          "paginaFimImpressa": 125,
+          "paginaFimPdf": 125
+        },
+        {
+          "nivel": 2,
+          "titulo": "Pagamentos",
+          "paginaImpressa": 125,
+          "paginaPdf": 125,
+          "paginaFimImpressa": 125,
+          "paginaFimPdf": 125
+        },
+        {
+          "nivel": 2,
+          "titulo": "Nulidade Dos Contratos",
+          "paginaImpressa": 126,
+          "paginaPdf": 126,
+          "paginaFimImpressa": 126,
+          "paginaFimPdf": 126
+        },
+        {
+          "nivel": 2,
+          "titulo": "Meios Alternativos De Resolução De Controvérsias",
+          "paginaImpressa": 126,
+          "paginaPdf": 126,
+          "paginaFimImpressa": 126,
+          "paginaFimPdf": 126
+        },
+        {
+          "nivel": 2,
+          "titulo": "Irregularidades",
+          "paginaImpressa": 127,
+          "paginaPdf": 127,
+          "paginaFimImpressa": 127,
+          "paginaFimPdf": 127
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 152,
+          "paginaFimPdf": 152
+        }
+      ]
+    }
+  ]
+}

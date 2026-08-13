@@ -1,0 +1,686 @@
+{
+  "arquivo": "3 - Direito Constitucional.pdf",
+  "materia": "Direito Constitucional",
+  "totalPaginas": 86,
+  "offset": 0,
+  "secaoTecInicioImpressa": 87,
+  "secaoTecInicioPdf": 87,
+  "contadores": {
+    "nivel1": 16,
+    "nivel2": 63,
+    "paginasTabulares": 86
+  },
+  "invariantePaginas": {
+    "paginasRostoSumario": 2,
+    "paginasTopicosNivel1": 84,
+    "paginasSecaoTec": 0,
+    "somaTotal": 86,
+    "esperado": 86,
+    "statusOk": true
+  },
+  "itens": [
+    {
+      "nivel": 1,
+      "titulo": "Aspectos Introdutórios do Direito Constitucional",
+      "paginaImpressa": 3,
+      "paginaPdf": 3,
+      "paginaFimImpressa": 7,
+      "paginaFimPdf": 7,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Concepções e Sentidos de Constituição",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 3,
+          "paginaFimPdf": 3
+        },
+        {
+          "nivel": 2,
+          "titulo": "Classificação das Constituições",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 4,
+          "paginaFimPdf": 4
+        },
+        {
+          "nivel": 2,
+          "titulo": "Eficácia e Aplicabilidade das Normas Constitucionais",
+          "paginaImpressa": 5,
+          "paginaPdf": 5,
+          "paginaFimImpressa": 5,
+          "paginaFimPdf": 5
+        },
+        {
+          "nivel": 2,
+          "titulo": "Elementos das Constituições (José Afonso da Silva)",
+          "paginaImpressa": 5,
+          "paginaPdf": 5,
+          "paginaFimImpressa": 5,
+          "paginaFimPdf": 5
+        },
+        {
+          "nivel": 2,
+          "titulo": "Normas Constitucionais no Tempo",
+          "paginaImpressa": 5,
+          "paginaPdf": 5,
+          "paginaFimImpressa": 5,
+          "paginaFimPdf": 5
+        },
+        {
+          "nivel": 2,
+          "titulo": "Poder Constituinte",
+          "paginaImpressa": 6,
+          "paginaPdf": 6,
+          "paginaFimImpressa": 6,
+          "paginaFimPdf": 6
+        },
+        {
+          "nivel": 2,
+          "titulo": "Métodos de Interpretação da Constituição",
+          "paginaImpressa": 6,
+          "paginaPdf": 6,
+          "paginaFimImpressa": 6,
+          "paginaFimPdf": 6
+        },
+        {
+          "nivel": 2,
+          "titulo": "Princípios de Interpretação da Constituição",
+          "paginaImpressa": 7,
+          "paginaPdf": 7,
+          "paginaFimImpressa": 7,
+          "paginaFimPdf": 7
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Dos Princípios Fundamentais",
+      "paginaImpressa": 8,
+      "paginaPdf": 8,
+      "paginaFimImpressa": 8,
+      "paginaFimPdf": 8,
+      "filhos": []
+    },
+    {
+      "nivel": 1,
+      "titulo": "Dos Direitos e Garantias Fundamentais",
+      "paginaImpressa": 9,
+      "paginaPdf": 9,
+      "paginaFimImpressa": 24,
+      "paginaFimPdf": 24,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Remédios Constitucionais",
+          "paginaImpressa": 14,
+          "paginaPdf": 14,
+          "paginaFimImpressa": 18,
+          "paginaFimPdf": 18
+        },
+        {
+          "nivel": 2,
+          "titulo": "Nacionalidade",
+          "paginaImpressa": 19,
+          "paginaPdf": 19,
+          "paginaFimImpressa": 22,
+          "paginaFimPdf": 22
+        },
+        {
+          "nivel": 2,
+          "titulo": "Partidos Políticos",
+          "paginaImpressa": 23,
+          "paginaPdf": 23,
+          "paginaFimImpressa": 24,
+          "paginaFimPdf": 24
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Organização do Estado",
+      "paginaImpressa": 25,
+      "paginaPdf": 25,
+      "paginaFimImpressa": 29,
+      "paginaFimPdf": 29,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Organização Político - Administrativa",
+          "paginaImpressa": 25,
+          "paginaPdf": 25,
+          "paginaFimImpressa": 25,
+          "paginaFimPdf": 25
+        },
+        {
+          "nivel": 2,
+          "titulo": "Titularidade dos Bens Públicos",
+          "paginaImpressa": 26,
+          "paginaPdf": 26,
+          "paginaFimImpressa": 26,
+          "paginaFimPdf": 26
+        },
+        {
+          "nivel": 2,
+          "titulo": "Repartição de Competências Constitucionais",
+          "paginaImpressa": 26,
+          "paginaPdf": 26,
+          "paginaFimImpressa": 29,
+          "paginaFimPdf": 29
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Intervenção",
+      "paginaImpressa": 30,
+      "paginaPdf": 30,
+      "paginaFimImpressa": 31,
+      "paginaFimPdf": 31,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Intevenção Federal",
+          "paginaImpressa": 30,
+          "paginaPdf": 30,
+          "paginaFimImpressa": 30,
+          "paginaFimPdf": 30
+        },
+        {
+          "nivel": 2,
+          "titulo": "Intervenção Estadual",
+          "paginaImpressa": 31,
+          "paginaPdf": 31,
+          "paginaFimImpressa": 31,
+          "paginaFimPdf": 31
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Administração Pública",
+      "paginaImpressa": 32,
+      "paginaPdf": 32,
+      "paginaFimImpressa": 41,
+      "paginaFimPdf": 41,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 32,
+          "paginaPdf": 32,
+          "paginaFimImpressa": 34,
+          "paginaFimPdf": 34
+        },
+        {
+          "nivel": 2,
+          "titulo": "Servidores Públicos",
+          "paginaImpressa": 35,
+          "paginaPdf": 35,
+          "paginaFimImpressa": 41,
+          "paginaFimPdf": 41
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Do Poder Legislativo",
+      "paginaImpressa": 42,
+      "paginaPdf": 42,
+      "paginaFimImpressa": 47,
+      "paginaFimPdf": 47,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Reuniões",
+          "paginaImpressa": 42,
+          "paginaPdf": 42,
+          "paginaFimImpressa": 42,
+          "paginaFimPdf": 42
+        },
+        {
+          "nivel": 2,
+          "titulo": "Congresso Nacional",
+          "paginaImpressa": 42,
+          "paginaPdf": 42,
+          "paginaFimImpressa": 42,
+          "paginaFimPdf": 42
+        },
+        {
+          "nivel": 2,
+          "titulo": "Câmara dos Deputados",
+          "paginaImpressa": 43,
+          "paginaPdf": 43,
+          "paginaFimImpressa": 43,
+          "paginaFimPdf": 43
+        },
+        {
+          "nivel": 2,
+          "titulo": "Senado Federal",
+          "paginaImpressa": 44,
+          "paginaPdf": 44,
+          "paginaFimImpressa": 44,
+          "paginaFimPdf": 44
+        },
+        {
+          "nivel": 2,
+          "titulo": "Comissões",
+          "paginaImpressa": 45,
+          "paginaPdf": 45,
+          "paginaFimImpressa": 45,
+          "paginaFimPdf": 45
+        },
+        {
+          "nivel": 2,
+          "titulo": "Deputados e Senadores",
+          "paginaImpressa": 46,
+          "paginaPdf": 46,
+          "paginaFimImpressa": 46,
+          "paginaFimPdf": 46
+        },
+        {
+          "nivel": 2,
+          "titulo": "Poder Legislativo Estadual e Municipal",
+          "paginaImpressa": 47,
+          "paginaPdf": 47,
+          "paginaFimImpressa": 47,
+          "paginaFimPdf": 47
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Do Processo Legislativo",
+      "paginaImpressa": 48,
+      "paginaPdf": 48,
+      "paginaFimImpressa": 51,
+      "paginaFimPdf": 51,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 48,
+          "paginaPdf": 48,
+          "paginaFimImpressa": 48,
+          "paginaFimPdf": 48
+        },
+        {
+          "nivel": 2,
+          "titulo": "Medida Provisória (MPV ou MP)",
+          "paginaImpressa": 48,
+          "paginaPdf": 48,
+          "paginaFimImpressa": 48,
+          "paginaFimPdf": 48
+        },
+        {
+          "nivel": 2,
+          "titulo": "Leis Ordinárias e Leis Complementares",
+          "paginaImpressa": 49,
+          "paginaPdf": 49,
+          "paginaFimImpressa": 49,
+          "paginaFimPdf": 49
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 1,
+          "paginaPdf": 1,
+          "paginaFimImpressa": 49,
+          "paginaFimPdf": 49
+        },
+        {
+          "nivel": 2,
+          "titulo": "Leis Delegadas",
+          "paginaImpressa": 50,
+          "paginaPdf": 50,
+          "paginaFimImpressa": 50,
+          "paginaFimPdf": 50
+        },
+        {
+          "nivel": 2,
+          "titulo": "Emendas Constitucionais (EC)",
+          "paginaImpressa": 51,
+          "paginaPdf": 51,
+          "paginaFimImpressa": 51,
+          "paginaFimPdf": 51
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Fiscalização Contábil, Financeira e Orçamentária",
+      "paginaImpressa": 52,
+      "paginaPdf": 52,
+      "paginaFimImpressa": 54,
+      "paginaFimPdf": 54,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Controle Externo e Interno",
+          "paginaImpressa": 52,
+          "paginaPdf": 52,
+          "paginaFimImpressa": 52,
+          "paginaFimPdf": 52
+        },
+        {
+          "nivel": 2,
+          "titulo": "Tribunal de Contas da União  –   TCU",
+          "paginaImpressa": 52,
+          "paginaPdf": 52,
+          "paginaFimImpressa": 53,
+          "paginaFimPdf": 53
+        },
+        {
+          "nivel": 2,
+          "titulo": "Controle Interno",
+          "paginaImpressa": 54,
+          "paginaPdf": 54,
+          "paginaFimImpressa": 54,
+          "paginaFimPdf": 54
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Do Poder Executivo",
+      "paginaImpressa": 55,
+      "paginaPdf": 55,
+      "paginaFimImpressa": 59,
+      "paginaFimPdf": 59,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Chefia de Estado e Chefia de Governo",
+          "paginaImpressa": 55,
+          "paginaPdf": 55,
+          "paginaFimImpressa": 55,
+          "paginaFimPdf": 55
+        },
+        {
+          "nivel": 2,
+          "titulo": "Formas e Sistemas de Governo",
+          "paginaImpressa": 55,
+          "paginaPdf": 55,
+          "paginaFimImpressa": 55,
+          "paginaFimPdf": 55
+        },
+        {
+          "nivel": 2,
+          "titulo": "Presidente e Vice - Presidente da República",
+          "paginaImpressa": 56,
+          "paginaPdf": 56,
+          "paginaFimImpressa": 56,
+          "paginaFimPdf": 56
+        },
+        {
+          "nivel": 2,
+          "titulo": "Atribuições do Presidente da República",
+          "paginaImpressa": 56,
+          "paginaPdf": 56,
+          "paginaFimImpressa": 56,
+          "paginaFimPdf": 56
+        },
+        {
+          "nivel": 2,
+          "titulo": "Responsabilidade do Presidente da República",
+          "paginaImpressa": 57,
+          "paginaPdf": 57,
+          "paginaFimImpressa": 57,
+          "paginaFimPdf": 57
+        },
+        {
+          "nivel": 2,
+          "titulo": "Conselho da República e Coselho de Defesa",
+          "paginaImpressa": 58,
+          "paginaPdf": 58,
+          "paginaFimImpressa": 58,
+          "paginaFimPdf": 58
+        },
+        {
+          "nivel": 2,
+          "titulo": "Ministros de Estado",
+          "paginaImpressa": 59,
+          "paginaPdf": 59,
+          "paginaFimImpressa": 59,
+          "paginaFimPdf": 59
+        },
+        {
+          "nivel": 2,
+          "titulo": "Poder Executivo Estadual e Municipal",
+          "paginaImpressa": 59,
+          "paginaPdf": 59,
+          "paginaFimImpressa": 59,
+          "paginaFimPdf": 59
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Do Poder Judiciário",
+      "paginaImpressa": 60,
+      "paginaPdf": 60,
+      "paginaFimImpressa": 67,
+      "paginaFimPdf": 67,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 60,
+          "paginaPdf": 60,
+          "paginaFimImpressa": 63,
+          "paginaFimPdf": 63
+        },
+        {
+          "nivel": 2,
+          "titulo": "Supremo Tribunal Federal  –   STF",
+          "paginaImpressa": 64,
+          "paginaPdf": 64,
+          "paginaFimImpressa": 64,
+          "paginaFimPdf": 64
+        },
+        {
+          "nivel": 2,
+          "titulo": "Superior Tribunal de Justiça  –   STJ",
+          "paginaImpressa": 65,
+          "paginaPdf": 65,
+          "paginaFimImpressa": 65,
+          "paginaFimPdf": 65
+        },
+        {
+          "nivel": 2,
+          "titulo": "Conselho Nacional de Justiça  –   CNJ",
+          "paginaImpressa": 66,
+          "paginaPdf": 66,
+          "paginaFimImpressa": 66,
+          "paginaFimPdf": 66
+        },
+        {
+          "nivel": 2,
+          "titulo": "Foro por Prerrogativa de Função (Tabela Auxiliar)",
+          "paginaImpressa": 67,
+          "paginaPdf": 67,
+          "paginaFimImpressa": 67,
+          "paginaFimPdf": 67
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Das Funções Essenciais à Justiça",
+      "paginaImpressa": 68,
+      "paginaPdf": 68,
+      "paginaFimImpressa": 70,
+      "paginaFimPdf": 70,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Ministério Público",
+          "paginaImpressa": 68,
+          "paginaPdf": 68,
+          "paginaFimImpressa": 68,
+          "paginaFimPdf": 68
+        },
+        {
+          "nivel": 2,
+          "titulo": "Conselho Nacional do Ministério Público (CNMP)",
+          "paginaImpressa": 69,
+          "paginaPdf": 69,
+          "paginaFimImpressa": 69,
+          "paginaFimPdf": 69
+        },
+        {
+          "nivel": 2,
+          "titulo": "Advocacia Pública",
+          "paginaImpressa": 70,
+          "paginaPdf": 70,
+          "paginaFimImpressa": 70,
+          "paginaFimPdf": 70
+        },
+        {
+          "nivel": 2,
+          "titulo": "Defensoria Pública",
+          "paginaImpressa": 70,
+          "paginaPdf": 70,
+          "paginaFimImpressa": 70,
+          "paginaFimPdf": 70
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Defesa do Estado e das Instituições Democráticas",
+      "paginaImpressa": 71,
+      "paginaPdf": 71,
+      "paginaFimImpressa": 72,
+      "paginaFimPdf": 72,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Estado de Defesa e Estado de Sítio",
+          "paginaImpressa": 71,
+          "paginaPdf": 71,
+          "paginaFimImpressa": 71,
+          "paginaFimPdf": 71
+        },
+        {
+          "nivel": 2,
+          "titulo": "Forças Armadas (FFAA)",
+          "paginaImpressa": 71,
+          "paginaPdf": 71,
+          "paginaFimImpressa": 71,
+          "paginaFimPdf": 71
+        },
+        {
+          "nivel": 2,
+          "titulo": "Segurança Pública",
+          "paginaImpressa": 72,
+          "paginaPdf": 72,
+          "paginaFimImpressa": 72,
+          "paginaFimPdf": 72
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Da Ordem Social",
+      "paginaImpressa": 73,
+      "paginaPdf": 73,
+      "paginaFimImpressa": 76,
+      "paginaFimPdf": 76,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Disposições Gerais",
+          "paginaImpressa": 73,
+          "paginaPdf": 73,
+          "paginaFimImpressa": 73,
+          "paginaFimPdf": 73
+        },
+        {
+          "nivel": 2,
+          "titulo": "Seguridade Social",
+          "paginaImpressa": 73,
+          "paginaPdf": 73,
+          "paginaFimImpressa": 76,
+          "paginaFimPdf": 76
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Controle de Constitucionalidade",
+      "paginaImpressa": 77,
+      "paginaPdf": 77,
+      "paginaFimImpressa": 84,
+      "paginaFimPdf": 84,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "Aspectos Gerais",
+          "paginaImpressa": 77,
+          "paginaPdf": 77,
+          "paginaFimImpressa": 77,
+          "paginaFimPdf": 77
+        },
+        {
+          "nivel": 2,
+          "titulo": "Espécies de Inconstitucionalidade",
+          "paginaImpressa": 78,
+          "paginaPdf": 78,
+          "paginaFimImpressa": 78,
+          "paginaFimPdf": 78
+        },
+        {
+          "nivel": 2,
+          "titulo": "Sistemas de Controle de Constitucionalidade",
+          "paginaImpressa": 79,
+          "paginaPdf": 79,
+          "paginaFimImpressa": 79,
+          "paginaFimPdf": 79
+        },
+        {
+          "nivel": 2,
+          "titulo": "Controle Concreto, Difuso ou Incidental",
+          "paginaImpressa": 80,
+          "paginaPdf": 80,
+          "paginaFimImpressa": 80,
+          "paginaFimPdf": 80
+        },
+        {
+          "nivel": 2,
+          "titulo": "Controle Abstrato, Concentrado ou Principal",
+          "paginaImpressa": 81,
+          "paginaPdf": 81,
+          "paginaFimImpressa": 84,
+          "paginaFimPdf": 84
+        }
+      ]
+    },
+    {
+      "nivel": 1,
+      "titulo": "Extra  –   Questões (TEC)",
+      "paginaImpressa": 85,
+      "paginaPdf": 85,
+      "paginaFimImpressa": 86,
+      "paginaFimPdf": 86,
+      "filhos": [
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 2,
+          "paginaPdf": 2,
+          "paginaFimImpressa": 2,
+          "paginaFimPdf": 2
+        },
+        {
+          "nivel": 2,
+          "titulo": "|",
+          "paginaImpressa": 3,
+          "paginaPdf": 3,
+          "paginaFimImpressa": 86,
+          "paginaFimPdf": 86
+        }
+      ]
+    }
+  ]
+}
