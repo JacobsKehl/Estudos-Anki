@@ -2,6 +2,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { PrismaClient } from "@prisma/client";
+import { getAllSubjectsMetrics, getGlobalMetrics } from "../src/lib/services/subject-metrics";
 
 require("dotenv").config();
 
@@ -28,6 +29,13 @@ interface CheckpointData {
       completedTheoryBlocksWeight2: number;
       totalFlashcards: number;
       orphanedFlashcards: number;
+      // Complitude REAL calculada pelas funções do serviço da aplicação (subject-metrics)
+      appCompleteness?: {
+        globalProgressPct: number;
+        completedTheoryBlocks: number;
+        totalTheoryBlocks: number;
+        bySubject: Record<string, { totalBlocks: number; completedBlocks: number; progressPct: number }>;
+      } | null;
     };
     // Métricas Globais do Banco de Dados
     blocksByTheoryStatus: Record<string, number>;
@@ -74,7 +82,7 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
     select: { id: true, email: true },
   });
 
-  let gabrielaMetrics = {
+  let gabrielaMetrics: CheckpointData["metrics"]["gabrielaMetrics"] = {
     userId: gabrielaUser?.id ?? "N/A",
     email: "gabriela.furtado.p@gmail.com",
     totalStudyBlocks: 0,
@@ -82,6 +90,7 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
     completedTheoryBlocksWeight2: 0,
     totalFlashcards: 0,
     orphanedFlashcards: 0,
+    appCompleteness: null,
   };
 
   if (gabrielaUser) {
@@ -107,6 +116,28 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
       }
     }
 
+    let gabrielaAppCompleteness = null;
+    try {
+      const allMetrics = await getAllSubjectsMetrics(gabrielaUser.id);
+      const globalStats = await getGlobalMetrics(gabrielaUser.id);
+      const bySubjectMap: Record<string, { totalBlocks: number; completedBlocks: number; progressPct: number }> = {};
+      for (const m of allMetrics) {
+        bySubjectMap[m.name] = {
+          totalBlocks: m.metrics.totalBlocks,
+          completedBlocks: m.metrics.completedBlocks,
+          progressPct: m.metrics.progress,
+        };
+      }
+      gabrielaAppCompleteness = {
+        globalProgressPct: globalStats.summary.globalProgress,
+        completedTheoryBlocks: globalStats.summary.completedBlocks,
+        totalTheoryBlocks: globalStats.summary.totalBlocks,
+        bySubject: bySubjectMap,
+      };
+    } catch (e: any) {
+      console.warn("  ⚠️ Não foi possível calcular complitude da aplicação:", e.message);
+    }
+
     gabrielaMetrics = {
       userId: gabrielaUser.id,
       email: gabrielaUser.email || "",
@@ -115,6 +146,7 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
       completedTheoryBlocksWeight2: completedWeight2,
       totalFlashcards: totalFc,
       orphanedFlashcards: gabrielaOrphans,
+      appCompleteness: gabrielaAppCompleteness,
     };
   }
 
@@ -341,6 +373,13 @@ function compareJSONs(fileA: string, fileB: string) {
     const gOrphanAlert = gOrphanB > 0 ? " ❌ [ALERT - FLASHCARDS ÓRFÃOS DETECTADOS!]" : " ✅ (Ok)";
     if (gOrphanB > 0) regressionsFound = true;
     console.log(` - ${"Gabriela: Flashcards Órfãos (Canário)".padEnd(38)} | Antigo: ${String(gOrphanA).padEnd(16)} | Novo: ${String(gOrphanB).padEnd(16)} | Delta: ${gOrphanB - gOrphanA}${gOrphanAlert}`);
+
+    if (gA.appCompleteness && gB.appCompleteness) {
+      console.log("\n--- COMPLITUDE REAL DA APLICAÇÃO (UI / SERVICE) ---");
+      checkNumericMetric("App Service: Progresso Global (%)", gA.appCompleteness.globalProgressPct, gB.appCompleteness.globalProgressPct, true);
+      checkNumericMetric("App Service: Teoria Concluída (Blocos)", gA.appCompleteness.completedTheoryBlocks, gB.appCompleteness.completedTheoryBlocks, true);
+      checkNumericMetric("App Service: Teoria Total (Blocos)", gA.appCompleteness.totalTheoryBlocks, gB.appCompleteness.totalTheoryBlocks);
+    }
   }
 
   console.log("\n--- MÉTRICAS GLOBAIS DO BANCO ---");
