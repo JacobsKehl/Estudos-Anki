@@ -7,85 +7,56 @@
 
 ---
 
-## 1. Listar Checkpoints Disponíveis
+## 1. Conectividade e Formas de Conexão (Supabase)
 
-Para ver o histórico de checkpoints disponíveis:
+| Forma | Host | Porta | Rede | `pg_restore` | Uso Recomendado |
+|---|---|---:|---|---|---|
+| **Direta** | `db.<ref>.supabase.co` | 5432 | **Apenas IPv6 (AAAA)** | ✅ Suporta | Ambientes com suporte nativo IPv6 |
+| **Session Pooler** | `aws-…pooler.supabase.com` | **5432** | IPv4 (A) | ✅ Suporta | **Recomendado para Restauração / Migração em IPv4** |
+| **Transaction Pooler** | `aws-…pooler.supabase.com` | **6543** | IPv4 (A) | ❌ Incompatível | Apenas para queries curtas da aplicação (Prisma) |
+
+> ⚠️ **NUNCA use a porta 6543 (Transaction Pooler) para `pg_restore` ou `prisma migrate`**. O modo transação não fornece persistência de sessão e causa falha de intspecção/DDL.
+
+---
+
+## 2. Trava de Segurança por Project Ref
+
+O script `scripts/restore.ts` implementa trava automática por **Project Ref**:
+- **Conexão Direta:** Extrai o ref do host (`db.<ref>.supabase.co`).
+- **Connection Pooler:** Extrai o ref do usuário (`postgres.<ref>`).
+
+Se o ref extraído da variável de destino for idêntico ao ref de produção (`DATABASE_URL`/`DIRECT_URL`), a restauração é **ABORTADA imediatamente**, exigindo a flag explícita `--target-is-production` e confirmação textual por extenso. Se o ref não puder ser extraído de alguma URL, a restauração é abortada por padrão.
+
+---
+
+## 3. Ordem de Execução do Rollback
+
+1. **Restaurar Banco de Dados**: Executar `pg_restore` contra o projeto de destino via **Session Pooler (porta 5432)**.
+2. **Git Checkout**: Fazer checkout do código na tag correspondente (`git checkout <tag>`).
+3. **Validação por Distribuição (`--compare`)**: Coletar métricas do banco restaurado e comparar contra o JSON oficial do checkpoint.
+
+---
+
+## 4. Comando Exato de Restauração (`pg_restore`)
 
 ```bash
-# Listar tags de versionamento de código no Git
-git tag -l -n1
+# 1. Restauração em banco descartável/teste:
+npx tsx scripts/restore.ts backups/cp2b-escopo-peso2-2026-08-13T02-56-04-249Z.dump --target-env TEST_TARGET_URL
 
-# Listar registros de distribuição de dados no repositório
-ls docs/checkpoints/
-
-# Listar dumps locais de banco disponíveis
-ls backups/*.dump
+# Comando pg_restore executado internamente (Flags oficiais):
+pg_restore --schema=public --clean --if-exists --no-owner --no-privileges -d "<URL_SESSION_POOLER_5432>" "<ARQUIVO.dump>"
 ```
 
 ---
 
-## 2. Ordem de Restauração (CRÍTICO)
-
-A ordem de restauração **DEVE** ser:
-
-1. **Primeiro o Banco de Dados**: Restaurar os dados a partir do arquivo `.dump` usando o script `restore.ts`.
-2. **Segundo o Código (Git)**: Fazer checkout da tag Git correspondente (`git checkout <rotulo>`).
-
-> **Por que a ordem importa?**
-> Código novo executado contra um banco antigo sem migração pode corromper tabelas ou estourar exceções de schema. Código antigo executado contra banco antigo garante compatibilidade 100% determinística.
-
----
-
-## 3. Procedimento de Restauração Passo a Passo
-
-### Passo A — Restaurar o Banco de Dados
-
-Para restaurar em um banco descartável (Docker ou projeto de teste):
+## 5. Validação com `--compare`
 
 ```bash
-npx tsx scripts/restore.ts backups/cp1-hybrid-removed-<timestamp>.dump --target-env TEST_TARGET_URL
+# Coletar o estado do banco restaurado
+npx tsx scripts/checkpoint.ts cp2b-restored-verification
+
+# Comparar exatamente com o JSON oficial versionado no Git
+npx tsx scripts/checkpoint.ts --compare docs/checkpoints/cp2b-escopo-peso2.json docs/checkpoints/cp2b-restored-verification.json
 ```
 
-Se por um motivo emergencial for necessário restaurar no banco de produção:
-
-```bash
-npx tsx scripts/restore.ts backups/cp1-hybrid-removed-<timestamp>.dump --target-env DIRECT_URL --target-is-production
-```
-
-O script exigirá a confirmação textual digitando `RESTAURAR` no terminal.
-
-### Passo B — Fazer Checkout da Tag Git
-
-```bash
-git checkout cp1-hybrid-removed
-```
-
-### Passo C — Validar Integridade com o Comando `--compare`
-
-Colete a distribuição do banco restaurado e compare com o JSON de referência:
-
-```bash
-# 1. Coletar distribuição do banco restaurado
-npx tsx scripts/checkpoint.ts cp1-restored-verification
-
-# 2. Comparar com a referência versionada no Git
-npx tsx scripts/checkpoint.ts --compare docs/checkpoints/cp1-hybrid-removed.json docs/checkpoints/cp1-restored-verification.json
-```
-
-A comparação deve retornar **NENHUMA REGRESSÃO CRÍTICA** (0 flashcards órfãos, contagem idêntica de blocos com `theoryStatus = COMPLETED`).
-
----
-
-## 4. Preservação Seletiva de Histórico (Rollback Parcial)
-
-Caso um problema seja detectado tardiamente após o usuário ter realizado revisões de flashcard ou sessões de estudo:
-
-- As tabelas de histórico **`FlashcardReview`** e **`StudySessionLog`** registradas no período intermediário devem ser preservadas.
-- Estruturas de blocos, cronogramas e materiais podem ser restauradas.
-
----
-
-## 5. Cobertura do Backup
-
-- O backup via `checkpoint.ts` cobre estritamente o schema `public` do PostgreSQL (dados de matérias, blocos, flashcards, cronogramas e históricos).
-- O backup **NÃO** inclui os schemas `auth` e `storage` do Supabase. Os usuários do sistema não são afetados pelas operações de dump/restore de estudo.
+O teste é considerado aprovado quando as contagens de `StudyBlock`, `Flashcard`, `FlashcardReview` e `StudySessionLog` baterem **100% sem nenhuma regressão de blocos concluídos ou cartões órfãos**.

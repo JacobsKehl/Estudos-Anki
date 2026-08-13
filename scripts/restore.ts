@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import fs from "fs";
 import readline from "readline";
+import { extractProjectRef } from "../src/lib/supabase-ref-extractor";
 
 require("dotenv").config();
 
@@ -47,22 +48,40 @@ async function main() {
     process.exit(1);
   }
 
-  const isTargetingProduction = targetEnvVarName === "DIRECT_URL" || targetEnvVarName === "DATABASE_URL" || targetUrl.includes("pooler.supabase.com");
+  const prodUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || "";
+  const prodRef = extractProjectRef(prodUrl);
+  const targetRef = extractProjectRef(targetUrl);
 
-  if (isTargetingProduction && !isProductionBypass) {
-    console.error("\n❌ ERRO DE SEGURANÇA OPERACIONAL:");
-    console.error(`   A variável '${targetEnvVarName}' aponta para o banco de PRODUÇÃO!`);
-    console.error("   Para restaurar no banco de produção, você DEVE passar explicitamente a flag '--target-is-production'.");
-    console.error("   Operação abortada.\n");
+  console.log(`\n======================================================================`);
+  console.log(`  RESTAURAÇÃO DE BANCO DE DADOS (SAFETY PROTOCOL BY PROJECT REF)`);
+  console.log(`======================================================================`);
+  console.log(`  Arquivo Dump:  ${dumpFilePath}`);
+  console.log(`  Variável Env:  ${targetEnvVarName}`);
+  console.log(`  Prod Project Ref:   ${prodRef || "NÃO IDENTIFICADO"}`);
+  console.log(`  Target Project Ref: ${targetRef || "NÃO IDENTIFICADO"}`);
+
+  if (!prodRef || !targetRef) {
+    console.error("\n❌ ERRO FATAL DE SEGURANÇA:");
+    console.error("   Não foi possível identificar com certeza o 'project ref' do Supabase na URL de Produção ou de Destino.");
+    console.error("   A operação de restauração foi ABORTADA para evitar riscos de destruição acidental de dados.\n");
     process.exit(1);
   }
 
-  console.log(`\n======================================================================`);
-  console.log(`  RESTAURAÇÃO DE BANCO DE DADOS (SAFETY PROTOCOL)`);
-  console.log(`======================================================================`);
-  console.log(`  Arquivo Dump: ${dumpFilePath}`);
-  console.log(`  Variável Env: ${targetEnvVarName}`);
-  console.log(`  Alvo Produção:${isTargetingProduction ? " SIM (Bypass Ativo)" : " NÃO (Banco Descartável/Teste)"}`);
+  const isTargetingProduction = targetRef === prodRef;
+
+  if (isTargetingProduction) {
+    console.warn(`\n⚠️ ATENÇÃO: O 'project ref' de destino ('${targetRef}') é IDÊNTICO ao ref da PRODUÇÃO!`);
+    if (!isProductionBypass) {
+      console.error("\n❌ ERRO DE SEGURANÇA OPERACIONAL:");
+      console.error(`   A variável '${targetEnvVarName}' aponta para o PROJETO DE PRODUÇÃO!`);
+      console.error("   Para restaurar no banco de produção, você DEVE passar explicitamente a flag '--target-is-production'.");
+      console.error("   Operação abortada.\n");
+      process.exit(1);
+    }
+  } else {
+    console.log(`  Destino: BANCO DE TESTES/DESCARTÁVEL (Ref '${targetRef}' !== Produção '${prodRef}') ✅`);
+  }
+
   console.log(`======================================================================\n`);
 
   let confirmText = autoConfirmText;
@@ -85,13 +104,13 @@ async function main() {
       const cmd = `npx supabase db push --db-url "${targetUrl}" --accept-data-loss`;
       execSync(cmd, { stdio: "inherit" });
     } else {
-      console.log("  Executando pg_restore com --clean --if-exists...");
-      const cmd = `pg_restore --clean --if-exists --no-owner --no-privileges -d "${targetUrl}" "${dumpFilePath}"`;
+      console.log("  Executando pg_restore com --schema=public --no-owner --no-privileges...");
+      const cmd = `pg_restore --schema=public --clean --if-exists --no-owner --no-privileges -d "${targetUrl}" "${dumpFilePath}"`;
       execSync(cmd, { stdio: "inherit" });
     }
   } catch (err: any) {
     console.warn("\n⚠️ AVISO DE RESTAURAÇÃO: pg_restore ou script de migração emitiu código não-zero.");
-    console.warn("   (Avisos de DROP em objetos inexistentes em banco limpo são normais).");
+    console.warn("   (Avisos de DROP/roles/extensões em objetos do Supabase são esperados).");
     console.warn("   O critério real de validação será a comparação da distribuição JSON (--compare).\n");
   }
 
@@ -100,7 +119,9 @@ async function main() {
   console.log(`  npx tsx scripts/checkpoint.ts --compare docs/checkpoints/<rotulo>.json <json_coletado_do_banco_restaurado>\n`);
 }
 
-main().catch((err) => {
-  console.error("Erro fatal no script de restauração:", err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Erro fatal no script de restauração:", err);
+    process.exit(1);
+  });
+}
