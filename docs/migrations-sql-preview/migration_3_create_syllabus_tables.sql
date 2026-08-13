@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS "SyllabusSubject" (
   "versionId" TEXT NOT NULL,
   "canonicalKey" TEXT NOT NULL,
   "displayName" TEXT NOT NULL,
-  "blocoConhecimento" TEXT NOT NULL,
+  "blocoConhecimento" TEXT,
   "questoesDaMateria" INTEGER,
   "weight" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
   "orderIndex" INTEGER NOT NULL DEFAULT 0,
@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS "SyllabusTopic" (
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "SyllabusTopic_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "SyllabusTopic_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "SyllabusVersion"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT "SyllabusTopic_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "SyllabusVersion"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "SyllabusTopic_subject_fkey" FOREIGN KEY ("versionId", "subjectCanonicalKey") REFERENCES "SyllabusSubject"("versionId", "canonicalKey") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "SyllabusTopic_versionId_topicCode_key" ON "SyllabusTopic"("versionId", "topicCode");
@@ -63,25 +64,25 @@ ON CONFLICT ("label") DO NOTHING;
 
 -- 4a. Matérias da versão ESTRATEGIA_COURSE_GRID (7 matérias)
 INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")
-VALUES ('cm01_estrategia_grid_v1__portuguese', 'cm01_estrategia_grid_v1', 'PORTUGUESE', 'Língua Portuguesa', 'GERAIS', NULL, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('cm01_estrategia_grid_v1__portuguese', 'cm01_estrategia_grid_v1', 'PORTUGUESE', 'Língua Portuguesa', NULL, NULL, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")
-VALUES ('cm01_estrategia_grid_v1__direito_administrativo', 'cm01_estrategia_grid_v1', 'DIREITO_ADMINISTRATIVO', 'Direito Administrativo', 'ESPECIFICOS', NULL, 2, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('cm01_estrategia_grid_v1__direito_administrativo', 'cm01_estrategia_grid_v1', 'DIREITO_ADMINISTRATIVO', 'Direito Administrativo', NULL, NULL, 1.2, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")
-VALUES ('cm01_estrategia_grid_v1__direito_constitucional', 'cm01_estrategia_grid_v1', 'DIREITO_CONSTITUCIONAL', 'Direito Constitucional', 'ESPECIFICOS', NULL, 2, 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('cm01_estrategia_grid_v1__direito_constitucional', 'cm01_estrategia_grid_v1', 'DIREITO_CONSTITUCIONAL', 'Direito Constitucional', NULL, NULL, 1.2, 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")
-VALUES ('cm01_estrategia_grid_v1__direito_trabalho', 'cm01_estrategia_grid_v1', 'DIREITO_TRABALHO', 'Direito do Trabalho', 'ESPECIFICOS', NULL, 2, 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('cm01_estrategia_grid_v1__direito_trabalho', 'cm01_estrategia_grid_v1', 'DIREITO_TRABALHO', 'Direito do Trabalho', NULL, NULL, 2, 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")
-VALUES ('cm01_estrategia_grid_v1__direito_civil', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', 'GERAIS', NULL, 1, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('cm01_estrategia_grid_v1__direito_civil', 'cm01_estrategia_grid_v1', 'DIREITO_CIVIL', 'Direito Civil', NULL, NULL, 1, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")
-VALUES ('cm01_estrategia_grid_v1__direito_processual_civil', 'cm01_estrategia_grid_v1', 'DIREITO_PROCESSUAL_CIVIL', 'Direito Processual Civil', 'ESPECIFICOS', NULL, 2, 6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('cm01_estrategia_grid_v1__direito_processual_civil', 'cm01_estrategia_grid_v1', 'DIREITO_PROCESSUAL_CIVIL', 'Direito Processual Civil', NULL, NULL, 1, 6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")
-VALUES ('cm01_estrategia_grid_v1__direito_processual_trabalho', 'cm01_estrategia_grid_v1', 'DIREITO_PROCESSUAL_TRABALHO', 'Direito Processual do Trabalho', 'ESPECIFICOS', NULL, 2, 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+VALUES ('cm01_estrategia_grid_v1__direito_processual_trabalho', 'cm01_estrategia_grid_v1', 'DIREITO_PROCESSUAL_TRABALHO', 'Direito Processual do Trabalho', NULL, NULL, 2, 7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("id") DO NOTHING;
 
 -- 4b. Tópicos da versão ESTRATEGIA_COURSE_GRID (110 tópicos)

@@ -657,16 +657,20 @@ model SyllabusVersion {
 // Camada intermediária: representa uma MATÉRIA dentro de uma versão específica.
 // Guarda atributos que são por-matéria (não por-tópico): questoesDaMateria, blocoConhecimento, weight.
 // Evita redundância de repetir "30 questões" em cada um dos 20 tópicos de Processual do Trabalho.
+// blocoConhecimento e questoesDaMateria são propriedades do EDITAL, não da grade de curso.
+// Versões derivadas de grade (ESTRATEGIA_COURSE_GRID) ficam com ambos NULL.
 model SyllabusSubject {
   id                String          @id @default(cuid())
   versionId         String
   version           SyllabusVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   canonicalKey      String          // e.g. DIREITO_CONSTITUCIONAL, RACIOCINIO_LOGICO_MATEMATICO
   displayName       String          // Nome de exibição: "Direito Constitucional"
-  blocoConhecimento String          // "ESPECIFICOS" | "GERAIS"
+  blocoConhecimento String?         // "ESPECIFICOS" | "GERAIS" | NULL (para versões sem dado de edital)
   questoesDaMateria Int?            // Número de questões do bloco de conhecimento (30 para TRT4 AJAJ). NULL para versões sem dado de edital.
-  weight            Float           @default(1.0) // Peso padrão da matéria nesta versão (2.0 para Específicos, 1.0 para Gerais)
+  weight            Float           @default(1.0) // Peso padrão da matéria nesta versão. Para V1, usa-se o valor do arquivo de constantes.
   orderIndex        Int             @default(0)
+
+  topics SyllabusTopic[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -678,13 +682,14 @@ model SyllabusTopic {
   id                  String          @id
   versionId           String
   version             SyllabusVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  subjectCanonicalKey String          // Chave canônica da matéria (vínculo implícito com SyllabusSubject via versionId + canonicalKey)
+  subjectCanonicalKey String
+  subject             SyllabusSubject @relation(fields: [versionId, subjectCanonicalKey], references: [versionId, canonicalKey])
   subjectName         String          // Nome legível da matéria (denormalizado para conveniência)
   topicCode           String          // e.g. "Tópico 01" (único dentro da versão+matéria)
   title               String
   normalizedTitle     String          // Título normalizado para comparação fuzzy
   orderIndex          Int
-  weight              Float           @default(1.0) // Peso individual do tópico (herda do SyllabusSubject por padrão, pode ser sobrescrito)
+  weight              Float           @default(1.0) // Peso individual do tópico. Na V1, vem do arquivo de constantes (1.0 para Português, 1.2 para as demais).
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -170,7 +170,7 @@ function escapeSQLString(str: string): string {
 interface SubjectMeta {
   canonicalKey: string;
   displayName: string;
-  blocoConhecimento: string;
+  blocoConhecimento: string | null;
   questoesDaMateria: number | null;
   weight: number;
   orderIndex: number;
@@ -198,6 +198,16 @@ function extractSubjectsFromProjetado(): SubjectMeta[] {
 function extractSubjectsFromEstrategia(): SubjectMeta[] {
   const seen = new Map<string, SubjectMeta>();
   let order = 0;
+  // Acumula o peso máximo por matéria a partir dos tópicos do arquivo de constantes.
+  // Os valores reais no arquivo são: 1.0 (Língua Portuguesa) e 1.2 (todas as demais).
+  const weightByKey = new Map<string, number>();
+  for (const t of OFFICIAL_TOPICS) {
+    const ck = SUBJECT_CANONICAL_MAP[t.subjectName];
+    if (ck) {
+      const current = weightByKey.get(ck) ?? 0;
+      if ((t.weight || 1.0) > current) weightByKey.set(ck, t.weight || 1.0);
+    }
+  }
   for (const t of OFFICIAL_TOPICS) {
     const canonicalKey = SUBJECT_CANONICAL_MAP[t.subjectName];
     if (canonicalKey && !seen.has(canonicalKey)) {
@@ -205,12 +215,11 @@ function extractSubjectsFromEstrategia(): SubjectMeta[] {
       seen.set(canonicalKey, {
         canonicalKey,
         displayName: t.subjectName,
-        // A versão Estratégia não vem de um edital oficial — sem blocoConhecimento formal.
-        // Usamos "ESPECIFICOS" para as 5 matérias de peso 2 e "GERAIS" para as demais,
-        // inferindo pela lista de matérias que coincidem com o edital.
-        blocoConhecimento: ["PORTUGUESE", "DIREITO_CIVIL"].includes(canonicalKey) ? "GERAIS" : "ESPECIFICOS",
-        questoesDaMateria: null, // Versão sem dado de edital — NULL honesto
-        weight: ["PORTUGUESE", "DIREITO_CIVIL"].includes(canonicalKey) ? 1.0 : 2.0,
+        // V1 é grade de curso, NÃO edital. blocoConhecimento e questoesDaMateria ficam NULL.
+        blocoConhecimento: null,
+        questoesDaMateria: null,
+        // Weight vem do ARQUIVO, não de inferência. Valor real por matéria.
+        weight: weightByKey.get(canonicalKey) ?? 1.0,
         orderIndex: order,
       });
     }
@@ -256,7 +265,7 @@ function generateSQL() {
   sql += `  "versionId" TEXT NOT NULL,\n`;
   sql += `  "canonicalKey" TEXT NOT NULL,\n`;
   sql += `  "displayName" TEXT NOT NULL,\n`;
-  sql += `  "blocoConhecimento" TEXT NOT NULL,\n`;
+  sql += `  "blocoConhecimento" TEXT,\n`;
   sql += `  "questoesDaMateria" INTEGER,\n`;
   sql += `  "weight" DOUBLE PRECISION NOT NULL DEFAULT 1.0,\n`;
   sql += `  "orderIndex" INTEGER NOT NULL DEFAULT 0,\n`;
@@ -282,7 +291,8 @@ function generateSQL() {
   sql += `  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n`;
   sql += `  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n`;
   sql += `  CONSTRAINT "SyllabusTopic_pkey" PRIMARY KEY ("id"),\n`;
-  sql += `  CONSTRAINT "SyllabusTopic_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "SyllabusVersion"("id") ON DELETE CASCADE ON UPDATE CASCADE\n`;
+  sql += `  CONSTRAINT "SyllabusTopic_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "SyllabusVersion"("id") ON DELETE CASCADE ON UPDATE CASCADE,\n`;
+  sql += `  CONSTRAINT "SyllabusTopic_subject_fkey" FOREIGN KEY ("versionId", "subjectCanonicalKey") REFERENCES "SyllabusSubject"("versionId", "canonicalKey") ON DELETE CASCADE ON UPDATE CASCADE\n`;
   sql += `);\n\n`;
   sql += `CREATE UNIQUE INDEX IF NOT EXISTS "SyllabusTopic_versionId_topicCode_key" ON "SyllabusTopic"("versionId", "topicCode");\n`;
   sql += `CREATE INDEX IF NOT EXISTS "SyllabusTopic_versionId_idx" ON "SyllabusTopic"("versionId");\n`;
@@ -300,7 +310,7 @@ function generateSQL() {
   for (const s of v1Subjects) {
     const subjectId = `${v1Id}__${s.canonicalKey.toLowerCase()}`;
     sql += `INSERT INTO "SyllabusSubject" ("id", "versionId", "canonicalKey", "displayName", "blocoConhecimento", "questoesDaMateria", "weight", "orderIndex", "createdAt", "updatedAt")\n`;
-    sql += `VALUES ('${subjectId}', '${v1Id}', '${s.canonicalKey}', '${escapeSQLString(s.displayName)}', '${s.blocoConhecimento}', ${s.questoesDaMateria === null ? "NULL" : s.questoesDaMateria}, ${s.weight}, ${s.orderIndex}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)\n`;
+    sql += `VALUES ('${subjectId}', '${v1Id}', '${s.canonicalKey}', '${escapeSQLString(s.displayName)}', ${s.blocoConhecimento === null ? "NULL" : `'${s.blocoConhecimento}'`}, ${s.questoesDaMateria === null ? "NULL" : s.questoesDaMateria}, ${s.weight}, ${s.orderIndex}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)\n`;
     sql += `ON CONFLICT ("id") DO NOTHING;\n`;
   }
   sql += `\n`;
