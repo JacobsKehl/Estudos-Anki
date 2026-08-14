@@ -800,6 +800,18 @@ export function BlockStudyView({
             )}
 
             <Button 
+              variant="outline" 
+              size="lg" 
+              className="rounded-2xl font-bold w-full sm:w-auto border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100 transition-all" 
+              asChild
+            >
+              <Link href={`/blocks/${block.id}?secondPass=true&returnTo=/`}>
+                <RefreshCw className="w-4 h-4 mr-2 text-violet-500" />
+                {block.sourceV1BlockId ? "Ler este bloco" : "Reler este bloco"}
+              </Link>
+            </Button>
+
+            <Button 
               variant="soft" 
               size="lg" 
               className="rounded-2xl font-bold w-full sm:w-auto text-muted-foreground hover:text-foreground" 
