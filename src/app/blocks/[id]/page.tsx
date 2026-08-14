@@ -23,12 +23,6 @@ export default async function BlockPage({
       subject: true,
       material: true,
       supportMaterials: { include: { material: true } },
-      sources: {
-        include: {
-          material: true,
-          segments: true
-        }
-      },
       _count: {
         select: {
           flashcards: true

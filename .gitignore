@@ -26,6 +26,7 @@ prisma/dev.db-journal
 
 # Backups e relatórios locais temporários
 scratch/
+tmp/
 backups/*.dump
 backups/json/
 backups/invalidos/
