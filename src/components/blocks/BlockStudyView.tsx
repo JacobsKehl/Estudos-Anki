@@ -669,6 +669,39 @@ export function BlockStudyView({
             </div>
           </div>
 
+          {/* Option to read/reread block without destroying progress */}
+          {!isSecondPass && (() => {
+            const isPrecredited = !!block.sourceV1BlockId;
+            return (
+              <div className="pt-2">
+                <Link
+                  href={`/blocks/${block.id}?secondPass=true&returnTo=/`}
+                  className="flex items-center gap-4 p-4 rounded-2xl border transition-all bg-violet-50 border-violet-100 hover:border-violet-200"
+                >
+                  <div className="p-2 rounded-xl text-violet-500">
+                    <RefreshCw className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-foreground">
+                        {isPrecredited ? "Ler este bloco" : "Reler este bloco"}
+                      </span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/60">
+                        {isPrecredited ? "Primeira Leitura" : "Releitura"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {isPrecredited 
+                        ? "Você ainda não leu este resumo aqui" 
+                        : "Segunda leitura (não altera cronograma)"}
+                    </span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                </Link>
+              </div>
+            );
+          })()}
+
           {/* Continue Studying Suggestions */}
           {!isSecondPass && (isFetchingSuggestions || suggestions.length > 0) && (
             <div className="space-y-4 pt-2">
@@ -719,37 +752,6 @@ export function BlockStudyView({
                       </Link>
                     );
                   })}
-
-                  {/* Option to read/reread block without destroying progress */}
-                  {(() => {
-                    const isPrecredited = !!block.sourceV1BlockId;
-                    return (
-                      <Link
-                        href={`/blocks/${block.id}?secondPass=true&returnTo=/`}
-                        className="flex items-center gap-4 p-4 rounded-2xl border transition-all bg-violet-50 border-violet-100 hover:border-violet-200"
-                      >
-                        <div className="p-2 rounded-xl text-violet-500">
-                          <RefreshCw className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-foreground">
-                              {isPrecredited ? "Ler este bloco" : "Reler este bloco"}
-                            </span>
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/60">
-                              {isPrecredited ? "Primeira Leitura" : "Releitura"}
-                            </span>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {isPrecredited 
-                              ? "Você ainda não leu este resumo aqui" 
-                              : "Segunda leitura (não altera cronograma)"}
-                          </span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
-                      </Link>
-                    );
-                  })()}
                 </div>
               )}
             </div>
