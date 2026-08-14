@@ -613,20 +613,28 @@ export function BlockStudyView({
       <div className="max-w-3xl mx-auto py-12 animate-in fade-in zoom-in-95 duration-500">
         <div className="bg-card rounded-[2.5rem] border border-border/40 p-10 shadow-sm text-center space-y-8">
           {/* Celebratory Badge & Icon */}
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-20 h-20 rounded-[2rem] bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
-              <Trophy className="w-10 h-10" />
-            </div>
-            <div className="space-y-2">
-              <Badge variant="outline" className="bg-accent/10 text-accent border-none font-bold text-xs uppercase tracking-wider px-4 py-1 rounded-full">
-                Sessão Concluída!
-              </Badge>
-              <h2 className="text-3xl font-black text-foreground tracking-tight">{block.title}</h2>
-              <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                Seu estudo teórico foi registrado e os flashcards curados foram integrados ao seu cronograma de revisões ativas.
-              </p>
-            </div>
-          </div>
+          {(() => {
+            const isPrecredited = !!block.sourceV1BlockId;
+            return (
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-20 h-20 rounded-[2rem] bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+                  <Trophy className="w-10 h-10" />
+                </div>
+                <div className="space-y-2">
+                  <Badge variant="outline" className="bg-accent/10 text-accent border-none font-bold text-xs uppercase tracking-wider px-4 py-1 rounded-full">
+                    {isPrecredited ? "Creditado pelo Histórico" : "Sessão Concluída!"}
+                  </Badge>
+                  <h2 className="text-3xl font-black text-foreground tracking-tight">{block.title}</h2>
+                  <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                    {isPrecredited 
+                      ? "Este bloco foi marcado como concluído com base no seu estudo prévio do Estratégia. Você pode realizar a leitura deste resumo do CFC quando desejar."
+                      : "Seu estudo teórico foi registrado e os flashcards curados foram integrados ao seu cronograma de revisões ativas."
+                    }
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Session Statistics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -712,25 +720,36 @@ export function BlockStudyView({
                     );
                   })}
 
-                  {/* Second Pass option */}
-                  {suggestions.some(s => s.type === "SECOND_PASS") && (
-                    <Link
-                      href={`/blocks/${block.id}?secondPass=true&returnTo=/`}
-                      className="flex items-center gap-4 p-4 rounded-2xl border transition-all bg-violet-50 border-violet-100 hover:border-violet-200"
-                    >
-                      <div className="p-2 rounded-xl text-violet-500">
-                        <RefreshCw className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-foreground">Reler este bloco</span>
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/60">Releitura</span>
+                  {/* Option to read/reread block without destroying progress */}
+                  {(() => {
+                    const isPrecredited = !!block.sourceV1BlockId;
+                    return (
+                      <Link
+                        href={`/blocks/${block.id}?secondPass=true&returnTo=/`}
+                        className="flex items-center gap-4 p-4 rounded-2xl border transition-all bg-violet-50 border-violet-100 hover:border-violet-200"
+                      >
+                        <div className="p-2 rounded-xl text-violet-500">
+                          <RefreshCw className="w-5 h-5" />
                         </div>
-                        <span className="text-xs text-muted-foreground">Segunda leitura (não altera cronograma)</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
-                    </Link>
-                  )}
+                        <div className="flex-1 text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-foreground">
+                              {isPrecredited ? "Ler este bloco" : "Reler este bloco"}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/60">
+                              {isPrecredited ? "Primeira Leitura" : "Releitura"}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {isPrecredited 
+                              ? "Você ainda não leu este resumo aqui" 
+                              : "Segunda leitura (não altera cronograma)"}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                      </Link>
+                    );
+                  })()}
                 </div>
               )}
             </div>
