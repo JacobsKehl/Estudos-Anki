@@ -1,67 +1,31 @@
 import "dotenv/config";
 import { prisma } from "../../src/lib/prisma";
 
-async function main() {
-  const gabriela = await prisma.user.findUnique({ where: { email: "gabriela.furtado.p@gmail.com" } });
-  const mockUserId = gabriela?.id;
-
-  const id = "cmss35fow0007iyaoey50kzf4";
-
-  const block = await (prisma as any).studyBlock.findUnique({
-    where: { id },
-    include: {
-      subject: true,
-      material: true,
-      supportMaterials: { include: { material: true } },
-      sources: {
-        include: {
-          material: true,
-          segments: true
-        }
-      },
-      _count: {
-        select: {
-          flashcards: true
-        }
-      },
-      flashcards: {
-        where: { userId: mockUserId },
-        select: {
-          id: true,
-          question: true,
-          answer: true,
-          type: true,
-          difficulty: true,
-          status: true
-        }
-      }
-    }
-  });
-
-  console.log("Block query result:", !!block);
-
-  let sourceV1Info: { sourceTitle: string; totalV2Topics: number } | null = null;
-  if (block?.possiblyAlreadyStudied && block.sourceV1BlockId) {
+async function testQuery() {
+  try {
     const sourceBlock = await prisma.studyBlock.findUnique({
-      where: { id: block.sourceV1BlockId },
-      select: { title: true, officialTopicId: true }
+      where: { id: "cmss35fow0007iyaoey50kzf4" },
+      select: { title: true, officialTopicId: true, sourceV1BlockId: true }
     });
+    console.log("Source block query:", sourceBlock);
 
-    if (sourceBlock) {
-      let v2Count = 1;
-      if (sourceBlock.officialTopicId) {
-        v2Count = await prisma.syllabusTopicMapping.count({
-          where: { v1TopicId: sourceBlock.officialTopicId }
+    if (sourceBlock?.sourceV1BlockId) {
+      const v1Block = await prisma.studyBlock.findUnique({
+        where: { id: sourceBlock.sourceV1BlockId },
+        select: { title: true, officialTopicId: true }
+      });
+      console.log("v1Block:", v1Block);
+
+      if (v1Block?.officialTopicId) {
+        const count = await prisma.syllabusTopicMapping.count({
+          where: { v1TopicId: v1Block.officialTopicId }
         });
+        console.log("syllabusTopicMapping count:", count);
       }
-      sourceV1Info = {
-        sourceTitle: sourceBlock.title,
-        totalV2Topics: Math.max(v2Count, 1)
-      };
     }
+  } catch (err) {
+    console.error("Test query error:", err);
   }
-
-  console.log("sourceV1Info:", sourceV1Info);
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect());
+testQuery().finally(() => prisma.$disconnect());

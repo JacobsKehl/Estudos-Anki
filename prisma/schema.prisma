@@ -58,6 +58,7 @@ model User {
   extractedContent     ExtractedContent[]
   studyBlocks          StudyBlock[]
   studySchedules       StudySchedule[]
+  gapNotes             StudyBlockGapNote[]
   studyScheduleItems   StudyScheduleItem[]
   studySessionLogs     StudySessionLog[]
   questionReviewTasks  QuestionReviewTask[]
@@ -107,6 +108,7 @@ model StudySubject {
   studyPriority       String               @default("PRIMARY")
   schedulingStatus    SchedulingStatus     @default(ACTIVE)
   deferredUntil       DateTime?
+  canonicalKey        String?
   userId              String
   user                User                 @relation(fields: [userId], references: [id])
   materials           StudyMaterial[]
@@ -352,6 +354,7 @@ model StudyBlock {
 
   methodology     StudyBlockMethodology @default(LINEAR)
   generationRunId String?               @unique
+  gapNote         StudyBlockGapNote?
 
   @@index([userId, theoryStatus])
   @@index([methodology])
@@ -655,7 +658,10 @@ model SyllabusVersion {
   subjects SyllabusSubject[]
   topics   SyllabusTopic[]
 
-  // Garante que no máximo UMA versão esteja ativa no banco
+  // ⚠️ ATENÇÃO: No PostgreSQL, este índice é PARCIAL: WHERE ("isActive" = true)
+  // Criado via SQL bruto na migration 150003_create_syllabus_tables para permitir múltiplas versões inativas (false).
+  // O Prisma CLI não representa índices parciais no datamodel.
+  // NUNCA APLIQUE o DDL "CREATE UNIQUE INDEX ... ON SyllabusVersion(isActive)" que o `prisma migrate diff` sugere!
   @@unique([isActive], name: "SyllabusVersion_single_active", map: "SyllabusVersion_single_active")
 }
 
@@ -724,4 +730,31 @@ model SyllabusTopicMapping {
   @@index([v1TopicId])
   @@index([v2TopicId])
 }
+
+enum GapNoteStatus {
+  READY
+  NOT_REQUIRED
+  FAILED
+}
+
+model StudyBlockGapNote {
+  id           String        @id @default(cuid())
+  studyBlockId String        @unique
+  studyBlock   StudyBlock    @relation(fields: [studyBlockId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status       GapNoteStatus @default(READY)
+  gapItems     Json?         // Array de strings com as lacunas (ou null se NOT_REQUIRED)
+  
+  modelVersion String        @default("gemini-2.5-flash")
+  tokensUsed   Int?
+  errorMessage String?
+
+  generatedAt  DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([userId, status])
+}
+
 

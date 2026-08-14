@@ -22,6 +22,7 @@ export default async function BlockPage({
     include: {
       subject: true,
       material: true,
+      gapNote: true,
       supportMaterials: { include: { material: true } },
       _count: {
         select: {

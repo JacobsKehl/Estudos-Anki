@@ -89,3 +89,25 @@ Sem ele, backup só é possível com TCP na porta 5432 liberada — o que depend
 | `scripts/check-orphan-official-topics.ts` | Audita órfãos na FK officialTopicId |
 | `scripts/verify-gabriela-subjects.ts` | Confirma contagens 348/132/862 |
 | `scripts/check-not-null-prod.ts` | Verifica constraints NOT NULL no banco |
+
+---
+
+## 8. Proteção contra o Índice Único Parcial `SyllabusVersion_single_active`
+
+> [!CAUTION]
+> **NUNCA aplique o DDL `CREATE UNIQUE INDEX "SyllabusVersion_single_active" ON "SyllabusVersion"("isActive")` gerado por `npx prisma migrate diff`.**
+
+### Motivo Físico:
+No PostgreSQL, o índice foi criado via SQL bruto na migration `150003_create_syllabus_tables` como um **ÍNDICE ÚNICO PARCIAL**:
+```sql
+CREATE UNIQUE INDEX "SyllabusVersion_single_active" 
+ON public."SyllabusVersion" USING btree ("isActive") 
+WHERE ("isActive" = true);
+```
+Ele garante que **no máximo UMA** versão de taxonomia pode ter `isActive = true`. Múltiplas versões inativas (`isActive = false`) são permitidas.
+
+O Prisma CLI não representa a cláusula `WHERE` de índices parciais no `schema.prisma`. Por isso, o `prisma migrate diff` sugere erroneamente recriá-lo como um índice único TOTAL. Se esse DDL for aplicado, o banco travará e rejeitará qualquer inserção de uma segunda versão inativa (`false`).
+
+**Regra operacional:**
+Scripts de geração de migration (`scripts/diag/run_prisma_migrate_diff.ts` ou equivalentes) devem abortar automaticamente se detectarem `SyllabusVersion_single_active` na saída do DDL.
+

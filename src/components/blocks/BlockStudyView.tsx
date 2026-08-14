@@ -81,6 +81,7 @@ interface ContinueSuggestion {
 }
 
 import { PossiblyStudiedCard } from "@/components/study/PossiblyStudiedCard";
+import { GapNoteSection } from "./GapNoteSection";
 
 interface BlockStudyViewProps {
   block: any;
@@ -669,6 +670,8 @@ export function BlockStudyView({
             </div>
           </div>
 
+          <GapNoteSection gapNote={block.gapNote} />
+
           {/* Option to read/reread block without destroying progress */}
           {!isSecondPass && (() => {
             const isPrecredited = !!block.sourceV1BlockId;
@@ -907,6 +910,8 @@ export function BlockStudyView({
           </div>
         </div>
       </header>
+
+      <GapNoteSection gapNote={block.gapNote} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-8 items-start">
         {/* Área de Leitura */}
