@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
     
     // 2. Fetch existing subjects to map by name
     const dbSubjects = await prisma.studySubject.findMany({
-      where: { userId }
+      where: { userId, schedulingStatus: { not: "ARCHIVED" } }
     });
 
     const subjectMap: Record<string, string> = {};

@@ -93,13 +93,35 @@ export async function POST(
 
     // 2. Extrair parâmetros do corpo
     let mode = "general";
+    let confirmReorganize = "";
     try {
       const body = await req.json();
-      if (body && body.mode) {
-        mode = body.mode;
+      if (body) {
+        if (body.mode) mode = body.mode;
+        if (body.confirmReorganize) confirmReorganize = body.confirmReorganize;
       }
     } catch (e) {
       // Ignora erro se não houver JSON no body, usando "general" como fallback
+    }
+
+    // TRAVA DE SEGURANÇA OPERACIONAL: Impedir exclusão acidental de blocos e flashcards existentes
+    if (mode === "general" || mode === "unorganize") {
+      const existingBlocksCount = await prisma.studyBlock.count({
+        where: { materialId: material.id }
+      });
+
+      if (existingBlocksCount > 0 && confirmReorganize !== "REORGANIZAR") {
+        const existingFlashcardsCount = await prisma.flashcard.count({
+          where: { materialId: material.id }
+        });
+
+        return NextResponse.json({
+          error: "REORGANIZATION_LOCKED",
+          message: `ATENÇÃO: Este material já possui ${existingBlocksCount} blocos organizados e ${existingFlashcardsCount} flashcards. A reorganização apagará permanentemente todos os blocos, flashcards e progresso deste material. Para prosseguir com o reset, forneça o parâmetro 'confirmReorganize': 'REORGANIZAR'.`,
+          existingBlocksCount,
+          existingFlashcardsCount
+        }, { status: 409 });
+      }
     }
 
     // ==========================================
