@@ -171,12 +171,12 @@ async function processMaterial(material: any, userId: string, isReorganizing: bo
     log(`Matéria detectada: "${detectedSubject}" (Confiança: ${idResult.confidence}, Motivo: ${idResult.reason})`);
 
     let subject = await prisma.studySubject.findFirst({
-      where: { userId, name: { contains: detectedSubject } }
+      where: { userId, name: { contains: detectedSubject }, schedulingStatus: { not: "ARCHIVED" } }
     });
 
     if (!subject) {
       const allSubjects = await prisma.studySubject.findMany({
-        where: { userId },
+        where: { userId, schedulingStatus: { not: "ARCHIVED" } },
         select: { id: true, name: true, createdAt: true, updatedAt: true, description: true, priority: true, examWeight: true, progress: true, studyPriority: true, schedulingStatus: true, deferredUntil: true, userId: true, canonicalKey: true }
       });
       subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;

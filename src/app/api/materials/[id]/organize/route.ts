@@ -372,11 +372,11 @@ export async function POST(
     const detectedSubject = idResult.subjectName;
 
     let subject = await prisma.studySubject.findFirst({
-      where: { userId, name: { contains: detectedSubject } }
+      where: { userId, name: { contains: detectedSubject }, schedulingStatus: { not: "ARCHIVED" } }
     });
 
     if (!subject) {
-      const allSubjects = await prisma.studySubject.findMany({ where: { userId } });
+      const allSubjects = await prisma.studySubject.findMany({ where: { userId, schedulingStatus: { not: "ARCHIVED" } } });
       subject = allSubjects.find(s => detectedSubject.includes(s.name)) ?? null;
     }
 
