@@ -132,7 +132,7 @@ async function collectMetrics(rotulo: string): Promise<CheckpointData> {
         bySubject: bySubjectMap,
       };
     } catch (e: any) {
-      console.warn("  ⚠️ Não foi possível calcular complitude da aplicação:", e.message);
+      console.warn("  ⚠️ Não foi possível calcular completude da aplicação:", e.message);
     }
 
     gabrielaMetrics = {

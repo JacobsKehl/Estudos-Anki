@@ -13,16 +13,16 @@ datasource db {
 }
 
 enum MaterialRole {
-  MAIN_MATERIAL       // Material Teórico Âncora (ex: CFC) - entra no scheduler e na complitude
-  REFERENCE_MATERIAL  // Material Teórico de Referência (ex: Estratégia) - NÃO entra no scheduler diário de teoria, MAS ENTRA na complitude se concluído
-  SUPPORT_MATERIAL    // Material de Apoio (Resumos, Questões, Leis) - NÃO entra no scheduler de teoria e NÃO entra na complitude principal
+  MAIN_MATERIAL       // Material Teórico Âncora (ex: CFC) - entra no scheduler e na completude
+  REFERENCE_MATERIAL  // Material Teórico de Referência (ex: Estratégia) - NÃO entra no scheduler diário de teoria, MAS ENTRA na completude se concluído
+  SUPPORT_MATERIAL    // Material de Apoio (Resumos, Questões, Leis) - NÃO entra no scheduler de teoria e NÃO entra na completude principal
   MIXED_MATERIAL      // Material Misto (Histórico)
   UNKNOWN             // Não classificado
 }
 
 // ⚠️ REGRA DE CONSUMO DE MATERIAL_ROLE:
 // 1. scheduler.ts (Agendamento de leitura THEORY): Exclui SUPPORT_MATERIAL E REFERENCE_MATERIAL (para evitar agendamento duplo).
-// 2. subject-metrics.ts e completion.ts (Complitude do edital): Exclui APENAS SUPPORT_MATERIAL (preservando blocos concluídos de referência na complitude).
+// 2. subject-metrics.ts e completion.ts (Completude do edital): Exclui APENAS SUPPORT_MATERIAL (preservando blocos concluídos de referência na completude).
 
 // ── Hybrid 80/20 ──────────────────────────────────────────────────────────────
 enum StudyMaterialProvider {

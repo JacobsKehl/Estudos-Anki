@@ -1,0 +1,1626 @@
+{
+ "grupos": [
+  {
+   "tema": "Conciliador x mediador: quem propoe solucao",
+   "manter": "cmq3skh8v0007jv045ilfjxd6",
+   "remover": [
+    "cms5es9q4000xld04m77drge0"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmq3skh8v0007jv045ilfjxd6",
+     "rep": 9,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a diferença entre o papel do conciliador e do mediador na proposição de soluções?",
+     "back": "O conciliador sugere a solução. O mediador não propõe soluções, apenas conduz as partes."
+    },
+    {
+     "id": "cms5es9q4000xld04m77drge0",
+     "rep": 1,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a principal diferença na atuação do conciliador e do mediador judicial?",
+     "back": "O conciliador pode sugerir soluções; o mediador não, apenas facilita o diálogo."
+    }
+   ]
+  },
+  {
+   "tema": "Meios alternativos: arbitragem, conciliacao, mediacao",
+   "manter": "cmpn47izc000djs04uao0qi4k",
+   "remover": [
+    "cmplro5r6000zjs04bg0vdbak"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpn47izc000djs04uao0qi4k",
+     "rep": 7,
+     "materia": "Direito Processual Civil",
+     "front": "Quais são os principais meios alternativos de solução de conflitos previstos na legislação processual civil?",
+     "back": "Arbitragem, conciliação e mediação."
+    },
+    {
+     "id": "cmplro5r6000zjs04bg0vdbak",
+     "rep": 5,
+     "materia": "Direito Processual Civil",
+     "front": "Além da atuação estatal, quais são as outras formas de resolução de conflitos estudadas no Direito Processual Civil?",
+     "back": "Arbitragem, conciliação e mediação."
+    }
+   ]
+  },
+  {
+   "tema": "Delegacao do decreto autonomo de organizacao",
+   "manter": "cmqzwva0w001bjo04unbr7uto",
+   "remover": [
+    "cmqzwtyf2000zjo041h7j36b8"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqzwva0w001bjo04unbr7uto",
+     "rep": 7,
+     "materia": "Revisão Geral",
+     "front": "O Chefe do Executivo pode delegar aos Ministros ou Secretários de Estado a função de editar decretos ou regulamentos de organização?",
+     "back": "Sim, desde que respeitados os limites constitucionais (não aumentar despesa e não criar/extinguir órgãos)."
+    },
+    {
+     "id": "cmqzwtyf2000zjo041h7j36b8",
+     "rep": 4,
+     "materia": "Revisão Geral",
+     "front": "O Chefe do Executivo pode delegar a função de editar regulamentos de organização (decretos autônomos)?",
+     "back": "Sim. O Chefe do Executivo pode transferir, no âmbito do Executivo, aos Ministros de Estado (ou Secretários) essa função, nos limites constitucionais[cite: 7]."
+    }
+   ]
+  },
+  {
+   "tema": "Limites materiais do decreto autonomo (art. 84, VI, a)",
+   "manter": "cmq04sqoj000xla04aoffp0m6",
+   "remover": [
+    "cmpgygigt002hiym0jr5cv5dv"
+   ],
+   "obs": "empate 7x7",
+   "detalhe": [
+    {
+     "id": "cmq04sqoj000xla04aoffp0m6",
+     "rep": 7,
+     "materia": "Direito Administrativo",
+     "front": "Quais condições limitam o decreto autônomo sobre organização e funcionamento da administração federal (CF, art. 84, VI, 'a')?",
+     "back": "Não implicar aumento de despesa, nem criação/extinção de órgãos públicos."
+    },
+    {
+     "id": "cmpgygigt002hiym0jr5cv5dv",
+     "rep": 7,
+     "materia": "Revisão Geral TRT",
+     "front": "Pode um Decreto Autônomo criar ou extinguir órgãos públicos?",
+     "back": "Não. O decreto autônomo serve apenas para organização interna, desde que NÃO crie/extinga órgãos nem aumente despesa."
+    }
+   ]
+  },
+  {
+   "tema": "Extradicao de brasileiro naturalizado",
+   "manter": "cmq8rnjyo0001k304c3jry5ax",
+   "remover": [
+    "cmqprkh440007l704t2w8kopu"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmq8rnjyo0001k304c3jry5ax",
+     "rep": 4,
+     "materia": "Direito Constitucional",
+     "front": "Em quais situações um brasileiro naturalizado pode ser extraditado, conforme a CF/88?",
+     "back": "Crime comum praticado antes da naturalização OU envolvimento em tráfico ilícito de entorpecentes e drogas afins."
+    },
+    {
+     "id": "cmqprkh440007l704t2w8kopu",
+     "rep": 3,
+     "materia": "Direito Constitucional",
+     "front": "Em quais hipóteses um brasileiro naturalizado pode ser extraditado, conforme a Constituição Federal?",
+     "back": "Crime comum cometido antes da naturalização OU comprovado envolvimento com tráfico ilícito de drogas."
+    }
+   ]
+  },
+  {
+   "tema": "Sigilo como excecao ao acesso a informacao (art. 5, XXXIII)",
+   "manter": "cmplqi6700005js048glhpnx4",
+   "remover": [
+    "cms5dmwq60007ld04yma8n7b5"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmplqi6700005js048glhpnx4",
+     "rep": 7,
+     "materia": "Direito Constitucional",
+     "front": "Em que hipótese não devem ser fornecidas informações pelos órgãos públicos, conforme art. 5º, XXXIII, da CF/88?",
+     "back": "Sigilo imprescindível à segurança da sociedade e do Estado, ou informações pessoais."
+    },
+    {
+     "id": "cms5dmwq60007ld04yma8n7b5",
+     "rep": 1,
+     "materia": "Direito Constitucional",
+     "front": "Qual a exceção ao direito de receber informações dos órgãos públicos, conforme Art. 5º, XXXIII, da CF/88?",
+     "back": "Informações cujo sigilo seja imprescindível à segurança da sociedade e do Estado."
+    }
+   ]
+  },
+  {
+   "tema": "Excecoes ao jus postulandi (Sumula 425 TST)",
+   "manter": "cmponiiao000bl704hb5s0xe6",
+   "remover": [
+    "cmqra4i09000bl504kvm1ai9g"
+   ],
+   "obs": "MESCLAR: o removido traz homologacao de acordo extrajudicial (art. 855-B CLT)",
+   "detalhe": [
+    {
+     "id": "cmponiiao000bl704hb5s0xe6",
+     "rep": 13,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Quais são as exceções ao 'jus postulandi' na Justiça do Trabalho, segundo a Súmula nº 425 do TST?",
+     "back": "Ação rescisória, ação cautelar, mandado de segurança e recursos ao TST."
+    },
+    {
+     "id": "cmqra4i09000bl504kvm1ai9g",
+     "rep": 8,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Em que ações/procedimentos o jus postulandi não se aplica na Justiça do Trabalho?",
+     "back": "Ação rescisória, mandado de segurança, ação cautelar, recursos ao TST e homologação de acordo extrajudicial (Súmula 425 TST, Art. 855-B CLT)."
+    }
+   ]
+  },
+  {
+   "tema": "Finalidade do direito de peticao",
+   "manter": "cmplqi6700007js04ih1h86e8",
+   "remover": [
+    "cmpvtbq64000hla040h78zspd"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmplqi6700007js04ih1h86e8",
+     "rep": 9,
+     "materia": "Direito Constitucional",
+     "front": "Qual a finalidade do direito de petição aos Poderes Públicos?",
+     "back": "Defesa de direitos ou contra ilegalidade/abuso de poder."
+    },
+    {
+     "id": "cmpvtbq64000hla040h78zspd",
+     "rep": 6,
+     "materia": "Direito Constitucional",
+     "front": "Qual a finalidade do direito de petição?",
+     "back": "Defesa de direitos e defesa contra ilegalidade ou abuso de poder."
+    }
+   ]
+  },
+  {
+   "tema": "Finalidade do direito de certidao",
+   "manter": "cmplqi6710009js04kknv8g4u",
+   "remover": [
+    "cmpvtbq64000jla04ilfh4lir"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmplqi6710009js04kknv8g4u",
+     "rep": 9,
+     "materia": "Direito Constitucional",
+     "front": "Qual a finalidade do direito de obtenção de certidões em repartições públicas?",
+     "back": "Defesa de direitos e esclarecimento de situações de interesse pessoal."
+    },
+    {
+     "id": "cmpvtbq64000jla04ilfh4lir",
+     "rep": 6,
+     "materia": "Direito Constitucional",
+     "front": "Qual a finalidade do direito de obter certidão?",
+     "back": "Defesa de direitos e esclarecimento de situações de interesse pessoal."
+    }
+   ]
+  },
+  {
+   "tema": "Vedacao a promocao pessoal na publicidade (art. 37, §1)",
+   "manter": "cmpgygigl0007iym0kksuqvwo",
+   "remover": [
+    "cms5dmwq50003ld04evds72yx"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpgygigl0007iym0kksuqvwo",
+     "rep": 4,
+     "materia": "Direito Constitucional",
+     "front": "O Princípio da Impessoalidade veda o quê na publicidade de atos públicos?",
+     "back": "Nomes, símbolos ou imagens que caracterizem promoção pessoal de autoridades ou servidores públicos (Art. 37, §1º CF)."
+    },
+    {
+     "id": "cms5dmwq50003ld04evds72yx",
+     "rep": 1,
+     "materia": "Direito Constitucional",
+     "front": "O que o Art. 37, § 1º, da CF/88 veda sobre a publicidade de atos, programas e campanhas dos órgãos públicos?",
+     "back": "Nomes, símbolos ou imagens que caracterizem promoção pessoal de autoridades ou servidores públicos."
+    }
+   ]
+  },
+  {
+   "tema": "Orgao publico: centro de competencia despersonalizado",
+   "manter": "cmpgygigo000piym06tnp1ia4",
+   "remover": [
+    "cmpgygigt002diym0y5qn2isu"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpgygigo000piym06tnp1ia4",
+     "rep": 5,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a diferença fundamental entre Entidade e Órgão?",
+     "back": "Entidades possuem personalidade jurídica própria; Órgãos são centros de competência despersonalizados integrantes de uma entidade."
+    },
+    {
+     "id": "cmpgygigt002diym0y5qn2isu",
+     "rep": 4,
+     "materia": "Direito Civil",
+     "front": "Órgãos públicos possuem personalidade jurídica própria?",
+     "back": "Não. São centros de competência despersonalizados, integrantes de uma pessoa jurídica."
+    }
+   ]
+  },
+  {
+   "tema": "CNJ: natureza administrativa, sem jurisdicao",
+   "manter": "cmpn47izb0001js04s8sil3xj",
+   "remover": [
+    "cmpmyhudk0007l504n9bijjpq"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpn47izb0001js04s8sil3xj",
+     "rep": 11,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a natureza do Conselho Nacional de Justiça (CNJ) e ele detém competência jurisdicional?",
+     "back": "O CNJ possui natureza administrativa e não detém competência jurisdicional."
+    },
+    {
+     "id": "cmpmyhudk0007l504n9bijjpq",
+     "rep": 7,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a natureza do CNJ e qual sua principal atribuição, conforme o art. 92, I-A, da CF?",
+     "back": "Órgão administrativo do Poder Judiciário, fiscaliza suas atividades, sem competência jurisdicional."
+    }
+   ]
+  },
+  {
+   "tema": "Habeas data: exigencia de requerimento previo",
+   "manter": "cmpvtbq64000lla043sgoz36d",
+   "remover": [
+    "cmplro5r70017js046m23f0b5"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpvtbq64000lla043sgoz36d",
+     "rep": 6,
+     "materia": "Direito Constitucional",
+     "front": "Qual requisito é necessário para ajuizar habeas data?",
+     "back": "Negativa ou omissão da Administração Pública a pedido administrativo."
+    },
+    {
+     "id": "cmplro5r70017js046m23f0b5",
+     "rep": 5,
+     "materia": "Direito Processual Civil",
+     "front": "Qual requisito mitiga o princípio da inafastabilidade da jurisdição para ajuizar habeas data?",
+     "back": "Prévio requerimento administrativo."
+    }
+   ]
+  },
+  {
+   "tema": "Regime de pessoal das fundacoes de direito privado",
+   "manter": "cmphdyhs5000fkw04aolllxeh",
+   "remover": [
+    "cmpgygigq001liym0bk8iz52q"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmphdyhs5000fkw04aolllxeh",
+     "rep": 5,
+     "materia": "Direito Administrativo",
+     "front": "Qual o regime de pessoal aplicável às fundações públicas de direito privado, segundo o entendimento prevalecente?",
+     "back": "Regime trabalhista comum (CLT, emprego público)."
+    },
+    {
+     "id": "cmpgygigq001liym0bk8iz52q",
+     "rep": 4,
+     "materia": "Direito do Trabalho",
+     "front": "O regime celetista pode incidir sobre Fundações Públicas de Direito Privado?",
+     "back": "Sim, o regime de pessoal dessas fundações é o celetista (CLT)."
+    }
+   ]
+  },
+  {
+   "tema": "Licenca e autorizacao como policia preventiva",
+   "manter": "cmqzwva0x001zjo04ja4dyo95",
+   "remover": [
+    "cmqzwtyf30013jo04mzvgb0mw"
+   ],
+   "obs": "empate 4x4",
+   "detalhe": [
+    {
+     "id": "cmqzwva0x001zjo04ja4dyo95",
+     "rep": 4,
+     "materia": "Direito Administrativo",
+     "front": "A concessão de uma autorização ou de uma licença constitui exemplo de poder de polícia de qual caráter?",
+     "back": "Caráter preventivo (atua antes para verificar o cumprimento dos requisitos legais)[cite: 7]."
+    },
+    {
+     "id": "cmqzwtyf30013jo04mzvgb0mw",
+     "rep": 4,
+     "materia": "Direito Administrativo",
+     "front": "Quais são exemplos de medidas do poder de polícia que possuem caráter eminentemente preventivo?",
+     "back": "A licença e a autorização[cite: 7]."
+    }
+   ]
+  },
+  {
+   "tema": "Consequencias da improbidade (art. 37, §4)",
+   "manter": "cmqslvja4000djm043pzpt087",
+   "remover": [
+    "cms5dmwq50005ld04fr7i2ums"
+   ],
+   "obs": "MESCLAR: completar a resposta com perda da funcao, indisponibilidade de bens e ressarcimento",
+   "detalhe": [
+    {
+     "id": "cmqslvja4000djm043pzpt087",
+     "rep": 5,
+     "materia": "Direito Constitucional",
+     "front": "Qual a consequência dos atos de improbidade administrativa em relação aos direitos políticos?",
+     "back": "Suspensão dos direitos políticos."
+    },
+    {
+     "id": "cms5dmwq50005ld04fr7i2ums",
+     "rep": 1,
+     "materia": "Direito Constitucional",
+     "front": "Quais as consequências dos atos de improbidade administrativa previstas no Art. 37, § 4º, da CF/88?",
+     "back": "Suspensão dos direitos políticos, perda da função pública, indisponibilidade dos bens e ressarcimento ao Erário."
+    }
+   ]
+  },
+  {
+   "tema": "Anulacao ex tunc x revogacao ex nunc",
+   "manter": "cmpgygigm000diym0e3m3iubo",
+   "remover": [
+    "cmr44ppvf0005l504401dnps9",
+    "cmr44ppvf0003l504jlfbnd34"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpgygigm000diym0e3m3iubo",
+     "rep": 4,
+     "materia": "Revisão Geral TRT",
+     "front": "Qual o efeito temporal da ANULAÇÃO e da REVOGAÇÃO de um ato?",
+     "back": "Anulação: Ex Tunc (retroage). Revogação: Ex Nunc (não retroage)."
+    },
+    {
+     "id": "cmr44ppvf0005l504401dnps9",
+     "rep": 3,
+     "materia": "Direito Administrativo",
+     "front": "Quais os efeitos jurídicos da revogação de um ato administrativo?",
+     "back": "Efeitos ex nunc (não retroativos)."
+    },
+    {
+     "id": "cmr44ppvf0003l504jlfbnd34",
+     "rep": 3,
+     "materia": "Direito Administrativo",
+     "front": "Quais os efeitos jurídicos da anulação de um ato administrativo?",
+     "back": "Efeitos ex tunc (retroativos)."
+    }
+   ]
+  },
+  {
+   "tema": "Sumula 473 STF - autotutela",
+   "manter": "cmpgygigm000biym0pmuadepq",
+   "remover": [
+    "cms5dmwq60009ld041mwe3bty"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpgygigm000biym0pmuadepq",
+     "rep": 4,
+     "materia": "Direito Constitucional",
+     "front": "O que estabelece o Princípio da Autotutela (Súmula 473 STF)?",
+     "back": "A Administração pode ANULAR seus atos (quando ilegais) ou REVOGAR (por conveniência ou oportunidade)."
+    },
+    {
+     "id": "cms5dmwq60009ld041mwe3bty",
+     "rep": 1,
+     "materia": "Direito Constitucional",
+     "front": "O que estabelece a Súmula nº 473 do STF sobre o princípio da autotutela administrativa?",
+     "back": "A Administração pode anular seus próprios atos ilegais ou revogá-los por conveniência/oportunidade, respeitados direitos adquiridos."
+    }
+   ]
+  },
+  {
+   "tema": "Ausencia de hierarquia entre Direta e Indireta",
+   "manter": "cmpgygigr001riym07ig0tjil",
+   "remover": [
+    "cmq02jefh000djs04tv8cvvsi",
+    "cmqzwtyf30011jo04xgut7mrb"
+   ],
+   "obs": "empate 4x4 com um deles",
+   "detalhe": [
+    {
+     "id": "cmpgygigr001riym07ig0tjil",
+     "rep": 4,
+     "materia": "Revisão Geral TRT",
+     "front": "Existe hierarquia entre a Administração Direta e a Indireta?",
+     "back": "Não. Existe apenas controle finalístico, também chamado de Tutela ou Supervisão Ministerial."
+    },
+    {
+     "id": "cmq02jefh000djs04tv8cvvsi",
+     "rep": 4,
+     "materia": "Direito Administrativo",
+     "front": "Existe relação de hierarquia entre a Administração Direta e as entidades da Indireta?",
+     "back": "Não, existe apenas vinculação ou tutela."
+    },
+    {
+     "id": "cmqzwtyf30011jo04xgut7mrb",
+     "rep": 3,
+     "materia": "Direito Administrativo",
+     "front": "A relação de controle e tutela entre um órgão da Administração Direta e uma entidade da Indireta decorre do poder hierárquico?",
+     "back": "Não. Não há hierarquia entre a Direta e a Indireta, apenas controle finalístico (vinculação ou supervisão ministerial)[cite: 7]."
+    }
+   ]
+  },
+  {
+   "tema": "Legalidade: particular x Administracao",
+   "manter": "cmpgygigl0005iym0wjvhh21c",
+   "remover": [
+    "cms5dmwq50001ld0479lxtp9i"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpgygigl0005iym0wjvhh21c",
+     "rep": 4,
+     "materia": "Direito Administrativo",
+     "front": "Qual a diferença de Legalidade entre o Particular e a Administração Pública?",
+     "back": "Particular: pode fazer tudo que a lei não proíbe. Administração: só pode fazer o que a lei autoriza (Legalidade Estrita)."
+    },
+    {
+     "id": "cms5dmwq50001ld0479lxtp9i",
+     "rep": 1,
+     "materia": "Direito Constitucional",
+     "front": "O que o princípio da legalidade permite à Administração Pública e aos particulares?",
+     "back": "AP: só o que a lei expressamente prevê; Particulares: tudo que a lei não proíbe."
+    }
+   ]
+  },
+  {
+   "tema": "Alcance do poder disciplinar",
+   "manter": "cmq02jefi000fjs04f9m6o65i",
+   "remover": [
+    "cmqzwva0w001rjo0437kpvz4i"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmq02jefi000fjs04f9m6o65i",
+     "rep": 7,
+     "materia": "Direito Administrativo",
+     "front": "A quem se aplica o poder disciplinar da Administração Pública?",
+     "back": "Servidores públicos e particulares com vínculo jurídico específico com a Administração."
+    },
+    {
+     "id": "cmqzwva0w001rjo0437kpvz4i",
+     "rep": 3,
+     "materia": "Direito Administrativo",
+     "front": "O Poder Disciplinar da Administração Pública alcança e sujeita todos os particulares de forma geral?",
+     "back": "Não. O Poder Disciplinar pune infrações funcionais de servidores e de particulares que possuam um vínculo jurídico especial com o Estado (ex: concessionários)[cite: 7]."
+    }
+   ]
+  },
+  {
+   "tema": "Controle judicial do merito discricionario",
+   "manter": "cmqodkcmh000bjr04e5lxc6i8",
+   "remover": [
+    "cmqzwtyf2000vjo04q94cvy78"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqodkcmh000bjr04e5lxc6i8",
+     "rep": 6,
+     "materia": "Direito Administrativo",
+     "front": "O Poder Judiciário pode realizar o controle do mérito do ato administrativo discricionário?",
+     "back": "Não, o controle judicial é de legalidade, não de mérito."
+    },
+    {
+     "id": "cmqzwtyf2000vjo04q94cvy78",
+     "rep": 3,
+     "materia": "Direito Administrativo",
+     "front": "O controle judicial do poder discricionário da Administração Pública restringe-se a qual aspecto?",
+     "back": "Restringe-se estritamente ao controle de legalidade e legitimidade (o Judiciário não analisa o mérito de conveniência)[cite: 7]."
+    }
+   ]
+  },
+  {
+   "tema": "Requisitos da convalidacao",
+   "manter": "cmqu1v2ku0007lc04maro0gav",
+   "remover": [
+    "cmrnrk7h50005l204zlvze4g9"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqu1v2ku0007lc04maro0gav",
+     "rep": 7,
+     "materia": "Direito Administrativo",
+     "front": "Qual a principal característica que permite a convalidação de um ato administrativo anulável?",
+     "back": "Apresenta vício sanável, desde que não seja lesivo ao patrimônio público nem cause prejuízo a terceiros."
+    },
+    {
+     "id": "cmrnrk7h50005l204zlvze4g9",
+     "rep": 2,
+     "materia": "Direito Administrativo",
+     "front": "Conforme a Lei 9.784/1999, quais são as condições para a Administração convalidar atos com defeitos sanáveis?",
+     "back": "Não causar lesão ao interesse público, nem prejuízo a terceiros, e o defeito ser sanável."
+    }
+   ]
+  },
+  {
+   "tema": "Quando o vicio de forma e insanavel",
+   "manter": "cmqodkcmh0007jr04xwb05hp9",
+   "remover": [
+    "cmrnrk7h5000bl204vm7210fi"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqodkcmh0007jr04xwb05hp9",
+     "rep": 9,
+     "materia": "Direito Administrativo",
+     "front": "Em que situação o vício de forma do ato administrativo é insanável?",
+     "back": "Quando afeta o conteúdo essencial do ato ou direitos dos administrados."
+    },
+    {
+     "id": "cmrnrk7h5000bl204vm7210fi",
+     "rep": 2,
+     "materia": "Direito Administrativo",
+     "front": "Quando um vício de forma de um ato administrativo é considerado insanável, impedindo a convalidação?",
+     "back": "Quando a forma for essencial (garantia de direitos individuais ou exigência legal imprescindível)."
+    }
+   ]
+  },
+  {
+   "tema": "Demissao de estavel por conveniencia",
+   "manter": "cmqzwva0v0019jo046e7uktdc",
+   "remover": [
+    "cmqzwtyf2000xjo04flh5jyny"
+   ],
+   "obs": "empate 3x3",
+   "detalhe": [
+    {
+     "id": "cmqzwva0v0019jo046e7uktdc",
+     "rep": 3,
+     "materia": "Direito Administrativo",
+     "front": "É cabível a demissão de servidor público estável sem a instauração de processo administrativo (PAD), sob a justificativa de atender à conveniência do serviço?",
+     "back": "Não. A demissão é penalidade vinculada (Poder Disciplinar); exige processo administrativo com contraditório e ampla defesa, não cabendo critérios de mera conveniência."
+    },
+    {
+     "id": "cmqzwtyf2000xjo04flh5jyny",
+     "rep": 3,
+     "materia": "Revisão Geral",
+     "front": "É lícita a aplicação de demissão de servidor público estável sob a justificativa de 'atender à conveniência do serviço'?",
+     "back": "Não. A demissão é ato vinculado e punitivo; não há margem de discricionariedade por conveniência (a lei impõe as hipóteses)[cite: 7]."
+    }
+   ]
+  },
+  {
+   "tema": "Sucessao de empregadores: responsabilidade do sucessor",
+   "manter": "cmpikn2ol000zl204o7cgpx5a",
+   "remover": [
+    "cmpgygih3005biym0uzuib2xx"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpikn2ol000zl204o7cgpx5a",
+     "rep": 5,
+     "materia": "Direito Civil",
+     "front": "Na Sucessão de Empregadores, quem responde por dívidas de contratos já extintos?",
+     "back": "O sucessor responde por todas as obrigações, inclusive as anteriores à sucessão (regra geral)."
+    },
+    {
+     "id": "cmpgygih3005biym0uzuib2xx",
+     "rep": 4,
+     "materia": "Direito Civil",
+     "front": "Na sucessão de empregadores, quem responde pelas obrigações trabalhistas?",
+     "back": "O sucessor responde pelos direitos adquiridos e pelas obrigações, inclusive as contraídas à época do sucedido."
+    }
+   ]
+  },
+  {
+   "tema": "Limite de 70% da receita da Camara Municipal",
+   "manter": "cmrm5ir490007js04jz8nglrw",
+   "remover": [
+    "cmrm5ir490005js0432vbtmct"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmrm5ir490007js04jz8nglrw",
+     "rep": 4,
+     "materia": "Direito Constitucional",
+     "front": "Em que hipótese o Presidente da Câmara Municipal comete crime de responsabilidade relacionado à folha de pagamento?",
+     "back": "Quando a Câmara gastar mais de 70% de sua receita com folha de pagamento."
+    },
+    {
+     "id": "cmrm5ir490005js0432vbtmct",
+     "rep": 3,
+     "materia": "Direito Constitucional",
+     "front": "Qual o limite percentual da receita que a Câmara Municipal pode gastar com folha de pagamento?",
+     "back": "Não mais de 70% da sua receita (Art. 29-A, § 1º, CF)."
+    }
+   ]
+  },
+  {
+   "tema": "CPC subsidiario: Eleitoral, Militar e Trabalho",
+   "manter": "cmpn47izb0003js042uy4ay2v",
+   "remover": [
+    "cmpmyhudl0009l504y0ew1a3c"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpn47izb0003js042uy4ay2v",
+     "rep": 7,
+     "materia": "Direito Processual Civil",
+     "front": "Em quais Justiças o Código de Processo Civil (CPC) é aplicado subsidiariamente?",
+     "back": "Na Justiça Eleitoral, Justiça Militar e Justiça do Trabalho."
+    },
+    {
+     "id": "cmpmyhudl0009l504y0ew1a3c",
+     "rep": 5,
+     "materia": "Direito Processual Civil",
+     "front": "Em que tipo de Justiça o Código de Processo Civil é aplicado subsidiariamente?",
+     "back": "Justiça Eleitoral, Justiça Militar e Justiça do Trabalho."
+    }
+   ]
+  },
+  {
+   "tema": "Dano moral trabalhista - competencia da JT",
+   "manter": "cmpgygih60065iym0kxwfvpsf",
+   "remover": [
+    "cmpikn2om0017l204daaa2id1"
+   ],
+   "obs": "EXCECAO A REGRA: o removido tem 5 rep mas o enunciado comeca com 'A whom cabe julgar' (erro de ingles)",
+   "detalhe": [
+    {
+     "id": "cmpgygih60065iym0kxwfvpsf",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "A quem cabe julgar ações de indenização por dano moral decorrentes da relação de trabalho?",
+     "back": "À Justiça do Trabalho (Súmula 392 do TST e Art. 114, VI, da CF)."
+    },
+    {
+     "id": "cmpikn2om0017l204daaa2id1",
+     "rep": 5,
+     "materia": "Direito Processual do Trabalho",
+     "front": "A whom cabe julgar ações de indenização por dano moral decorrentes da relação de trabalho?",
+     "back": "À Justiça do Trabalho (Súmula 392 do TST e Art. 114, VI, da CF)."
+    }
+   ]
+  },
+  {
+   "tema": "Curador especial - hipoteses",
+   "manter": "cmqu5yqah0005js0414cmeysq",
+   "remover": [
+    "cmqxv4ax3000lif04fmbvkipe"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqu5yqah0005js0414cmeysq",
+     "rep": 4,
+     "materia": "Direito Processual Civil",
+     "front": "Quais as hipóteses de designação de curador especial para o réu, conforme o CPC?",
+     "back": "Réu preso revel e réus revéis citados por edital ou hora certa."
+    },
+    {
+     "id": "cmqxv4ax3000lif04fmbvkipe",
+     "rep": 3,
+     "materia": "Direito Processual Civil",
+     "front": "Em quais hipóteses o CPC prevê a designação de curador especial para o réu?",
+     "back": "Para réu preso revel, e réus revéis citados por edital ou por hora certa."
+    }
+   ]
+  },
+  {
+   "tema": "Autor nao regulariza incapacidade processual",
+   "manter": "cmqxv4ax4000pif04sryvqaob",
+   "remover": [
+    "cmqu5yqai000bjs04spt9rta6"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqxv4ax4000pif04sryvqaob",
+     "rep": 9,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a consequência se o autor não regularizar a incapacidade processual ou irregularidade de representação na instância originária?",
+     "back": "O processo será extinto sem resolução do mérito."
+    },
+    {
+     "id": "cmqu5yqai000bjs04spt9rta6",
+     "rep": 3,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a consequência para o autor que não regulariza a incapacidade processual na instância originária?",
+     "back": "O processo será extinto sem resolução do mérito."
+    }
+   ]
+  },
+  {
+   "tema": "Valor da causa ausente na inicial trabalhista",
+   "manter": "cmqra4i0a000fl504v0ei1afb",
+   "remover": [
+    "cmqvhndv8000lk104v4qmdiwr"
+   ],
+   "obs": "empate 3x3",
+   "detalhe": [
+    {
+     "id": "cmqra4i0a000fl504v0ei1afb",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual a consequência da ausência de indicação do valor da causa na petição inicial trabalhista?",
+     "back": "Extinção do pedido sem resolução do mérito (Art. 840, §3º da CLT)."
+    },
+    {
+     "id": "cmqvhndv8000lk104v4qmdiwr",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual a consequência para pedidos que não contenham valor da causa na petição inicial, conforme o §3º do art. 840 da CLT?",
+     "back": "Serão extintos sem resolução do mérito."
+    }
+   ]
+  },
+  {
+   "tema": "OJ 310 - prazo em dobro nao se aplica a JT",
+   "manter": "cmppzlvpt000fle04mdebfjf8",
+   "remover": [
+    "cmqiosmpw0001l5045ifc2ebh"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmppzlvpt000fle04mdebfjf8",
+     "rep": 5,
+     "materia": "Direito Processual do Trabalho",
+     "front": "A regra do prazo em dobro para litisconsortes com diferentes procuradores (Art. 229 CPC) é aplicável ao processo do trabalho?",
+     "back": "Não, é inaplicável ao processo do trabalho, conforme OJ nº 310 da SDI-1 do TST."
+    },
+    {
+     "id": "cmqiosmpw0001l5045ifc2ebh",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "A regra de contagem em dobro do prazo para litisconsortes com diferentes procuradores é aplicável ao processo do trabalho?",
+     "back": "Não, em razão da incompatibilidade com a celeridade (OJ 310 SDI-1 TST)."
+    }
+   ]
+  },
+  {
+   "tema": "Possessoria imobiliaria - competencia absoluta",
+   "manter": "cmqfs1hpd0007l804l8hl2rdd",
+   "remover": [
+    "cmrif88vm001djr046a7g1yqv"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqfs1hpd0007l804l8hl2rdd",
+     "rep": 7,
+     "materia": "Direito Processual Civil",
+     "front": "Qual a natureza da competência em ação possessória imobiliária, conforme o Art. 47, §2º do CPC?",
+     "back": "Absoluta, no foro da situação da coisa."
+    },
+    {
+     "id": "cmrif88vm001djr046a7g1yqv",
+     "rep": 3,
+     "materia": "Direito Processual Civil",
+     "front": "Qual o foro competente e a natureza jurídica da competência para o ajuizamento de ações possessórias imobiliárias?",
+     "back": "A ação possessória imobiliária será proposta obrigatoriamente no foro de situação da coisa, cujo juízo possui COMPETÊNCIA ABSOLUTA territorial (Art. 47, §2º, do CPC)."
+    }
+   ]
+  },
+  {
+   "tema": "Continencia - continente proposta antes",
+   "manter": "cmqpt8y2x0009ik04i6ppvyjt",
+   "remover": [
+    "cmrigv5hv001vl604nh9nt6xu"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqpt8y2x0009ik04i6ppvyjt",
+     "rep": 3,
+     "materia": "Direito Processual Civil",
+     "front": "Na continência, se a ação continente for ajuizada primeiro, qual o desfecho da ação contida?",
+     "back": "A ação contida será extinta sem julgamento do mérito por litispendência."
+    },
+    {
+     "id": "cmrigv5hv001vl604nh9nt6xu",
+     "rep": 2,
+     "materia": "Direito Processual Civil",
+     "front": "No caso de CONTINÊNCIA, se a ação continente tiver sido proposta ANTERIORMENTE, qual a consequência para o processo da ação contida?",
+     "back": "No processo relativo à ação contida será proferida sentença SEM resolução de mérito (Art. 57 do CPC). A banca erra ao afirmar que a sentença seria 'com' resolução."
+    }
+   ]
+  },
+  {
+   "tema": "Recuperacao judicial nao vai a Justica Federal",
+   "manter": "cmrigv5hu001rl604seo9z2y3",
+   "remover": [
+    "cmrigv5hv001tl6048ibsd0wt"
+   ],
+   "obs": "empate 2x2",
+   "detalhe": [
+    {
+     "id": "cmrigv5hu001rl604seo9z2y3",
+     "rep": 2,
+     "materia": "Direito Processual Civil",
+     "front": "Se a União intervir em processo de RECUPERAÇÃO JUDICIAL ou FALÊNCIA na Justiça Comum, os autos devem ser remetidos à Justiça Federal?",
+     "back": "Não. As ações de recuperação judicial, falência, insolvência civil e acidente de trabalho são EXCEÇÕES expressas e permanecem na Justiça Comum (Art. 45, I, do CPC e Art. 109, I, da CF)[cite: 25]."
+    },
+    {
+     "id": "cmrigv5hv001tl6048ibsd0wt",
+     "rep": 2,
+     "materia": "Revisão Geral",
+     "front": "Por que está INCORRETA a afirmação de que o processo de recuperação judicial é remetido à Justiça Federal 'se houver requerimento da União'?",
+     "back": "Porque a vedação de remessa das ações de falência e recuperação judicial para a esfera federal é absoluta; o processo PERMANECE na Justiça Comum independentemente de requerimento ou interesse manifestado pela União[cite: 25]."
+    }
+   ]
+  },
+  {
+   "tema": "Honorarios de sucumbencia na JT",
+   "manter": "cmq1jhju20003lb04fd2l4jba",
+   "remover": [
+    "cmpvtf08k000dl4045syq030s"
+   ],
+   "obs": "MESCLAR: o removido traz o piso de 5%",
+   "detalhe": [
+    {
+     "id": "cmq1jhju20003lb04fd2l4jba",
+     "rep": 8,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual o percentual máximo dos honorários de sucumbência nas reclamações trabalhistas?",
+     "back": "15% sobre o valor da liquidação da sentença."
+    },
+    {
+     "id": "cmpvtf08k000dl4045syq030s",
+     "rep": 6,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual o percentual mínimo e máximo dos honorários de sucumbência na Justiça do Trabalho, inclusive para advogado em causa própria?",
+     "back": "Mínimo de 5% e máximo de 15% sobre o valor da liquidação, proveito econômico ou causa."
+    }
+   ]
+  },
+  {
+   "tema": "OJ 245 SDI-1 - tolerancia de atraso na audiencia",
+   "manter": "cmpikn2oo001jl204gkyngal3",
+   "remover": [
+    "cmsdso9kh0007l404bxfnm6pt",
+    "cmrtsttan0005l7042m32ywnq"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpikn2oo001jl204gkyngal3",
+     "rep": 5,
+     "materia": "Direito do Trabalho",
+     "front": "Há alguma tolerância legal de atraso para o comparecimento das partes na audiência trabalhista?",
+     "back": "Inexiste previsão legal tolerando atraso no horário de comparecimento da parte na audiência (OJ 245 da SDI-1 do TST)."
+    },
+    {
+     "id": "cmsdso9kh0007l404bxfnm6pt",
+     "rep": 2,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O que estabelece a OJ n. 245 da SBDI-1 do TST sobre o atraso da parte à audiência?",
+     "back": "Inexiste previsão legal tolerando atraso no horário de comparecimento da parte na audiência."
+    },
+    {
+     "id": "cmrtsttan0005l7042m32ywnq",
+     "rep": 2,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O que a OJ nº 245 da SDI-1 do TST estabelece sobre a tolerância de atraso das partes na audiência trabalhista?",
+     "back": "Inexiste previsão legal tolerando atraso no comparecimento da parte na audiência."
+    }
+   ]
+  },
+  {
+   "tema": "Sumula 16 TST - presuncao de recebimento da notificacao",
+   "manter": "cmrb5uhbb0009ju04oy2osh4y",
+   "remover": [
+    "cmr473x6b0001jl04nbk1vn4a"
+   ],
+   "obs": "empate 3x3",
+   "detalhe": [
+    {
+     "id": "cmrb5uhbb0009ju04oy2osh4y",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O que estabelece a Súmula 16 do TST sobre a presunção de recebimento da notificação postal?",
+     "back": "Presume-se recebida em 48h da postagem, cabendo ao reclamado provar o não recebimento."
+    },
+    {
+     "id": "cmr473x6b0001jl04nbk1vn4a",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual a presunção de recebimento da notificação postal, segundo a Súmula 16 do TST?",
+     "back": "48 horas após sua postagem."
+    }
+   ]
+  },
+  {
+   "tema": "Suspensao de prazos 20/12 a 20/01",
+   "manter": "cmqe210bv0005l10426spejmm",
+   "remover": [
+    "cmqoena9r0001k104wfe6qgoq",
+    "cmqiosmpx0009l504z4vb0pky"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqe210bv0005l10426spejmm",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual o período de suspensão dos prazos processuais na Justiça do Trabalho?",
+     "back": "De 20 de dezembro a 20 de janeiro, inclusive."
+    },
+    {
+     "id": "cmqoena9r0001k104wfe6qgoq",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual o período de suspensão dos prazos processuais na Justiça do Trabalho, conforme a CLT?",
+     "back": "De 20 de dezembro a 20 de janeiro, inclusive."
+    },
+    {
+     "id": "cmqiosmpx0009l504z4vb0pky",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual é o período de suspensão do curso do prazo processual no processo do trabalho, conforme o Art. 775-A da CLT?",
+     "back": "De 20 de dezembro a 20 de janeiro, inclusive."
+    }
+   ]
+  },
+  {
+   "tema": "Atos vedados no periodo de 20/12 a 20/01",
+   "manter": "cmqa2tpu8000jlh045hedodkh",
+   "remover": [
+    "cmqoena9r0003k104oh9mqshp"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqa2tpu8000jlh045hedodkh",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Quais atos processuais são expressamente proibidos de serem realizados no período de 20 de dezembro a 20 de janeiro na Justiça do Trabalho, conforme o art. 775-A da CLT?",
+     "back": "Apenas sessões de julgamento e audiências."
+    },
+    {
+     "id": "cmqoena9r0003k104oh9mqshp",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Durante o período de suspensão dos prazos na Justiça do Trabalho (20/12 a 20/01), o que NÃO pode ser realizado?",
+     "back": "Audiências nem sessões de julgamento."
+    }
+   ]
+  },
+  {
+   "tema": "Prazo da excecao de incompetencia territorial (art. 800 CLT)",
+   "manter": "cmr473x6b0007jl04lfwrwejm",
+   "remover": [
+    "cms58leay0001jy04p1utoet3"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmr473x6b0007jl04lfwrwejm",
+     "rep": 9,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual o prazo e a forma de apresentação da exceção de incompetência territorial no processo do trabalho?",
+     "back": "Escrita, em 5 dias do recebimento da notificação (Art. 800 CLT)."
+    },
+    {
+     "id": "cms58leay0001jy04p1utoet3",
+     "rep": 1,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual o prazo e o momento para apresentação da exceção de incompetência territorial na Justiça do Trabalho, conforme o Art. 800 da CLT?",
+     "back": "5 dias a contar da notificação, antes da audiência."
+    }
+   ]
+  },
+  {
+   "tema": "Preposto nao precisa ser empregado (art. 843, §3)",
+   "manter": "cmponiian0007l704758z7g1z",
+   "remover": [
+    "cmrtsttan0007l704slzhjskn",
+    "cmsdso9kh0003l404xtztq09e"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmponiian0007l704758z7g1z",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "É obrigatório que o preposto da parte reclamada seja seu empregado na Justiça do Trabalho após a Reforma Trabalhista?",
+     "back": "Não, o Art. 843, §3º da CLT retirou essa exigência."
+    },
+    {
+     "id": "cmrtsttan0007l704slzhjskn",
+     "rep": 2,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Conforme o Art. 843, §3º da CLT, o preposto da parte reclamada precisa ser seu empregado?",
+     "back": "Não, o preposto não precisa ser empregado da parte reclamada."
+    },
+    {
+     "id": "cmsdso9kh0003l404xtztq09e",
+     "rep": 2,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Conforme o art. 843, §3º da CLT (reforma trabalhista), qual o requisito para o preposto em relação ao seu vínculo com a empresa?",
+     "back": "NÃO precisa ser empregado da empresa."
+    }
+   ]
+  },
+  {
+   "tema": "Prazo para anotacao da CTPS (5 dias uteis)",
+   "manter": "cmpgygih4005niym0m17njra4",
+   "remover": [
+    "cmr2m2h8d0001ld044qpap5hc"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpgygih4005niym0m17njra4",
+     "rep": 8,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o prazo para o empregador anotar a CTPS do empregado (Pós-Reforma)?",
+     "back": "5 dias úteis a partir da admissão."
+    },
+    {
+     "id": "cmr2m2h8d0001ld044qpap5hc",
+     "rep": 3,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o prazo legal para o empregador anotar a CTPS do trabalhador admitido, conforme a CLT?",
+     "back": "5 (cinco) dias úteis."
+    }
+   ]
+  },
+  {
+   "tema": "Desistencia apos contestacao exige anuencia do reu",
+   "manter": "cmqvhndv7000hk104xrliaba1",
+   "remover": [
+    "cmqvhkuwq0001k104l6xscwey"
+   ],
+   "obs": "empate 3x3",
+   "detalhe": [
+    {
+     "id": "cmqvhndv7000hk104xrliaba1",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "No Processo do Trabalho, o que acontece se o reclamado não concordar com a desistência da ação após a apresentação da contestação?",
+     "back": "O juiz não pode homologar a desistência, e a ação prossegue normalmente."
+    },
+    {
+     "id": "cmqvhkuwq0001k104l6xscwey",
+     "rep": 3,
+     "materia": "Direito Processual do Trabalho",
+     "front": "No Processo do Trabalho, após a contestação, o reclamante pode desistir da ação sem consentimento do reclamado?",
+     "back": "Não, é necessário o consentimento do reclamado."
+    }
+   ]
+  },
+  {
+   "tema": "Suspensao disciplinar superior a 30 dias (art. 474)",
+   "manter": "cmrif88vj000ljr04gta8h950",
+   "remover": [
+    "cmqyjxkun0009ld049rnz1imf"
+   ],
+   "obs": "empate 3x3",
+   "detalhe": [
+    {
+     "id": "cmrif88vj000ljr04gta8h950",
+     "rep": 3,
+     "materia": "Direito do Trabalho",
+     "front": "No exercício do poder disciplinar pelo empregador, qual a consequência jurídica se a suspensão aplicada ao empregado for superior a 30 dias consecutivos?",
+     "back": "Importa na rescisão injusta (indireta) do contrato de trabalho por parte do empregador (Art. 474 da CLT)[cite: 14]."
+    },
+    {
+     "id": "cmqyjxkun0009ld049rnz1imf",
+     "rep": 3,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o limite máximo da suspensão disciplinar do empregado e qual a consequência de excedê-lo?",
+     "back": "30 dias; exceder esse prazo importa em rescisão injusta do contrato de trabalho."
+    }
+   ]
+  },
+  {
+   "tema": "Foro de eleicao e invalido no processo do trabalho",
+   "manter": "cmpikn2on001dl20474s5lnxt",
+   "remover": [
+    "cmpgygih7006hiym07x4ta4mn"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpikn2on001dl20474s5lnxt",
+     "rep": 6,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o impacto da IN 39/16 do TST sobre a cláusula de foro de eleição no contrato de trabalho?",
+     "back": "A instrução confirma que a cláusula de foro de eleição é nula por dificultar o acesso do trabalhador à justiça."
+    },
+    {
+     "id": "cmpgygih7006hiym07x4ta4mn",
+     "rep": 5,
+     "materia": "Direito do Trabalho",
+     "front": "O foro de eleição (escolhido em contrato) é válido no Processo do Trabalho?",
+     "back": "Em regra não, pois prevalece a natureza imperativa do Art. 651 da CLT para proteger o acesso do trabalhador à justiça."
+    }
+   ]
+  },
+  {
+   "tema": "Art. 651, §3 CLT - foro da contratacao x prestacao",
+   "manter": "cmpikn2on001bl204lehpjj7u",
+   "remover": [
+    "cmpgygih60061iym0f18341wx"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpikn2on001bl204lehpjj7u",
+     "rep": 11,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o foro competente se o empregador for móvel (ex: circo) e atuar em vários locais?",
+     "back": "O empregado poderá escolher entre o local da contratação ou o da prestação dos serviços (Art. 651, §3º CLT)."
+    },
+    {
+     "id": "cmpgygih60061iym0f18341wx",
+     "rep": 4,
+     "materia": "Direito do Trabalho",
+     "front": "Se o empregador realizar atividades fora do lugar do contrato (§3º Art. 651), qual o foro?",
+     "back": "O empregado pode optar pelo foro da celebração do contrato ou pelo da prestação dos serviços."
+    }
+   ]
+  },
+  {
+   "tema": "Lay-off - suspensao para qualificacao (art. 476-A)",
+   "manter": "cmqyjxkun000bld04mn0egbv7",
+   "remover": [
+    "cmrif88vl0019jr04gnd40545"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqyjxkun000bld04mn0egbv7",
+     "rep": 6,
+     "materia": "Direito do Trabalho",
+     "front": "Quais os requisitos cumulativos e o período máximo para a suspensão do contrato de trabalho para participação em curso de qualificação (lay-off)?",
+     "back": "Previsão em negociação coletiva, concordância formal do empregado e duração de dois a cinco meses."
+    },
+    {
+     "id": "cmrif88vl0019jr04gnd40545",
+     "rep": 2,
+     "materia": "Direito do Trabalho",
+     "front": "A suspensão do contrato de trabalho por curso de qualificação profissional (lay-off) exige quais requisitos cumulativos?",
+     "back": "Exige previsão em convenção ou acordo coletivo de trabalho E aquiescência (concordância) formal do empregado (Art. 476-A da CLT)[cite: 22]."
+    }
+   ]
+  },
+  {
+   "tema": "Licenca nojo do professor - 9 dias",
+   "manter": "cmqu3vtjv000jjs04kcz1o1bg",
+   "remover": [
+    "cmrif88vl0015jr046njti3n8"
+   ],
+   "obs": "MESCLAR: o removido traz o rol conjuge/pai/mae/filho",
+   "detalhe": [
+    {
+     "id": "cmqu3vtjv000jjs04kcz1o1bg",
+     "rep": 5,
+     "materia": "Direito do Trabalho",
+     "front": "Qual a duração da licença nojo por falecimento de familiar para o empregado professor, conforme a CLT?",
+     "back": "9 dias consecutivos."
+    },
+    {
+     "id": "cmrif88vl0015jr046njti3n8",
+     "rep": 2,
+     "materia": "Direito do Trabalho",
+     "front": "Para o empregado professor, em caso de falecimento de filho ou casamento (gala/luto), qual o prazo de interrupção contratual garantido?",
+     "back": "Não serão descontadas as faltas no decurso de 9 dias, restrito ao falecimento de cônjuge, pai, mãe ou filho (Art. 320, § 3º, da CLT)[cite: 21]."
+    }
+   ]
+  },
+  {
+   "tema": "Contrato determinado sucessivo em menos de 6 meses (art. 452)",
+   "manter": "cmr2m2h8e0009ld04esaelzg7",
+   "remover": [
+    "cmqk9dyoa0007ju048qlgvo4r"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmr2m2h8e0009ld04esaelzg7",
+     "rep": 4,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o prazo para um contrato por prazo determinado, que sucede outro, se converter em indeterminado, salvo exceções legais, conforme a CLT?",
+     "back": "6 (seis) meses."
+    },
+    {
+     "id": "cmqk9dyoa0007ju048qlgvo4r",
+     "rep": 3,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o efeito jurídico, conforme a CLT, de um contrato que sucede outro por prazo determinado, dentro de 6 meses?",
+     "back": "Considera-se por prazo indeterminado, salvo exceções legais (Art. 452 CLT)."
+    }
+   ]
+  },
+  {
+   "tema": "FGTS na suspensao por acidente de trabalho",
+   "manter": "cmqu3vtjw000ljs04q3r0xec0",
+   "remover": [
+    "cmqyjxkum0003ld04kl9jc545"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqu3vtjw000ljs04q3r0xec0",
+     "rep": 7,
+     "materia": "Direito do Trabalho",
+     "front": "Em quais hipóteses de suspensão do contrato de trabalho o empregador continua recolhendo o FGTS?",
+     "back": "Afastamento por acidente de trabalho e serviço militar obrigatório."
+    },
+    {
+     "id": "cmqyjxkum0003ld04kl9jc545",
+     "rep": 3,
+     "materia": "Direito do Trabalho",
+     "front": "Na suspensão do contrato por afastamento previdenciário decorrente de acidente de trabalho, a obrigação de recolher o FGTS e computar o tempo de serviço permanece para o empregador?",
+     "back": "Sim, a obrigação de recolher o FGTS e computar o tempo de serviço permanece."
+    }
+   ]
+  },
+  {
+   "tema": "Reducao da jornada no aviso previo (art. 488)",
+   "manter": "cmqu3vtjv000hjs048eq0x9sj",
+   "remover": [
+    "cmrmpzr60000djm04skbigsho"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmqu3vtjv000hjs048eq0x9sj",
+     "rep": 4,
+     "materia": "Direito do Trabalho",
+     "front": "Quais as opções de redução da jornada no aviso prévio promovido pelo empregador, conforme a CLT?",
+     "back": "Redução de 2 horas diárias ou faltar por 7 dias corridos."
+    },
+    {
+     "id": "cmrmpzr60000djm04skbigsho",
+     "rep": 2,
+     "materia": "Direito do Trabalho",
+     "front": "Quais são as duas opções do empregado para redução da jornada no aviso prévio concedido pelo empregador?",
+     "back": "Redução de 2 horas diárias ou falta por 7 dias corridos. (Art. 488 CLT)"
+    }
+   ]
+  },
+  {
+   "tema": "Aviso previo na culpa reciproca",
+   "manter": "cmr9sug0e0005jl0475m2cq8k",
+   "remover": [
+    "cmrmpzr60000hjm0461w6gv8w"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmr9sug0e0005jl0475m2cq8k",
+     "rep": 3,
+     "materia": "Direito do Trabalho",
+     "front": "Na rescisão do contrato de trabalho por culpa recíproca, qual o percentual devido da multa do FGTS e do aviso prévio, respectivamente?",
+     "back": "Multa do FGTS de 20%; aviso prévio de 50%."
+    },
+    {
+     "id": "cmrmpzr60000hjm0461w6gv8w",
+     "rep": 2,
+     "materia": "Direito do Trabalho",
+     "front": "Qual o percentual do aviso prévio devido ao empregado em caso de culpa recíproca?",
+     "back": "50% do valor. (Súmula 14 TST)"
+    }
+   ]
+  },
+  {
+   "tema": "Parentesco ate 3 grau - impedimento/suspeicao",
+   "manter": "cmq74rcjj000bia04fg315a3k",
+   "remover": [
+    "cmrvd1k0r000bjv045ihgcfoz",
+    "cmq77p9n80001js04dktyeg8j"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmq74rcjj000bia04fg315a3k",
+     "rep": 10,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Até qual grau de parentesco, por consanguinidade ou afinidade, um Magistrado é considerado impedido ou suspeito?",
+     "back": "Até o terceiro grau civil (linha reta ou colateral)."
+    },
+    {
+     "id": "cmrvd1k0r000bjv045ihgcfoz",
+     "rep": 2,
+     "materia": "Direito Processual Civil",
+     "front": "Qual o grau de parentesco máximo que caracteriza impedimento ou suspeição do juiz, conforme o CPC?",
+     "back": "Até o terceiro grau, consanguíneo ou afim, em linha reta ou colateral."
+    },
+    {
+     "id": "cmq77p9n80001js04dktyeg8j",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Segundo o Art. 801 da CLT, até qual grau de parentesco por afinidade gera a suspeição do juiz?",
+     "back": "Até o terceiro grau civil."
+    }
+   ]
+  },
+  {
+   "tema": "Revelia nao impede poderes instrutorios (art. 370)",
+   "manter": "cmsdtj9pj0009ju04rlaquv1r",
+   "remover": [
+    "cmsdtj9pj000bju04tmsdzdw5"
+   ],
+   "obs": "empate 1x1",
+   "detalhe": [
+    {
+     "id": "cmsdtj9pj0009ju04rlaquv1r",
+     "rep": 1,
+     "materia": "Direito Processual do Trabalho",
+     "front": "A presunção relativa de veracidade dos fatos, decorrente da revelia, impede o Juiz de determinar a produção de provas?",
+     "back": "Não, pois o Juiz possui poderes instrutórios (Art. 370 CPC e Súmula 74, III TST)."
+    },
+    {
+     "id": "cmsdtj9pj000bju04tmsdzdw5",
+     "rep": 1,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Mesmo havendo revelia, o Juiz é obrigado a julgar antecipadamente a lide?",
+     "back": "Não, pois pode determinar a produção de provas, conforme seus poderes instrutórios (Art. 370 CPC)."
+    }
+   ]
+  },
+  {
+   "tema": "Vedacao a decisao surpresa (art. 10 CPC)",
+   "manter": "cmq00gexx0009l2048o6skde1",
+   "remover": [
+    "cmrif88vk000rjr040fx0ti7f"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmq00gexx0009l2048o6skde1",
+     "rep": 4,
+     "materia": "Direito Processual Civil",
+     "front": "O que o Art. 10 do CPC estabelece sobre a decisão do juiz com base em fundamento não manifestado pelas partes?",
+     "back": "Não pode decidir, mesmo de ofício, sobre fundamento sem prévia manifestação das partes."
+    },
+    {
+     "id": "cmrif88vk000rjr040fx0ti7f",
+     "rep": 3,
+     "materia": "Direito Processual Civil",
+     "front": "O juiz pode decidir com base em fundamento sobre o qual as partes não se manifestaram se a matéria for de ordem pública (cognoscível de ofício)?",
+     "back": "Não. O art. 10 do CPC veda a decisão surpresa, exigindo prévia manifestação das partes ainda que se trate de matéria sobre a qual deva decidir de ofício."
+    }
+   ]
+  },
+  {
+   "tema": "Substabelecimento por mandato tacito (OJ 200)",
+   "manter": "cmpvtf08k0009l404ftgmwpxj",
+   "remover": [
+    "cmpikn2oo001hl204kntkazi6"
+   ],
+   "obs": "empate 6x6",
+   "detalhe": [
+    {
+     "id": "cmpvtf08k0009l404ftgmwpxj",
+     "rep": 6,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O detentor de mandato tácito no processo do trabalho pode substabelecer seus poderes?",
+     "back": "Não, é inválido o substabelecimento, conforme OJ nº 200 da SDI-1 do TST."
+    },
+    {
+     "id": "cmpikn2oo001hl204kntkazi6",
+     "rep": 6,
+     "materia": "Direito do Trabalho",
+     "front": "É válido o substabelecimento de advogado que foi investido apenas por mandato tácito na Justiça do Trabalho?",
+     "back": "Não. Conforme a OJ 200 da SDI-1 do TST, esse tipo de substabelecimento é inválido."
+    }
+   ]
+  },
+  {
+   "tema": "Sociedade sem PJ nao opoe irregularidade (art. 75, §2)",
+   "manter": "cmqxv4ax4000nif04ngc4iw7y",
+   "remover": [
+    "cmqu5yqah0007js04e3ugw2bt"
+   ],
+   "obs": "empate 3x3",
+   "detalhe": [
+    {
+     "id": "cmqxv4ax4000nif04ngc4iw7y",
+     "rep": 3,
+     "materia": "Direito Processual Civil",
+     "front": "Sociedades ou associações sem personalidade jurídica podem opor sua irregularidade de constituição para evitar uma demanda judicial?",
+     "back": "Não, é inadmissível a oposição de irregularidade de constituição para evitar a demanda judicial (Art. 75, §2º do CPC)."
+    },
+    {
+     "id": "cmqu5yqah0007js04e3ugw2bt",
+     "rep": 3,
+     "materia": "Direito Processual Civil",
+     "front": "Sociedade sem personalidade jurídica pode alegar sua irregularidade de constituição para evitar demanda judicial?",
+     "back": "Não, conforme art. 75, §2º do CPC."
+    }
+   ]
+  },
+  {
+   "tema": "Confissao ficta e indeferimento de prova testemunhal",
+   "manter": "cmponiiao0009l704jhe7r1mk",
+   "remover": [
+    "cmrtsttan0009l704h0w9ja4o"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmponiiao0009l704jhe7r1mk",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O indeferimento de prova testemunhal por confissão ficta em depoimento pessoal configura cerceamento de defesa?",
+     "back": "Não, conforme a Tese Vinculante do TST nº 135."
+    },
+    {
+     "id": "cmrtsttan0009l704h0w9ja4o",
+     "rep": 2,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O indeferimento de prova testemunhal por presunção de veracidade decorrente de confissão ficta do preposto configura cerceamento de defesa?",
+     "back": "Não, conforme a Tese Vinculante TST nº 135."
+    }
+   ]
+  },
+  {
+   "tema": "Sumula Vinculante 45 - Juri x foro estadual",
+   "manter": "cmplqi671000fjs04lymgtduy",
+   "remover": [
+    "cmpvtbq65000tla04rt9vg422"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmplqi671000fjs04lymgtduy",
+     "rep": 7,
+     "materia": "Direito Constitucional",
+     "front": "O que a Súmula Vinculante nº 45 estabelece sobre a competência do Júri e foro por prerrogativa de função estadual?",
+     "back": "O Júri prevalece sobre foro por prerrogativa de função estabelecido exclusivamente pela Constituição estadual."
+    },
+    {
+     "id": "cmpvtbq65000tla04rt9vg422",
+     "rep": 6,
+     "materia": "Direito Constitucional",
+     "front": "O que a Súmula Vinculante nº 45 estabelece sobre a competência do Tribunal do Júri?",
+     "back": "Prevalece sobre foro por prerrogativa de função estabelecido exclusivamente por Constituição estadual."
+    }
+   ]
+  },
+  {
+   "tema": "Sumula Vinculante 13 - nepotismo",
+   "manter": "cmpgygign000niym0mtj95m5y",
+   "remover": [
+    "cmsnws797000xla04kwzq1cak"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpgygign000niym0mtj95m5y",
+     "rep": 4,
+     "materia": "Revisão Geral TRT",
+     "front": "A proibição do Nepotismo (SV 13) aplica-se a cargos políticos (ex: Secretários)?",
+     "back": "Em regra, não. Salvo em casos de nepotismo cruzado ou evidente falta de qualificação técnica/fraude à lei."
+    },
+    {
+     "id": "cmsnws797000xla04kwzq1cak",
+     "rep": 1,
+     "materia": "Direito Constitucional",
+     "front": "A vedação ao nepotismo pela Súmula Vinculante nº 13 do STF alcança a nomeação para cargos políticos?",
+     "back": "Não."
+    }
+   ]
+  },
+  {
+   "tema": "Sumula 428 TST - sobreaviso e aparelhos telematicos",
+   "manter": "cmpk98p2g000dkt043ozd2tdy",
+   "remover": [
+    "cmq74rcji0001ia04g98vdqky"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmpk98p2g000dkt043ozd2tdy",
+     "rep": 5,
+     "materia": "Direito do Trabalho",
+     "front": "O uso de instrumentos telemáticos ou informatizados fornecidos pela empresa, por si só, caracteriza regime de sobreaviso?",
+     "back": "Não, por si só, não caracteriza regime de sobreaviso (Súmula 428, I, TST)."
+    },
+    {
+     "id": "cmq74rcji0001ia04g98vdqky",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O que a Súmula nº 428 do TST estabelece sobre horas de sobreaviso por uso de telefone celular?",
+     "back": "O simples fornecimento de aparelho celular não gera direito a horas de sobreaviso."
+    }
+   ]
+  },
+  {
+   "tema": "Dever de obediencia x ordem manifestamente ilegal",
+   "manter": "cmq02jefh000bjs04e2ha5q9h",
+   "remover": [
+    "cmqzwva0w001hjo04hi74zlon"
+   ],
+   "obs": "empate 4x4",
+   "detalhe": [
+    {
+     "id": "cmq02jefh000bjs04e2ha5q9h",
+     "rep": 4,
+     "materia": "Direito Administrativo",
+     "front": "Quando o subordinado pode se recusar a cumprir uma ordem superior?",
+     "back": "Quando a ordem for manifestamente ilegal."
+    },
+    {
+     "id": "cmqzwva0w001hjo04hi74zlon",
+     "rep": 4,
+     "materia": "Revisão Geral",
+     "front": "As ordens ilegais emitidas por um superior hierárquico impõem ao funcionário subordinado o dever de obediência?",
+     "back": "Não. O dever de obediência cessa quando a ordem recebida for manifestamente ilegal."
+    }
+   ]
+  },
+  {
+   "tema": "Ministerio Publico - prazo em dobro",
+   "manter": "cmq77p9n9000bjs04yuvp0974",
+   "remover": [
+    "cmqe210bv000dl104mgcvvdbl"
+   ],
+   "obs": "",
+   "detalhe": [
+    {
+     "id": "cmq77p9n9000bjs04yuvp0974",
+     "rep": 7,
+     "materia": "Direito Processual do Trabalho",
+     "front": "O Ministério Público goza de prazo em dobro para manifestar-se nos autos?",
+     "back": "Sim, salvo se a lei estabelecer prazo próprio (Art. 180 CPC)."
+    },
+    {
+     "id": "cmqe210bv000dl104mgcvvdbl",
+     "rep": 4,
+     "materia": "Direito Processual do Trabalho",
+     "front": "Qual a prerrogativa de prazo do Ministério Público no processo do trabalho?",
+     "back": "Prazo em dobro para manifestar-se e recorrer."
+    }
+   ]
+  }
+ ],
+ "revisar": [
+  {
+   "tema": "Ato complexo x ato composto",
+   "a": "cmqu1v2ku0003lc04bnifvi9t",
+   "b": "cmqzwtyf2000rjo044d5k036w",
+   "obs": "o segundo define 'ato composto' com mais precisao que o card de contraste; decidir se vira nota do primeiro"
+  },
+  {
+   "tema": "Criacao de EP/SEM por autorizacao legislativa",
+   "a": "cmpgygigo000xiym0d74eweq4",
+   "b": "cmrqawlug0005ib04vfe8qio7",
+   "obs": "o segundo tem escopo maior (inclui fundacao de direito privado); nao remover sem mesclar"
+  }
+ ]
+}

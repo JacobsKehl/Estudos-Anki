@@ -16,12 +16,12 @@ export function SubjectPossiblyStudiedBanner({ count }: SubjectPossiblyStudiedBa
         </div>
         <div className="space-y-1">
           <p className="text-sm font-bold leading-tight">
-            Seu material principal mudou para os resumos do CFC. {count > 0 ? `${count} blocos podem já ter sido estudados` : "19 blocos podem já ter sido estudados"} — confirme para atualizar seu progresso.
+            Seu material principal mudou para os resumos do CFC. {count > 0 ? `${count} blocos podem já ter sido estudados` : "Blocos podem já ter sido estudados"} — confirme para atualizar seu progresso.
           </p>
           <p className="text-xs text-muted-foreground leading-relaxed flex items-center gap-1.5 pt-0.5">
             <Info className="w-3.5 h-3.5 shrink-0 text-amber-700" />
             <span>
-              A queda temporária na porcentagem ocorre porque o CFC passou a ser o caminho principal de leitura e os materiais antigos viraram consulta. Conforme você confirmar o que já estudou, sua complitude subirá para <strong>48,3%</strong> (acima dos 37,9% de antes).
+              Os resumos do CFC passaram a ser o seu roteiro principal de leitura. Conforme você confirmar os blocos que já estudou, a sua completude da matéria será atualizada automaticamente.
             </span>
           </p>
         </div>

@@ -15,14 +15,38 @@ export function GenerateAllFlashcardsButton({ subjectId }: GenerateAllFlashcards
   const router = useRouter();
 
   const handleGenerateAll = async () => {
-    const confirm = window.confirm(
-      "Isso irá gerar flashcards para TODOS os blocos de estudo desta matéria que ainda não possuem cards. Deseja continuar?"
-    );
-    
-    if (!confirm) return;
-
     setIsLoading(true);
-    const toastId = toast.loading("Analisando todos os blocos e gerando cards...");
+    let stats: { totalBlocks: number; blocksWithoutCards: number; existingApprovedCards: number } | null = null;
+    
+    try {
+      const statsRes = await fetch(`/api/subjects/${subjectId}/generate-all-flashcards`);
+      if (statsRes.ok) {
+        stats = await statsRes.json();
+      }
+    } catch {
+      // Ignore preflight fetch error
+    }
+
+    if (stats) {
+      if (stats.blocksWithoutCards === 0) {
+        toast.info(`Esta matéria possui ${stats.totalBlocks} blocos e todos os ${stats.existingApprovedCards} flashcards já estão ativos. Nenhum novo card precisa ser gerado.`);
+        setIsLoading(false);
+        return;
+      }
+
+      const confirmMsg = `Esta matéria possui ${stats.totalBlocks} blocos no total e ${stats.existingApprovedCards} flashcards aprovados.\n\nSerão gerados novos flashcards APENAS para os ${stats.blocksWithoutCards} blocos que ainda NÃO possuem cards.\n\nDeseja continuar?`;
+      if (!window.confirm(confirmMsg)) {
+        setIsLoading(false);
+        return;
+      }
+    } else {
+      if (!window.confirm("Isso irá gerar flashcards APENAS para blocos que ainda não possuem cards. Deseja continuar?")) {
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    const toastId = toast.loading("Analisando blocos sem cards e gerando com IA...");
     
     try {
       const response = await fetch(`/api/subjects/${subjectId}/generate-all-flashcards`, {

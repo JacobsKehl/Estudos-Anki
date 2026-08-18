@@ -61,12 +61,12 @@ export default async function Dashboard() {
     ] = await Promise.all([
       getUnifiedTodayCards(userId),
       prisma.studySubject.count({ where: { userId } }),
-      prisma.studyMaterial.count({ where: { userId } } as any),
-      (prisma as any).studyBlock.count({ where: { userId } }),
+      prisma.studyMaterial.count({ where: { userId } }),
+      prisma.studyBlock.count({ where: { userId } }),
       prisma.studyMaterial.findFirst({
         where: { userId, organizationStatus: { not: "ORGANIZED" } }
       }),
-      (prisma as any).studyScheduleItem.findFirst({
+      prisma.studyScheduleItem.findFirst({
         where: {
           userId,
           status: { in: ["PENDING", "IN_PROGRESS"] },
@@ -74,7 +74,7 @@ export default async function Dashboard() {
           scheduledDate: { lt: todayStart }
         }
       }),
-      (prisma as any).studyScheduleItem.findMany({
+      prisma.studyScheduleItem.findMany({
         where: {
           userId,
           schedule: { status: "ACTIVE" },
@@ -106,7 +106,7 @@ export default async function Dashboard() {
         },
         orderBy: { priorityScore: "desc" },
       }),
-      (prisma as any).studySchedule.findFirst({
+      prisma.studySchedule.findFirst({
         where: { userId, status: "ACTIVE" }
       })
     ]);
@@ -160,10 +160,10 @@ export default async function Dashboard() {
     // 3. Se não houver teoria hoje, verificar de forma leve se existem blocos teóricos elegíveis não concluídos
     let hasEligiblePendingTheoryBlocks = false;
     if (activeSchedule && !hasTodayPendingTheory) {
-      const eligibleBlock = await (prisma as any).studyBlock.findFirst({
+      const eligibleBlock = await prisma.studyBlock.findFirst({
         where: {
           userId,
-          status: { not: "COMPLETED" },
+          theoryStatus: { not: "COMPLETED" },
           subject: {
             studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
           },
@@ -204,7 +204,7 @@ export default async function Dashboard() {
       }
       
       // Re-fetch since it has been reorganized
-      todayItems = await (prisma as any).studyScheduleItem.findMany({
+      todayItems = await prisma.studyScheduleItem.findMany({
         where: {
           userId,
           schedule: { status: "ACTIVE" },
@@ -313,7 +313,7 @@ export default async function Dashboard() {
   const completedMinutes = completedStudyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
   const totalMinutes = studyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
 
-  const isDayCompleted = studyTasks.length === 0 && todayStats.total === 0;
+  const isDayCompleted = pendingStudyTasks.length === 0 && todayStats.total === 0;
 
   return (
     <div className="space-y-10 max-w-4xl mx-auto animate-in fade-in duration-700 slide-in-from-bottom-4 pb-24">

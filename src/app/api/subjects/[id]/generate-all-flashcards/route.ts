@@ -6,6 +6,42 @@ import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: subjectId } = await params;
+  const mockUserId = await getMockUserId();
+
+  try {
+    const totalBlocks = await (prisma as any).studyBlock.count({
+      where: { subjectId, userId: mockUserId }
+    });
+
+    const blocksWithoutCards = await (prisma as any).studyBlock.count({
+      where: {
+        subjectId,
+        userId: mockUserId,
+        flashcards: {
+          none: { status: "APPROVED" }
+        }
+      }
+    });
+
+    const existingApprovedCards = await prisma.flashcard.count({
+      where: { subjectId, userId: mockUserId, status: "APPROVED" }
+    });
+
+    return NextResponse.json({
+      totalBlocks,
+      blocksWithoutCards,
+      existingApprovedCards
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -27,11 +63,14 @@ export async function POST(
       return NextResponse.json({ error: "Matéria não encontrada ou acesso não autorizado." }, { status: 404 });
     }
 
-    // 1. Fetch all blocks for this subject (escopado por usuário)
+    // 1. Fetch ONLY blocks without active (APPROVED) flashcards to guarantee IDEMPOTENCY
     const blocks = await (prisma as any).studyBlock.findMany({
       where: {
         subjectId,
         userId: mockUserId,
+        flashcards: {
+          none: { status: "APPROVED" }
+        }
       },
       include: {
         _count: {
@@ -41,7 +80,10 @@ export async function POST(
     });
 
     if (blocks.length === 0) {
-      return NextResponse.json({ error: "Não há blocos de estudo nesta matéria para gerar flashcards." }, { status: 400 });
+      return NextResponse.json({ 
+        message: "Todos os blocos desta matéria já possuem flashcards ativos. Nenhum novo card foi gerado.",
+        count: 0 
+      }, { status: 200 });
     }
 
     let totalSaved = 0;
