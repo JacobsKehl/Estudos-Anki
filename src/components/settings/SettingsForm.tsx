@@ -121,8 +121,8 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
   };
 
   const handleResetFlashcards = async () => {
-    if (resetConfirmText !== "APAGAR") {
-      toast.error("Digite APAGAR para confirmar a exclusão.");
+    if (resetConfirmText !== "DELETE_ALL_FLASHCARDS") {
+      toast.error("Digite DELETE_ALL_FLASHCARDS para confirmar a exclusão irreversível.");
       return;
     }
 
@@ -900,7 +900,7 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
                         type="text"
                         value={resetConfirmText}
                         onChange={(e) => setResetConfirmText(e.target.value)}
-                        placeholder="Digite APAGAR para confirmar"
+                        placeholder="Digite DELETE_ALL_FLASHCARDS para confirmar"
                         className="flex-1 h-10 px-3 rounded-xl border border-border/50 bg-background text-xs focus:outline-none focus:ring-2 focus:ring-accent/15 focus:border-accent transition-all"
                       />
                       <Button
