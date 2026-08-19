@@ -10,8 +10,8 @@ async function main() {
   console.log("======================================================================\n");
 
   const prodUrl = process.env.PRODUCTION_URL || process.env.NEXT_PUBLIC_APP_URL || "https://estudos-anki.vercel.app";
-  const email = process.env.SMOKE_EMAIL || "gabriela.furtado.p@gmail.com";
-  const password = process.env.SMOKE_PASSWORD || "123456";
+  const email = process.env.SMOKE_EMAIL || "smoke-tester@estudosanki.internal";
+  const password = process.env.SMOKE_PASSWORD || "SmokeTester123!";
 
   console.log(`Buscando sessão autenticada em: ${prodUrl}/api/auth/login (${email})`);
 

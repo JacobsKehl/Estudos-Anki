@@ -3,19 +3,19 @@
   "regions": ["gru1"],
   "functions": {
     "src/app/api/materials/organize-all/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "src/app/api/materials/[id]/organize/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     },
     "src/app/api/materials/[id]/process/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/cron/reminder",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }

@@ -123,4 +123,19 @@ Scripts de geração de migration (`scripts/diag/run_prisma_migrate_diff.ts` ou 
 - **Duração de Functions (`maxDuration`):** O valor padrão no Hobby é 300s; no Pro é 300s por padrão (expansível até 800s). **O `maxDuration` nunca foi o problema — o cron era.**
 - **Guarda-costas de Deploy:** O script `scripts/diag/verify-prod-positive-control.ts` deve ser executado pós-deploy para verificar se o `Deployment ID` realmente mudou e interromper com exit code não-nulo caso a produção continue estagnada.
 
+---
+
+## 10. Colisão de Rotas no Next.js App Router (Estática vs. Dinâmica `[id]`)
+
+> [!CAUTION]
+> **Rotas estáticas dentro de diretórios com parâmetro dinâmico `[id]` são interceptadas se o dinamico não tiver o método correspondente.**
+
+No Next.js App Router:
+- Uma rota estática como `/api/blocks/flagged/route.ts` colide com `/api/blocks/[id]/route.ts` se estiver sob o mesmo nível `/api/blocks/`.
+- Se `/api/blocks/[id]/route.ts` exportar apenas `PATCH` e `DELETE`, uma chamada `GET /api/blocks/flagged` é capturada por `[id]` com `id="flagged"` e retorna HTTP **405 Method Not Allowed**.
+
+**Regra Operacional:**
+Nunca criar `/api/blocks/<nome_estatico>` no mesmo nível em que existir `/api/blocks/[id]`. Crie endpoints de nível superior autônomos (ex: `/api/flagged-blocks/route.ts`).
+
+
 
