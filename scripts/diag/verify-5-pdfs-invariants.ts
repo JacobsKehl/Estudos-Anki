@@ -36,7 +36,11 @@ async function main() {
     if (!fs.existsSync(pdfPath)) pdfPath = path.join(downloadsDir, "study-inbox", m.name);
     if (!fs.existsSync(pdfPath)) pdfPath = path.join(downloadsDir, "CFC TRT4", m.name);
 
-    const matBlocks = (blocks || []).filter(b => (b as any).StudyMaterial?.originalFileName === m.name);
+    const matBlocks = (blocks || []).filter(b => 
+      (b as any).StudyMaterial?.originalFileName === m.name && 
+      b.pageStart > 0 && 
+      (b as any).theoryStatus !== "EXCLUDED"
+    );
     matBlocks.sort((a, b) => a.pageStart - b.pageStart);
 
     console.log(`📘 VERIFICANDO ${matBlocks.length} BLOCOS DE: '${m.name}'`);
@@ -51,14 +55,11 @@ async function main() {
       if (curr.pageEnd + 1 < next.pageStart) {
         gapsCount++;
         totalGaps++;
-        console.log(` 🔴 LACUNA DECTETADA entre '${curr.title}' [${curr.pageStart}–${curr.pageEnd}] e '${next.title}' [${next.pageStart}–${next.pageEnd}] (Faltam páginas ${curr.pageEnd + 1}..${next.pageStart - 1})`);
+        console.log(` 🔴 LACUNA DETECTADA entre '${curr.title}' [${curr.pageStart}–${curr.pageEnd}] e '${next.title}' [${next.pageStart}–${next.pageEnd}] (Faltam páginas ${curr.pageEnd + 1}..${next.pageStart - 1})`);
       } else if (curr.pageEnd >= next.pageStart) {
-        // Se pageEnd de curr for igual ao pageStart do próximo (ex: 27 e 27 no sub-item de Prescrição no art 611-B), verificar se há sobreposição real de mais de 1 pág
-        if (curr.pageEnd > next.pageStart) {
-          overlapCount++;
-          totalOverlaps++;
-          console.log(` 🔴 SOBREPOSIÇÃO DETECTADA entre '${curr.title}' [${curr.pageStart}–${curr.pageEnd}] e '${next.title}' [${next.pageStart}–${next.pageEnd}]`);
-        }
+        overlapCount++;
+        totalOverlaps++;
+        console.log(` 🔴 SOBREPOSIÇÃO DETECTADA entre '${curr.title}' [${curr.pageStart}–${curr.pageEnd}] e '${next.title}' [${next.pageStart}–${next.pageEnd}]`);
       }
     }
 
