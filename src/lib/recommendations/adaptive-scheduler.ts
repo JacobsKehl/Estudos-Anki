@@ -91,6 +91,77 @@ function calcPriorityScore(params: {
   return score;
 }
 
+// ─── Pure D3 State Machine ──────────────────────────────────────────────────
+
+export interface D3BlockInput {
+  id: string;
+  title: string;
+  theoryCompletedAt: Date | null;
+  review1dCompletedAt: Date | null;
+  review15dCompletedAt: Date | null;
+  review30dCompletedAt: Date | null;
+  estimatedStudyMinutes?: number | null;
+}
+
+export interface PendingD3Review<T extends D3BlockInput = D3BlockInput> {
+  block: T;
+  dueDate: Date;
+  stageName: "D+5" | "D+15" | "D+30";
+}
+
+export function computePendingD3BlockReviews<T extends D3BlockInput>(
+  blocks: T[],
+  referenceDate: Date,
+  maxQuota: number = 3
+): { topAllocated: PendingD3Review<T>[]; allPending: PendingD3Review<T>[] } {
+  const pendingReviews: PendingD3Review<T>[] = [];
+
+  for (const b of blocks) {
+    const d0 = b.theoryCompletedAt;
+    if (!d0) continue; // D0 estrito: sem data de conclusão de teoria -> NÃO entra na fila
+
+    const d0Date = new Date(d0);
+
+    // Stage 1: D+5 (Grava em review1dCompletedAt)
+    if (!b.review1dCompletedAt) {
+      const d5 = new Date(d0Date);
+      d5.setDate(d5.getDate() + 5);
+      if (d5 <= referenceDate) {
+        pendingReviews.push({ block: b, dueDate: d5, stageName: "D+5" });
+        continue;
+      }
+    }
+
+    // Stage 2: D+15 (Elegível após Stage 1 D+5 concluído, Grava em review15dCompletedAt)
+    if (b.review1dCompletedAt && !b.review15dCompletedAt) {
+      const d15 = new Date(d0Date);
+      d15.setDate(d15.getDate() + 15);
+      if (d15 <= referenceDate) {
+        pendingReviews.push({ block: b, dueDate: d15, stageName: "D+15" });
+        continue;
+      }
+    }
+
+    // Stage 3: D+30 (Elegível após Stage 2 D+15 concluído, Grava em review30dCompletedAt)
+    if (b.review15dCompletedAt && !b.review30dCompletedAt) {
+      const d30 = new Date(d0Date);
+      d30.setDate(d30.getDate() + 30);
+      if (d30 <= referenceDate) {
+        pendingReviews.push({ block: b, dueDate: d30, stageName: "D+30" });
+        continue;
+      }
+    }
+  }
+
+  // Ordenar por data de vencimento mais antiga primeiro
+  pendingReviews.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+
+  return {
+    topAllocated: pendingReviews.slice(0, maxQuota),
+    allPending: pendingReviews,
+  };
+}
+
 // ─── Main Queue Generator ─────────────────────────────────────────────────────
 
 /**
@@ -116,8 +187,18 @@ export async function getAdaptiveStudyPlan(
 
   const maxNewTheoryPerDay = config?.maxNewTheoryPerDay ?? 2;
   const maxBlockReviewsPerDay = config?.maxBlockReviewsPerDay ?? 3;
+  const blockReviewTimeFactor = config?.blockReviewTimeFactor ?? 0.35; // Padrão 35% (~12 min para bloco de 35 min)
   const now = new Date();
   const tasks: StudyTask[] = [];
+
+  const cfcFileNames = [
+    "1 - Direito Administrativo_compressed.pdf",
+    "3 - Direito Constitucional_compressed.pdf",
+    "3 - Direito Constitucional.pdf",
+    "Direito Processual Civil_compressed.pdf",
+    "4 - Direito Processual do Trabalho.pdf",
+    "2 - Direito do Trabalho.pdf"
+  ];
 
   const subjects = await prisma.studySubject.findMany({
     where: {
@@ -141,16 +222,6 @@ export async function getAdaptiveStudyPlan(
     };
 
     // 1. D3: Revisões de bloco por fila de vencimento (D+5 → D+15 → D+30)
-    // Apenas blocos do CFC (sourceV1BlockId: null) com teoria concluída e material oficial CFC
-    const cfcFileNames = [
-      "1 - Direito Administrativo_compressed.pdf",
-      "3 - Direito Constitucional_compressed.pdf",
-      "3 - Direito Constitucional.pdf",
-      "Direito Processual Civil_compressed.pdf",
-      "4 - Direito Processual do Trabalho.pdf",
-      "2 - Direito do Trabalho.pdf"
-    ];
-
     const completedAnchorBlocks = await prisma.studyBlock.findMany({
       where: {
         subjectId: subject.id,
@@ -175,53 +246,13 @@ export async function getAdaptiveStudyPlan(
       }
     });
 
-    const pendingReviews: { block: (typeof completedAnchorBlocks)[0]; dueDate: Date; stageName: string }[] = [];
+    const { topAllocated } = computePendingD3BlockReviews(
+      completedAnchorBlocks,
+      now,
+      maxBlockReviewsPerDay
+    );
 
-    for (const b of completedAnchorBlocks) {
-      // D0 é estritamente a data em que a teoria foi concluída (ou confirmada)
-      const d0 = b.theoryCompletedAt;
-      if (!d0) continue; // Sem data de conclusão de teoria, NÃO entra na fila de revisão
-
-      const d0Date = new Date(d0);
-
-      // Stage 1: D+5 (Grava em review1dCompletedAt)
-      if (!b.review1dCompletedAt) {
-        const d5 = new Date(d0Date);
-        d5.setDate(d5.getDate() + 5);
-        if (d5 <= now) {
-          pendingReviews.push({ block: b, dueDate: d5, stageName: "D+5" });
-          continue;
-        }
-      }
-
-      // Stage 2: D+15 (Elegível após Stage 1 D+5 concluído, Grava em review15dCompletedAt)
-      if (b.review1dCompletedAt && !b.review15dCompletedAt) {
-        const d15 = new Date(d0Date);
-        d15.setDate(d15.getDate() + 15);
-        if (d15 <= now) {
-          pendingReviews.push({ block: b, dueDate: d15, stageName: "D+15" });
-          continue;
-        }
-      }
-
-      // Stage 3: D+30 (Elegível após Stage 2 D+15 concluído, Grava em review30dCompletedAt)
-      if (b.review15dCompletedAt && !b.review30dCompletedAt) {
-        const d30 = new Date(d0Date);
-        d30.setDate(d30.getDate() + 30);
-        if (d30 <= now) {
-          pendingReviews.push({ block: b, dueDate: d30, stageName: "D+30" });
-          continue;
-        }
-      }
-    }
-
-    // Ordenar por data de vencimento mais antiga primeiro (mais antigo tem prioridade)
-    pendingReviews.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-
-    const topBlockReviews = pendingReviews.slice(0, maxBlockReviewsPerDay);
-    const blockReviewTimeFactor = config?.blockReviewTimeFactor ?? 0.35; // Padrão 35% (~12 min para bloco de 35 min)
-
-    for (const { block, stageName } of topBlockReviews) {
+    for (const { block, stageName } of topAllocated) {
       tasks.push({
         type: "REVIEW_BLOCK",
         subjectId: subject.id,
