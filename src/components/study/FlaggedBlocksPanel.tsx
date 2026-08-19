@@ -31,7 +31,7 @@ export function FlaggedBlocksPanel({ initialBlocks }: FlaggedBlocksPanelProps) {
   const fetchBlocks = React.useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/blocks/flagged");
+      const res = await fetch("/api/flagged-blocks");
       if (res.ok) {
         const data = await res.json();
         setBlocks(data.blocks || []);

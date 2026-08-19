@@ -67,14 +67,34 @@ async function main() {
   const hasSubjectName = subjHtml.includes("Direito Administrativo") || subjHtml.includes("Direito Constitucional");
   const hasCompletude = subjHtml.includes("completude");
 
+  // Controle Positivo do Painel dos 14 (SSR)
+  const hasPanelTitle = subjHtml.includes("Painel de Confirmação de Blocos");
+  const hasPanelCount = subjHtml.includes("14 pendentes");
+  const hasSampleTitle1 = subjHtml.includes("Atos Administrativos");
+  const hasSampleTitle2 = subjHtml.includes("Recursos Trabalhistas");
+  const hasSampleTitle3 = subjHtml.includes("Teletrabalho");
+  const hasActionJaEstudei = subjHtml.includes("Já estudei");
+  const hasActionAindaNao = subjHtml.includes("Ainda não");
+  const hasActionNaoEMateria = subjHtml.includes("desta matéria");
+
   // Controle Negativo (provar que os erros foram removidos)
   const hasComplitude = subjHtml.includes("complitude");
   const has379 = subjHtml.includes("37,9%");
   const has483 = subjHtml.includes("48,3%");
 
-  console.log(`\n[CONTROLE POSITIVO]`);
+  console.log(`\n[CONTROLE POSITIVO PÁGINA /subjects]`);
   console.log(` - Matéria da Gabriela presente ('Direito Administrativo'): ${hasSubjectName ? "SIM ✅" : "NÃO ❌"}`);
   console.log(` - Grafia correta presente ('completude'):                ${hasCompletude ? "SIM ✅" : "NÃO ❌"}`);
+
+  console.log(`\n[CONTROLE POSITIVO PAINEL DOS 14 SINALIZADOS (SSR)]`);
+  console.log(` - Título do painel presente ('Painel de Confirmação de Blocos'): ${hasPanelTitle ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Contagem '14 pendentes' no cabeçalho:                         ${hasPanelCount ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Título de amostra 1 presente ('Atos Administrativos'):         ${hasSampleTitle1 ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Título de amostra 2 presente ('Recursos Trabalhistas'):        ${hasSampleTitle2 ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Título de amostra 3 presente ('Teletrabalho'):                 ${hasSampleTitle3 ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Botão de ação 1 presente ('Já estudei'):                       ${hasActionJaEstudei ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Botão de ação 2 presente ('Ainda não'):                        ${hasActionAindaNao ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Botão de ação 3 presente ('Não é desta matéria'):              ${hasActionNaoEMateria ? "SIM ✅" : "NÃO ❌"}`);
 
   console.log(`\n[CONTROLE NEGATIVO]`);
   console.log(` - Grafia errada ausente ('complitude'):                  ${!hasComplitude ? "SIM ✅ (Ausente)" : "NÃO ❌ (Presente)"}`);
@@ -132,7 +152,7 @@ async function main() {
   console.log(` - ID Anterior Gravado: '${previousDplId || "NENHUM"}'`);
   console.log(` - ID Atual em Produção: '${dplId}'`);
 
-  const subjectsControlPassed = hasSubjectName && hasCompletude && !hasComplitude && !has379 && !has483;
+  const subjectsControlPassed = hasSubjectName && hasCompletude && hasPanelTitle && hasPanelCount && hasSampleTitle1 && hasActionJaEstudei && !hasComplitude && !has379 && !has483;
 
   if (!subjectsControlPassed) {
     console.error(`\n🔴 FALHA CRÍTICA DE PLACAR: A página /subjects não passou em 100% dos controles!`);
