@@ -9,15 +9,16 @@ interface ReviewQueueItem {
   blockId: string;
   title: string;
   dueDate: Date;
-  stage: 1 | 2 | 3; // D+5, D+15, D+30
+  stage: 1 | 2 | 3;
 }
 
-interface SimConfig {
-  readsPerDay: number;      // 1 ou 2 leituras por dia
-  reviewsPerDayLimit: number; // 2, 3 ou 4 revisões de bloco por dia
+interface SimSensitivityConfig {
+  readsPerDay: number;          // 2 inéditos/dia
+  reviewsPerDayLimit: number;   // 3 revisões/dia
+  reviewMinutesPerBlock: number; // 12m, 20m, 30m
 }
 
-async function run90DaySimulation(config: SimConfig) {
+async function run90DaySensitivitySim(config: SimSensitivityConfig) {
   const { data: user } = await supabase
     .from("User")
     .select("id")
@@ -59,7 +60,7 @@ async function run90DaySimulation(config: SimConfig) {
     .eq("theoryStatus", "COMPLETED")
     .in("materialId", cfcMaterialIds);
 
-  // Flashcards SRS
+  // Flashcards SRS reais com nextReviewAt no banco
   const { data: flashcards } = await supabase
     .from("Flashcard")
     .select("id, nextReviewAt")
@@ -94,8 +95,6 @@ async function run90DaySimulation(config: SimConfig) {
   let totalDailyMinutesPeak = 0;
   let peakDayStr = "";
 
-  const dailyLog: any[] = [];
-
   // Simular 90 dias (19/08/2026 a 16/11/2026)
   for (let dayOffset = 0; dayOffset < 90; dayOffset++) {
     const currDate = new Date(baseSimDate);
@@ -106,6 +105,7 @@ async function run90DaySimulation(config: SimConfig) {
     const isSunday = weekdayIdx === 0;
 
     // Fila de revisões vencidas no INÍCIO do dia
+    // estoque inicial (N+1) = estoque final (N) + novos vencimentos do dia (N+1)
     const overdueStartOfDay = reviewQueue.filter(r => r.dueDate <= currDate).length;
     if (overdueStartOfDay > peakQueueDepth) {
       peakQueueDepth = overdueStartOfDay;
@@ -117,7 +117,7 @@ async function run90DaySimulation(config: SimConfig) {
     let dayReviewCount = 0;
     let dayReviewMins = 0;
 
-    // 1. THEORY (Novo estudo): Se não for Domingo e houver blocos na fila
+    // 1. THEORY: Se não for Domingo e houver blocos na fila
     if (!isSunday && remainingTheoryQueue.length > 0) {
       const slots = Math.min(config.readsPerDay, remainingTheoryQueue.length);
       for (let s = 0; s < slots; s++) {
@@ -126,7 +126,7 @@ async function run90DaySimulation(config: SimConfig) {
         const mins = allocated.estimatedStudyMinutes || 45;
         dayTheoryMins += mins;
 
-        // Quando o bloco é concluído no dia currDate, insere D+5, D+15, D+30 na fila!
+        // D+5, D+15, D+30
         const d5 = new Date(currDate); d5.setDate(d5.getDate() + 5);
         const d15 = new Date(currDate); d15.setDate(d15.getDate() + 15);
         const d30 = new Date(currDate); d30.setDate(d30.getDate() + 30);
@@ -150,22 +150,21 @@ async function run90DaySimulation(config: SimConfig) {
     for (let r = 0; r < reviewSlots; r++) {
       const revItem = dueReviews[r];
       dayReviewCount++;
-      // Tempo REALÍSTICO de releitura/revisão de bloco lido: 12 min/bloco
-      dayReviewMins += 12;
+      dayReviewMins += config.reviewMinutesPerBlock;
 
       const qIdx = reviewQueue.indexOf(revItem);
       if (qIdx >= 0) reviewQueue.splice(qIdx, 1);
     }
 
-    // Fila de revisões vencidas no FIM do dia
+    // Fila no FIM do dia
     const overdueEndOfDay = reviewQueue.filter(r => r.dueDate <= currDate).length;
     if (overdueEndOfDay === 0 && reviewQueue.length === 0 && !dateLastReviewCompleted) {
       dateLastReviewCompleted = dateStr;
     }
 
-    // 3. FLASHCARDS SRS: 25 cards/dia em média (com base na rotina real de 20-30 cards)
+    // 3. FLASHCARDS SRS REAL: 25 cards/dia em média (~18 min/dia)
     const dueCardsCount = isSunday ? 30 : 25;
-    const flashcardMins = Math.round(dueCardsCount * 0.75); // ~18 a 22 min/dia
+    const flashcardMins = Math.round(dueCardsCount * 0.75);
 
     const totalDailyMins = dayTheoryMins + dayReviewMins + flashcardMins;
     if (totalDailyMins > totalDailyMinutesPeak) {
@@ -176,18 +175,6 @@ async function run90DaySimulation(config: SimConfig) {
     totalTheoryMinutesSum += dayTheoryMins;
     totalReviewMinutesSum += dayReviewMins;
     totalFlashcardMinutesSum += flashcardMins;
-
-    if (dayOffset < 14 || dayOffset % 15 === 0 || dateStr === dateAllTheoryCompleted || dateStr === "2026-11-16") {
-      dailyLog.push({
-        day: `Dia ${dayOffset + 1} (${dateStr})`,
-        theory: `${dayTheoryCount} (${dayTheoryMins}m)`,
-        reviewBlock: `${dayReviewCount} (${dayReviewMins}m)`,
-        flashcards: `${dueCardsCount} (${flashcardMins}m)`,
-        total: `${totalDailyMins} min (${(totalDailyMins / 60).toFixed(1)}h)`,
-        queueStart: overdueStartOfDay,
-        queueEnd: overdueEndOfDay
-      });
-    }
   }
 
   const averageDailyMinutes = Math.round((totalTheoryMinutesSum + totalReviewMinutesSum + totalFlashcardMinutesSum) / 90);
@@ -200,41 +187,37 @@ async function run90DaySimulation(config: SimConfig) {
     dateOfPeak,
     totalDailyMinutesPeak,
     peakDayStr,
-    averageDailyMinutes,
-    dailyLog
+    averageDailyMinutes
   };
 }
 
 async function main() {
   console.log("======================================================================");
-  console.log("   SIMULAÇÃO DE 90 DIAS DO BLOCO D (ATÉ O EDITAL DE NOVEMBRO 2026)    ");
+  console.log("    ANÁLISE DE SENSIBILIDADE DE DURAÇÃO DE REVISÃO (12m vs 20m vs 30m)   ");
+  console.log("    REGIME DEFINIDO: 2 LEITURAS INÉDITAS/DIA · COTA DE REVISÃO 3/DIA   ");
   console.log("======================================================================\n");
 
-  const configs: SimConfig[] = [
-    { readsPerDay: 2, reviewsPerDayLimit: 2 },
-    { readsPerDay: 2, reviewsPerDayLimit: 3 },
-    { readsPerDay: 2, reviewsPerDayLimit: 4 },
-    { readsPerDay: 1, reviewsPerDayLimit: 2 },
-    { readsPerDay: 1, reviewsPerDayLimit: 3 },
+  const sensitivityConfigs: SimSensitivityConfig[] = [
+    { readsPerDay: 2, reviewsPerDayLimit: 3, reviewMinutesPerBlock: 12 },
+    { readsPerDay: 2, reviewsPerDayLimit: 3, reviewMinutesPerBlock: 20 },
+    { readsPerDay: 2, reviewsPerDayLimit: 3, reviewMinutesPerBlock: 30 },
   ];
 
-  const summaryResults: any[] = [];
+  const results: any[] = [];
 
-  for (const cfg of configs) {
-    const res = await run90DaySimulation(cfg);
-    summaryResults.push({
-      "Ritmo de Leitura": `${cfg.readsPerDay} inédito(s)/dia`,
-      "Cota Revisão Bloco": `${cfg.reviewsPerDayLimit} bloco(s)/dia`,
-      "Término das 28 Teorias": res.dateAllTheoryCompleted,
-      "Pico da Fila (Estoque Max)": `${res.peakQueueDepth} itens (${res.dateOfPeak})`,
+  for (const cfg of sensitivityConfigs) {
+    const res = await run90DaySensitivitySim(cfg);
+    results.push({
+      "Premissa de Revisão (Tempo/Bloco)": `${cfg.reviewMinutesPerBlock} min / bloco`,
+      "Término 28 Teorias": res.dateAllTheoryCompleted,
+      "Pico da Fila (Estoque Máx)": `${res.peakQueueDepth} itens (${res.dateOfPeak})`,
       "Término da ÚLTIMA Revisão": res.dateLastReviewCompleted,
-      "Média Diária Total": `${res.averageDailyMinutes} min (${(res.averageDailyMinutes / 60).toFixed(1)}h)`,
-      "Pico Máximo de Tempo": `${res.totalDailyMinutesPeak} min (${(res.totalDailyMinutesPeak / 60).toFixed(1)}h em ${res.peakDayStr})`
+      "Média Diária Total (90 dias)": `${res.averageDailyMinutes} min (${(res.averageDailyMinutes / 60).toFixed(1)}h)`,
+      "Dia de Pico Máximo": `${res.totalDailyMinutesPeak} min (${(res.totalDailyMinutesPeak / 60).toFixed(1)}h em ${res.peakDayStr})`
     });
   }
 
-  console.log("--- QUADRO COMPARATIVO DOS REGIMES DE ESTUDO (90 DIAS) ---");
-  console.table(summaryResults);
+  console.table(results);
 }
 
 main();

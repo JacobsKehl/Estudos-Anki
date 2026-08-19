@@ -97,10 +97,24 @@ function calcPriorityScore(params: {
  * Returns a ranked list of study tasks for a user.
  * Replaces getAdaptiveStudyRecommendation (single block) with a full queue.
  */
-export async function getAdaptiveStudyQueue(
+export interface AdaptiveSchedulerConfig {
+  maxNewTheoryPerDay?: number;     // Padrão: 2 inéditos/dia
+  maxBlockReviewsPerDay?: number;  // Padrão: 3 revisões/dia
+}
+
+// Alias para retrocompatibilidade
+export const getAdaptiveStudyQueue = getAdaptiveStudyPlan;
+
+export async function getAdaptiveStudyPlan(
   userId: string,
-  limit = 20
+  configOrLimit?: number | AdaptiveSchedulerConfig
 ): Promise<StudyTask[]> {
+  const config = typeof configOrLimit === "number" 
+    ? { maxNewTheoryPerDay: configOrLimit, maxBlockReviewsPerDay: 3 }
+    : configOrLimit;
+
+  const maxNewTheoryPerDay = config?.maxNewTheoryPerDay ?? 2;
+  const maxBlockReviewsPerDay = config?.maxBlockReviewsPerDay ?? 3;
   const now = new Date();
   const tasks: StudyTask[] = [];
 
@@ -139,7 +153,7 @@ export async function getAdaptiveStudyQueue(
         ],
       },
       orderBy: { lastStudiedAt: "asc" },
-      take: 3,
+      take: maxBlockReviewsPerDay,
     });
 
     for (const block of overdueBlockReviews) {
@@ -262,7 +276,7 @@ export async function getAdaptiveStudyQueue(
         return a.orderIndex - b.orderIndex;
       });
 
-      const topNotStartedBlocks = notStartedBlocks.slice(0, 2);
+      const topNotStartedBlocks = notStartedBlocks.slice(0, maxNewTheoryPerDay);
 
       for (const block of topNotStartedBlocks) {
         tasks.push({
@@ -282,8 +296,9 @@ export async function getAdaptiveStudyQueue(
     }
   }
 
-  // Ordenar por score decrescente e limitar
-  return tasks.sort((a, b) => b.priorityScore - a.priorityScore).slice(0, limit);
+  // Ordenar por score decrescente e limitar se limite numérico fornecido
+  const sorted = tasks.sort((a, b) => b.priorityScore - a.priorityScore);
+  return typeof configOrLimit === "number" ? sorted.slice(0, configOrLimit) : sorted;
 }
 
 function buildTheoryReason(

@@ -23,11 +23,11 @@ async function main() {
 
   const prodUrl = "https://estudos-anki.vercel.app";
 
-  const apiRes = await fetch(`${prodUrl}/api/blocks/flagged`, {
+  const apiRes = await fetch(`${prodUrl}/api/flagged-blocks`, {
     headers: { cookie: cookieHeader }
   });
   const apiText = await apiRes.text();
-  console.log(`\nGET /api/blocks/flagged -> status ${apiRes.status}, body length: ${apiText.length}:`, apiText.substring(0, 300));
+  console.log(`\nGET /api/flagged-blocks -> status ${apiRes.status}, body length: ${apiText.length}:`, apiText.substring(0, 300));
 
   const res = await fetch(`${prodUrl}/subjects`, {
     headers: {
