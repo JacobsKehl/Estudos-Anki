@@ -111,3 +111,15 @@ O Prisma CLI não representa a cláusula `WHERE` de índices parciais no `schema
 **Regra operacional:**
 Scripts de geração de migration (`scripts/diag/run_prisma_migrate_diff.ts` ou equivalentes) devem abortar automaticamente se detectarem `SyllabusVersion_single_active` na saída do DDL.
 
+---
+
+## 9. Proteção e Limites de Plano da Vercel (Hobby vs. Pro)
+
+> [!CAUTION]
+> **Mudança de plano na Vercel é mudança de ambiente de build.**
+
+- **Vercel Crons no Hobby Plan:** Contas Hobby aceitam no máximo **uma execução de cron por dia** (`0 8 * * *`). Agendamentos com expressões cron frequentes (ex: `*/15 * * * *`) fazem a Vercel rejeitar o pré-flight do deploy **silenciosamente no nível de infraestrutura**, sem gerar entradas no log de compilação.
+- **Duração de Functions (`maxDuration`):** O valor padrão e máximo no Hobby é 60s; no Pro é 300s (podendo ir a 800s).
+- **Guarda-costas de Deploy:** O script `scripts/diag/verify-prod-positive-control.ts` deve ser executado pós-deploy para verificar se o `Deployment ID` realmente mudou e interromper com exit code não-nulo caso a produção continue estagnada.
+
+
