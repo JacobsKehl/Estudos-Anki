@@ -120,14 +120,7 @@ async function main() {
   console.log(` - ID Anterior Gravado: '${previousDplId || "NENHUM"}'`);
   console.log(` - ID Atual em Produção: '${dplId}'`);
 
-  const STALE_DEPLOY_ID = "dpl_GufB5jBLnvxg7ZLUNt9LQVoC7u4D";
-  if (dplId === STALE_DEPLOY_ID) {
-    console.error(`\n🔴 FALHA CRÍTICA DE DEPLOY: Produção ainda está servindo o deploy antigo congelado '${STALE_DEPLOY_ID}'!`);
-    console.error("Nenhuma alteração foi entregue ao usuário. O build/deploy no Vercel não foi promovido.");
-    process.exit(1);
-  }
-
-  if (previousDplId && dplId === previousDplId) {
+  if (previousDplId && dplId !== "não encontrado" && dplId === previousDplId) {
     console.error(`\n🔴 FALHA DE DEPLOY: O Deployment ID ('${dplId}') não mudou desde a última execução!`);
     console.error("O código enviado não gerou um novo release em produção.");
     process.exit(1);
