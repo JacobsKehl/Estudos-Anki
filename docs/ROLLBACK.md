@@ -155,5 +155,16 @@ Nunca criar `/api/blocks/<nome_estatico>` no mesmo nível em que existir `/api/b
 - **Filtro de D0:** O D0 é estritamente a data em que a teoria foi concluída (`theoryCompletedAt`). Se `theoryCompletedAt` for nulo (ex: blocos antigos legados não confirmados), o bloco NÃO entra na fila de revisão de blocos.
 - **Escopo do CFC:** A consulta do agendador restringe estritamente aos materiais do CFC (`material.originalFileName IN (...)`). Blocos de outros materiais (ex: Estratégia) são filtrados da fila de blocos.
 
+---
+
+## 12. Regra de Segurança de Dados e Localização de Backups
+
+> [!IMPORTANT]
+> **Todo e qualquer backup de banco de dados (JSON ou SQL/dump) deve ser obrigatoriamente salvo na pasta `backups/json/` ou `backups/`, as quais estão protegidas pelo `.gitignore`.**
+
+**Regra Operacional:**
+- É estritamente proibido salvar snapshots de dados de usuários dentro da pasta `docs/` ou qualquer outro diretório versionado.
+- Antes de qualquer operação de mutação ou re-extração em lote no banco de dados, o script deve gerar um arquivo JSON em `backups/json/` e validar que a pasta está listada no `.gitignore`.
+
 
 
