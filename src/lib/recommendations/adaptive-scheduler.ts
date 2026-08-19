@@ -100,6 +100,7 @@ function calcPriorityScore(params: {
 export interface AdaptiveSchedulerConfig {
   maxNewTheoryPerDay?: number;     // Padrão: 2 inéditos/dia
   maxBlockReviewsPerDay?: number;  // Padrão: 3 revisões/dia
+  blockReviewTimeFactor?: number;
 }
 
 // Alias para retrocompatibilidade
@@ -140,13 +141,25 @@ export async function getAdaptiveStudyPlan(
     };
 
     // 1. D3: Revisões de bloco por fila de vencimento (D+5 → D+15 → D+30)
-    // Apenas blocos do CFC (sourceV1BlockId: null) com teoria concluída (theoryStatus: COMPLETED)
+    // Apenas blocos do CFC (sourceV1BlockId: null) com teoria concluída e material oficial CFC
+    const cfcFileNames = [
+      "1 - Direito Administrativo_compressed.pdf",
+      "3 - Direito Constitucional_compressed.pdf",
+      "3 - Direito Constitucional.pdf",
+      "Direito Processual Civil_compressed.pdf",
+      "4 - Direito Processual do Trabalho.pdf",
+      "2 - Direito do Trabalho.pdf"
+    ];
+
     const completedAnchorBlocks = await prisma.studyBlock.findMany({
       where: {
         subjectId: subject.id,
         userId,
         theoryStatus: "COMPLETED",
         sourceV1BlockId: null,
+        material: {
+          originalFileName: { in: cfcFileNames }
+        }
       },
       select: {
         id: true,
@@ -165,12 +178,13 @@ export async function getAdaptiveStudyPlan(
     const pendingReviews: { block: (typeof completedAnchorBlocks)[0]; dueDate: Date; stageName: string }[] = [];
 
     for (const b of completedAnchorBlocks) {
-      const d0 = b.theoryCompletedAt || b.lastStudiedAt || b.createdAt;
-      if (!d0) continue;
+      // D0 é estritamente a data em que a teoria foi concluída (ou confirmada)
+      const d0 = b.theoryCompletedAt;
+      if (!d0) continue; // Sem data de conclusão de teoria, NÃO entra na fila de revisão
 
       const d0Date = new Date(d0);
 
-      // Stage 1: D+5
+      // Stage 1: D+5 (Grava em review1dCompletedAt)
       if (!b.review1dCompletedAt) {
         const d5 = new Date(d0Date);
         d5.setDate(d5.getDate() + 5);
@@ -180,8 +194,8 @@ export async function getAdaptiveStudyPlan(
         }
       }
 
-      // Stage 2: D+15
-      if (!b.review7dCompletedAt && !b.review15dCompletedAt) {
+      // Stage 2: D+15 (Elegível após Stage 1 D+5 concluído, Grava em review15dCompletedAt)
+      if (b.review1dCompletedAt && !b.review15dCompletedAt) {
         const d15 = new Date(d0Date);
         d15.setDate(d15.getDate() + 15);
         if (d15 <= now) {
@@ -190,8 +204,8 @@ export async function getAdaptiveStudyPlan(
         }
       }
 
-      // Stage 3: D+30
-      if (!b.review30dCompletedAt) {
+      // Stage 3: D+30 (Elegível após Stage 2 D+15 concluído, Grava em review30dCompletedAt)
+      if (b.review15dCompletedAt && !b.review30dCompletedAt) {
         const d30 = new Date(d0Date);
         d30.setDate(d30.getDate() + 30);
         if (d30 <= now) {
@@ -205,6 +219,7 @@ export async function getAdaptiveStudyPlan(
     pendingReviews.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
 
     const topBlockReviews = pendingReviews.slice(0, maxBlockReviewsPerDay);
+    const blockReviewTimeFactor = config?.blockReviewTimeFactor ?? 0.35; // Padrão 35% (~12 min para bloco de 35 min)
 
     for (const { block, stageName } of topBlockReviews) {
       tasks.push({
@@ -213,7 +228,7 @@ export async function getAdaptiveStudyPlan(
         subjectName: subject.name,
         studyBlockId: block.id,
         blockTitle: block.title,
-        estimatedMinutes: Math.round((block.estimatedStudyMinutes ?? 60) * 0.5),
+        estimatedMinutes: Math.max(5, Math.round((block.estimatedStudyMinutes ?? 35) * blockReviewTimeFactor)),
         priorityScore: calcPriorityScore({
           ...baseParams,
           actionType: "REVIEW_BLOCK",

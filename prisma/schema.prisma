@@ -328,16 +328,16 @@ model StudyBlock {
   questionsCompletedAt  DateTime?
   flashcardsGeneratedAt DateTime?
 
-  // Spaced repetition block reviews
+  // Spaced repetition block reviews (Fila D3: D+5 -> D+15 -> D+30)
   review1dScheduledAt  DateTime?
   review7dScheduledAt  DateTime?
   review15dScheduledAt DateTime?
   review30dScheduledAt DateTime?
 
-  review1dCompletedAt  DateTime?
-  review7dCompletedAt  DateTime?
-  review15dCompletedAt DateTime?
-  review30dCompletedAt DateTime?
+  review1dCompletedAt  DateTime? // Mapeia Estágio 1 do D3 (Revisão D+5 de Bloco)
+  review7dCompletedAt  DateTime? // Reservado / Legado (Não utilizado na fila D3 de 3 estágios)
+  review15dCompletedAt DateTime? // Mapeia Estágio 2 do D3 (Revisão D+15 de Bloco)
+  review30dCompletedAt DateTime? // Mapeia Estágio 3 do D3 (Revisão D+30 de Bloco)
 
   lastStudiedAt  DateTime?
   nextActionType String? // THEORY | QUESTIONS | GENERATE_FLASHCARDS | REVIEW_BLOCK | REINFORCEMENT

@@ -137,5 +137,23 @@ No Next.js App Router:
 **Regra Operacional:**
 Nunca criar `/api/blocks/<nome_estatico>` no mesmo nível em que existir `/api/blocks/[id]`. Crie endpoints de nível superior autônomos (ex: `/api/flagged-blocks/route.ts`).
 
+---
+
+## 11. Mapeamento de Colunas da Fila D3 de Revisão de Blocos (`StudyBlock`)
+
+> [!NOTE]
+> **As colunas de repetição espaçada na tabela `StudyBlock` guardam os 3 estágios da fila D3 (D+5 → D+15 → D+30).**
+
+| Estágio D3 | Intervalo | Coluna PostgreSQL | Descrição / Estado |
+|---|---|---|---|
+| Estágio 1 | D+5 | `review1dCompletedAt` | Data em que a 1ª revisão (D+5) foi concluída pelo usuário |
+| Legado / Reservado | - | `review7dCompletedAt` | Coluna legada (não utilizada na régua D3 de 3 estágios) |
+| Estágio 2 | D+15 | `review15dCompletedAt` | Data em que a 2ª revisão (D+15) foi concluída pelo usuário |
+| Estágio 3 | D+30 | `review30dCompletedAt` | Data em que a 3ª e última revisão (D+30) foi concluída pelo usuário |
+
+- **Condição de Saída:** Quando `review30dCompletedAt !== null`, o bloco concluiu os 3 estágios e sai da fila de revisão de blocos para sempre.
+- **Filtro de D0:** O D0 é estritamente a data em que a teoria foi concluída (`theoryCompletedAt`). Se `theoryCompletedAt` for nulo (ex: blocos antigos legados não confirmados), o bloco NÃO entra na fila de revisão de blocos.
+- **Escopo do CFC:** A consulta do agendador restringe estritamente aos materiais do CFC (`material.originalFileName IN (...)`). Blocos de outros materiais (ex: Estratégia) são filtrados da fila de blocos.
+
 
 
