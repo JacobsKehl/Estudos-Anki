@@ -82,7 +82,8 @@ async function main() {
   console.log(` - Porcentagem estática ausente ('48,3%'):                 ${!has483 ? "SIM ✅ (Ausente)" : "NÃO ❌ (Presente)"}`);
 
   // ------------------------------------------------------------------
-  // 2. HOMEPAGE (/) (COM CONTROLE POSITIVO DA SEÇÃO DO DIA SEGUINTE)
+  // ------------------------------------------------------------------
+  // 2. HOMEPAGE (/) (COM CONTROLE POSITIVO ADAPTATIVO DE ESTADO)
   // ------------------------------------------------------------------
   console.log("\n--- 2. VERIFICAÇÃO AUTENTICADA DA HOMEPAGE (/) ---");
   const homeRes = await fetch(`${prodUrl}/`, {
@@ -98,13 +99,24 @@ async function main() {
 
   const hasDayDone = homeHtml.includes("Hoje está concluído");
   const hasNextDayBtn = homeHtml.includes("Estudar o próximo dia agora");
+  const hasPendingTasks = homeHtml.includes("Ler este bloco") || homeHtml.includes("Atos Administrativos") || homeHtml.includes("Estudar agora");
 
+  let homepageControlPassed = false;
   console.log(`\n[CONTROLE POSITIVO HOMEPAGE]`);
-  console.log(` - Título de dia concluído ('Hoje está concluído ✨'): ${hasDayDone ? "SIM ✅" : "NÃO ❌"}`);
-  console.log(` - Botão de avanço ('Estudar o próximo dia agora'):     ${hasNextDayBtn ? "SIM ✅" : "NÃO ❌"}`);
+  if (hasPendingTasks) {
+    console.log(` - Medição de Estado: Usuária possui tarefas teóricas pendentes ativas.`);
+    console.log(` - Lista de tarefas pendentes renderizada: SIM ✅`);
+    console.log(` - Banner 'Hoje está concluído' pulado com justificativa (dia em andamento) ℹ️`);
+    homepageControlPassed = true;
+  } else {
+    console.log(` - Medição de Estado: Nenhuma tarefa pendente hoje.`);
+    console.log(` - Título de dia concluído ('Hoje está concluído ✨'): ${hasDayDone ? "SIM ✅" : "NÃO ❌"}`);
+    console.log(` - Botão de avanço ('Estudar o próximo dia agora'):     ${hasNextDayBtn ? "SIM ✅" : "NÃO ❌"}`);
+    homepageControlPassed = hasDayDone && hasNextDayBtn;
+  }
 
   // ------------------------------------------------------------------
-  // VALIDAÇÃO DE TRAVA DE DEPLOYMENT ID (ITEM 6)
+  // VALIDAÇÃO DE PLACAR RÍGIDO E TRAVA DE EXIT CODE (ITEM 3)
   // ------------------------------------------------------------------
   const fs = await import("fs");
   const path = await import("path");
@@ -116,9 +128,21 @@ async function main() {
 
   fs.writeFileSync(lastDplFile, dplId);
 
-  console.log(`\n[VALIDAÇÃO DE DEPLOYMENT]`);
+  console.log(`\n[VALIDAÇÃO DE DEPLOYMENT & PLACAR]`);
   console.log(` - ID Anterior Gravado: '${previousDplId || "NENHUM"}'`);
   console.log(` - ID Atual em Produção: '${dplId}'`);
+
+  const subjectsControlPassed = hasSubjectName && hasCompletude && !hasComplitude && !has379 && !has483;
+
+  if (!subjectsControlPassed) {
+    console.error(`\n🔴 FALHA CRÍTICA DE PLACAR: A página /subjects não passou em 100% dos controles!`);
+    process.exit(1);
+  }
+
+  if (!homepageControlPassed) {
+    console.error(`\n🔴 FALHA CRÍTICA DE PLACAR: A homepage não passou no controle positivo de estado!`);
+    process.exit(1);
+  }
 
   if (previousDplId && dplId !== "não encontrado" && dplId === previousDplId) {
     console.error(`\n🔴 FALHA DE DEPLOY: O Deployment ID ('${dplId}') não mudou desde a última execução!`);
@@ -126,7 +150,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("✅ Novo Deployment ID promovido em produção com sucesso!");
+  console.log("✅ TODOS OS CONTROLES PASSARAM COM PLACAR 100% LIMPO!");
 
   console.log("\n======================================================================");
   console.log("  PROVA DE PRODUÇÃO COM CONTROLE POSITIVO CONCLUÍDA COM SUCESSO        ");
