@@ -116,11 +116,11 @@ Scripts de geração de migration (`scripts/diag/run_prisma_migrate_diff.ts` ou 
 ## 9. Proteção e Limites de Plano da Vercel (Hobby vs. Pro)
 
 > [!CAUTION]
-> **Mudança de plano na Vercel é mudança de ambiente de build.**
+> **O projeto está ativo no plano Vercel Pro.**
 
-- **Vercel Crons no Hobby Plan:** Contas Hobby aceitam no máximo **uma execução de cron por dia** (`0 8 * * *`). Agendamentos com expressões cron frequentes (ex: `*/15 * * * *`) fazem a Vercel rejeitar o pré-flight do deploy **silenciosamente no nível de infraestrutura**, sem gerar entradas no log de compilação.
-- **Invariante do Cron:** O intervalo de execução do cron (ex: 15 minutos) obrigatoriamente deve ser menor que a janela de tolerância de `isTimeInGridWindow` (ex: 20 minutos) no servidor. Se o intervalo for superior à janela, o lembrete diário deixa de ser disparado sem erros ou logs.
-- **Duração de Functions (`maxDuration`):** O valor padrão no Hobby é 300s; no Pro é 300s por padrão (expansível até 800s). **O `maxDuration` nunca foi o problema — o cron era.**
+- **Ambiente de Produção (Vercel Pro):** O projeto utiliza o plano Pro. No Pro, agendamentos cron frequentes como `*/15 * * * *` e `maxDuration: 300` são plenamente suportados e ativos em produção.
+- **Vercel Crons no Hobby Plan (Histórico):** Contas Hobby aceitam no máximo **uma execução de cron por dia** (`0 8 * * *`) e `maxDuration` de no máximo 60s. Se a conta for rebaixada para Hobby, a Vercel rejeita o pré-flight do deploy silenciosamente no nível de infraestrutura.
+- **Invariante do Cron:** O intervalo de execução do cron (15 minutos) obrigatoriamente deve ser menor que a janela de tolerância de `isTimeInGridWindow` (20 minutos) no servidor (`America/Sao_Paulo`). Se o intervalo for superior à janela, o lembrete diário deixa de ser disparado sem erros ou logs.
 - **Guarda-costas de Deploy:** O script `scripts/diag/verify-prod-positive-control.ts` deve ser executado pós-deploy para verificar se o `Deployment ID` realmente mudou e interromper com exit code não-nulo caso a produção continue estagnada.
 
 ---

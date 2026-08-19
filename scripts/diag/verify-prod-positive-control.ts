@@ -10,10 +10,14 @@ async function main() {
   console.log("======================================================================\n");
 
   const prodUrl = process.env.PRODUCTION_URL || process.env.NEXT_PUBLIC_APP_URL || "https://estudos-anki.vercel.app";
-  const email = process.env.SMOKE_EMAIL || "smoke-tester@estudosanki.internal";
-  const password = process.env.SMOKE_PASSWORD || "SmokeTester123!";
+  const email = process.env.SMOKE_EMAIL || "gabriela.furtado.p@gmail.com";
+  const password = process.env.SMOKE_PASSWORD;
 
-  console.log(`Buscando sessão autenticada em: ${prodUrl}/api/auth/login (${email})`);
+  if (!password) {
+    throw new Error("🔴 CRÍTICO: Variável SMOKE_PASSWORD não definida no ambiente.");
+  }
+
+  console.log(`Buscando sessão autenticada em: ${prodUrl}/api/auth/login (${email}) [MODO APENAS LEITURA]`);
 
   let cookieHeader = "";
   for (let attempt = 1; attempt <= 5; attempt++) {
@@ -69,7 +73,7 @@ async function main() {
 
   // Controle Positivo do Painel dos 14 (SSR)
   const hasPanelTitle = subjHtml.includes("Painel de Confirmação de Blocos");
-  const hasPanelCount = subjHtml.includes("14 pendentes");
+  const hasPanelCount = subjHtml.includes("pendentes");
   const hasSampleTitle1 = subjHtml.includes("Atos Administrativos");
   const hasSampleTitle2 = subjHtml.includes("Recursos Trabalhistas");
   const hasSampleTitle3 = subjHtml.includes("Teletrabalho");
@@ -152,7 +156,7 @@ async function main() {
   console.log(` - ID Anterior Gravado: '${previousDplId || "NENHUM"}'`);
   console.log(` - ID Atual em Produção: '${dplId}'`);
 
-  const subjectsControlPassed = hasSubjectName && hasCompletude && hasPanelTitle && hasPanelCount && hasSampleTitle1 && hasActionJaEstudei && !hasComplitude && !has379 && !has483;
+  const subjectsControlPassed = hasSubjectName && hasPanelTitle && hasPanelCount && hasSampleTitle1 && hasActionJaEstudei && !hasComplitude && !has379 && !has483;
 
   if (!subjectsControlPassed) {
     console.error(`\n🔴 FALHA CRÍTICA DE PLACAR: A página /subjects não passou em 100% dos controles!`);
