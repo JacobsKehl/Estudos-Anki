@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 import { getAllSubjectsMetrics } from "@/lib/services/subject-metrics";
 
-import { SubjectPossiblyStudiedBanner } from "@/components/study/SubjectPossiblyStudiedBanner";
+import { FlaggedBlocksPanel } from "@/components/study/FlaggedBlocksPanel";
 
 export default async function SubjectsPage() {
   const userId = await getMockUserId();
@@ -18,12 +18,35 @@ export default async function SubjectsPage() {
   let subjects: any[] = [];
   let scheduleMode = "DYNAMIC";
   let userPrefsCreatedAt: string | undefined = undefined;
-  let totalPossibly = 0;
+  let flaggedBlocksData: any[] = [];
 
   try {
-    totalPossibly = await prisma.studyBlock.count({
-      where: { userId, possiblyAlreadyStudied: true }
+    const rawFlagged = await prisma.studyBlock.findMany({
+      where: {
+        userId,
+        possiblyAlreadyStudied: true,
+        theoryStatus: { not: "COMPLETED" }
+      },
+      include: {
+        subject: { select: { id: true, name: true } },
+        material: { select: { id: true, originalFileName: true } }
+      },
+      orderBy: { createdAt: "asc" }
     });
+
+    flaggedBlocksData = rawFlagged.map(b => ({
+      id: b.id,
+      title: b.title,
+      subjectId: b.subjectId,
+      subjectName: b.subject?.name || "Desconhecido",
+      materialId: b.materialId,
+      originalFileName: b.material?.originalFileName || "PDF Desconhecido",
+      officialTopicId: b.officialTopicId,
+      officialTopicName: b.officialTopicName,
+      possiblyAlreadyStudied: b.possiblyAlreadyStudied,
+      theoryStatus: b.theoryStatus
+    }));
+
     const userPrefs = await prisma.userPreferences.findUnique({
       where: { userId },
       select: { scheduleGenerationMode: true, createdAt: true }
@@ -33,9 +56,6 @@ export default async function SubjectsPage() {
 
     const subjectsWithMetrics = await getAllSubjectsMetrics(userId);
     
-    // We also need the _count for the SubjectCard interface if it's not in metrics
-    // Fetch them separately or update the service. Let's fetch them here for simplicity or update the service.
-    // Actually, SubjectCard uses _count for materials. Let's update the service to include it.
     subjects = await prisma.studySubject.findMany({
       where: { userId },
       include: {
@@ -68,7 +88,7 @@ export default async function SubjectsPage() {
         <CreateSubjectDialog />
       </PageHeader>
 
-      <SubjectPossiblyStudiedBanner count={totalPossibly} />
+      <FlaggedBlocksPanel initialBlocks={flaggedBlocksData} />
 
       {subjects.length === 0 ? (
         <EmptyState 

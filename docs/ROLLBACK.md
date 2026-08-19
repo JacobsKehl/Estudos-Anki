@@ -119,7 +119,8 @@ Scripts de geração de migration (`scripts/diag/run_prisma_migrate_diff.ts` ou 
 > **Mudança de plano na Vercel é mudança de ambiente de build.**
 
 - **Vercel Crons no Hobby Plan:** Contas Hobby aceitam no máximo **uma execução de cron por dia** (`0 8 * * *`). Agendamentos com expressões cron frequentes (ex: `*/15 * * * *`) fazem a Vercel rejeitar o pré-flight do deploy **silenciosamente no nível de infraestrutura**, sem gerar entradas no log de compilação.
-- **Duração de Functions (`maxDuration`):** O valor padrão e máximo no Hobby é 60s; no Pro é 300s (podendo ir a 800s).
+- **Invariante do Cron:** O intervalo de execução do cron (ex: 15 minutos) obrigatoriamente deve ser menor que a janela de tolerância de `isTimeInGridWindow` (ex: 20 minutos) no servidor. Se o intervalo for superior à janela, o lembrete diário deixa de ser disparado sem erros ou logs.
+- **Duração de Functions (`maxDuration`):** O valor padrão no Hobby é 300s; no Pro é 300s por padrão (expansível até 800s). **O `maxDuration` nunca foi o problema — o cron era.**
 - **Guarda-costas de Deploy:** O script `scripts/diag/verify-prod-positive-control.ts` deve ser executado pós-deploy para verificar se o `Deployment ID` realmente mudou e interromper com exit code não-nulo caso a produção continue estagnada.
 
 

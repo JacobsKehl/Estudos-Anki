@@ -230,48 +230,55 @@ export async function getAdaptiveStudyQueue(
       }
     }
 
-    // 5. Blocos não iniciados → THEORY (ignoring support materials)
-    const notStartedBlocks = await (prisma as any).studyBlock.findMany({
-      where: {
-        subjectId: subject.id,
-        userId,
-        theoryStatus: "NOT_STARTED",
-        material: {
-          materialRole: {
-            not: "SUPPORT_MATERIAL"
+    // 5. Blocos não iniciados → THEORY (D1: apenas inéditos sourceV1BlockId = null e possivelmente já estudado = false; D2: domingo = 0 THEORY)
+    const spDay = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).getDay();
+    const isSunday = spDay === 0;
+
+    if (!isSunday) {
+      const notStartedBlocks = await (prisma as any).studyBlock.findMany({
+        where: {
+          subjectId: subject.id,
+          userId,
+          theoryStatus: "NOT_STARTED",
+          sourceV1BlockId: null,
+          possiblyAlreadyStudied: false,
+          material: {
+            materialRole: {
+              not: "SUPPORT_MATERIAL"
+            }
           }
+        },
+        include: {
+          material: true
         }
-      },
-      include: {
-        material: true
-      }
-    });
-
-    // Ordenação lógica/natural por nome do PDF (ex: "pdf 0" antes de "pdf 1") e depois pelo orderIndex
-    notStartedBlocks.sort((a: any, b: any) => {
-      const fileA = a.material?.fileName || "";
-      const fileB = b.material?.fileName || "";
-      const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
-      if (fileCompare !== 0) return fileCompare;
-      return a.orderIndex - b.orderIndex;
-    });
-
-    const topNotStartedBlocks = notStartedBlocks.slice(0, 2);
-
-    for (const block of topNotStartedBlocks) {
-      tasks.push({
-        type: "THEORY",
-        subjectId: subject.id,
-        subjectName: subject.name,
-        studyBlockId: block.id,
-        blockTitle: block.title,
-        estimatedMinutes: block.estimatedStudyMinutes ?? 60,
-        priorityScore: calcPriorityScore({
-          ...baseParams,
-          actionType: "THEORY",
-        }),
-        reason: buildTheoryReason(subject.name, metrics.health),
       });
+
+      // Ordenação lógica/natural por nome do PDF (ex: "pdf 0" antes de "pdf 1") e depois pelo orderIndex
+      notStartedBlocks.sort((a: any, b: any) => {
+        const fileA = a.material?.fileName || "";
+        const fileB = b.material?.fileName || "";
+        const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
+        if (fileCompare !== 0) return fileCompare;
+        return a.orderIndex - b.orderIndex;
+      });
+
+      const topNotStartedBlocks = notStartedBlocks.slice(0, 2);
+
+      for (const block of topNotStartedBlocks) {
+        tasks.push({
+          type: "THEORY",
+          subjectId: subject.id,
+          subjectName: subject.name,
+          studyBlockId: block.id,
+          blockTitle: block.title,
+          estimatedMinutes: block.estimatedStudyMinutes ?? 60,
+          priorityScore: calcPriorityScore({
+            ...baseParams,
+            actionType: "THEORY",
+          }),
+          reason: buildTheoryReason(subject.name, metrics.health),
+        });
+      }
     }
   }
 

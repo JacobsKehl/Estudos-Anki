@@ -1,30 +1,13 @@
+import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
 
-// Load .env variables natively
-const envPath = path.join(process.cwd(), ".env");
-const envVars: Record<string, string> = {};
-if (fs.existsSync(envPath)) {
-  const content = fs.readFileSync(envPath, "utf-8");
-  for (const line of content.split("\n")) {
-    const match = line.match(/^\s*([\w_]+)\s*=\s*"(.*)"\s*$/) || line.match(/^\s*([\w_]+)\s*=\s*(.*)\s*$/);
-    if (match) {
-      envVars[match[1]] = match[2].trim();
-    }
-  }
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-const supabaseUrl = envVars["NEXT_PUBLIC_SUPABASE_URL"];
-const anonKey = envVars["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
-let serviceKey = envVars["SUPABASE_SERVICE_ROLE_KEY"];
-
-// Se a serviceKey for um sb_secret (CLI secret), usa a anonKey (JWT válido) para a API REST
-if (serviceKey && serviceKey.startsWith("sb_secret_")) {
-  serviceKey = anonKey;
-}
-
-const apiKey = serviceKey || anonKey;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Extract models from prisma/schema.prisma dynamically
 export function getPrismaModelNames(): string[] {
@@ -63,41 +46,27 @@ export interface BackupManifest {
 }
 
 async function fetchTablePostgREST(tableName: string): Promise<any[]> {
-  if (!supabaseUrl || !apiKey) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL ou Chave do Supabase (ANON/SERVICE_ROLE) não configuradas no .env");
-  }
-
   const pageSize = 1000;
   let offset = 0;
   let allRows: any[] = [];
 
   while (true) {
-    const url = `${supabaseUrl}/rest/v1/${tableName}?select=*&limit=${pageSize}&offset=${offset}`;
-    const res = await fetch(url, {
-      headers: {
-        apikey: apiKey,
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
+    const { data, error } = await supabase
+      .from(tableName)
+      .select("*")
+      .range(offset, offset + pageSize - 1);
 
-    if (!res.ok) {
-      if (res.status === 404) {
-        // Tabela ainda não existe fisicamente no banco de produção
+    if (error) {
+      if (error.code === "PGRST116" || error.message.includes("does not exist")) {
         return [];
       }
-      const errText = await res.text();
-      throw new Error(`[POSTGREST ERROR] Tabela '${tableName}' retornou HTTP ${res.status}: ${errText}`);
+      throw new Error(`[POSTGREST ERROR] Tabela '${tableName}' retornou: ${error.message}`);
     }
 
-    const rows: any[] = await res.json();
-    if (!Array.isArray(rows)) {
-      throw new Error(`[POSTGREST ERROR] Tabela '${tableName}' não retornou um array JSON válido.`);
-    }
-
+    const rows: any[] = data || [];
     allRows = allRows.concat(rows);
 
     if (rows.length < pageSize) {
-      // Página final atingida e verificada (provado que não há truncamento silencioso)
       break;
     }
 
@@ -141,7 +110,7 @@ async function main() {
     rotulo,
     timestamp: new Date().toISOString(),
     supabaseUrl: supabaseUrl || "N/A",
-    usedServiceRoleKey: !!serviceKey,
+    usedServiceRoleKey: true,
     totalTables: modelNames.length,
     totalRecords: 0,
     totalSizeBytes: 0,

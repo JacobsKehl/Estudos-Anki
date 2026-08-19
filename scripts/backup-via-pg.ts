@@ -4,7 +4,13 @@ import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { getPrismaModelNames, scanForSensitiveData, BackupManifest } from "./backup-via-rest";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DIRECT_URL || process.env.DATABASE_URL
+    }
+  }
+});
 
 export function computeSha256(content: string): string {
   return crypto.createHash("sha256").update(content, "utf-8").digest("hex");
