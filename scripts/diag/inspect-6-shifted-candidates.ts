@@ -15,7 +15,7 @@ async function main() {
   const downloadsDir = "C:\\Users\\henrique.kehl\\Downloads";
 
   for (const c of candidates) {
-    let pdfPath = path.join(downloadsDir, c.folder, c.pdfFile || c.pdf);
+    let pdfPath = path.join(downloadsDir, c.folder, c.pdf);
     if (!fs.existsSync(pdfPath)) pdfPath = path.join(downloadsDir, "study-inbox", c.pdf);
     if (!fs.existsSync(pdfPath)) pdfPath = path.join(downloadsDir, "CFC TRT4", c.pdf);
 

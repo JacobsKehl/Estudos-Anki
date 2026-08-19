@@ -82,10 +82,10 @@ async function main() {
         reason = "Resíduo de Embargos de Declaração no topo";
       } else if (i > 0) {
         const prevBlock = matBlocks[i - 1];
-        const prevTitleWords = prevBlock.title.split(" ").filter(w => w.length > 5);
+        const prevTitleWords = prevBlock.title.split(" ").filter((w: string) => w.length > 5);
         // Se a primeira linha limpa da página iniciar explicitamente com palavras marcantes do bloco anterior
         const firstLine = cleanText.substring(0, 80).toLowerCase();
-        const matchesPrev = prevTitleWords.filter(w => firstLine.includes(w.toLowerCase()));
+        const matchesPrev = prevTitleWords.filter((w: string) => firstLine.includes(w.toLowerCase()));
         if (matchesPrev.length >= 2 && !firstLine.includes(b.title.split(" ")[0].toLowerCase())) {
           isShifted = true;
           reason = `Primeira linha menciona palavras do bloco anterior: ${matchesPrev.join(", ")}`;
