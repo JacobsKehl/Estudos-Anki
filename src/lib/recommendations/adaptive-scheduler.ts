@@ -139,24 +139,74 @@ export async function getAdaptiveStudyPlan(
       lastStudiedAt: metrics.lastStudiedAt,
     };
 
-    // 1. Revisões de bloco vencidas (D+1, D+7, D+15, D+30)
-    const overdueBlockReviews = await (prisma as any).studyBlock.findMany({
+    // 1. D3: Revisões de bloco por fila de vencimento (D+5 → D+15 → D+30)
+    // Apenas blocos do CFC (sourceV1BlockId: null) com teoria concluída (theoryStatus: COMPLETED)
+    const completedAnchorBlocks = await prisma.studyBlock.findMany({
       where: {
         subjectId: subject.id,
         userId,
-        status: "COMPLETED",
-        OR: [
-          { review1dScheduledAt: { lte: now }, review1dCompletedAt: null },
-          { review7dScheduledAt: { lte: now }, review7dCompletedAt: null },
-          { review15dScheduledAt: { lte: now }, review15dCompletedAt: null },
-          { review30dScheduledAt: { lte: now }, review30dCompletedAt: null },
-        ],
+        theoryStatus: "COMPLETED",
+        sourceV1BlockId: null,
       },
-      orderBy: { lastStudiedAt: "asc" },
-      take: maxBlockReviewsPerDay,
+      select: {
+        id: true,
+        title: true,
+        theoryCompletedAt: true,
+        lastStudiedAt: true,
+        createdAt: true,
+        estimatedStudyMinutes: true,
+        review1dCompletedAt: true,
+        review7dCompletedAt: true,
+        review15dCompletedAt: true,
+        review30dCompletedAt: true,
+      }
     });
 
-    for (const block of overdueBlockReviews) {
+    const pendingReviews: { block: (typeof completedAnchorBlocks)[0]; dueDate: Date; stageName: string }[] = [];
+
+    for (const b of completedAnchorBlocks) {
+      const d0 = b.theoryCompletedAt || b.lastStudiedAt || b.createdAt;
+      if (!d0) continue;
+
+      const d0Date = new Date(d0);
+
+      // Stage 1: D+5
+      if (!b.review1dCompletedAt) {
+        const d5 = new Date(d0Date);
+        d5.setDate(d5.getDate() + 5);
+        if (d5 <= now) {
+          pendingReviews.push({ block: b, dueDate: d5, stageName: "D+5" });
+          continue;
+        }
+      }
+
+      // Stage 2: D+15
+      if (!b.review7dCompletedAt && !b.review15dCompletedAt) {
+        const d15 = new Date(d0Date);
+        d15.setDate(d15.getDate() + 15);
+        if (d15 <= now) {
+          pendingReviews.push({ block: b, dueDate: d15, stageName: "D+15" });
+          continue;
+        }
+      }
+
+      // Stage 3: D+30
+      if (!b.review30dCompletedAt) {
+        const d30 = new Date(d0Date);
+        d30.setDate(d30.getDate() + 30);
+        if (d30 <= now) {
+          pendingReviews.push({ block: b, dueDate: d30, stageName: "D+30" });
+          continue;
+        }
+      }
+    }
+
+    // Ordenar por data de vencimento mais antiga primeiro (mais antigo tem prioridade)
+    pendingReviews.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+
+    const topBlockReviews = pendingReviews.slice(0, maxBlockReviewsPerDay);
+
+    for (const { block, stageName } of topBlockReviews) {
       tasks.push({
         type: "REVIEW_BLOCK",
         subjectId: subject.id,
@@ -169,7 +219,7 @@ export async function getAdaptiveStudyPlan(
           actionType: "REVIEW_BLOCK",
           isOverdueReview: true,
         }),
-        reason: `Revisão de bloco vencida: "${block.title}" precisa ser revisada para consolidar o aprendizado.`,
+        reason: `Revisão de bloco ${stageName} vencida: "${block.title}" precisa ser revisada para consolidar o aprendizado.`,
       });
     }
 

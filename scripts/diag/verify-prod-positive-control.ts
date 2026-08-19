@@ -70,6 +70,7 @@ async function main() {
   // Controle Positivo (provar que a página logada foi renderizada)
   const hasSubjectName = subjHtml.includes("Direito Administrativo") || subjHtml.includes("Direito Constitucional");
   const hasCompletude = subjHtml.includes("completude");
+  const hasSubjectHeader = subjHtml.includes("Minhas Matérias");
 
   // Controle Positivo do Painel dos 14 (SSR)
   const hasPanelTitle = subjHtml.includes("Painel de Confirmação de Blocos");
@@ -89,6 +90,7 @@ async function main() {
   console.log(`\n[CONTROLE POSITIVO PÁGINA /subjects]`);
   console.log(` - Matéria da Gabriela presente ('Direito Administrativo'): ${hasSubjectName ? "SIM ✅" : "NÃO ❌"}`);
   console.log(` - Grafia correta presente ('completude'):                ${hasCompletude ? "SIM ✅" : "NÃO ❌"}`);
+  console.log(` - Cabeçalho da página presente ('Minhas Matérias'):       ${hasSubjectHeader ? "SIM ✅" : "NÃO ❌"}`);
 
   console.log(`\n[CONTROLE POSITIVO PAINEL DOS 14 SINALIZADOS (SSR)]`);
   console.log(` - Título do painel presente ('Painel de Confirmação de Blocos'): ${hasPanelTitle ? "SIM ✅" : "NÃO ❌"}`);
@@ -156,7 +158,7 @@ async function main() {
   console.log(` - ID Anterior Gravado: '${previousDplId || "NENHUM"}'`);
   console.log(` - ID Atual em Produção: '${dplId}'`);
 
-  const subjectsControlPassed = hasSubjectName && hasPanelTitle && hasPanelCount && hasSampleTitle1 && hasActionJaEstudei && !hasComplitude && !has379 && !has483;
+  const subjectsControlPassed = hasSubjectName && hasSubjectHeader && hasPanelTitle && hasPanelCount && hasSampleTitle1 && hasSampleTitle2 && hasSampleTitle3 && hasActionJaEstudei && hasActionAindaNao && hasActionNaoEMateria && !hasComplitude && !has379 && !has483;
 
   if (!subjectsControlPassed) {
     console.error(`\n🔴 FALHA CRÍTICA DE PLACAR: A página /subjects não passou em 100% dos controles!`);
