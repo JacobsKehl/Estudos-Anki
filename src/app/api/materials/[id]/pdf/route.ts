@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
 
   try {
     const material = await prisma.studyMaterial.findFirst({

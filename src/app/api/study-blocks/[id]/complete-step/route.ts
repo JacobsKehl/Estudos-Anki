@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { completeStudyBlock } from "@/lib/study/completion";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   try {
     const body = await req.json().catch(() => ({}));

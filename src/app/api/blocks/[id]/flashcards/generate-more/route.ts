@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import type { FlashcardDifficulty } from "@/lib/ai/prompts/flashcard-generation";
 
@@ -75,7 +75,7 @@ export async function POST(
   const { id } = await params;
   
   // Autenticação segura do usuário
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
   if (!userId) {
     return NextResponse.json({ error: "Usuário não autenticado." }, { status: 401 });
   }

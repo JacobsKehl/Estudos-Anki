@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { completeStudyBlock, reopenStudyBlock } from "@/lib/study/completion";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export async function PATCH(
   req: NextRequest,
@@ -11,7 +11,7 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const body = await req.json();
     const { status } = body;
 

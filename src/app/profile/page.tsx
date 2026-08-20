@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { ProfileClient } from "@/components/profile/ProfileClient";
 import { getSessionUser } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
 
   // 1. Buscar usuário
   const user = await prisma.user.findUnique({

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { checkRateLimit, rateLimitErrorResponse } from "@/lib/rate-limit";
 
 /**
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // Rate Limiting: 10 uploads por 15 minutos por usuário
     const rateLimitKey = `upload:${userId}`;

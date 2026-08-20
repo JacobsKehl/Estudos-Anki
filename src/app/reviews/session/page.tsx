@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { ReviewSessionClient } from "@/components/reviews/ReviewSessionClient";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReviewSessionPage() {
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
   const now = new Date();
 
   // 1. Get today's block IDs to exclude them (they are in "Cards do Dia")

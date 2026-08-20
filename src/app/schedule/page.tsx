@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic";
 import { Calendar, Layers, CheckCircle2, Clock, Play } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -15,7 +15,7 @@ import { ActivateSecondaryModal } from "@/components/schedule/ActivateSecondaryM
 import { getTodayRangeSP } from "@/lib/date-utils";
 
 export default async function SchedulePage() {
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
   let schedule: any = null;
   
   // ─── 1. FETCH PREFERENCES, SUBJECTS, AND BLOCKS ───

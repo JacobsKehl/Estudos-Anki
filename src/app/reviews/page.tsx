@@ -2,13 +2,13 @@
 export const dynamic = "force-dynamic";
 import { RotateCw } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { ReviewDashboard } from "@/components/reviews/ReviewDashboard";
 
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function ReviewsPage() {
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
   const now = new Date();
 
   // 1. Fetch pending cards (nextReviewAt <= now AND status = APPROVED)

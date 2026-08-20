@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { detectQuestionsOrGabaritoHeuristic } from "@/lib/ai/organizer";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
 async function repairMaterials(req: NextRequest) {
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     console.log(`[Repair Supports] Iniciando varredura de materiais para usuário: ${userId}`);
 
     // 1. Buscar apenas os materiais do próprio usuário organizados que não são rotulados como apoio

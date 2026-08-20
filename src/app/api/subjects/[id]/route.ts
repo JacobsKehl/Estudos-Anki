@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export async function PATCH(
   req: NextRequest,
@@ -9,7 +9,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const body = await req.json();
     const { name, description, priority, examWeight, studyPriority } = body;
 
@@ -100,7 +100,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // Verify subject belongs to user
     const subject = await prisma.studySubject.findFirst({ where: { id, userId } });

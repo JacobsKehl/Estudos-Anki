@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpen, Blocks, Layers, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SubjectDetailsPage({ params }: { params: { id: string } }) {
   const { id } = await params;
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
   
   let subject: any = null;
   let metrics: any = null;

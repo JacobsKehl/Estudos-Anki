@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { calculateNextReview, FlashcardRating, FlashcardState } from "@/lib/srs/anki";
 
 export async function POST(
@@ -9,7 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   try {
     const body = await req.json();

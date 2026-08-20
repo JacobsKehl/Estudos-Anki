@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { completeStudyBlock } from "@/lib/study/completion";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const { id } = await params;
     const body = await req.json();
     const { action } = body; // "CONFIRM" | "DISMISS"

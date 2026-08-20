@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { checkRateLimit, rateLimitErrorResponse } from "@/lib/rate-limit";
 
 // Robust CSV row parser handling quotes, double quotes, and internal commas
@@ -135,7 +135,7 @@ function detectSubjectForImportedFlashcard(front: string, back: string): string 
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // Rate Limiting: 5 execuções por 30 minutos por usuário
     const rateLimitKey = `import-csv:${userId}`;

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import type { FlashcardDifficulty } from "@/lib/ai/prompts/flashcard-generation";
 
@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   try {
     // 1. Fetch the study block and validate ownership

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { identifySubject, detectStructure, findBestOfficialTopic, getStructureSampleText } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
@@ -74,7 +74,7 @@ export async function POST(
 
   try {
     // 1. Buscar o material e o usuário real
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { preferences: true }

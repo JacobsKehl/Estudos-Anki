@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export async function GET() {
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -68,7 +68,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const body = await request.json();
 
     const user = await prisma.user.findUnique({

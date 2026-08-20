@@ -31,7 +31,7 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 jest.mock("@/lib/auth-mock", () => ({
-  getMockUserId: jest.fn().mockResolvedValue("user-123"),
+  getCurrentUserId: jest.fn().mockResolvedValue("user-123"),
 }));
 
 jest.mock("@/lib/supabase", () => ({

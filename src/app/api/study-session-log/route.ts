@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { StudySessionActionType, StudySessionSource } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ const ALLOWED_ACTION_TYPES: string[] = [
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const body = await req.json();
 
     const { studyBlockId, actionType, startedAt, completedAt, actualDurationMinutes } = body as {

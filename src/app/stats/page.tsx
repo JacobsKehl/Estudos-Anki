@@ -1,5 +1,5 @@
 import { getGlobalMetrics } from "@/lib/services/subject-metrics";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { Trophy } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StudyStats } from "@/components/stats/StudyStats";
@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function StatsPage() {
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
   const metrics = await getGlobalMetrics(userId);
 
   let goal = "Estudos";

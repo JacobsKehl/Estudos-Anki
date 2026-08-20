@@ -6,7 +6,7 @@ import { ProcessMaterialButton } from "@/components/materials/ProcessMaterialBut
 import { ArrowLeft, BookOpen, FileText, AlertCircle, Blocks } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { BlockGenerator } from "@/components/materials/BlockGenerator";
 import { StudyBlockItem } from "@/components/subjects/StudyBlockItem";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default async function MaterialDetailsPage({ params }: { params: { id: string } }) {
   const { id } = await params;
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let material: any = null;

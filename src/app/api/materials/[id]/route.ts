@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 // Valores válidos para o campo provider (StudyMaterialProvider enum)
 const VALID_PROVIDERS = ["CFC", "ESTRATEGIA", "OTHER"] as const;
@@ -14,7 +14,7 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // Validar propriedade do material (ownership)
     const material = await prisma.studyMaterial.findFirst({
@@ -51,7 +51,7 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // 1. Autenticar e confirmar ownership
     const material = await prisma.studyMaterial.findFirst({
@@ -118,7 +118,7 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // 1. Validar propriedade do material (ownership)
     const material = await prisma.studyMaterial.findFirst({

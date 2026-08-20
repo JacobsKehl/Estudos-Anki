@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { PDFDocument } from "pdf-lib";
 import { extractTextWithGeminiOCR } from "@/lib/ai/ocr/gemini-ocr";
 
@@ -39,7 +39,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   try {
     const material = await prisma.studyMaterial.findFirst({ where: { id, userId: mockUserId } });

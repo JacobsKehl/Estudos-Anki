@@ -34,10 +34,10 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 jest.mock("@/lib/auth-mock", () => ({
-  getMockUserId: jest.fn(),
+  getCurrentUserId: jest.fn(),
 }));
 
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 describe("Tenant Isolation Behavioral Security Tests", () => {
   const userA_id = "user_A_123";
@@ -120,7 +120,7 @@ describe("Tenant Isolation Behavioral Security Tests", () => {
   describe("2. Isolamento de Escrita por Tenant (Tentativa de Exclusão Cruzada)", () => {
     it("deve recusar a exclusão da matéria do Usuário B quando a requisição vem do Usuário A", async () => {
       // Autenticado como Usuário A
-      (getMockUserId as jest.Mock).mockResolvedValue(userA_id);
+      (getCurrentUserId as jest.Mock).mockResolvedValue(userA_id);
 
       // Tentando acessar/deletar a matéria pertencente ao Usuário B
       (prisma.studySubject.findFirst as jest.Mock).mockImplementation(({ where }) => {
@@ -145,7 +145,7 @@ describe("Tenant Isolation Behavioral Security Tests", () => {
 
     it("deve permitir a exclusão apenas quando o usuário é o verdadeiro proprietário e não há dependências", async () => {
       // Autenticado como Usuário A
-      (getMockUserId as jest.Mock).mockResolvedValue(userA_id);
+      (getCurrentUserId as jest.Mock).mockResolvedValue(userA_id);
 
       // Valida propriedade da matéria A sob Usuário A
       (prisma.studySubject.findFirst as jest.Mock).mockResolvedValue(subjectA);

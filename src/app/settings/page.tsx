@@ -1,13 +1,13 @@
 import { Settings } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { PageHeader } from "@/components/ui/page-header";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
   let unorganizedCount = 0;
   let isAdmin = false;
 

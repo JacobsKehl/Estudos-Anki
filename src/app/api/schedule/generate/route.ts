@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateSmartSchedule } from "@/lib/scheduler";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
     const user = await prisma.user.findUnique({
       where: { id: userId }
     });

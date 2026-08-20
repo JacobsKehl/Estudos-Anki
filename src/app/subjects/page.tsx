@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { BookMarked } from "lucide-react";
 import { SubjectCard } from "@/components/subjects/SubjectCard";
 import { CreateSubjectDialog } from "@/components/subjects/CreateSubjectDialog";
@@ -13,7 +13,7 @@ import { getAllSubjectsMetrics } from "@/lib/services/subject-metrics";
 import { FlaggedBlocksPanel } from "@/components/study/FlaggedBlocksPanel";
 
 export default async function SubjectsPage() {
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
 
   let subjects: any[] = [];
   let scheduleMode = "DYNAMIC";

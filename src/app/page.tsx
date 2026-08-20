@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import Link from "next/link";
 import { TodayTaskCard } from "@/components/today/TodayTaskCard";
 import { getAdaptiveStudyQueue } from "@/lib/recommendations/adaptive-scheduler";
@@ -30,7 +30,7 @@ import { shouldReorganizeSchedule } from "@/lib/scheduler/legacy-trt4-queue";
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
   const now = new Date();
 
   // ─── PARALLEL INITIAL QUERIES ─────────────────────────────────────────────

@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { PracticeDashboard } from "@/components/flashcards/PracticeDashboard";
 
 import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
 
 export default async function PracticePage({ searchParams }: { searchParams: { blockId?: string, blockIds?: string, source?: string } }) {
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
   const { blockId, blockIds, source } = await searchParams;
 
   let practiceCards: any[] = [];

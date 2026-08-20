@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { FlashcardRepository } from "@/components/flashcards/FlashcardRepository";
 
 import { BrainCircuit } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function FlashcardsPage({ searchParams }: { searchParams: { blockId?: string } }) {
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
   const { blockId } = await searchParams;
 
   let flashcards: any[] = [];

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
 import { CloudUploadButton } from "@/components/materials/CloudUploadButton";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { MaterialsListClient } from "@/components/materials/MaterialsListClient";
 
 type MaterialItem = {
@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MaterialsPage() {
   let materials: MaterialItem[] = [];
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   try {
     const dbMaterials = await prisma.studyMaterial.findMany({

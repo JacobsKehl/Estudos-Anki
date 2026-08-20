@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: subjectId } = await params;
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   try {
     const totalBlocks = await (prisma as any).studyBlock.count({
@@ -47,7 +47,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: subjectId } = await params;
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   try {
     const userPrefs = await prisma.userPreferences.findUnique({

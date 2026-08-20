@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * Lança um erro caso o usuário não seja autenticado ou não tenha o e-mail cadastrado como admin.
  */
 async function getAdminUser() {
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });

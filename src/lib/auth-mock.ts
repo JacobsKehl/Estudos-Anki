@@ -61,10 +61,4 @@ export async function getCurrentUserId(): Promise<string> {
   throw new Error("Configuração de AUTH_MODE inválida ou sessão expirada.");
 }
 
-/**
- * Helper legível e compatível temporariamente para as rotas que ainda usam getMockUserId.
- * @deprecated Use getCurrentUserId() em vez disso.
- */
-export async function getMockUserId(): Promise<string> {
-  return getCurrentUserId();
-}
+

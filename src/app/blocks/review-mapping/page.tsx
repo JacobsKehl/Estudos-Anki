@@ -1,13 +1,13 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
 import { ReviewMappingClient } from "./ReviewMappingClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReviewMappingPage() {
-  const userId = await getMockUserId();
+  const userId = await getCurrentUserId();
 
   // Buscar todos os blocos do usuário que precisam de revisão manual ou estão sem tópico oficial
   const unmappedBlocks = await prisma.studyBlock.findMany({

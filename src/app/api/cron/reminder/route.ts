@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { getUserCopy } from "@/lib/user-copy";
@@ -545,7 +545,7 @@ export async function GET(req: NextRequest) {
 
     // Tentar ler a sessão para chamadas manuais logadas
     try {
-      sessionUserId = await getMockUserId();
+      sessionUserId = await getCurrentUserId();
       if (sessionUserId) {
         sessionUser = await prisma.user.findUnique({
           where: { id: sessionUserId },

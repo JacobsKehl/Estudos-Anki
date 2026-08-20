@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { notFound } from "next/navigation";
 import { BlockStudyView } from "@/components/blocks/BlockStudyView";
 
@@ -15,7 +15,7 @@ export default async function BlockPage({
 }) {
   const { id } = await params;
   const { returnTo, from, scheduleItemId, secondPass } = await searchParams;
-  const mockUserId = await getMockUserId();
+  const mockUserId = await getCurrentUserId();
 
   const block = await (prisma as any).studyBlock.findUnique({
     where: { id },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 import { checkRateLimit, rateLimitErrorResponse } from "@/lib/rate-limit";
 import { identifySubject, detectStructure, findBestOfficialTopic, getStructureSampleText } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
@@ -560,7 +560,7 @@ export async function POST(req: NextRequest) {
     const materialId = body.materialId as string | undefined;
 
     // 1. Usuário real
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // Rate Limiting: 3 execuções por 30 minutos por usuário (apenas execuções reais, não polling)
     if (body.getPendingIds !== true) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { completeStudyBlock, reopenStudyBlock } from "@/lib/study/completion";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export async function PATCH(
   req: NextRequest,
@@ -12,7 +12,7 @@ export async function PATCH(
     const body = await req.json();
     const { title, description, pageStart, pageEnd, estimatedStudyMinutes, status } = body;
 
-    const mockUserId = await getMockUserId();
+    const mockUserId = await getCurrentUserId();
 
     // Validar propriedade do bloco (ownership)
     const blockExists = await prisma.studyBlock.findFirst({
@@ -62,7 +62,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const mockUserId = await getMockUserId();
+    const mockUserId = await getCurrentUserId();
 
     // Validar propriedade do bloco (ownership)
     const blockExists = await prisma.studyBlock.findFirst({

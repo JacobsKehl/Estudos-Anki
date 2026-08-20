@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { suggestStudyBlocks } from "@/lib/ai/study-blocks";
-import { getMockUserId } from "@/lib/auth-mock";
+import { getCurrentUserId } from "@/lib/auth-mock";
 
 export async function POST(
   req: NextRequest,
@@ -11,7 +11,7 @@ export async function POST(
   const { id } = await params;
 
   try {
-    const userId = await getMockUserId();
+    const userId = await getCurrentUserId();
 
     // Validar propriedade do material
     const material = await prisma.studyMaterial.findFirst({

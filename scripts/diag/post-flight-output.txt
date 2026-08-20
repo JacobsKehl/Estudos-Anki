@@ -1,0 +1,93 @@
+
+====================================================================================================
+  1. COMPARATIVO DE ITENS DA AGENDA NOS PRÓXIMOS 7 DIAS (ANTES vs DEPOIS)
+====================================================================================================
+
+  Data       | ANTES | DEPOIS | Status
+  -----------|-------|--------|------------------
+  2026-08-20 |    20 |     21 | ⚠️ Mudou (+1)
+  2026-08-21 |    23 |     23 | ✅ Idêntico
+  2026-08-22 |    22 |     22 | ✅ Idêntico
+  2026-08-23 |    21 |     21 | ✅ Idêntico
+  2026-08-24 |    23 |     23 | ✅ Idêntico
+  2026-08-25 |    23 |     23 | ✅ Idêntico
+  2026-08-26 |    20 |     20 | ✅ Idêntico
+
+====================================================================================================
+  2. INVARIANTE 1: LACUNAS E SOBREPOSIÇÕES (CONTIGUIDADE)
+====================================================================================================
+  📘 1 - Direito Administrativo_compressed.pdf   : 16 blocos → ✅ 0 LACUNAS | 0 SOBREPOSIÇÕES
+  📘 2 - Direito do Trabalho.pdf                 : 12 blocos → ✅ 0 LACUNAS | 0 SOBREPOSIÇÕES
+  📘 3 - Direito Constitucional.pdf              : 12 blocos → ✅ 0 LACUNAS | 0 SOBREPOSIÇÕES
+  📘 4 - Direito Processual do Trabalho.pdf      : 7 blocos → ✅ 0 LACUNAS | 0 SOBREPOSIÇÕES
+  📘 Direito Processual Civil_compressed.pdf     : 11 blocos → ✅ 0 LACUNAS | 0 SOBREPOSIÇÕES
+
+====================================================================================================
+  3. INVARIANTE 2: LIMITES DE FRONTEIRA DO ARQUIVO (COM EXCEÇÃO NOMEADA)
+====================================================================================================
+  📌 EXCEÇÃO NOMEADA REGISTRADA:
+     'A capa/sumário (pp. 1-3 ou 1-5) e a última página de cada PDF do CFC (EXTRA – EXERCÍCIOS/QUESTÕES (TEC)) não pertencem a bloco.'
+
+  📘 1 - Direito Administrativo_compressed.pdf   : minStart=6 (esperado 6) [✅] | maxEnd=151 (esperado 151, TEC é p.152) [✅]
+  📘 2 - Direito do Trabalho.pdf                 : minStart=4 (esperado 4) [✅] | maxEnd=37 (esperado 37, TEC é p.38) [✅]
+  📘 3 - Direito Constitucional.pdf              : minStart=4 (esperado 4) [✅] | maxEnd=85 (esperado 85, TEC é p.86) [✅]
+  📘 4 - Direito Processual do Trabalho.pdf      : minStart=3 (esperado 3) [✅] | maxEnd=29 (esperado 29, TEC é p.30) [✅]
+  📘 Direito Processual Civil_compressed.pdf     : minStart=4 (esperado 4) [✅] | maxEnd=75 (esperado 75, TEC é p.76) [✅]
+
+====================================================================================================
+  4. INVARIANTE 3: DETECTOR POSITIVO DE ÂNCORA PÓS-REALINHAMENTO
+====================================================================================================
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+  🔴 ÂNCORA NÃO ENCONTRADA: 1 - Direito Administrativo_compressed.pdf | 'Lei 14.133/21 – Licitações (Modalidades, Cont' p.104
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: TT: undefined function: 21
+  🔴 ÂNCORA NÃO ENCONTRADA: 4 - Direito Processual do Trabalho.pdf | 'Jurisprudências (Súmulas STF/STJ/TST e OJ)' p.21
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+
+  Total de blocos auditados pelo detector positivo: 58
+  Títulos ausentes na página inicial: 2
+
+====================================================================================================
+  5. MÉTRICAS RECALCULADAS PARA GABRIELA
+====================================================================================================
+  - Total de blocos CFC ativos: 58
+  - Blocos concluídos (COMPLETED): 26
+  - Blocos inéditos (NOT_STARTED): 32
+  - Tempo total de estudo nos blocos CFC: 1278 min (21.3h) [era 1377 min / 22.9h — economia de 99 min]
+  - Projeção de conclusão da teoria (CFC): 11 dias letivos → ~2026-08-31
+
+  🔍 VERIFICAÇÃO DE BLOCOS COMPLETED COM INTERVALO ALTERADO:
+     ↳ [COMPLETED] Agentes Públicos – Parte Constitucional [68–75] (24m)
+     ↳ [COMPLETED] Glossário de Siglas [6–7] (15m)
+     ↳ [COMPLETED] Conceitos e Fontes do Direito Administrativo + Administração Pública (conforme CF/88) + Poderes e Deveres da Administração Pública [8–16] (27m)
+     ↳ [COMPLETED] Atos Administrativos [17–25] (27m)
+     ↳ [COMPLETED] Organização da Administração Pública e Terceiro Setor [26–30] (15m)
+     ↳ [COMPLETED] Dos Princípios Fundamentais [9–9] (15m)
+     ↳ [COMPLETED] Rescisão do Contrato de Trabalho + Aviso Prévio [20–22] (15m)
+     ↳ [COMPLETED] Da Organização do Estado + Da Intervenção [26–32] (21m)
+     ↳ [COMPLETED] Lei 8.112/90 – Estatuto dos Servidores Públicos Federais [76–89] (42m)
+     ↳ [COMPLETED] Remuneração [12–14] (15m)
+     ↳ [COMPLETED] Aspectos Introdutórios do Direito Constitucional [4–8] (15m)
+     ↳ [COMPLETED] Duração do Trabalho [15–16] (15m)
+     ↳ [COMPLETED] Teletrabalho [17–17] (15m)
+     ↳ [COMPLETED] Da Administração Pública [33–42] (30m)
+     ↳ [COMPLETED] Controle de Constitucionalidade [78–85] (24m)
+     ↳ [COMPLETED] Empregador, Empregado e Relação de Emprego [7–7] (15m)
+     ↳ [COMPLETED] Introdução [4–5] (15m)
+     ↳ [COMPLETED] Atos Processuais [23–31] (27m)
+     ↳ [COMPLETED] Da Função Jurisdicional [6–10] (15m)
+     ↳ [COMPLETED] Princípios e Fontes do Direito do Trabalho + Direitos Trabalhistas Previstos Constitucionalmente [4–6] (15m)
+     ↳ [COMPLETED] Organização da Justiça do Trabalho + Jurisdição e Competência da Justiça do Trabalho [3–5] (15m)
+     ↳ [COMPLETED] Do Processo em Geral [6–10] (15m)
+     ↳ [COMPLETED] Dos Dissídios Individuais [11–14] (15m)
+     ↳ [COMPLETED] Partes e dos Procuradores - Sujeitos do Processo [11–17] (21m)
+     ↳ [COMPLETED] Juiz e dos Auxiliares da Justiça [18–22] (15m)
+     ↳ [COMPLETED] Dos Direitos e Garantias Fundamentais [10–25] (48m)
+     Total de blocos COMPLETED afetados pelo ajuste: 26
+
+====================================================================================================
+
