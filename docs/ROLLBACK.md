@@ -157,14 +157,54 @@ Nunca criar `/api/blocks/<nome_estatico>` no mesmo nível em que existir `/api/b
 
 ---
 
-## 12. Regra de Segurança de Dados e Localização de Backups
+---
 
-> [!IMPORTANT]
-> **Todo e qualquer backup de banco de dados (JSON ou SQL/dump) deve ser obrigatoriamente salvo na pasta `backups/json/` ou `backups/`, as quais estão protegidas pelo `.gitignore`.**
+## 13. Regra de Mapeamento de Sumário Impresso vs. Índice Físico do PDF
+
+> [!CAUTION]
+> **Nunca grave o número da página impressa no rodapé diretamente no campo `pageStart` do banco sem converter para o índice do arquivo PDF.**
 
 **Regra Operacional:**
-- É estritamente proibido salvar snapshots de dados de usuários dentro da pasta `docs/` ou qualquer outro diretório versionado.
-- Antes de qualquer operação de mutação ou re-extração em lote no banco de dados, o script deve gerar um arquivo JSON em `backups/json/` e validar que a pasta está listada no `.gitignore`.
+- Em apostilas e PDFs diagramados, a capa e o sumário (geralmente páginas 1 a 3, ou 1 a 5) deslocam o índice do PDF em relação ao número impresso no rodapé (geralmente `índice do PDF = número impresso + 1`).
+- Mapeamento de página de sumário só é aceito após confirmação determinística (via leitor de PDF/text extraction) de que a página de destino real no arquivo contém o título de capítulo esperado.
+
+---
+
+## 14. Exceções Nomeadas do Invariante de Fronteira dos PDFs do CFC
+
+> [!NOTE]
+> **Definição de Fronteiras Físicas do Acervo CFC (5 PDFs):**
+
+**Regra Operacional:**
+- **Início do Conteúdo (`firstContentPage`):** A capa, a apresentação e o sumário (páginas 1 a 5 no *Direito Administrativo*, e páginas 1 a 3 nos demais 4 PDFs) são explicitamente excluídos da divisão em blocos de estudo.
+---
+
+## 15. Exceções Nomeadas Estruturais do Detector Positivo de Âncora
+
+> [!NOTE]
+> **Exceções Estruturais Conhecidas do Detector Positivo de Títulos (2 Casos):**
+
+**Regra Operacional:**
+- **Licitações – Parte 2 (pág. 104 de *Direito Administrativo*):** Trata-se de uma divisão artificial interna em 2 blocos de um capítulo único do PDF (`[90–116]`). A página 104 física abre na *"Seção II - Das Modalidades"*, não contendo o título principal do capítulo. É uma exceção estrutural esperada de divisão por tamanho.
+- **Jurisprudências (pág. 21 de *Direito Processual do Trabalho*):** O capítulo é citado no sumário impresso (pág. 19), mas a página 21 física abre diretamente no texto de *"STF, Súmula 198"* sem banner de título impresso no topo. É o único capítulo do acervo sem título impresso na página física inicial.
+- **Resultado Esperado do Detector:** Zero alertas, exceto exclusivamente para estes 2 casos estruturais registrados.
+
+---
+
+---
+
+## 17. Regra de Validação de Completude de Backups JSON (Paginação e Asserção)
+
+> [!CAUTION]
+> **Todo backup em formato JSON em `backups/json/` deve obrigatoriamente paginar consultas no PostgREST e validar a contagem exata de linhas por tabela.**
+
+**Regra Operacional:**
+- O motor HTTPS PostgREST impõe um limite padrão de 1000 linhas por requisição. Scripts de backup de dados devem obrigatoriamente paginar consultas via `.range(from, to)` em laço até consumir a tabela inteira.
+- **Asserção de Completude:** O script deve realizar uma consulta `COUNT(*)` exata no banco de dados para cada tabela e comparar com a quantidade de linhas exportadas no arquivo JSON.
+- **Regra de Ouro:** Se houver divergência de 1 linha em qualquer tabela, o backup falha com exit code não-nulo e o arquivo JSON NÃO é gerado. Nenhum script de alteração ou exclusão em massa pode ser executado sem um backup paginado com asserção de completude validada.
+
+
+
 
 
 

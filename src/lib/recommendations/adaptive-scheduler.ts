@@ -340,7 +340,7 @@ export async function getAdaptiveStudyPlan(
       }
     }
 
-    // 5. Blocos não iniciados → THEORY (D1: apenas inéditos sourceV1BlockId = null e possivelmente já estudado = false; D2: domingo = 0 THEORY)
+    // 5. Blocos não iniciados → THEORY (Restrito ao CFC, domingo = 0 THEORY)
     const spDay = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).getDay();
     const isSunday = spDay === 0;
 
@@ -353,6 +353,7 @@ export async function getAdaptiveStudyPlan(
           sourceV1BlockId: null,
           possiblyAlreadyStudied: false,
           material: {
+            originalFileName: { in: cfcFileNames },
             materialRole: {
               not: "SUPPORT_MATERIAL"
             }
@@ -363,18 +364,16 @@ export async function getAdaptiveStudyPlan(
         }
       });
 
-      // Ordenação lógica/natural por nome do PDF (ex: "pdf 0" antes de "pdf 1") e depois pelo orderIndex
+      // Ordenação lógica/natural por nome do PDF e depois pelo pageStart/orderIndex
       notStartedBlocks.sort((a: any, b: any) => {
         const fileA = a.material?.fileName || "";
         const fileB = b.material?.fileName || "";
         const fileCompare = fileA.localeCompare(fileB, undefined, { numeric: true, sensitivity: 'base' });
         if (fileCompare !== 0) return fileCompare;
-        return a.orderIndex - b.orderIndex;
+        return a.pageStart - b.pageStart;
       });
 
-      const topNotStartedBlocks = notStartedBlocks.slice(0, maxNewTheoryPerDay);
-
-      for (const block of topNotStartedBlocks) {
+      for (const block of notStartedBlocks) {
         tasks.push({
           type: "THEORY",
           subjectId: subject.id,
@@ -392,8 +391,41 @@ export async function getAdaptiveStudyPlan(
     }
   }
 
-  // Ordenar por score decrescente e limitar se limite numérico fornecido
-  const sorted = tasks.sort((a, b) => b.priorityScore - a.priorityScore);
+  // ─── Pós-processamento de THEORY: Aplicar Cota Global + Rodízio de Matérias ───
+  const nonTheoryTasks = tasks.filter(t => t.type !== "THEORY");
+  const allTheoryTasks = tasks.filter(t => t.type === "THEORY");
+
+  // Agrupar teoria por matéria
+  const theoryBySubject: Record<string, StudyTask[]> = {};
+  for (const t of allTheoryTasks) {
+    if (!theoryBySubject[t.subjectId]) theoryBySubject[t.subjectId] = [];
+    theoryBySubject[t.subjectId].push(t);
+  }
+
+  // Seleção com Rodízio entre matérias (maior priorityScore desempata, 2 matérias distintas por dia)
+  const selectedTheoryTasks: StudyTask[] = [];
+  const subjectIds = Object.keys(theoryBySubject);
+
+  // Ordenar as matérias pela maior pontuação do seu primeiro bloco
+  subjectIds.sort((a, b) => {
+    const scoreA = theoryBySubject[a][0]?.priorityScore ?? 0;
+    const scoreB = theoryBySubject[b][0]?.priorityScore ?? 0;
+    return scoreB - scoreA;
+  });
+
+  // Intercalar matérias: pega 1 bloco da matéria de maior score, depois 1 da segunda matéria de maior score
+  for (const subId of subjectIds) {
+    if (selectedTheoryTasks.length >= maxNewTheoryPerDay) break;
+    const candidateBlock = theoryBySubject[subId].shift();
+    if (candidateBlock) {
+      selectedTheoryTasks.push(candidateBlock);
+    }
+  }
+
+  // Combinar tarefas de revisão/flashcards/reforço com as tarefas de teoria limitadas pela cota global
+  const combinedTasks = [...nonTheoryTasks, ...selectedTheoryTasks];
+  const sorted = combinedTasks.sort((a, b) => b.priorityScore - a.priorityScore);
+
   return typeof configOrLimit === "number" ? sorted.slice(0, configOrLimit) : sorted;
 }
 

@@ -67,7 +67,8 @@ function generateEmailHtml(
                 : "PDF não identificado";
               const pageStart = t.studyBlock?.pageStart;
               const pageEnd = t.studyBlock?.pageEnd;
-              const pageRange = pageStart !== undefined && pageEnd !== undefined ? `Páginas: ${pageStart} - ${pageEnd}` : "";
+              const hasValidPages = typeof pageStart === "number" && typeof pageEnd === "number" && pageStart > 0 && pageEnd > 0;
+              const pageRange = hasValidPages ? `Páginas: ${pageStart} - ${pageEnd}` : "";
               const pdfHtml = material 
                 ? `<div style="font-size: 13px; color: #4a5568; margin-top: 2px;">
                      <strong>PDF:</strong> ${pdfName} ${pageRange ? `(${pageRange})` : ""}
@@ -158,7 +159,8 @@ function generateEmailHtml(
       : "PDF não identificado";
     const nextPageStart = nextTheoryItem.studyBlock?.pageStart;
     const nextPageEnd = nextTheoryItem.studyBlock?.pageEnd;
-    const nextPageRange = nextPageStart !== undefined && nextPageEnd !== undefined ? `Páginas: ${nextPageStart} - ${nextPageEnd}` : "";
+    const hasValidNextPages = typeof nextPageStart === "number" && typeof nextPageEnd === "number" && nextPageStart > 0 && nextPageEnd > 0;
+    const nextPageRange = hasValidNextPages ? `Páginas: ${nextPageStart} - ${nextPageEnd}` : "";
     
     nextTheoryItemHtml = `
       <!-- Section: Sugestão de Adiantamento -->
@@ -418,7 +420,10 @@ async function processUserReminder(
 
   // 5. Renderizar HTML
   const studentName = user.name || "Estudante";
-  const appUrl = process.env.APP_BASE_URL || "https://kehlstudy.com";
+  const appUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://estudos-anki.vercel.app";
+  if (!process.env.APP_BASE_URL) {
+    console.warn("[CRON] APP_BASE_URL não está configurada no ambiente. Usando fallback seguro para https://estudos-anki.vercel.app");
+  }
   const languageTone = user.preferences?.languageTone || "MASCULINE_NEUTRAL";
   const emailHtml = generateEmailHtml(
     studentName,
