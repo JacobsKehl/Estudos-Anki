@@ -1097,13 +1097,23 @@ export async function reorganizeOverdueSchedule(
     }
   }
 
-  // Buscar todos os blocos pendentes das matérias elegíveis no banco de dados
+  // CFC PDFs permitidos
+  const cfcFileNames = [
+    "1 - Direito Administrativo_compressed.pdf",
+    "2 - Direito do Trabalho.pdf",
+    "3 - Direito Constitucional.pdf",
+    "4 - Direito Processual do Trabalho.pdf",
+    "Direito Processual Civil_compressed.pdf",
+  ];
+
+  // Buscar todos os blocos pendentes das matérias elegíveis no banco de dados (Restrito ao CFC)
   const dbPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
       theoryStatus: { not: "COMPLETED" },
       subjectId: { in: eligibleSubjectIds },
       material: {
+        originalFileName: { in: cfcFileNames },
         materialRole: {
           not: "SUPPORT_MATERIAL"
         }
@@ -1511,9 +1521,15 @@ export async function reorganizeOverdueSchedule(
           }
         }
 
-        // 2. Avaliar terceiro bloco complementar se ainda houver capacidade (>= 30 min e < 90 min)
+        // Regra de Produto: A cota maxNewTheoryPerDay = 2 MANDA. Não adicionar 3º bloco de teoria no dia.
+        const currentTheoryCountOnDay = [
+          ...preservedTheoryOnDay,
+          ...updatesList.filter((item: any) => item.dayNumber === dayNumber && item.actionType === "THEORY"),
+          ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber && item.actionType === "THEORY")
+        ].length;
+
         const remainingCapacity = targetTheoryMinutes - theoryMinutesOnDay;
-        if (remainingCapacity >= 30) {
+        if (remainingCapacity >= 30 && currentTheoryCountOnDay < 2) {
           const civilSubject = eligibleSubjects.find(s => s.name.toLowerCase().includes("direito civil"));
           let thirdBlock = (civilSubject && !sameDaySubjectIds.has(civilSubject.id)) ? (blocksBySubject[civilSubject.id] || []).shift() : null;
 

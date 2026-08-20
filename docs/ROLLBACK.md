@@ -202,6 +202,7 @@ Nunca criar `/api/blocks/<nome_estatico>` no mesmo nível em que existir `/api/b
 - O motor HTTPS PostgREST impõe um limite padrão de 1000 linhas por requisição. Scripts de backup de dados devem obrigatoriamente paginar consultas via `.range(from, to)` em laço até consumir a tabela inteira.
 - **Asserção de Completude:** O script deve realizar uma consulta `COUNT(*)` exata no banco de dados para cada tabela e comparar com a quantidade de linhas exportadas no arquivo JSON.
 - **Regra de Ouro:** Se houver divergência de 1 linha em qualquer tabela, o backup falha com exit code não-nulo e o arquivo JSON NÃO é gerado. Nenhum script de alteração ou exclusão em massa pode ser executado sem um backup paginado com asserção de completude validada.
+- **Quarentena de Arquivos Incompletos:** Qualquer arquivo de backup que porventura tenha sido gerado com truncamento deve obrigatoriamente ser renomeado com a extensão `.TRUNCADO.json` ou excluído, impedindo que seja confundido com um backup válido de restauração.
 
 
 
