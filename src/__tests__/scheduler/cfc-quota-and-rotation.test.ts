@@ -18,7 +18,8 @@ jest.mock("../../lib/prisma", () => ({
         studyPriority: "PRIMARY",
         schedulingStatus: "ACTIVE",
         materials: [{ blocks: [{ id: "b1", theoryStatus: "NOT_STARTED" }] }],
-        blocks: [{ id: "b1", theoryStatus: "NOT_STARTED" }]
+        studyBlocks: [{ id: "b1", theoryStatus: "NOT_STARTED" }],
+        flashcards: []
       })),
     },
     flashcardReview: {
