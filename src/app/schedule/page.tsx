@@ -205,7 +205,10 @@ export default async function SchedulePage() {
 
   // Proteção defensiva: não exibir tarefas pendentes/em andamento de matérias excluídas (EXCLUDED)
   const activeItems = allItems.filter(
-    (item: any) => item.status !== "COMPLETED" && item.subject?.studyPriority !== "EXCLUDED"
+    (item: any) =>
+      item.status !== "COMPLETED" &&
+      item.status !== "SKIPPED" &&
+      item.subject?.studyPriority !== "EXCLUDED"
   );
   const completedItems = allItems.filter((item: any) => item.status === "COMPLETED");
 
