@@ -25,7 +25,7 @@ export default async function SubjectsPage() {
       where: {
         userId,
         possiblyAlreadyStudied: true,
-        theoryStatus: { not: "COMPLETED" }
+        theoryStatus: "NOT_STARTED"
       },
       include: {
         subject: { select: { id: true, name: true } },

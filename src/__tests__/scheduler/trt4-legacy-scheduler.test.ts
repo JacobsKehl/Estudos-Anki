@@ -212,13 +212,13 @@ describe("generateLegacyTrt4Schedule — regressão do fluxo LEGACY_TRT4", () =>
       );
     });
 
-    it("deve buscar StudyBlocks filtrando por userId e status não COMPLETED", async () => {
+    it("deve buscar StudyBlocks filtrando por userId e status NOT_STARTED (R9: whitelist)", async () => {
       const startDate = new Date(2026, 6, 13);
       await generateLegacyTrt4Schedule(userId, { startDate }, userPrefs);
 
       const findManyCalls = (mockPrisma.studyBlock.findMany as jest.Mock).mock.calls;
       const pendingCall = findManyCalls.find(
-        (call: any[]) => call[0]?.where?.theoryStatus?.not === "COMPLETED"
+        (call: any[]) => call[0]?.where?.theoryStatus === "NOT_STARTED"
       );
       expect(pendingCall).toBeDefined();
       expect(pendingCall[0].where.userId).toBe(userId);

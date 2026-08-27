@@ -163,7 +163,7 @@ export default async function Dashboard() {
       const eligibleBlock = await prisma.studyBlock.findFirst({
         where: {
           userId,
-          theoryStatus: { not: "COMPLETED" },
+          theoryStatus: "NOT_STARTED",
           subject: {
             studyPriority: { notIn: ["SECONDARY", "EXCLUDED"] }
           },

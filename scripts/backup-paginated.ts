@@ -103,6 +103,12 @@ export async function createPaginatedBackup(label: string): Promise<{ backupPath
     console.log(`  [${table.padEnd(20)}] DB Count: ${exactCount.toString().padStart(5)} | Exported: ${data.length.toString().padStart(5)} | ${isOk ? "✅ OK" : "❌ ERRO"}`);
   }
 
+  // Asserção final: aborta antes de gravar se qualquer tabela divergiu
+  const failures = summaryTable.filter(s => s.Status.includes("TRUNCADO"));
+  if (failures.length > 0) {
+    throw new Error(`🛑 BACKUP ABORTADO: ${failures.length} tabela(s) com contagem divergente: ${failures.map(f => f.Table).join(", ")}`);
+  }
+
   const backupDir = path.join(process.cwd(), "backups", "json");
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
 

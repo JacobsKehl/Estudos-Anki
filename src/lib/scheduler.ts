@@ -395,7 +395,7 @@ export async function generateLegacyTrt4Schedule(
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
-      theoryStatus: { not: "COMPLETED" },
+      theoryStatus: "NOT_STARTED",
       subjectId: { in: eligibleSubjectIds },
       material: {
         materialRole: {
@@ -592,7 +592,7 @@ export async function generateDynamicSchedule(
   const allPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
-      theoryStatus: { not: "COMPLETED" },
+      theoryStatus: "NOT_STARTED",
       subjectId: { in: eligibleSubjects.map(s => s.id) },
       material: {
         materialRole: {
@@ -1110,7 +1110,7 @@ export async function reorganizeOverdueSchedule(
   const dbPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
       userId,
-      theoryStatus: { not: "COMPLETED" },
+      theoryStatus: "NOT_STARTED",
       subjectId: { in: eligibleSubjectIds },
       material: {
         originalFileName: { in: cfcFileNames },

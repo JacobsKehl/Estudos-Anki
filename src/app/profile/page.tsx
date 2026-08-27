@@ -59,7 +59,7 @@ export default async function ProfilePage() {
     where: {
       userId,
       subjectId: { in: activeSubjectIds },
-      theoryStatus: { not: "COMPLETED" },
+      theoryStatus: "NOT_STARTED",
       material: {
         materialRole: {
           not: "SUPPORT_MATERIAL"
