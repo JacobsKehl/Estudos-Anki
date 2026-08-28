@@ -106,8 +106,8 @@ async function main() {
 
   if (oldItems && oldItems.length > 0) {
     const oldIds = oldItems.map((i) => i.id);
-    await supabase.from("StudyScheduleItem").delete().in("id", oldIds);
-    console.log(`🧹 Removidos ${oldIds.length} itens THEORY PENDING antigos do cronograma.`);
+    await supabase.from("StudyScheduleItem").update({ status: "SKIPPED" }).in("id", oldIds);
+    console.log(`🧹 Marcados ${oldIds.length} itens THEORY PENDING antigos como SKIPPED no cronograma.`);
   }
 
   // 5. Alocar novos blocos a partir de hoje (27/08/2026)
