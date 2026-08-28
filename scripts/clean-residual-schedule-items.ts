@@ -11,6 +11,12 @@
  * 5. Dry-run por padrão (--apply para executar).
  */
 import "dotenv/config";
+
+if (!process.env.RODAR_SCRIPT_HISTORICO) {
+  console.error("🛑 SCRIPT HISTÓRICO BLOQUEADO: Para executar este script de saneamento passado, defina RODAR_SCRIPT_HISTORICO=true");
+  process.exit(1);
+}
+
 import { createClient } from "@supabase/supabase-js";
 import { fetchAllRowsPaginated, createPaginatedBackup } from "./backup-paginated";
 

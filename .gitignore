@@ -30,6 +30,9 @@ tmp/
 backups/*.dump
 backups/json/
 backups/invalidos/
+evidencias-cronometro/
+saida-*.txt
+historico_completo_flashcards_trt4.csv
 
 
 

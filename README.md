@@ -69,10 +69,13 @@ npm run dev
 
 ## ☁️ Deploy na Vercel
 
-O projeto está configurado para deploy contínuo. Ao conectar seu repositório à Vercel:
+O projeto está configurado para deploy contínuo e manual via Vercel CLI. Para publicar alterações em produção:
 
-1.  Certifique-se de adicionar todas as variáveis de ambiente acima nas **Environment Variables** da Vercel.
-2.  O build rodará automaticamente `prisma generate && next build`.
+```bash
+npx vercel --prod --scope jacobskehls-projects --yes
+```
+
+> **Nota:** Certifique-se de que todas as variáveis de ambiente necessárias estejam configuradas no painel da Vercel. O script de build executa automaticamente `prisma generate` e aplica as migrations pendentes antes de compilar com Next.js (Turbopack).
 
 ---
 
