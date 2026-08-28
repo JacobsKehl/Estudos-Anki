@@ -42,10 +42,6 @@ let pdfjsLibCache: typeof import("pdfjs-dist/legacy/build/pdf.mjs") | null = nul
 async function getPdfjsLib() {
   if (pdfjsLibCache) return pdfjsLibCache;
   const lib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  lib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.mjs",
-    import.meta.url
-  ).href;
   pdfjsLibCache = lib;
   return lib;
 }
