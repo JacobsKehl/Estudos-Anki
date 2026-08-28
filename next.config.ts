@@ -10,7 +10,8 @@ const nextConfig: NextConfig = {
     'tesseract.js',
     'pdfreader',
     'pdf2pic',
-    'pdf-parse'
+    'pdf-parse',
+    'pdfjs-dist',
   ],
   async headers() {
     return [
