@@ -1045,15 +1045,12 @@ export async function reorganizeOverdueSchedule(
   const eligiblePendingTheory = eligibleTheory.filter(item => item.status === "PENDING");
   const eligiblePendingOther = activeEligiblePendingItems.filter(item => item.actionType !== "THEORY");
 
-  // THEORY PENDING: Pendentes atrasados (< todayStart) e futuros (>= allocationStartDate)
+  // THEORY PENDING: Pendentes atrasados (< todayStart) e itens alocáveis a partir de allocationStartDate
   const overdueTheory = eligiblePendingTheory.filter(
     item => item.scheduledDate && item.scheduledDate < todayStart
   );
   const futureTheory = eligiblePendingTheory.filter(
     item => item.scheduledDate && item.scheduledDate >= allocationStartDate
-  );
-  const todayTheoryPending = eligiblePendingTheory.filter(
-    item => item.scheduledDate && getTodayRangeSP(item.scheduledDate).dateString === todayStr
   );
 
   // Ordenar de forma determinística
@@ -1067,7 +1064,6 @@ export async function reorganizeOverdueSchedule(
   };
   sortItems(overdueTheory);
   sortItems(futureTheory);
-  sortItems(todayTheoryPending);
 
   const mode = userPrefs?.scheduleGenerationMode || "DYNAMIC";
 
@@ -1076,9 +1072,7 @@ export async function reorganizeOverdueSchedule(
   // IMPORTANTE: O pool contém APENAS registros com status === "PENDING". Itens IN_PROGRESS ou COMPLETED NUNCA entram no pool!
   const theoryQueue = mode === "LEGACY_TRT4" ? [] : [...overdueTheory, ...futureTheory];
 
-  const poolCandidates = preserveToday
-    ? [...overdueTheory, ...futureTheory]
-    : [...overdueTheory, ...todayTheoryPending, ...futureTheory];
+  const poolCandidates = [...overdueTheory, ...futureTheory];
   const unusedPendingItemsPool = mode === "LEGACY_TRT4" ? poolCandidates.filter(i => i.status === "PENDING") : [];
 
   // Outros tipos (REVIEW_BLOCK / SUPPORT):
@@ -1633,22 +1627,75 @@ export async function reorganizeOverdueSchedule(
     dayNumber++;
   }
 
+  const porId = new Map(allItems.map((i: any) => [i.id, i]));
+
+  const mudancasReais = updatesList.filter((up) => {
+    const cur = porId.get(up.id);
+    if (!cur) return true;
+    const curDateStr = cur.scheduledDate ? getTodayRangeSP(cur.scheduledDate).dateString : "";
+    const upDateStr = up.scheduledDate ? getTodayRangeSP(up.scheduledDate).dateString : "";
+    return (
+      curDateStr !== upDateStr ||
+      cur.dayNumber !== up.dayNumber ||
+      (up.subjectId !== undefined && cur.subjectId !== up.subjectId) ||
+      (up.studyBlockId !== undefined && cur.studyBlockId !== up.studyBlockId) ||
+      (up.reason !== undefined && cur.reason !== up.reason) ||
+      (up.estimatedMinutes !== undefined && cur.estimatedMinutes !== up.estimatedMinutes)
+    );
+  });
+
+  const finalChangesReport: Array<{
+    itemId: string;
+    actionType: string;
+    subjectName: string;
+    originalDate: string;
+    newDate: string;
+  }> = [
+    ...mudancasReais.map(up => {
+      const cur = porId.get(up.id);
+      const origDateStr = cur?.scheduledDate ? getTodayRangeSP(cur.scheduledDate).dateString : "UNKNOWN";
+      const newDateStr = up.scheduledDate ? getTodayRangeSP(up.scheduledDate).dateString : "UNKNOWN";
+      const subjectId = up.subjectId || cur?.subjectId;
+      const subject = eligibleSubjects.find(s => s.id === subjectId) || cur?.subject;
+      return {
+        itemId: up.id,
+        actionType: (up.actionType || cur?.actionType || "THEORY") as any,
+        subjectName: subject?.name || "Sem Matéria",
+        originalDate: origDateStr,
+        newDate: newDateStr
+      };
+    }),
+    ...newItemsToCreate.map((newItem, idx) => {
+      const subject = eligibleSubjects.find(s => s.id === newItem.subjectId);
+      return {
+        itemId: `NEW_${idx + 1}`,
+        actionType: newItem.actionType || "THEORY",
+        subjectName: subject?.name || "Sem Matéria",
+        originalDate: "LACUNA",
+        newDate: newItem.scheduledDate ? getTodayRangeSP(newItem.scheduledDate).dateString : "UNKNOWN"
+      };
+    })
+  ];
+
   // Executar transações no banco se dryRun for false
   if (!dryRun) {
     await prisma.$transaction(async (tx) => {
-      // 1. Purgar itens de teoria pendentes excedentes que não foram reaproveitados (apenas status PENDING)
+      // 1. Purgar itens de teoria pendentes excedentes marcando como SKIPPED (Zero-Delete Policy)
       if (unusedPendingItemsPool.length > 0) {
         const unusedIds = unusedPendingItemsPool.map(i => i.id);
-        await (tx as any).studyScheduleItem.deleteMany({
+        await (tx as any).studyScheduleItem.updateMany({
           where: {
             id: { in: unusedIds },
             status: "PENDING"
+          },
+          data: {
+            status: "SKIPPED"
           }
         });
       }
 
-      // 2. Atualizar itens existentes (proteção contra alteração de itens que viraram IN_PROGRESS/COMPLETED)
-      for (const up of updatesList) {
+      // 2. Atualizar itens existentes apenas se houver mudanças reais
+      for (const up of mudancasReais) {
         if (typeof (tx as any).studyScheduleItem.updateMany === "function") {
           await (tx as any).studyScheduleItem.updateMany({
             where: { id: up.id, status: "PENDING" },
@@ -1691,11 +1738,13 @@ export async function reorganizeOverdueSchedule(
         }
       }
 
-      // 4. Atualizar cronograma
-      await (tx as any).studySchedule.update({
-        where: { id: activeSchedule.id },
-        data: { updatedAt: now }
-      });
+      // 4. Atualizar cronograma apenas se houver alterações reais
+      if (mudancasReais.length > 0 || newItemsToCreate.length > 0 || unusedPendingItemsPool.length > 0) {
+        await (tx as any).studySchedule.update({
+          where: { id: activeSchedule.id },
+          data: { updatedAt: now }
+        });
+      }
     });
   }
 
@@ -1717,7 +1766,7 @@ export async function reorganizeOverdueSchedule(
     theoryDatesCount: assignedDates.size,
     reviewOnlyDatesCount: 0,
     mergedReviewBlocksCount,
-    changes: changesReport,
+    changes: finalChangesReport,
     lastDateAfterReorganization: finalLastDateStr,
     excludedItemsPurgedCount,
   };
