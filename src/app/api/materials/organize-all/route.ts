@@ -7,6 +7,7 @@ import { identifySubject, detectStructure, findBestOfficialTopic, getStructureSa
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
 import { generateSmartSchedule } from "@/lib/scheduler";
+import { createPreOrganizeAllBackup } from "@/lib/backup/organize-all-backup";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 min
@@ -598,6 +599,10 @@ export async function POST(req: NextRequest) {
     // Handle full reorganization reset
     if (reset) {
       console.log(`[REORGANIZE RESET] Iniciando reset completo para o usuário: ${userId}`);
+
+      // 1. BACKUP OBRIGATÓRIO: Snapshot completo com asserção estrita de contagem antes de qualquer exclusão
+      const backupResult = await createPreOrganizeAllBackup(userId);
+      console.log(`[REORGANIZE RESET] Backup garantido: ${backupResult.backupPath}`);
 
       // Delete all derived data in safe dependency order
       await prisma.flashcardReview.deleteMany({
