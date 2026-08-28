@@ -14,10 +14,16 @@ const nextConfig: NextConfig = {
   ],
   outputFileTracingExcludes: {
     '*': [
-      'node_modules/@swc/core-linux-x64-gnu',
-      'node_modules/@swc/core-linux-x64-musl',
-      'node_modules/@esbuild/linux-x64',
-      'node_modules/canvas',
+      'node_modules/@swc/**',
+      'node_modules/@esbuild/**',
+      'node_modules/canvas/**',
+      'node_modules/pdfjs-dist/standard_fonts/**',
+      'node_modules/pdfjs-dist/cmaps/**',
+      'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+      'node_modules/@prisma/engines/**',
+      'node_modules/prisma/**',
+      'node_modules/typescript/**',
+      'node_modules/esbuild/**',
     ],
   },
   async headers() {
