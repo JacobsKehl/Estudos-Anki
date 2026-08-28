@@ -70,6 +70,55 @@ function loadBlueprint(): BlueprintRow[] {
   });
 }
 
+export function validateScheduleItemsIntegrity(
+  scheduleItems: any[],
+  blueprint: BlueprintRow[],
+  cfcFiles: readonly string[]
+): string[] {
+  const invalidItems: string[] = [];
+
+  for (const item of scheduleItems || []) {
+    const b = item.StudyBlock as any;
+    const matFileName = b?.StudyMaterial?.originalFileName;
+    const subName = (item.StudySubject as any)?.name;
+
+    if (!b) {
+      invalidItems.push(`❌ Item ${item.id} (${item.scheduledDate}) sem StudyBlock vinculado (studyBlockId=${item.studyBlockId})`);
+      continue;
+    }
+
+    // (a) Existe no blueprint com pageStart e pageEnd exatos
+    const match = blueprint.find(
+      (r) =>
+        r.pdf_no_banco === matFileName &&
+        r.pageStart === b.pageStart &&
+        r.pageEnd === b.pageEnd
+    );
+
+    if (!match) {
+      invalidItems.push(
+        `❌ Item ${item.id} (${item.scheduledDate?.substring(0, 10) ?? ""}) [${subName}]: Bloco [${b.pageStart}–${b.pageEnd}] "${b.title}" NÃO existe no Blueprint (PDF=${matFileName})`
+      );
+    }
+
+    // (b) Está NOT_STARTED
+    if (b.theoryStatus !== "NOT_STARTED") {
+      invalidItems.push(
+        `❌ Item ${item.id} (${item.scheduledDate?.substring(0, 10) ?? ""}) [${subName}]: Bloco tem theoryStatus="${b.theoryStatus}" (esperado: "NOT_STARTED")`
+      );
+    }
+
+    // (c) Pertence a um dos 5 PDFs do CFC
+    if (!cfcFiles.includes(matFileName)) {
+      invalidItems.push(
+        `❌ Item ${item.id} (${item.scheduledDate?.substring(0, 10) ?? ""}) [${subName}]: Material "${matFileName}" NÃO pertence aos 5 PDFs do CFC`
+      );
+    }
+  }
+
+  return invalidItems;
+}
+
 describe("CFC Blueprint Integrity Guard", () => {
   const blueprint = loadBlueprint();
 
@@ -116,6 +165,104 @@ describe("CFC Blueprint Integrity Guard", () => {
     expect(totalOverlaps).toBe(0);
     expect(totalGaps).toBe(0);
     expect(maxPages).toBeLessThanOrEqual(8);
+  });
+
+  it("Modo Unitário: Guardião detecta, identifica e REPROVA itens forjados fora do Blueprint ([3-23], [3-13], PDF não-CFC e status inválido)", () => {
+    const cfcFiles = [
+      "1 - Direito Administrativo_compressed.pdf",
+      "2 - Direito do Trabalho.pdf",
+      "3 - Direito Constitucional.pdf",
+      "4 - Direito Processual do Trabalho.pdf",
+      "Direito Processual Civil_compressed.pdf",
+    ];
+
+    const forgedItems = [
+      // 1. Bloco clássico do Estratégia [3-23] (fora do CFC e fora do Blueprint)
+      {
+        id: "forged-item-1",
+        scheduledDate: "2026-08-28T00:00:00-03:00",
+        actionType: "THEORY",
+        status: "PENDING",
+        studyBlockId: "block-estrategia-da-1",
+        StudySubject: { name: "Direito Administrativo" },
+        StudyBlock: {
+          id: "block-estrategia-da-1",
+          title: "Agentes Públicos — Conceito e Classificações",
+          pageStart: 3,
+          pageEnd: 23,
+          theoryStatus: "NOT_STARTED",
+          StudyMaterial: { originalFileName: "direito administrativo 11.pdf" },
+        },
+      },
+      // 2. Bloco clássico do Estratégia [3-13] (fora do CFC e fora do Blueprint)
+      {
+        id: "forged-item-2",
+        scheduledDate: "2026-08-28T00:00:00-03:00",
+        actionType: "THEORY",
+        status: "PENDING",
+        studyBlockId: "block-estrategia-dc-1",
+        StudySubject: { name: "Direito Constitucional" },
+        StudyBlock: {
+          id: "block-estrategia-dc-1",
+          title: "Poder Legislativo — Funções e Estrutura",
+          pageStart: 3,
+          pageEnd: 13,
+          theoryStatus: "NOT_STARTED",
+          StudyMaterial: { originalFileName: "direito constitucional 9.pdf" },
+        },
+      },
+      // 3. Bloco do CFC com theoryStatus = COMPLETED agendado indevidamente
+      {
+        id: "forged-item-3",
+        scheduledDate: "2026-08-29T00:00:00-03:00",
+        actionType: "THEORY",
+        status: "PENDING",
+        studyBlockId: "block-cfc-completed",
+        StudySubject: { name: "Direito do Trabalho" },
+        StudyBlock: {
+          id: "block-cfc-completed",
+          title: "Contratos de Trabalho",
+          pageStart: 8,
+          pageEnd: 10,
+          theoryStatus: "COMPLETED",
+          StudyMaterial: { originalFileName: "2 - Direito do Trabalho.pdf" },
+        },
+      },
+      // 4. Bloco com páginas inexistentes no Blueprint [90-99]
+      {
+        id: "forged-item-4",
+        scheduledDate: "2026-08-30T00:00:00-03:00",
+        actionType: "THEORY",
+        status: "PENDING",
+        studyBlockId: "block-cfc-invalid-pages",
+        StudySubject: { name: "Direito Processual Civil" },
+        StudyBlock: {
+          id: "block-cfc-invalid-pages",
+          title: "Capítulo Inexistente",
+          pageStart: 90,
+          pageEnd: 99,
+          theoryStatus: "NOT_STARTED",
+          StudyMaterial: { originalFileName: "Direito Processual Civil_compressed.pdf" },
+        },
+      },
+    ];
+
+    const violations = validateScheduleItemsIntegrity(forgedItems, blueprint, cfcFiles);
+
+    // O guardião DEVE reprovar todas as 4 anomalias
+    expect(violations.length).toBeGreaterThanOrEqual(4);
+
+    // Reprovação específica de [3-23]
+    expect(violations.some((v) => v.includes("[3–23]") && v.includes("direito administrativo 11.pdf"))).toBe(true);
+
+    // Reprovação específica de [3-13]
+    expect(violations.some((v) => v.includes("[3–13]") && v.includes("direito constitucional 9.pdf"))).toBe(true);
+
+    // Reprovação de status COMPLETED
+    expect(violations.some((v) => v.includes('theoryStatus="COMPLETED"'))).toBe(true);
+
+    // Reprovação de páginas fora do Blueprint [90-99]
+    expect(violations.some((v) => v.includes("[90–99]") && v.includes("NÃO existe no Blueprint"))).toBe(true);
   });
 
   const shouldRunDbTest = process.env.RUN_CFC_BLUEPRINT_DB_TEST === "true";
@@ -301,46 +448,7 @@ describe("CFC Blueprint Integrity Guard", () => {
     if (itemsErr) throw itemsErr;
     expect(scheduleItems).toBeDefined();
 
-    const invalidItems: string[] = [];
-
-    for (const item of scheduleItems || []) {
-      const b = item.StudyBlock as any;
-      const matFileName = b?.StudyMaterial?.originalFileName;
-      const subName = (item.StudySubject as any)?.name;
-
-      if (!b) {
-        invalidItems.push(`❌ Item ${item.id} (${item.scheduledDate}) sem StudyBlock vinculado (studyBlockId=${item.studyBlockId})`);
-        continue;
-      }
-
-      // (a) Existe no blueprint com pageStart e pageEnd exatos
-      const match = blueprint.find(
-        (r) =>
-          r.pdf_no_banco === matFileName &&
-          r.pageStart === b.pageStart &&
-          r.pageEnd === b.pageEnd
-      );
-
-      if (!match) {
-        invalidItems.push(
-          `❌ Item ${item.id} (${item.scheduledDate.substring(0, 10)}) [${subName}]: Bloco [${b.pageStart}–${b.pageEnd}] "${b.title}" NÃO existe no Blueprint (PDF=${matFileName})`
-        );
-      }
-
-      // (b) Está NOT_STARTED
-      if (b.theoryStatus !== "NOT_STARTED") {
-        invalidItems.push(
-          `❌ Item ${item.id} (${item.scheduledDate.substring(0, 10)}) [${subName}]: Bloco tem theoryStatus="${b.theoryStatus}" (esperado: "NOT_STARTED")`
-        );
-      }
-
-      // (c) Pertence a um dos 5 PDFs do CFC
-      if (!cfcFiles.includes(matFileName)) {
-        invalidItems.push(
-          `❌ Item ${item.id} (${item.scheduledDate.substring(0, 10)}) [${subName}]: Material "${matFileName}" NÃO pertence aos 5 PDFs do CFC`
-        );
-      }
-    }
+    const invalidItems = validateScheduleItemsIntegrity(scheduleItems || [], blueprint, cfcFiles);
 
     if (invalidItems.length > 0) {
       console.error("\n=== ITENS DE AGENDAMENTO INVÁLIDOS NA GRADE DE 30 DIAS ===");
@@ -349,6 +457,6 @@ describe("CFC Blueprint Integrity Guard", () => {
     }
 
     expect(invalidItems).toEqual([]);
+    expect(scheduleItems!.length).toBeGreaterThanOrEqual(1);
   }, 30000);
 });
-
