@@ -77,6 +77,7 @@ export default async function Dashboard() {
       prisma.studyScheduleItem.findMany({
         where: {
           userId,
+          status: { not: "SKIPPED" },
           schedule: { status: "ACTIVE" },
           scheduledDate: { gte: todayStart, lt: todayEnd },
           subject: {
@@ -211,6 +212,7 @@ export default async function Dashboard() {
       todayItems = await prisma.studyScheduleItem.findMany({
         where: {
           userId,
+          status: { not: "SKIPPED" },
           schedule: { status: "ACTIVE" },
           scheduledDate: { gte: todayStart, lt: todayEnd },
           subject: {
@@ -292,9 +294,12 @@ export default async function Dashboard() {
   }
 
   // Separate tasks: only THEORY blocks represent the main study session, while REVIEW_BLOCK with active flashcards represents content reviews.
-  const studyTasks = todayItems.filter(item => item.actionType === "THEORY");
+  const studyTasks = todayItems.filter(
+    item => item.actionType === "THEORY" && item.status !== "SKIPPED"
+  );
 
   const reviewTasks = todayItems.filter(item => {
+    if (item.status === "SKIPPED") return false;
     if (item.actionType === "REVIEW_BLOCK") {
       const activeCards = item.studyBlock?.flashcards || [];
       return activeCards.length > 0;
