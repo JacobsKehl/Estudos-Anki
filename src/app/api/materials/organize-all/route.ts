@@ -7,6 +7,7 @@ import { identifySubject, detectStructure, findBestOfficialTopic, getStructureSa
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
 import { generateSmartSchedule } from "@/lib/scheduler";
+import { CFC_FILE_NAMES } from "@/lib/scheduler/config";
 import { createPreOrganizeAllBackup } from "@/lib/backup/organize-all-backup";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +95,12 @@ async function extractAllPages(sourcePath: string): Promise<{ pages: PageContent
 async function processMaterial(material: any, userId: string, isReorganizing: boolean = false) {
   const log = (msg: string) => console.log(`[ORGANIZE] ${material.fileName}: ${msg}`);
   const result = { blocks: 0, flashcards: 0, subjectCreated: false };
+
+  // Proteção: PDFs do CFC são determinísticos via blueprint e NUNCA devem ser processados por IA no organize-all
+  if ((CFC_FILE_NAMES as readonly string[]).includes(material.originalFileName || material.fileName)) {
+    log(`Material CFC protegido (divisão determinística pelo blueprint mantida).`);
+    return result;
+  }
 
   // Buscar preferências do usuário
   const user = await prisma.user.findUnique({
@@ -562,6 +569,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Usuário real
     const userId = await getCurrentUserId();
+    const cfcFileList: string[] = [...CFC_FILE_NAMES];
 
     // Rate Limiting: 3 execuções por 30 minutos por usuário (apenas execuções reais, não polling)
     if (body.getPendingIds !== true) {
@@ -578,13 +586,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
     }
 
-    // Retorna IDs de todos os materiais pendentes para polling real no frontend
+    // Retorna IDs de todos os materiais pendentes para polling real no frontend (excluindo PDFs do CFC protegidos)
     if (body.getPendingIds === true) {
       const pendingMaterials = await prisma.studyMaterial.findMany({
         where: {
           userId,
           organizationStatus: { in: ["IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", "GENERATING_FLASHCARDS", "ERROR"] },
-          sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] }
+          sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] },
+          originalFileName: { notIn: cfcFileList }
         },
         select: { id: true },
         orderBy: { createdAt: 'desc' }
@@ -604,7 +613,7 @@ export async function POST(req: NextRequest) {
       const backupResult = await createPreOrganizeAllBackup(userId);
       console.log(`[REORGANIZE RESET] Backup garantido: ${backupResult.backupPath}`);
 
-      // Delete all derived data in safe dependency order
+      // Delete all derived data in safe dependency order (preservando blocos determinísticos do CFC)
       await prisma.flashcardReview.deleteMany({
         where: { flashcard: { userId } }
       });
@@ -612,13 +621,25 @@ export async function POST(req: NextRequest) {
         where: { userId }
       });
       await prisma.studyScheduleItem.deleteMany({
-        where: { userId }
+        where: {
+          userId,
+          studyBlock: {
+            material: {
+              originalFileName: { notIn: cfcFileList }
+            }
+          }
+        }
       });
       await prisma.studySchedule.deleteMany({
         where: { userId }
       });
       await prisma.studyBlock.deleteMany({
-        where: { userId }
+        where: {
+          userId,
+          material: {
+            originalFileName: { notIn: cfcFileList }
+          }
+        }
       });
       await prisma.studyPlanDay.deleteMany({
         where: { studyPlan: { userId } }
@@ -637,9 +658,12 @@ export async function POST(req: NextRequest) {
         data: { progress: 0 }
       });
 
-      // Reset all study materials back to IMPORTED state
+      // Reset all study materials back to IMPORTED state (exceto CFC protegidos)
       await prisma.studyMaterial.updateMany({
-        where: { userId },
+        where: {
+          userId,
+          originalFileName: { notIn: cfcFileList }
+        },
         data: {
           organizationStatus: "IMPORTED",
           processingError: null,
@@ -649,17 +673,18 @@ export async function POST(req: NextRequest) {
         }
       });
 
-      // Fetch all CLOUD_UPLOAD study material IDs to return to client
+      // Fetch all CLOUD_UPLOAD study material IDs to return to client (excluindo CFC)
       const materials = await prisma.studyMaterial.findMany({
         where: {
           userId,
-          sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] }
+          sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] },
+          originalFileName: { notIn: cfcFileList }
         },
         select: { id: true }
       });
 
       const materialIds = materials.map(m => m.id);
-      console.log(`[REORGANIZE RESET] Reset concluído com sucesso. ${materialIds.length} materiais prontos para reprocessar.`);
+      console.log(`[REORGANIZE RESET] Reset concluído com sucesso. ${materialIds.length} materiais não-CFC prontos para reprocessar.`);
 
       return NextResponse.json({
         message: "Reset completo realizado. Materiais prontos para reorganização.",
@@ -671,7 +696,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[ORGANIZE ALL] Iniciando processamento para: ${userId} (force=${force}, materialId=${materialId || "todos"})`);
 
-    // 2. Materiais a organizar (inclui tentativas recuperáveis na fila de processamento automático)
+    // 2. Materiais a organizar (inclui tentativas recuperáveis na fila de processamento automático, excluindo CFC)
     const statusFilter = [
       "IMPORTED", "UPLOADED", "NEW", "EXTRACTING", "ANALYZING", 
       "GENERATING_FLASHCARDS", "ERROR", "NEEDS_RETRY", "AI_UNAVAILABLE", "SUBJECT_DETECTION_FAILED",
@@ -682,7 +707,8 @@ export async function POST(req: NextRequest) {
       where: {
         userId,
         ...(materialId ? { id: materialId } : { organizationStatus: { in: statusFilter } }),
-        sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] }
+        sourceType: { in: ["CLOUD_UPLOAD", "LOCAL_UPLOAD", "LOCAL_INBOX"] },
+        originalFileName: { notIn: cfcFileList }
       },
       take: 1
     });
