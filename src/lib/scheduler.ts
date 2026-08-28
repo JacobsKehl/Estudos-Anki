@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "./date-utils";
 import { selectLegacySubjectCandidate, LegacySubjectCandidate, selectLegacyQueueItemIndex, LegacyQueueItemCandidate } from "./scheduler/legacy-subject-diversity";
 import { getLegacyTrt4NextSubjects, sortPendingBlocksForSubject } from "./scheduler/legacy-trt4-queue";
+import { SCHEDULER_LIMITS } from "./scheduler/config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1310,7 +1311,7 @@ export async function reorganizeOverdueSchedule(
           const inBlocks = (blocksBySubject[subjectId] || []).length > 0;
           return inQueue || inBlocks;
         },
-        count: 2,
+        count: SCHEDULER_LIMITS.maxNewTheoryPerDay,
       });
       cycleSubjects = legacyNextSlots.map(s => s.subjectName.toLowerCase());
     }

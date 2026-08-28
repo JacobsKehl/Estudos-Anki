@@ -19,6 +19,8 @@ export const SCHEDULER_LIMITS = {
   dailyTheoryMinutesFloor: 30,
   /** Máximo de blocos de teoria por dia (hard cap) */
   maxTheoryBlocksPerDay: 4,
+  /** Alias para número máximo de novas teorias por dia */
+  maxNewTheoryPerDay: 4,
   /** Dias da semana sem teoria (0 = Domingo) */
   noTheoryDays: [0] as readonly number[],
 } as const;
