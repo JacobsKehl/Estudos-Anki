@@ -156,10 +156,13 @@ export default async function Dashboard() {
     const hasTodayPendingTheory = initialTodayItems.some(
       (item: any) => item.actionType === "THEORY" && (item.status === "PENDING" || item.status === "IN_PROGRESS")
     );
+    const hasTodayCompletedTheory = initialTodayItems.some(
+      (item: any) => item.actionType === "THEORY" && item.status === "COMPLETED"
+    );
 
-    // 3. Se não houver teoria hoje, verificar de forma leve se existem blocos teóricos elegíveis não concluídos
+    // 3. Se não houver teoria hoje e o usuário ainda não tiver concluído a teoria de hoje, verificar blocos elegíveis não concluídos
     let hasEligiblePendingTheoryBlocks = false;
-    if (activeSchedule && !hasTodayPendingTheory) {
+    if (activeSchedule && !hasTodayPendingTheory && !hasTodayCompletedTheory) {
       const eligibleBlock = await prisma.studyBlock.findFirst({
         where: {
           userId,
@@ -184,6 +187,7 @@ export default async function Dashboard() {
       scheduleTodayStr,
       todayStr,
       hasTodayPendingTheory,
+      hasTodayCompletedTheory,
       hasEligiblePendingTheoryBlocks
     });
 

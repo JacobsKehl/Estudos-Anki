@@ -254,6 +254,7 @@ export interface ShouldReorganizeInput {
   scheduleTodayStr?: string;
   todayStr: string;
   hasTodayPendingTheory: boolean;
+  hasTodayCompletedTheory?: boolean;
   hasEligiblePendingTheoryBlocks: boolean;
 }
 
@@ -263,13 +264,16 @@ export interface ShouldReorganizeInput {
  * Regra:
  * - Condição A (Rollover Diário Normal): O cronograma não foi atualizado hoje (scheduleTodayStr !== todayStr).
  * - Condição B (Auto-Recuperação de Cronograma Vazio): O usuário possui cronograma ativo, não possui nenhuma
- *   atividade THEORY PENDING ou IN_PROGRESS para hoje, mas ainda possui blocos teóricos elegíveis não concluídos.
+ *   atividade THEORY PENDING ou IN_PROGRESS para hoje, NÃO concluiu teoria hoje, mas ainda possui blocos teóricos elegíveis não concluídos.
  */
 export function shouldReorganizeSchedule(input: ShouldReorganizeInput): boolean {
   if (!input.hasActiveSchedule) return false;
 
   const scheduleNeedsDailyRollover = input.scheduleTodayStr !== input.todayStr;
-  const scheduleNeedsRecovery = !input.hasTodayPendingTheory && input.hasEligiblePendingTheoryBlocks;
+  const scheduleNeedsRecovery =
+    !input.hasTodayPendingTheory &&
+    input.hasEligiblePendingTheoryBlocks &&
+    !input.hasTodayCompletedTheory;
 
   return scheduleNeedsDailyRollover || scheduleNeedsRecovery;
 }

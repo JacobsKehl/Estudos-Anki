@@ -62,4 +62,17 @@ describe("Decisão de Reorganização e Auto-Recuperação do Cronograma", () =>
 
     expect(result).toBe(false);
   });
+
+  test("Cenário 6 (Frente 1.2 Aceite) — Aluno concluiu as teorias de hoje (hasTodayCompletedTheory = true, 0 pendentes) -> NÃO reorganiza (shouldReorganize = false)", () => {
+    const result = shouldReorganizeSchedule({
+      hasActiveSchedule: true,
+      scheduleTodayStr: todayStr,
+      todayStr,
+      hasTodayPendingTheory: false,
+      hasTodayCompletedTheory: true,
+      hasEligiblePendingTheoryBlocks: true,
+    });
+
+    expect(result).toBe(false);
+  });
 });
