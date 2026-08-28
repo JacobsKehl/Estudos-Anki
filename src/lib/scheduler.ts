@@ -1126,27 +1126,23 @@ export async function reorganizeOverdueSchedule(
     }
   });
 
-  // Extrair blocos pendentes de eligiblePendingTheory para garantir cobertura total dos blocos existentes
+  // Extrair blocos pendentes de eligiblePendingTheory para garantir cobertura total dos blocos existentes (estritamente NOT_STARTED)
   const itemPendingBlocks: any[] = [];
   for (const item of eligiblePendingTheory) {
-    if (item.studyBlock && item.studyBlock.theoryStatus !== "COMPLETED") {
-      const blockId = item.studyBlock.id;
-      if (!dbPendingBlocks.some((b: any) => b.id === blockId)) {
+    const isExcluded = item.studyBlock && item.studyBlock.theoryStatus === "EXCLUDED";
+    const isCompleted = item.studyBlock && item.studyBlock.theoryStatus === "COMPLETED";
+    if (!isExcluded && !isCompleted) {
+      const blockId = item.studyBlock?.id || item.studyBlockId;
+      if (blockId && !dbPendingBlocks.some((b: any) => b.id === blockId)) {
         itemPendingBlocks.push({
-          ...item.studyBlock,
+          ...(item.studyBlock || {
+            id: blockId,
+            orderIndex: item.dayNumber || 1,
+            material: null,
+            estimatedStudyMinutes: item.estimatedMinutes || 45
+          }),
           subjectId: item.subjectId,
           subject: item.subject || eligibleSubjects.find((s: any) => s.id === item.subjectId)
-        });
-      }
-    } else if (item.studyBlockId) {
-      if (!dbPendingBlocks.some((b: any) => b.id === item.studyBlockId)) {
-        itemPendingBlocks.push({
-          id: item.studyBlockId,
-          subjectId: item.subjectId,
-          subject: item.subject || eligibleSubjects.find((s: any) => s.id === item.subjectId),
-          orderIndex: item.dayNumber || 1,
-          material: null,
-          estimatedStudyMinutes: item.estimatedMinutes || 45
         });
       }
     }

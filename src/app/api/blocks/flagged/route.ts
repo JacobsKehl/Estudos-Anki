@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       where: {
         userId,
         possiblyAlreadyStudied: true,
-        theoryStatus: { not: "COMPLETED" }
+        theoryStatus: "NOT_STARTED"
       },
       include: {
         subject: { select: { id: true, name: true } },
