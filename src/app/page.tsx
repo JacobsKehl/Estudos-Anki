@@ -26,6 +26,7 @@ import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
 import { NextDayStudySession } from "@/components/today/NextDayStudySession";
 import { getTodayRangeSP } from "@/lib/date-utils";
 import { shouldReorganizeSchedule } from "@/lib/scheduler/legacy-trt4-queue";
+import { selectTodayTasks } from "@/lib/schedule/today-tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -294,35 +295,16 @@ export default async function Dashboard() {
   }
 
   // Separate tasks: only THEORY blocks represent the main study session, while REVIEW_BLOCK with active flashcards represents content reviews.
-  const studyTasks = todayItems.filter(
-    item => item.actionType === "THEORY" && item.status !== "SKIPPED"
-  );
-
-  const reviewTasks = todayItems.filter(item => {
-    if (item.status === "SKIPPED") return false;
-    if (item.actionType === "REVIEW_BLOCK") {
-      const activeCards = item.studyBlock?.flashcards || [];
-      return activeCards.length > 0;
-    }
-    return false;
-  });
-  
-  const pendingStudyTasks = studyTasks.filter(item =>
-    item.status === "PENDING" || item.status === "IN_PROGRESS"
-  );
-
-  const completedStudyTasks = studyTasks.filter(item =>
-    item.status === "COMPLETED"
-  );
-
-  const pendingReviewTasks = reviewTasks.filter(item =>
-    item.status === "PENDING" || item.status === "IN_PROGRESS"
-  );
-
-  const completedMinutes = completedStudyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
-  const totalMinutes = studyTasks.reduce((acc, i) => acc + (i.estimatedMinutes ?? 60), 0);
-
-  const isDayCompleted = pendingStudyTasks.length === 0 && todayStats.total === 0;
+  const {
+    studyTasks,
+    reviewTasks,
+    pendingStudyTasks,
+    completedStudyTasks,
+    pendingReviewTasks,
+    totalMinutes,
+    completedMinutes,
+    isDayCompleted,
+  } = selectTodayTasks(todayItems, todayStats.total);
 
   return (
     <div className="space-y-10 max-w-4xl mx-auto animate-in fade-in duration-700 slide-in-from-bottom-4 pb-24">

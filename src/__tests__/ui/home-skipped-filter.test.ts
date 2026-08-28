@@ -6,46 +6,7 @@
  * reviewTasks ou no somatório de totalMinutes da página inicial.
  */
 
-export function computeHomeTasks(todayItems: any[]) {
-  const studyTasks = todayItems.filter(
-    (item) => item.actionType === "THEORY" && item.status !== "SKIPPED"
-  );
-
-  const reviewTasks = todayItems.filter((item) => {
-    if (item.status === "SKIPPED") return false;
-    if (item.actionType === "REVIEW_BLOCK") {
-      const activeCards = item.studyBlock?.flashcards || [];
-      return activeCards.length > 0;
-    }
-    return false;
-  });
-
-  const pendingStudyTasks = studyTasks.filter(
-    (item) => item.status === "PENDING" || item.status === "IN_PROGRESS"
-  );
-
-  const completedStudyTasks = studyTasks.filter(
-    (item) => item.status === "COMPLETED"
-  );
-
-  const totalMinutes = studyTasks.reduce(
-    (acc, i) => acc + (i.estimatedMinutes ?? 60),
-    0
-  );
-  const completedMinutes = completedStudyTasks.reduce(
-    (acc, i) => acc + (i.estimatedMinutes ?? 60),
-    0
-  );
-
-  return {
-    studyTasks,
-    reviewTasks,
-    pendingStudyTasks,
-    completedStudyTasks,
-    totalMinutes,
-    completedMinutes,
-  };
-}
+import { selectTodayTasks } from "@/lib/schedule/today-tasks";
 
 describe("Home UI — Filtro Rigoroso de Itens SKIPPED", () => {
   test("Cenário de Aceite: todayItems com 3 PENDING (33 min) + 2 SKIPPED (120 min) deve renderizar APENAS 3 tarefas e somar 33 min", () => {
@@ -93,7 +54,7 @@ describe("Home UI — Filtro Rigoroso de Itens SKIPPED", () => {
       },
     ];
 
-    const result = computeHomeTasks(rawTodayItems);
+    const result = selectTodayTasks(rawTodayItems, 0);
 
     // Deve conter exatamente as 3 teorias ativas (sem os 2 SKIPPED)
     expect(result.studyTasks.length).toBe(3);
