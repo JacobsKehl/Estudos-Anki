@@ -244,7 +244,13 @@ describe("Validação de Regressão — Diversidade LEGACY_TRT4 nos 3 Caminhos C
         scheduledDate: pastDate,
         dayNumber: 10,
         estimatedMinutes: 45,
-        subject: dtSubject
+        subject: dtSubject,
+        studyBlock: {
+          id: "block-dt-1",
+          subjectId: "sub-dt",
+          theoryStatus: "NOT_STARTED",
+          material: { originalFileName: "2 - Direito do Trabalho.pdf" }
+        }
       },
       {
         id: "item-da-overdue-1",
@@ -257,7 +263,13 @@ describe("Validação de Regressão — Diversidade LEGACY_TRT4 nos 3 Caminhos C
         scheduledDate: pastDate,
         dayNumber: 10,
         estimatedMinutes: 45,
-        subject: daSubject
+        subject: daSubject,
+        studyBlock: {
+          id: "block-da-1",
+          subjectId: "sub-da",
+          theoryStatus: "NOT_STARTED",
+          material: { originalFileName: "1 - Direito Administrativo_compressed.pdf" }
+        }
       }
     ];
 
@@ -335,6 +347,14 @@ describe("Runtime da fila LEGACY_TRT4 — reorganizeOverdueSchedule", () => {
     dayNumber,
     estimatedMinutes,
     subject,
+    studyBlock: {
+      id: `block-${id}`,
+      subjectId,
+      theoryStatus: "NOT_STARTED",
+      material: {
+        originalFileName: subjectId === "sub-da" ? "1 - Direito Administrativo_compressed.pdf" : "2 - Direito do Trabalho.pdf"
+      }
+    }
   });
 
   const setupBase = (subjects: any[], items: any[]) => {

@@ -12,6 +12,14 @@ export const ORDEM_MATERIAS = [
   "Direito Processual Civil",
 ] as const;
 
+export const CFC_FILE_NAMES = [
+  "1 - Direito Administrativo_compressed.pdf",
+  "2 - Direito do Trabalho.pdf",
+  "3 - Direito Constitucional.pdf",
+  "4 - Direito Processual do Trabalho.pdf",
+  "Direito Processual Civil_compressed.pdf",
+] as const;
+
 export const SCHEDULER_LIMITS = {
   /** Cota diária de teoria em minutos — soma estimatedStudyMinutes até este teto */
   dailyTheoryMinutesTarget: 45,

@@ -237,4 +237,118 @@ describe("CFC Blueprint Integrity Guard", () => {
     expect(duplicatePairs).toEqual([]);
     expect(dbBlocks!.length).toBe(89); // 89 blocos de teoria ativos
   }, 30000);
+
+  conditionalTest("Modo Integração DB: Todo StudyScheduleItem PENDING de THEORY nos próximos 30 dias deve apontar para bloco CFC NOT_STARTED do Blueprint", async () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://msmdekjetxajcwuxmxps.supabase.co";
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const userId = "cmp8od0wz0000iybklaotfqbs";
+    const cfcFiles = [
+      "1 - Direito Administrativo_compressed.pdf",
+      "2 - Direito do Trabalho.pdf",
+      "3 - Direito Constitucional.pdf",
+      "4 - Direito Processual do Trabalho.pdf",
+      "Direito Processual Civil_compressed.pdf",
+    ];
+
+    // Buscar cronograma ativo
+    const { data: schedule, error: sErr } = await supabase
+      .from("StudySchedule")
+      .select("id")
+      .eq("userId", userId)
+      .eq("status", "ACTIVE")
+      .single();
+
+    if (sErr) throw sErr;
+    expect(schedule).toBeDefined();
+
+    const todayStr = "2026-08-28T00:00:00-03:00";
+    const in30DaysStr = "2026-09-27T23:59:59-03:00";
+
+    const { data: scheduleItems, error: itemsErr } = await supabase
+      .from("StudyScheduleItem")
+      .select(`
+        id,
+        scheduledDate,
+        dayNumber,
+        actionType,
+        status,
+        studyBlockId,
+        StudyBlock:studyBlockId (
+          id,
+          title,
+          pageStart,
+          pageEnd,
+          theoryStatus,
+          materialId,
+          StudyMaterial:materialId (
+            id,
+            originalFileName
+          )
+        ),
+        StudySubject:subjectId (
+          name
+        )
+      `)
+      .eq("userId", userId)
+      .eq("scheduleId", schedule.id)
+      .eq("actionType", "THEORY")
+      .eq("status", "PENDING")
+      .gte("scheduledDate", todayStr)
+      .lte("scheduledDate", in30DaysStr);
+
+    if (itemsErr) throw itemsErr;
+    expect(scheduleItems).toBeDefined();
+
+    const invalidItems: string[] = [];
+
+    for (const item of scheduleItems || []) {
+      const b = item.StudyBlock as any;
+      const matFileName = b?.StudyMaterial?.originalFileName;
+      const subName = (item.StudySubject as any)?.name;
+
+      if (!b) {
+        invalidItems.push(`❌ Item ${item.id} (${item.scheduledDate}) sem StudyBlock vinculado (studyBlockId=${item.studyBlockId})`);
+        continue;
+      }
+
+      // (a) Existe no blueprint com pageStart e pageEnd exatos
+      const match = blueprint.find(
+        (r) =>
+          r.pdf_no_banco === matFileName &&
+          r.pageStart === b.pageStart &&
+          r.pageEnd === b.pageEnd
+      );
+
+      if (!match) {
+        invalidItems.push(
+          `❌ Item ${item.id} (${item.scheduledDate.substring(0, 10)}) [${subName}]: Bloco [${b.pageStart}–${b.pageEnd}] "${b.title}" NÃO existe no Blueprint (PDF=${matFileName})`
+        );
+      }
+
+      // (b) Está NOT_STARTED
+      if (b.theoryStatus !== "NOT_STARTED") {
+        invalidItems.push(
+          `❌ Item ${item.id} (${item.scheduledDate.substring(0, 10)}) [${subName}]: Bloco tem theoryStatus="${b.theoryStatus}" (esperado: "NOT_STARTED")`
+        );
+      }
+
+      // (c) Pertence a um dos 5 PDFs do CFC
+      if (!cfcFiles.includes(matFileName)) {
+        invalidItems.push(
+          `❌ Item ${item.id} (${item.scheduledDate.substring(0, 10)}) [${subName}]: Material "${matFileName}" NÃO pertence aos 5 PDFs do CFC`
+        );
+      }
+    }
+
+    if (invalidItems.length > 0) {
+      console.error("\n=== ITENS DE AGENDAMENTO INVÁLIDOS NA GRADE DE 30 DIAS ===");
+      invalidItems.forEach((msg) => console.error("  " + msg));
+      console.error(`Total de itens avaliados: ${scheduleItems?.length} | Inválidos: ${invalidItems.length}\n`);
+    }
+
+    expect(invalidItems).toEqual([]);
+  }, 30000);
 });
+

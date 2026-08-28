@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "./date-utils";
 import { selectLegacySubjectCandidate, LegacySubjectCandidate, selectLegacyQueueItemIndex, LegacyQueueItemCandidate } from "./scheduler/legacy-subject-diversity";
 import { getLegacyTrt4NextSubjects, sortPendingBlocksForSubject } from "./scheduler/legacy-trt4-queue";
-import { SCHEDULER_LIMITS } from "./scheduler/config";
+import { SCHEDULER_LIMITS, CFC_FILE_NAMES } from "./scheduler/config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -887,6 +887,7 @@ export async function reorganizeOverdueSchedule(
           subject: true,
           studyBlock: {
             include: {
+              material: true,
               flashcards: {
                 where: {
                   status: "APPROVED",
@@ -1098,15 +1099,6 @@ export async function reorganizeOverdueSchedule(
     }
   }
 
-  // CFC PDFs permitidos
-  const cfcFileNames = [
-    "1 - Direito Administrativo_compressed.pdf",
-    "2 - Direito do Trabalho.pdf",
-    "3 - Direito Constitucional.pdf",
-    "4 - Direito Processual do Trabalho.pdf",
-    "Direito Processual Civil_compressed.pdf",
-  ];
-
   // Buscar todos os blocos pendentes das matérias elegíveis no banco de dados (Restrito ao CFC)
   const dbPendingBlocks = await (prisma as any).studyBlock.findMany({
     where: {
@@ -1114,7 +1106,7 @@ export async function reorganizeOverdueSchedule(
       theoryStatus: "NOT_STARTED",
       subjectId: { in: eligibleSubjectIds },
       material: {
-        originalFileName: { in: cfcFileNames },
+        originalFileName: { in: CFC_FILE_NAMES as readonly string[] },
         materialRole: {
           not: "SUPPORT_MATERIAL"
         }
@@ -1126,21 +1118,15 @@ export async function reorganizeOverdueSchedule(
     }
   });
 
-  // Extrair blocos pendentes de eligiblePendingTheory para garantir cobertura total dos blocos existentes (estritamente NOT_STARTED)
+  // Extrair blocos pendentes de eligiblePendingTheory para garantir cobertura total dos blocos existentes (estritamente NOT_STARTED do CFC)
   const itemPendingBlocks: any[] = [];
   for (const item of eligiblePendingTheory) {
-    const isExcluded = item.studyBlock && item.studyBlock.theoryStatus === "EXCLUDED";
-    const isCompleted = item.studyBlock && item.studyBlock.theoryStatus === "COMPLETED";
-    if (!isExcluded && !isCompleted) {
-      const blockId = item.studyBlock?.id || item.studyBlockId;
-      if (blockId && !dbPendingBlocks.some((b: any) => b.id === blockId)) {
+    const isCfc = (CFC_FILE_NAMES as readonly string[]).includes((item.studyBlock as any)?.material?.originalFileName ?? "");
+    if (item.studyBlock?.theoryStatus === "NOT_STARTED" && isCfc) {
+      const blockId = item.studyBlock.id;
+      if (!dbPendingBlocks.some((b: any) => b.id === blockId)) {
         itemPendingBlocks.push({
-          ...(item.studyBlock || {
-            id: blockId,
-            orderIndex: item.dayNumber || 1,
-            material: null,
-            estimatedStudyMinutes: item.estimatedMinutes || 45
-          }),
+          ...item.studyBlock,
           subjectId: item.subjectId,
           subject: item.subject || eligibleSubjects.find((s: any) => s.id === item.subjectId)
         });
