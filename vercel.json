@@ -1,15 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["gru1"],
+  "build": {
+    "env": {
+      "VERCEL_SUPPORT_LARGE_FUNCTIONS": "1"
+    }
+  },
   "functions": {
     "src/app/api/materials/organize-all/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "memory": 3008
     },
     "src/app/api/materials/[id]/organize/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "memory": 3008
     },
     "src/app/api/materials/[id]/process/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "memory": 3008
     }
   },
   "crons": [
