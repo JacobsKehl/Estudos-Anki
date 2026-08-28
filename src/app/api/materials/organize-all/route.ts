@@ -6,7 +6,6 @@ import { checkRateLimit, rateLimitErrorResponse } from "@/lib/rate-limit";
 import { identifySubject, detectStructure, findBestOfficialTopic, getStructureSampleText } from "@/lib/ai/organizer";
 import { generateFlashcards } from "@/lib/ai/flashcards";
 import { OFFICIAL_TOPICS } from "@/lib/constants/official-topics";
-import { generateSmartSchedule } from "@/lib/scheduler";
 import { CFC_FILE_NAMES } from "@/lib/scheduler/config";
 import { createPreOrganizeAllBackup } from "@/lib/backup/organize-all-backup";
 
@@ -35,55 +34,40 @@ interface PageContent {
   text: string;
 }
 
-// ─── pdfjs cache ──────────────────────────────────────────────────────────────
+const PDFParser = require("pdf2json");
 
-let pdfjsLibCache: typeof import("pdfjs-dist/legacy/build/pdf.mjs") | null = null;
-
-async function getPdfjsLib() {
-  if (pdfjsLibCache) return pdfjsLibCache;
-  const lib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjsLibCache = lib;
-  return lib;
-}
-
-// ─── Extração por página ───────────────────────────────────────────────────────
+// ─── Extração por página com pdf2json ─────────────────────────────────────────
 
 async function extractAllPages(sourcePath: string): Promise<{ pages: PageContent[]; numPages: number }> {
-  const pdfjsLib = await getPdfjsLib();
-  
   // Download from Supabase Storage always
   const { data, error } = await supabase.storage.from('materials').download(sourcePath);
   if (error) throw new Error(`Erro ao baixar arquivo do Storage: ${error.message}`);
   const arrayBuffer = await data.arrayBuffer();
-  const uint8Array = new Uint8Array(arrayBuffer);
+  const buffer = Buffer.from(arrayBuffer);
 
-  const loadingTask = pdfjsLib.getDocument({
-    data: uint8Array,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    useSystemFonts: true,
-    disableFontFace: true,
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
+    pdfParser.on("pdfParser_dataError", (errData: any) => reject(errData.parserError));
+    pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+      const pages: PageContent[] = (pdfData.Pages || []).map((page: any, index: number) => {
+        let text = (page.Texts || []).map((t: any) => {
+          try {
+            return decodeURIComponent(t.R?.[0]?.T || "");
+          } catch {
+            return t.R?.[0]?.T || "";
+          }
+        }).join(" ").trim();
+        text = text.replace(/\u0000/g, "");
+        return {
+          pageNumber: index + 1,
+          text
+        };
+      });
+      resolve({ pages, numPages: pages.length });
+    });
+
+    pdfParser.parseBuffer(buffer);
   });
-
-  const pdfDocument = await loadingTask.promise;
-  const numPages = pdfDocument.numPages;
-  const pages: PageContent[] = [];
-
-  for (let i = 1; i <= numPages; i++) {
-    const page = await pdfDocument.getPage(i);
-    const textContent = await page.getTextContent();
-    let text = textContent.items
-      .map((item: any) => ("str" in item ? item.str : ""))
-      .join(" ")
-      .trim();
-    
-    // Sanitize null bytes (\u0000) to prevent Postgres invalid byte sequence error
-    text = text.replace(/\u0000/g, "");
-    
-    pages.push({ pageNumber: i, text });
-  }
-
-  return { pages, numPages };
 }
 
 // ─── Pipeline por material ─────────────────────────────────────────────────────
