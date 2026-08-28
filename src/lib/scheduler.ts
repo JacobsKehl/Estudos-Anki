@@ -868,11 +868,14 @@ export async function reorganizeOverdueSchedule(
     });
 
     if (!dryRun) {
-      await (prisma as any).studyScheduleItem.deleteMany({
+      await (prisma as any).studyScheduleItem.updateMany({
         where: {
           userId,
           subjectId: { in: excludedSubjectIds },
           status: { in: ["PENDING", "IN_PROGRESS"] }
+        },
+        data: {
+          status: "SKIPPED"
         }
       });
     }
