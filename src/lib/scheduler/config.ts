@@ -25,6 +25,8 @@ export const SCHEDULER_LIMITS = {
   dailyTheoryMinutesTarget: 45,
   /** Mínimo de minutos no dia se houver bloco disponível */
   dailyTheoryMinutesFloor: 30,
+  /** Teto de minutos de teoria por dia — nunca ultrapassar */
+  dailyTheoryMinutesCeil: 60,
   /** Máximo de blocos de teoria por dia (hard cap) */
   maxTheoryBlocksPerDay: 4,
   /** Alias para número máximo de novas teorias por dia */

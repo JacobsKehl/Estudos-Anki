@@ -91,7 +91,7 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
         status: "PENDING",
         scheduledDate: today,
         dayNumber: 10,
-        estimatedMinutes: 45,
+        estimatedMinutes: 24, // maior bloco real do blueprint — antes 45, calibrado para o teto antigo de 90
         subject: { id: "sub-dc", name: "Direito Constitucional" },
         studyBlock: { id: "block-dc-old", title: "Bloco DC Antigo", flashcards: [] },
       },
@@ -104,7 +104,7 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
         status: "PENDING",
         scheduledDate: today,
         dayNumber: 10,
-        estimatedMinutes: 45,
+        estimatedMinutes: 24,
         subject: { id: "sub-dpc", name: "Direito Processual Civil" },
         studyBlock: { id: "block-dpc-old", title: "Bloco DPC Antigo", flashcards: [] },
       },
@@ -127,8 +127,8 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
 
     // Blocos pendentes disponíveis no banco para DT e LP
     (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue([
-      { id: "block-dt-1", subjectId: "sub-dt", status: "PENDING", orderIndex: 1, material: { fileName: "Direito do Trabalho 1.pdf" }, subject: eligibleSubjects[0] },
-      { id: "block-lp-1", subjectId: "sub-lp", status: "PENDING", orderIndex: 1, material: { fileName: "Língua Portuguesa 1.pdf" }, subject: eligibleSubjects[1] },
+      { id: "block-dt-1", subjectId: "sub-dt", status: "PENDING", orderIndex: 1, estimatedStudyMinutes: 24, material: { fileName: "Direito do Trabalho 1.pdf" }, subject: eligibleSubjects[0] },
+      { id: "block-lp-1", subjectId: "sub-lp", status: "PENDING", orderIndex: 1, estimatedStudyMinutes: 24, material: { fileName: "Língua Portuguesa 1.pdf" }, subject: eligibleSubjects[1] },
     ]);
 
     const result = await reorganizeOverdueSchedule(userId, false, false, today);
@@ -219,7 +219,7 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
         status: "PENDING",
         scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
         dayNumber: 1,
-        estimatedMinutes: 45,
+        estimatedMinutes: 24,
         subject: { id: "sub-lp", name: "Língua Portuguesa" },
         studyBlock: { id: "block-lp-1", title: "Bloco LP 1", flashcards: [] },
       },
@@ -232,7 +232,7 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
         status: "PENDING",
         scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
         dayNumber: 1,
-        estimatedMinutes: 45,
+        estimatedMinutes: 24,
         subject: { id: "sub-dpt", name: "Direito Processual do Trabalho" },
         studyBlock: { id: "block-dpt-1", title: "Bloco DPT 1", flashcards: [] },
       },
@@ -254,8 +254,8 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
     });
 
     (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue([
-      { id: "block-lp-1", subjectId: "sub-lp", status: "PENDING", orderIndex: 1, material: { fileName: "Língua Portuguesa 1.pdf" }, subject: eligibleSubjects[1] },
-      { id: "block-dpt-1", subjectId: "sub-dpt", status: "PENDING", orderIndex: 1, material: { fileName: "Direito Processual do Trabalho 1.pdf" }, subject: eligibleSubjects[2] },
+      { id: "block-lp-1", subjectId: "sub-lp", status: "PENDING", orderIndex: 1, estimatedStudyMinutes: 24, material: { fileName: "Língua Portuguesa 1.pdf" }, subject: eligibleSubjects[1] },
+      { id: "block-dpt-1", subjectId: "sub-dpt", status: "PENDING", orderIndex: 1, estimatedStudyMinutes: 24, material: { fileName: "Direito Processual do Trabalho 1.pdf" }, subject: eligibleSubjects[2] },
     ]);
 
     const result = await reorganizeOverdueSchedule(userId, false, false, today);
@@ -284,7 +284,7 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
         status: "PENDING",
         scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
         dayNumber: 1,
-        estimatedMinutes: 45,
+        estimatedMinutes: 24,
         subject: { id: "sub-dpt", name: "Direito Processual do Trabalho" },
         studyBlock: { id: "block-dpt-1", title: "Bloco DPT 1", flashcards: [] },
       },
@@ -297,7 +297,7 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
         status: "PENDING",
         scheduledDate: new Date("2026-08-10T10:00:00.000Z"),
         dayNumber: 1,
-        estimatedMinutes: 45,
+        estimatedMinutes: 24,
         subject: { id: "sub-da", name: "Direito Administrativo" },
         studyBlock: { id: "block-da-1", title: "Bloco DA 1", flashcards: [] },
       },
@@ -319,8 +319,8 @@ describe("Regressão — reorganizeOverdueSchedule com fila circular LEGACY_TRT4
     });
 
     (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue([
-      { id: "block-dpt-1", subjectId: "sub-dpt", status: "PENDING", orderIndex: 1, material: { fileName: "Direito Processual do Trabalho 1.pdf" }, subject: eligibleSubjects[2] },
-      { id: "block-da-1", subjectId: "sub-da", status: "PENDING", orderIndex: 1, material: { fileName: "Direito Administrativo 1.pdf" }, subject: eligibleSubjects[3] },
+      { id: "block-dpt-1", subjectId: "sub-dpt", status: "PENDING", orderIndex: 1, estimatedStudyMinutes: 24, material: { fileName: "Direito Processual do Trabalho 1.pdf" }, subject: eligibleSubjects[2] },
+      { id: "block-da-1", subjectId: "sub-da", status: "PENDING", orderIndex: 1, estimatedStudyMinutes: 24, material: { fileName: "Direito Administrativo 1.pdf" }, subject: eligibleSubjects[3] },
     ]);
 
     const result = await reorganizeOverdueSchedule(userId, false, false, today);

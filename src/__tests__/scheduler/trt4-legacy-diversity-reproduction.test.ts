@@ -333,7 +333,7 @@ describe("Runtime da fila LEGACY_TRT4 — reorganizeOverdueSchedule", () => {
     subject: any,
     scheduledDate: Date,
     dayNumber: number,
-    estimatedMinutes = 45,
+    estimatedMinutes = 24, // maior bloco real do blueprint (8 páginas × 3min) — antes usava 45, calibrado para o teto antigo de 90
     actionType = "THEORY"
   ) => ({
     id,
@@ -351,6 +351,7 @@ describe("Runtime da fila LEGACY_TRT4 — reorganizeOverdueSchedule", () => {
       id: `block-${id}`,
       subjectId,
       theoryStatus: "NOT_STARTED",
+      estimatedStudyMinutes: estimatedMinutes,
       material: {
         originalFileName: subjectId === "sub-da" ? "1 - Direito Administrativo_compressed.pdf" : "2 - Direito do Trabalho.pdf"
       }
@@ -380,7 +381,7 @@ describe("Runtime da fila LEGACY_TRT4 — reorganizeOverdueSchedule", () => {
     // Matéria A = ciclo de hoje (Direito do Trabalho — ciclo dia 1 TRT4)
     // Matéria B = fora do ciclo (Direito Administrativo)
     // Fila de atrasados: A1 (DT), A2 (DT), B1 (DA)
-    // Capacidade dia 1: 2 blocos de 45 min = 90 min de teoria
+    // Capacidade dia 1: 2 blocos de 24 min = 48 min de teoria (dentro do teto de 60)
     // Resultado esperado: dia 1 = A1 + B1 (diversidade); dia 2 = A2
 
     const subA = makeSubject("sub-dt", "Direito do Trabalho");

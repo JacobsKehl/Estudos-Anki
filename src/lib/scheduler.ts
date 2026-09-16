@@ -1179,8 +1179,9 @@ export async function reorganizeOverdueSchedule(
   }> = [];
 
   const assignedDates = new Set<string>();
-  const dailyMinutes = activeSchedule.dailyStudyMinutes || 120;
-  const targetTheoryMinutes = dailyMinutes - 30; // 90 min
+  // dailyStudyMinutes (padrão 120) é o TOTAL do dia (teoria + exercícios + flashcards),
+  // NÃO a cota de teoria. A cota de teoria vive em SCHEDULER_LIMITS, independente do total.
+  const targetTheoryMinutes = SCHEDULER_LIMITS.dailyTheoryMinutesTarget;
 
   let currentDate = new Date(firstStudyDate);
   let dayNumber = currentDayNumber;
@@ -1368,6 +1369,10 @@ export async function reorganizeOverdueSchedule(
         const selectedCandidate = allCandidates.find(c => c.queueIndex === selectedIdx);
         if (!selectedCandidate?.isCycleSubject) break;
 
+        // R2 (teto): não adiciona item que estoure dailyTheoryMinutesCeil no dia.
+        const candidateMins = theoryQueue[selectedIdx]?.estimatedMinutes || 45;
+        if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + candidateMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) break;
+
         scheduleQueueItem(selectedIdx);
       }
     }
@@ -1391,6 +1396,11 @@ export async function reorganizeOverdueSchedule(
         });
 
         if (selectedIdx === null) break;
+
+        // R2 (teto): não adiciona item que estoure dailyTheoryMinutesCeil no dia.
+        const candidateMins = theoryQueue[selectedIdx]?.estimatedMinutes || 45;
+        if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + candidateMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) break;
+
         scheduleQueueItem(selectedIdx);
       }
     }
@@ -1442,11 +1452,20 @@ export async function reorganizeOverdueSchedule(
               continue;
             }
 
+            const blockMins = nextBlock.estimatedStudyMinutes || 45;
+
+            // R2 (teto): não adiciona bloco que estoure dailyTheoryMinutesCeil no dia.
+            // Devolve o bloco à fila e encerra a alocação obrigatória por hoje.
+            if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + blockMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) {
+              if (!blocksBySubject[nextBlock.subjectId]) blocksBySubject[nextBlock.subjectId] = [];
+              blocksBySubject[nextBlock.subjectId].unshift(nextBlock);
+              break;
+            }
+
             sameDaySubjectIds.add(nextBlock.subjectId);
             completedSubjectHistory.push(nextBlock.subjectId);
             scheduledBlockIds.add(nextBlock.id);
             const blockSubject = nextBlock.subject || eligibleSubjects.find((s: any) => s.id === nextBlock.subjectId) || targetSubject;
-            const blockMins = nextBlock.estimatedStudyMinutes || 45;
             const isFallback = nextBlock.subjectId !== targetSubject.id;
             const reasonText = isFallback
               ? `Roteiro: Teoria de ${blockSubject.name} (Fallback — Preenchimento de Lacuna)`
@@ -1593,9 +1612,17 @@ export async function reorganizeOverdueSchedule(
             const nextBlock = subjectBlocks.shift();
 
             if (nextBlock) {
+              const nextBlockMins = nextBlock.estimatedStudyMinutes || 45;
+
+              // R2 (teto): não adiciona bloco que estoure dailyTheoryMinutesCeil no dia.
+              if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + nextBlockMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) {
+                subjectBlocks.unshift(nextBlock);
+                continue;
+              }
+
               blockFound = true;
               scheduledBlockIds.add(nextBlock.id);
-              
+
               newItemsToCreate.push({
                 userId,
                 scheduleId: activeSchedule.id,
@@ -1606,7 +1633,7 @@ export async function reorganizeOverdueSchedule(
                 reason: `Roteiro: Teoria de ${subject.name} (Preenchimento de Lacuna)`,
                 dayNumber,
                 scheduledDate: new Date(currentDate),
-                estimatedMinutes: nextBlock.estimatedStudyMinutes || 45,
+                estimatedMinutes: nextBlockMins,
                 status: "PENDING"
               });
 
@@ -1618,7 +1645,7 @@ export async function reorganizeOverdueSchedule(
                 newDate: dateStr
               });
 
-              theoryMinutesOnDay += nextBlock.estimatedStudyMinutes || 45;
+              theoryMinutesOnDay += nextBlockMins;
               if (theoryMinutesOnDay >= targetTheoryMinutes) break;
             }
           }
