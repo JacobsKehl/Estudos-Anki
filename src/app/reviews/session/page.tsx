@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth-mock";
 import { ReviewSessionClient } from "@/components/reviews/ReviewSessionClient";
 import { redirect } from "next/navigation";
+import { getDueFlashcards } from "@/lib/reviews/get-due-flashcards";
 
 export const dynamic = "force-dynamic";
 
@@ -57,27 +58,10 @@ export default async function ReviewSessionPage() {
   let pendingCards: any[] = [];
 
   try {
-    pendingCards = await (prisma as any).flashcard.findMany({
-      where: {
-        userId: mockUserId,
-        status: "APPROVED",
-        nextReviewAt: { lte: now },
-        reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] },
-        studyBlockId: { notIn: todayBlockIds }
-      },
-      select: {
-        id: true,
-        question: true,
-        answer: true,
-        type: true,
-        difficulty: true,
-        reviewState: true,
-        intervalDays: true,
-        learningStep: true,
-        easeFactor: true,
-        subject: { select: { name: true } }
-      },
-      orderBy: { nextReviewAt: "asc" }
+    pendingCards = await getDueFlashcards({
+      userId: mockUserId,
+      now,
+      excludeStudyBlockIds: todayBlockIds,
     });
   } catch (error) {
     console.error("Failed to fetch review cards:", error);

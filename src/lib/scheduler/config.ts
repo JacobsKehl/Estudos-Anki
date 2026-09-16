@@ -32,3 +32,8 @@ export const SCHEDULER_LIMITS = {
   /** Dias da semana sem teoria (0 = Domingo) */
   noTheoryDays: [0] as readonly number[],
 } as const;
+
+export const SRS_LIMITS = {
+  /** Teto diário da fila de revisão SRS — os mais atrasados primeiro. Não reescreve nextReviewAt. */
+  maxReviewsPerDay: 100,
+} as const;
