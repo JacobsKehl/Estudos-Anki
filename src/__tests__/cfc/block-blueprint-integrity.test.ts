@@ -459,4 +459,64 @@ describe("CFC Blueprint Integrity Guard", () => {
     expect(invalidItems).toEqual([]);
     expect(scheduleItems!.length).toBeGreaterThanOrEqual(1);
   }, 30000);
+
+  conditionalTest("Modo Integração DB: Todo StudyScheduleItem REVIEW_BLOCK PENDING (qualquer data, passado incluído) deve apontar para StudyBlock não-EXCLUDED", async () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://msmdekjetxajcwuxmxps.supabase.co";
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const userId = "cmp8od0wz0000iybklaotfqbs";
+
+    const { data: schedule, error: sErr } = await supabase
+      .from("StudySchedule")
+      .select("id")
+      .eq("userId", userId)
+      .eq("status", "ACTIVE")
+      .single();
+
+    if (sErr) throw sErr;
+    expect(schedule).toBeDefined();
+
+    const { data: reviewItems, error: itemsErr } = await supabase
+      .from("StudyScheduleItem")
+      .select(`
+        id,
+        scheduledDate,
+        actionType,
+        status,
+        studyBlockId,
+        StudyBlock:studyBlockId (
+          id,
+          title,
+          pageStart,
+          pageEnd,
+          theoryStatus
+        )
+      `)
+      .eq("userId", userId)
+      .eq("scheduleId", schedule.id)
+      .eq("actionType", "REVIEW_BLOCK")
+      .eq("status", "PENDING");
+
+    if (itemsErr) throw itemsErr;
+    expect(reviewItems).toBeDefined();
+
+    const orphaned: string[] = [];
+    for (const item of reviewItems || []) {
+      const b = item.StudyBlock as any;
+      if (b?.theoryStatus === "EXCLUDED") {
+        orphaned.push(
+          `❌ Item ${item.id} (${item.scheduledDate?.substring(0, 10) ?? ""}): REVIEW_BLOCK aponta para StudyBlock EXCLUDED — ID=${b.id} "${b.title}" [${b.pageStart}–${b.pageEnd}]`
+        );
+      }
+    }
+
+    if (orphaned.length > 0) {
+      console.error("\n=== REVIEW_BLOCK PENDING ÓRFÃS (apontam para bloco EXCLUDED) ===");
+      orphaned.forEach((msg) => console.error("  " + msg));
+      console.error(`Total REVIEW_BLOCK PENDING avaliados: ${reviewItems?.length} | Órfãs: ${orphaned.length}\n`);
+    }
+
+    expect(orphaned).toEqual([]);
+  }, 30000);
 });
