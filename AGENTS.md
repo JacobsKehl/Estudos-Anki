@@ -178,6 +178,18 @@ branch) só gera preview.
 publicar — ele ignora o preview e vai direto pra produção. Reserve para quando `release` não puder
 ser usada.
 
+🔴 **`outputFileTracingExcludes` remove arquivos do bundle serverless — já derrubou a produção duas
+vezes** (`@prisma/engines` em setembro, `@swc/helpers` em 16/09, 53 min fora do ar). Um pacote só
+entra nessa lista depois de responder por escrito: **ele é usado em RUNTIME?** Se a resposta não for
+um "não" verificado (grep em `src/`, não achismo), ele fica de fora. **Escopo inteiro (`@org/**`)
+nunca** — só o subpacote exato que de fato é build-time.
+
+🔴 **Verificação de deploy não é status 200 numa página estática.** A página de login serve do CDN e
+devolveu 200 com título correto **durante a queda inteira de 16/09** — enganou duas verificações
+independentes antes de alguém pedir a rota certa. **Precisa ser uma resposta que SÓ o código da
+aplicação poderia ter gerado**: um 400/401 com corpo JSON do app, um stack trace passando por código
+de negócio (não por `next/dist/...`). Ver o passo 4 do fluxo acima — é o motivo dele existir.
+
 **Variáveis na Vercel:**
 ```
 DATABASE_URL  →  pooler  :6543  +  ?pgbouncer=true    (serverless; sem isso dá erro intermitente
