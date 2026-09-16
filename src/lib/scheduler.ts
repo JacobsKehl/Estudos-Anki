@@ -1235,6 +1235,12 @@ export async function reorganizeOverdueSchedule(
     const dateStr = getTodayRangeSP(currentDate).dateString;
     assignedDates.add(dateStr);
 
+    // R5: dias em SCHEDULER_LIMITS.noTheoryDays (domingo) não recebem teoria nova.
+    // Domingo continua em studyDaysOfWeek (é o weeklyReviewDayOfWeek) — a regra mora
+    // aqui, não na preferência. Revisões/SRS não passam por este loop de teoria.
+    const isNoTheoryDay = (SCHEDULER_LIMITS.noTheoryDays as readonly number[]).includes(currentDate.getDay());
+    const targetTheoryMinutesToday = isNoTheoryDay ? 0 : targetTheoryMinutes;
+
     // 1. Somar teoria já agendada e preservada neste dia (se houver, ex: preserveToday)
     let theoryMinutesOnDay = 0;
     const preservedTheoryOnDay = allItems.filter(item => {
@@ -1330,7 +1336,7 @@ export async function reorganizeOverdueSchedule(
     // Usa selectLegacyQueueItemIndex para garantir a hierarquia correta: qualquer
     // matéria nova hoje tem precedência sobre repetição, mesmo que fora do ciclo.
     if (mode === "LEGACY_TRT4" && cycleSubjects.length > 0) {
-      while (theoryMinutesOnDay < targetTheoryMinutes) {
+      while (theoryMinutesOnDay < targetTheoryMinutesToday) {
         // Construir candidatos: apenas itens do ciclo de hoje
         const cycleCandidates: LegacyQueueItemCandidate[] = theoryQueue
           .map((item, idx) => ({
@@ -1380,7 +1386,7 @@ export async function reorganizeOverdueSchedule(
     // Tentativa 2: Alocar qualquer item da fila (fallback / carryover apenas em modo DYNAMIC)
     if (mode !== "LEGACY_TRT4") {
       const prevDaySet = new Set(prevDaySubjects);
-      while (theoryMinutesOnDay < targetTheoryMinutes) {
+      while (theoryMinutesOnDay < targetTheoryMinutesToday) {
         const allCandidates: LegacyQueueItemCandidate[] = theoryQueue.map((item, idx) => ({
           subjectId: item.subjectId,
           isCycleSubject: mode === "LEGACY_TRT4" && cycleSubjects.some(n =>
@@ -1405,8 +1411,8 @@ export async function reorganizeOverdueSchedule(
       }
     }
 
-    // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutes
-    if (theoryMinutesOnDay < targetTheoryMinutes) {
+    // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutesToday
+    if (theoryMinutesOnDay < targetTheoryMinutesToday) {
       if (mode === "LEGACY_TRT4") {
         const subjectsToSchedule = legacyNextSlots
           .map(slot => eligibleSubjects.find(s => s.id === slot.subjectId))
@@ -1414,7 +1420,7 @@ export async function reorganizeOverdueSchedule(
 
         // Para cada uma das duas matérias obrigatórias, tentar agendar um bloco
         for (const targetSubject of subjectsToSchedule) {
-          if (theoryMinutesOnDay >= targetTheoryMinutes) break;
+          if (theoryMinutesOnDay >= targetTheoryMinutesToday) break;
 
           let nextBlock = null;
           if (!sameDaySubjectIds.has(targetSubject.id)) {
@@ -1527,7 +1533,7 @@ export async function reorganizeOverdueSchedule(
           ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber && item.actionType === "THEORY")
         ].length;
 
-        const remainingCapacity = targetTheoryMinutes - theoryMinutesOnDay;
+        const remainingCapacity = targetTheoryMinutesToday - theoryMinutesOnDay;
         if (remainingCapacity >= 30 && currentTheoryCountOnDay < 2) {
           const civilSubject = eligibleSubjects.find(s => s.name.toLowerCase().includes("direito civil"));
           let thirdBlock = (civilSubject && !sameDaySubjectIds.has(civilSubject.id)) ? (blocksBySubject[civilSubject.id] || []).shift() : null;
@@ -1605,7 +1611,7 @@ export async function reorganizeOverdueSchedule(
         // Modo DYNAMIC original
         const subjectsToday = eligibleSubjects;
         let blockFound = true;
-        while (theoryMinutesOnDay < targetTheoryMinutes && blockFound) {
+        while (theoryMinutesOnDay < targetTheoryMinutesToday && blockFound) {
           blockFound = false;
           for (const subject of subjectsToday) {
             const subjectBlocks = blocksBySubject[subject.id] || [];
@@ -1646,7 +1652,7 @@ export async function reorganizeOverdueSchedule(
               });
 
               theoryMinutesOnDay += nextBlockMins;
-              if (theoryMinutesOnDay >= targetTheoryMinutes) break;
+              if (theoryMinutesOnDay >= targetTheoryMinutesToday) break;
             }
           }
         }
