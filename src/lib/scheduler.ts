@@ -1269,7 +1269,7 @@ export async function reorganizeOverdueSchedule(
 
       return !theoryQueue.some(q => q.id === item.id);
     });
-    theoryMinutesOnDay = preservedTheoryOnDay.reduce((sum, item) => sum + (item.estimatedMinutes || 45), 0);
+    theoryMinutesOnDay = preservedTheoryOnDay.reduce((sum, item) => sum + (item.estimatedMinutes ?? 45), 0);
 
     const sameDaySubjectIds = new Set<string>();
     preservedTheoryOnDay.forEach((item: any) => sameDaySubjectIds.add(item.subjectId));
@@ -1329,7 +1329,7 @@ export async function reorganizeOverdueSchedule(
           newDate: dateStr,
         });
       }
-      theoryMinutesOnDay += item.estimatedMinutes || 45;
+      theoryMinutesOnDay += item.estimatedMinutes ?? 45;
     };
 
     // Tentativa 1: Alocar itens da fila que correspondem ao ciclo de hoje (prioridade)
@@ -1376,7 +1376,7 @@ export async function reorganizeOverdueSchedule(
         if (!selectedCandidate?.isCycleSubject) break;
 
         // R2 (teto): não adiciona item que estoure dailyTheoryMinutesCeil no dia.
-        const candidateMins = theoryQueue[selectedIdx]?.estimatedMinutes || 45;
+        const candidateMins = theoryQueue[selectedIdx]?.estimatedMinutes ?? 45;
         if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + candidateMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) break;
 
         scheduleQueueItem(selectedIdx);
@@ -1404,24 +1404,24 @@ export async function reorganizeOverdueSchedule(
         if (selectedIdx === null) break;
 
         // R2 (teto): não adiciona item que estoure dailyTheoryMinutesCeil no dia.
-        const candidateMins = theoryQueue[selectedIdx]?.estimatedMinutes || 45;
+        const candidateMins = theoryQueue[selectedIdx]?.estimatedMinutes ?? 45;
         if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + candidateMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) break;
 
         scheduleQueueItem(selectedIdx);
       }
     }
 
-    // 3. Gap-filling: Preencher lacunas se theoryMinutesOnDay < targetTheoryMinutesToday
-    if (theoryMinutesOnDay < targetTheoryMinutesToday) {
+    // 3. Preenchimento de teoria do dia. Domingo (isNoTheoryDay) não recebe teoria nova.
+    if (!isNoTheoryDay) {
       if (mode === "LEGACY_TRT4") {
         const subjectsToSchedule = legacyNextSlots
           .map(slot => eligibleSubjects.find(s => s.id === slot.subjectId))
           .filter((s): s is typeof eligibleSubjects[number] => !!s);
 
-        // Para cada uma das duas matérias obrigatórias, tentar agendar um bloco
+        // Passo 1 — as matérias obrigatórias do ciclo entram SEMPRE, independentemente
+        // de minutos. Nenhuma guarda de piso/teto aqui: o piso/alvo/teto só governam
+        // o preenchimento ADICIONAL (Passo 2/3, abaixo).
         for (const targetSubject of subjectsToSchedule) {
-          if (theoryMinutesOnDay >= targetTheoryMinutesToday) break;
-
           let nextBlock = null;
           if (!sameDaySubjectIds.has(targetSubject.id)) {
             nextBlock = (blocksBySubject[targetSubject.id] || []).shift();
@@ -1458,16 +1458,12 @@ export async function reorganizeOverdueSchedule(
               continue;
             }
 
-            const blockMins = nextBlock.estimatedStudyMinutes || 45;
+            const blockMins = nextBlock.estimatedStudyMinutes ?? 45;
 
-            // R2 (teto): não adiciona bloco que estoure dailyTheoryMinutesCeil no dia.
-            // Devolve o bloco à fila e encerra a alocação obrigatória por hoje.
-            if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + blockMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) {
-              if (!blocksBySubject[nextBlock.subjectId]) blocksBySubject[nextBlock.subjectId] = [];
-              blocksBySubject[nextBlock.subjectId].unshift(nextBlock);
-              break;
-            }
-
+            // As matérias obrigatórias do ciclo (subjectsToSchedule, hoje 2 via
+            // SCHEDULER_LIMITS.maxNewTheoryPerDay) entram SEMPRE, independentemente
+            // de minutos — nenhuma guarda de piso/teto aqui. O piso/alvo/teto só
+            // governam o preenchimento ADICIONAL, logo abaixo deste laço.
             sameDaySubjectIds.add(nextBlock.subjectId);
             completedSubjectHistory.push(nextBlock.subjectId);
             scheduledBlockIds.add(nextBlock.id);
@@ -1526,85 +1522,102 @@ export async function reorganizeOverdueSchedule(
           }
         }
 
-        // Regra de Produto: A cota maxNewTheoryPerDay = 2 MANDA. Não adicionar 3º bloco de teoria no dia.
-        const currentTheoryCountOnDay = [
+        // Passo 2/3 — preenchimento ADICIONAL, além das matérias obrigatórias.
+        const countTheoryItemsToday = () => [
           ...preservedTheoryOnDay,
           ...updatesList.filter((item: any) => item.dayNumber === dayNumber && item.actionType === "THEORY"),
           ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber && item.actionType === "THEORY")
         ].length;
 
-        const remainingCapacity = targetTheoryMinutesToday - theoryMinutesOnDay;
-        if (remainingCapacity >= 30 && currentTheoryCountOnDay < 2) {
-          const civilSubject = eligibleSubjects.find(s => s.name.toLowerCase().includes("direito civil"));
-          let thirdBlock = (civilSubject && !sameDaySubjectIds.has(civilSubject.id)) ? (blocksBySubject[civilSubject.id] || []).shift() : null;
+        // Tenta agendar um bloco extra de qualquer matéria elegível (sem repetir
+        // matéria nem studyBlockId no dia). Retorna false quando não há mais bloco
+        // elegível (o chamador deve parar o while). Retorna true tanto quando um
+        // bloco foi de fato adicionado quanto quando um duplicado foi descartado
+        // (o chamador tenta de novo no próximo giro, consumindo a fila).
+        const tryFillOneExtraBlock = (respectCeiling: boolean): boolean => {
+          const fallbackSubject = getFallbackSubjectForSlot(
+            eligibleSubjects,
+            dbPendingBlocks,
+            scheduledBlockIds,
+            [],
+            newItemsToCreate,
+            updatesList,
+            dayNumber,
+            lastCompletedSubjectIds,
+            sameDaySubjectIds
+          );
+          if (!fallbackSubject) return false;
 
-          // Se Direito Civil não tiver blocos ou já usado hoje, aciona fallback
-          if (!thirdBlock) {
-            const fallbackSubject = getFallbackSubjectForSlot(
-              eligibleSubjects,
-              dbPendingBlocks,
-              scheduledBlockIds,
-              [],
-              newItemsToCreate,
-              updatesList,
-              dayNumber,
-              lastCompletedSubjectIds,
-              sameDaySubjectIds
-            );
-            if (fallbackSubject) {
-              thirdBlock = (blocksBySubject[fallbackSubject.id] || []).shift();
-            }
+          const block = (blocksBySubject[fallbackSubject.id] || []).shift();
+          if (!block) return false;
+
+          // Evitar duplicidade de studyBlockId no mesmo dia
+          const dayBlockIds = [
+            ...preservedTheoryOnDay.map((item: any) => item.studyBlockId),
+            ...updatesList.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId),
+            ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId)
+          ].filter(Boolean);
+
+          if (dayBlockIds.includes(block.id)) {
+            scheduledBlockIds.add(block.id);
+            return true;
           }
 
-          if (thirdBlock) {
-            const blockSubject = thirdBlock.subject || eligibleSubjects.find((s: any) => s.id === thirdBlock.subjectId) || civilSubject;
-            const blockMins = thirdBlock.estimatedStudyMinutes || 45;
+          const blockMins = block.estimatedStudyMinutes ?? 45;
 
-            // Evitar duplicidade de studyBlockId no mesmo dia
-            const dayBlockIds = [
-              ...preservedTheoryOnDay.map((item: any) => item.studyBlockId),
-              ...updatesList.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId),
-              ...newItemsToCreate.filter((item: any) => item.dayNumber === dayNumber).map((item: any) => item.studyBlockId)
-            ].filter(Boolean);
-
-            if (!dayBlockIds.includes(thirdBlock.id)) {
-              if (blockMins <= remainingCapacity + 15) {
-                sameDaySubjectIds.add(thirdBlock.subjectId);
-                scheduledBlockIds.add(thirdBlock.id);
-
-                newItemsToCreate.push({
-                  userId,
-                  scheduleId: activeSchedule.id,
-                  subjectId: thirdBlock.subjectId,
-                  studyBlockId: thirdBlock.id,
-                  actionType: "THEORY",
-                  priorityScore: 80,
-                  reason: `Roteiro: Teoria de ${blockSubject?.name || "Complementar"} (Complemento)`,
-                  dayNumber,
-                  scheduledDate: new Date(currentDate),
-                  estimatedMinutes: blockMins,
-                  status: "PENDING"
-                });
-
-                changesReport.push({
-                  itemId: `NEW_${nextItemIndex++}`,
-                  actionType: "THEORY",
-                  subjectName: blockSubject?.name || "Complementar",
-                  originalDate: "LACUNA",
-                  newDate: dateStr
-                });
-
-                theoryMinutesOnDay += blockMins;
-              } else {
-                // Devolver o bloco para a fila se estourou muito
-                if (civilSubject && thirdBlock.subjectId === civilSubject.id) {
-                  blocksBySubject[civilSubject.id].unshift(thirdBlock);
-                } else if (thirdBlock.subjectId) {
-                  blocksBySubject[thirdBlock.subjectId].unshift(thirdBlock);
-                }
-              }
-            }
+          // Teto: nunca deixa o dia vazio por causa do teto (exceção do 1º bloco
+          // adicional), mas acima disso não estoura dailyTheoryMinutesCeil.
+          if (respectCeiling && theoryMinutesOnDay > 0 && theoryMinutesOnDay + blockMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) {
+            if (!blocksBySubject[block.subjectId]) blocksBySubject[block.subjectId] = [];
+            blocksBySubject[block.subjectId].unshift(block);
+            return false;
           }
+
+          const blockSubject = block.subject || eligibleSubjects.find((s: any) => s.id === block.subjectId) || fallbackSubject;
+          sameDaySubjectIds.add(block.subjectId);
+          completedSubjectHistory.push(block.subjectId);
+          scheduledBlockIds.add(block.id);
+
+          newItemsToCreate.push({
+            userId,
+            scheduleId: activeSchedule.id,
+            subjectId: block.subjectId,
+            studyBlockId: block.id,
+            actionType: "THEORY",
+            priorityScore: 80,
+            reason: `Roteiro: Teoria de ${blockSubject?.name || "Complementar"} (Complemento)`,
+            dayNumber,
+            scheduledDate: new Date(currentDate),
+            estimatedMinutes: blockMins,
+            status: "PENDING"
+          });
+
+          changesReport.push({
+            itemId: `NEW_${nextItemIndex++}`,
+            actionType: "THEORY",
+            subjectName: blockSubject?.name || "Complementar",
+            originalDate: "LACUNA",
+            newDate: dateStr
+          });
+
+          theoryMinutesOnDay += blockMins;
+          return true;
+        };
+
+        // Piso: garante pelo menos dailyTheoryMinutesFloor, se houver bloco elegível.
+        while (
+          theoryMinutesOnDay < SCHEDULER_LIMITS.dailyTheoryMinutesFloor &&
+          countTheoryItemsToday() < SCHEDULER_LIMITS.maxTheoryBlocksPerDay
+        ) {
+          if (!tryFillOneExtraBlock(false)) break;
+        }
+
+        // Acima do piso, continua até o alvo, agora respeitando o teto.
+        while (
+          theoryMinutesOnDay < targetTheoryMinutesToday &&
+          countTheoryItemsToday() < SCHEDULER_LIMITS.maxTheoryBlocksPerDay
+        ) {
+          if (!tryFillOneExtraBlock(true)) break;
         }
 
       } else {
@@ -1618,7 +1631,7 @@ export async function reorganizeOverdueSchedule(
             const nextBlock = subjectBlocks.shift();
 
             if (nextBlock) {
-              const nextBlockMins = nextBlock.estimatedStudyMinutes || 45;
+              const nextBlockMins = nextBlock.estimatedStudyMinutes ?? 45;
 
               // R2 (teto): não adiciona bloco que estoure dailyTheoryMinutesCeil no dia.
               if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + nextBlockMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) {

@@ -27,10 +27,12 @@ export const SCHEDULER_LIMITS = {
   dailyTheoryMinutesFloor: 30,
   /** Teto de minutos de teoria por dia — nunca ultrapassar */
   dailyTheoryMinutesCeil: 60,
-  /** Máximo de blocos de teoria por dia (hard cap) */
+  /** Máximo de blocos de teoria por dia (hard cap, cobre obrigatórias + preenchimento) */
   maxTheoryBlocksPerDay: 4,
-  /** Alias para número máximo de novas teorias por dia */
-  maxNewTheoryPerDay: 4,
+  /** Quantas matérias obrigatórias do ciclo TRT4 entram por dia, sempre, antes do
+   *  preenchimento por piso/alvo/teto. Era 4 (divergia do comentário histórico em
+   *  scheduler.ts, "cota = 2 MANDA", e do default de adaptive-scheduler.ts). */
+  maxNewTheoryPerDay: 2,
   /** Dias da semana sem teoria (0 = Domingo) */
   noTheoryDays: [0] as readonly number[],
 } as const;
