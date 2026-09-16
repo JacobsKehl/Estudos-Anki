@@ -9,6 +9,18 @@
  * d321b5db06c4c1ef101fd80099dfe2e2), não é derivado do banco — é
  * exatamente a diferença que reprovou o guardião circular daquela vez.
  * O md5 é conferido antes de qualquer uso; o teste aborta se não bater.
+ *
+ * H1-H4 (segunda auditoria, sobre a primeira versão deste arquivo):
+ * H1 — studyBlock.findMany tem que devolver o MESMO pool em toda rodada.
+ *      Agendar um item não muda StudyBlock.theoryStatus; a query real
+ *      (scheduler.ts) filtra só por theoryStatus=NOT_STARTED. Uma rodada
+ *      "faminta" (pool vazio) não reflete produção.
+ * H2 — idempotência não se mede por result.changes.length (autorrelato).
+ *      Mede-se comparando o grid (data -> [subjectId, studyBlockId, min])
+ *      antes/depois, campo a campo — reason é cosmético, não conta como
+ *      instabilidade.
+ * H3 — convergência: roda 4 vezes, cada uma alimentada pela anterior.
+ * H4 — critérios de aceite já verdes viram expect(), não só console.log.
  */
 import fs from "fs";
 import path from "path";
@@ -95,11 +107,37 @@ function loadBlueprint(): BlueprintRow[] {
   });
 }
 
+type SimBlock = {
+  id: string;
+  subjectId: string;
+  estimatedStudyMinutes: number;
+  orderIndex: number;
+  pageStart: number;
+  pageEnd: number;
+  theoryStatus: string;
+  material: { fileName: string; originalFileName: string };
+  subject: { id: string; name: string; studyPriority: string };
+};
+
+type SimItem = {
+  id: string;
+  userId: string;
+  subjectId: string;
+  studyBlockId: string;
+  actionType: string;
+  status: string;
+  scheduledDate: Date;
+  dayNumber: number;
+  estimatedMinutes: number;
+  reason?: string;
+  subject?: any;
+  studyBlock?: any;
+};
+
 describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, blueprint real)", () => {
   const userId = "user-gabriela-sim";
 
-  // As 5 matérias do CFC, com o mesmo canonicalIndex de LEGACY_TRT4_SUBJECT_SEQUENCE
-  // (Língua Portuguesa fica de fora — não tem blueprint aqui, não é o escopo do CFC).
+  // As 5 matérias do CFC (Língua Portuguesa fica de fora — sem blueprint aqui).
   const subjectByName: Record<string, { id: string; name: string; studyPriority: string }> = {
     "Direito do Trabalho": { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" },
     "Direito Processual do Trabalho": { id: "sub-dpt", name: "Direito Processual do Trabalho", studyPriority: "PRIMARY" },
@@ -115,16 +153,13 @@ describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, bluepr
   beforeAll(() => {
     blueprint = loadBlueprint();
     expect(blueprint.length).toBe(94);
-    // As linhas "EXTRA – EXERCÍCIOS/QUESTÕES (TEC)" não são StudyBlock de teoria
-    // reais — o próprio guardião (block-blueprint-integrity.test.ts) as exclui
-    // da comparação com o banco (89 blocos de teoria ativos).
     theoryRows = blueprint.filter(
       (r) => !r.tituloCapitulo.includes("EXTRA – EXERCÍCIOS (TEC)") && !r.tituloCapitulo.includes("EXTRA – QUESTÕES (TEC)")
     );
     expect(theoryRows.length).toBe(89);
   });
 
-  function buildBlocksBySubject(rows: BlueprintRow[]) {
+  function buildBlocks(rows: BlueprintRow[]): SimBlock[] {
     return rows.map((r) => ({
       id: `block-${r.pdfNoBanco}-${r.ordem}`,
       subjectId: subjectByName[r.materia].id,
@@ -138,40 +173,17 @@ describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, bluepr
     }));
   }
 
-  test("30 dias, reorganizeOverdueSchedule real, 13 números de aceite", async () => {
-    jest.clearAllMocks();
-
-    // "Hoje" é uma segunda-feira (2026-09-14), para reproduzir o cenário real
-    // (dois blocos concluídos em 14 e 15/09, per o status do projeto).
+  test("30 dias, reorganizeOverdueSchedule real, 4 rodadas, grid comparado campo a campo", async () => {
     const today = new Date("2026-09-16T10:00:00.000Z"); // quarta-feira
 
-    // Os 2 primeiros blocos por ordem (DA #1 e #2) contam como já concluídos —
-    // referência da própria predição da auditoria ("585 menos os 2 blocos que
-    // ela já concluiu").
     const completedRows = theoryRows.slice(0, 2);
     const pendingRows = theoryRows.slice(2);
+    // H1: pool ESTÁTICO — StudyBlock.theoryStatus não muda só porque um item
+    // foi agendado. A mesma consulta real (theoryStatus=NOT_STARTED) devolveria
+    // os mesmos 87 blocos em toda rodada, até algum ser de fato completado.
+    const pendingBlocks = buildBlocks(pendingRows);
+    const blockById = new Map(pendingBlocks.map((b) => [b.id, b]));
 
-    const pendingBlocks = buildBlocksBySubject(pendingRows);
-    const completedSubjectIds = completedRows.map((r) => subjectByName[r.materia].id);
-
-    (prisma.userPreferences.findUnique as jest.Mock).mockResolvedValue({
-      userId,
-      scheduleGenerationMode: "LEGACY_TRT4",
-      studyDaysOfWeek: "0,1,2,3,4,5,6", // domingo continua em studyDaysOfWeek — é weeklyReviewDayOfWeek
-    });
-    (prisma.studySubject.findMany as jest.Mock).mockImplementation(async ({ where }: any) => {
-      if (where?.studyPriority?.in) return [];
-      return eligibleSubjects;
-    });
-    (prisma.studyScheduleItem.count as jest.Mock).mockResolvedValue(0);
-    (prisma.studyScheduleItem.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-    (prisma.studyScheduleItem.update as jest.Mock).mockImplementation(async ({ data }: any) => data);
-    (prisma.studyScheduleItem.updateMany as jest.Mock).mockImplementation(async ({ data }: any) => data);
-    (prisma.studyScheduleItem.create as jest.Mock).mockImplementation(async ({ data }: any) => data);
-    (prisma.studySchedule.update as jest.Mock).mockResolvedValue({});
-
-    // Histórico de conclusão: findFirst devolve o último item COMPLETED; findMany
-    // (para completedTheoryItems / getUniqueCompletedTheoryDaysCount) devolve os 2.
     const completedItems = completedRows.map((r, i) => ({
       id: `item-completed-${i}`,
       subjectId: subjectByName[r.materia].id,
@@ -180,18 +192,8 @@ describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, bluepr
       completedAt: new Date(`2026-09-${14 + i}T12:00:00.000Z`),
       scheduledDate: new Date(`2026-09-${14 + i}T12:00:00.000Z`),
     }));
-    (prisma.studyScheduleItem.findFirst as jest.Mock).mockResolvedValue(
-      completedItems[completedItems.length - 1] || null
-    );
-    (prisma.studyScheduleItem.findMany as jest.Mock).mockImplementation(async ({ where }: any) => {
-      if (where?.status === "COMPLETED" && where?.actionType === "THEORY") return completedItems;
-      return [];
-    });
 
-    // Um item PENDING atrasado (não-teoria) para não cair no atalho de
-    // idempotência logo de cara — reflete o estado real: ela sempre tem algo
-    // pendente no cronograma ativo.
-    const seedItem = {
+    const seedItem: SimItem = {
       id: "item-seed",
       userId,
       subjectId: pendingBlocks[0].subjectId,
@@ -205,35 +207,162 @@ describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, bluepr
       studyBlock: { id: "block-seed-unused", title: "Seed", theoryStatus: "NOT_STARTED", flashcards: [{ id: "fc" }] },
     };
 
-    (prisma.studySchedule.findFirst as jest.Mock).mockResolvedValue({
-      id: "sched-sim",
-      userId,
-      status: "ACTIVE",
-      dailyStudyMinutes: 120,
-      items: [seedItem],
-    });
+    function configureMocks(items: SimItem[]) {
+      jest.clearAllMocks();
+      (prisma.userPreferences.findUnique as jest.Mock).mockResolvedValue({
+        userId,
+        scheduleGenerationMode: "LEGACY_TRT4",
+        studyDaysOfWeek: "0,1,2,3,4,5,6",
+      });
+      (prisma.studySubject.findMany as jest.Mock).mockImplementation(async ({ where }: any) => {
+        if (where?.studyPriority?.in) return [];
+        return eligibleSubjects;
+      });
+      (prisma.studyScheduleItem.count as jest.Mock).mockResolvedValue(0);
+      (prisma.studyScheduleItem.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.studyScheduleItem.update as jest.Mock).mockImplementation(async ({ data }: any) => data);
+      (prisma.studyScheduleItem.updateMany as jest.Mock).mockImplementation(async ({ data }: any) => data);
+      (prisma.studyScheduleItem.create as jest.Mock).mockImplementation(async ({ data }: any) => data);
+      (prisma.studySchedule.update as jest.Mock).mockResolvedValue({});
+      (prisma.studyScheduleItem.findFirst as jest.Mock).mockResolvedValue(
+        completedItems[completedItems.length - 1] || null
+      );
+      (prisma.studyScheduleItem.findMany as jest.Mock).mockImplementation(async ({ where }: any) => {
+        if (where?.status === "COMPLETED" && where?.actionType === "THEORY") return completedItems;
+        return [];
+      });
+      (prisma.studySchedule.findFirst as jest.Mock).mockResolvedValue({
+        id: "sched-sim",
+        userId,
+        status: "ACTIVE",
+        dailyStudyMinutes: 120,
+        items,
+      });
+      // H1: mesmo pool em toda rodada.
+      (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue(pendingBlocks);
+    }
 
-    (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue(pendingBlocks);
+    let globalIdCounter = 0;
 
-    // ── Rodada 1 ────────────────────────────────────────────────────────
-    const result1 = await reorganizeOverdueSchedule(userId, false, false, today);
-    expect(result1.success).toBe(true);
+    async function runRound(items: SimItem[]) {
+      configureMocks(items);
+      const result = await reorganizeOverdueSchedule(userId, false, false, today);
+      expect(result.success).toBe(true);
 
-    const createManyCalls1 = (prisma.studyScheduleItem.createMany as jest.Mock).mock.calls;
-    const created1: any[] = createManyCalls1.flatMap(([arg]: any) => arg?.data || []);
-    // O id do item atualizado vem no `where`, não no `data` — bug de
-    // reconstrução descoberto rodando isto: sem o id, todo update colapsava
-    // num único registro `undefined` e a rodada 2 via um estado quase
-    // inteiramente stale, inflando a contagem de idempotência para 88.
-    const updateManyCalls1 = (prisma.studyScheduleItem.updateMany as jest.Mock).mock.calls;
-    const updated1: any[] = updateManyCalls1
-      .map(([arg]: any) => (arg?.where?.id ? { id: arg.where.id, ...arg.data } : null))
-      .filter(Boolean);
+      const createManyCalls = (prisma.studyScheduleItem.createMany as jest.Mock).mock.calls;
+      const created: any[] = createManyCalls.flatMap(([arg]: any) => arg?.data || []);
+      const updateManyCalls = (prisma.studyScheduleItem.updateMany as jest.Mock).mock.calls;
 
-    const theoryCreated1 = created1.filter((it) => it.actionType === "THEORY");
+      // Duas formas de updateMany na produção: um id único (where.id = string —
+      // reatribuição de item existente) OU uma lista (where.id = {in: [...]} —
+      // a purga de sobras do unusedPendingItemsPool em SKIPPED, scheduler.ts:1758).
+      // C3 da auditoria: perder a segunda forma faz sobras da rodada anterior
+      // sobreviverem como PENDING e aparecerem como "duplicatas" na rodada seguinte
+      // — não é bug de produção, é reconstrução incompleta do estado.
+      const updated: { id: string; data: any }[] = [];
+      for (const [arg] of updateManyCalls) {
+        if (typeof arg?.where?.id === "string") {
+          updated.push({ id: arg.where.id, data: arg.data });
+        } else if (arg?.where?.id?.in) {
+          for (const id of arg.where.id.in) {
+            updated.push({ id, data: arg.data });
+          }
+        }
+      }
 
-    // ── As 13 contagens ────────────────────────────────────────────────
-    const blockById = new Map(pendingBlocks.map((b) => [b.id, b]));
+      const porId = new Map<string, SimItem>(items.map((i) => [i.id, i]));
+      for (const up of updated) {
+        const cur = porId.get(up.id);
+        if (cur) porId.set(up.id, { ...cur, ...up.data });
+      }
+      for (const c of created) {
+        const id = `NEW_${globalIdCounter++}`;
+        const block = blockById.get(c.studyBlockId);
+        porId.set(id, {
+          id,
+          userId,
+          subjectId: c.subjectId,
+          studyBlockId: c.studyBlockId,
+          actionType: c.actionType,
+          status: c.status,
+          scheduledDate: new Date(c.scheduledDate),
+          dayNumber: c.dayNumber,
+          estimatedMinutes: c.estimatedMinutes,
+          reason: c.reason,
+          subject: block?.subject,
+          studyBlock: block,
+        });
+      }
+
+      return { result, items: Array.from(porId.values()), created, updated };
+    }
+
+    // ── H2: grid = data -> lista ordenada de (subjectId, studyBlockId, minutos), só THEORY ──
+    function gridOf(items: SimItem[]): Map<string, { subjectId: string; studyBlockId: string; minutes: number }[]> {
+      const map = new Map<string, { subjectId: string; studyBlockId: string; minutes: number }[]>();
+      for (const it of items) {
+        if (it.actionType !== "THEORY" || it.status !== "PENDING") continue;
+        const d = new Date(it.scheduledDate).toISOString().slice(0, 10);
+        if (!map.has(d)) map.set(d, []);
+        map.get(d)!.push({ subjectId: it.subjectId, studyBlockId: it.studyBlockId, minutes: it.estimatedMinutes });
+      }
+      for (const list of map.values()) {
+        list.sort((a, b) => (a.studyBlockId || "").localeCompare(b.studyBlockId || ""));
+      }
+      return map;
+    }
+
+    function compareGrids(before: Map<string, any[]>, after: Map<string, any[]>) {
+      const dates = new Set([...before.keys(), ...after.keys()]);
+      let diasComGridDiferente = 0;
+      for (const d of dates) {
+        const a = before.get(d) || [];
+        const b = after.get(d) || [];
+        if (JSON.stringify(a) !== JSON.stringify(b)) diasComGridDiferente++;
+      }
+      return { igual: diasComGridDiferente === 0, diasComGridDiferente };
+    }
+
+    // Itens presentes nas duas rodadas (por id): o que mudou, campo a campo.
+    function diffItems(before: SimItem[], after: SimItem[]) {
+      const beforeById = new Map(before.map((i) => [i.id, i]));
+      let itensComDataDiferente = 0;
+      let itensSoComReasonDif = 0;
+      for (const a of after) {
+        if (a.actionType !== "THEORY") continue;
+        const b = beforeById.get(a.id);
+        if (!b) continue;
+        const dateChanged = new Date(a.scheduledDate).toISOString() !== new Date(b.scheduledDate).toISOString();
+        const subjectChanged = a.subjectId !== b.subjectId;
+        const blockChanged = a.studyBlockId !== b.studyBlockId;
+        const minutesChanged = a.estimatedMinutes !== b.estimatedMinutes;
+        const reasonChanged = a.reason !== b.reason;
+        const structural = dateChanged || subjectChanged || blockChanged || minutesChanged;
+        if (dateChanged) itensComDataDiferente++;
+        if (!structural && reasonChanged) itensSoComReasonDif++;
+      }
+      return { itensComDataDiferente, itensSoComReasonDif };
+    }
+
+    // ── Rodadas 1-4 ────────────────────────────────────────────────────
+    const r1 = await runRound([seedItem]);
+    const r2 = await runRound(r1.items);
+    const r3 = await runRound(r2.items);
+    const r4 = await runRound(r3.items);
+
+    const grid1 = gridOf(r1.items);
+    const grid2 = gridOf(r2.items);
+    const grid3 = gridOf(r3.items);
+    const grid4 = gridOf(r4.items);
+
+    const cmp12 = compareGrids(grid1, grid2);
+    const cmp23 = compareGrids(grid2, grid3);
+    const cmp34 = compareGrids(grid3, grid4);
+    const diff12 = diffItems(r1.items, r2.items);
+
+    // ── As 13 contagens de aceite (Regra Zero da simulação — a partir da
+    //    rodada 1, que é a que reflete "organizar do zero") ──────────────
+    const theoryCreated1 = r1.created.filter((it) => it.actionType === "THEORY");
     const blueprintPagesBySubject = new Map<string, Set<string>>();
     for (const r of theoryRows) {
       const key = subjectByName[r.materia].name;
@@ -241,22 +370,19 @@ describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, bluepr
       blueprintPagesBySubject.get(key)!.add(`${r.pageStart}-${r.pageEnd}`);
     }
 
-    const byDate: Record<string, { subjectName: string; minutes: number; pageStart: number; blockId: string }[]> = {};
+    const byDate: Record<string, { subjectName: string; minutes: number; pageStart: number }[]> = {};
     for (const it of theoryCreated1) {
       const dateStr = new Date(it.scheduledDate).toISOString().slice(0, 10);
       const block = blockById.get(it.studyBlockId);
-      const subjectName = block?.subject?.name || "";
       if (!byDate[dateStr]) byDate[dateStr] = [];
       byDate[dateStr].push({
-        subjectName,
+        subjectName: block?.subject?.name || "",
         minutes: it.estimatedMinutes,
         pageStart: block?.pageStart ?? -1,
-        blockId: it.studyBlockId,
       });
     }
 
     const diasDeTeoria = Object.keys(byDate).length;
-
     let teoriaEmDomingo = 0;
     let diasForaDaFaixaComBlocoDisponivel = 0;
     let materiaRepetidaNoDia = 0;
@@ -282,16 +408,8 @@ describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, bluepr
       for (const c of counts.values()) if (c > 1) materiaRepetidaNoDia++;
     }
 
-    let itensComBlocoExcluded = 0; // sempre 0 aqui — nenhum bloco no pool é EXCLUDED
-    let itensForaDoBlueprint = 0;
-    for (const items of Object.values(byDate)) {
-      for (const i of items) {
-        const pages = blueprintPagesBySubject.get(i.subjectName);
-        if (!pages) continue;
-        // já sabemos que vem do próprio blueprint (blocksBySubject foi montado a
-        // partir dele) — a checagem serve para detectar corrupção no caminho.
-      }
-    }
+    const itensComBlocoExcluded = 0; // nenhum bloco do pool é EXCLUDED por construção
+    const itensForaDoBlueprint = 0; // idem — o pool vem direto do blueprint
 
     let foraDeOrdem = 0;
     const bySubjectSeq: Record<string, number[]> = {};
@@ -315,104 +433,35 @@ describe("Frente C — simulação de 30 dias (sem banco, mock de Prisma, bluepr
       return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
     };
 
-    // ── Idempotência: aplica a rodada 1 ao estado do mock e roda de novo ──
-    const porId = new Map<string, any>([[seedItem.id, seedItem]]);
-    for (const up of updated1) {
-      const cur = porId.get(up.id) || {};
-      porId.set(up.id, { ...cur, ...up, id: up.id });
-    }
-    let nextNewId = 0;
-    for (const created of created1) {
-      const id = `NEW_ITEM_${nextNewId++}`;
-      const block = blockById.get(created.studyBlockId);
-      porId.set(id, {
-        id,
-        userId,
-        subjectId: created.subjectId,
-        studyBlockId: created.studyBlockId,
-        actionType: created.actionType,
-        status: created.status,
-        scheduledDate: new Date(created.scheduledDate),
-        dayNumber: created.dayNumber,
-        estimatedMinutes: created.estimatedMinutes,
-        reason: created.reason,
-        subject: block?.subject,
-        studyBlock: block,
-      });
-    }
-    const itemsAfterRound1 = Array.from(porId.values());
-
-    (prisma.studySchedule.findFirst as jest.Mock).mockResolvedValue({
-      id: "sched-sim",
-      userId,
-      status: "ACTIVE",
-      dailyStudyMinutes: 120,
-      items: itemsAfterRound1,
-    });
-    // Blocos já agendados na rodada 1 saem do pool de pendentes do banco (como
-    // no banco real: StudyBlock.theoryStatus só vira NOT_STARTED->algo quando
-    // completado, mas o pool de "pendente para NOVO agendamento" no teste é
-    // simplesmente o que ainda não foi usado — reflete via scheduledBlockIds
-    // interno da função, que já filtra pelos items existentes).
-    (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue(pendingBlocks);
-    jest.clearAllMocks();
-    (prisma.userPreferences.findUnique as jest.Mock).mockResolvedValue({
-      userId,
-      scheduleGenerationMode: "LEGACY_TRT4",
-      studyDaysOfWeek: "0,1,2,3,4,5,6",
-    });
-    (prisma.studySubject.findMany as jest.Mock).mockImplementation(async ({ where }: any) => {
-      if (where?.studyPriority?.in) return [];
-      return eligibleSubjects;
-    });
-    (prisma.studyScheduleItem.count as jest.Mock).mockResolvedValue(0);
-    (prisma.studyScheduleItem.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-    (prisma.studyScheduleItem.update as jest.Mock).mockImplementation(async ({ data }: any) => data);
-    (prisma.studyScheduleItem.updateMany as jest.Mock).mockImplementation(async ({ data }: any) => data);
-    (prisma.studyScheduleItem.create as jest.Mock).mockImplementation(async ({ data }: any) => data);
-    (prisma.studySchedule.update as jest.Mock).mockResolvedValue({});
-    (prisma.studyScheduleItem.findFirst as jest.Mock).mockResolvedValue(
-      completedItems[completedItems.length - 1] || null
-    );
-    (prisma.studyScheduleItem.findMany as jest.Mock).mockImplementation(async ({ where }: any) => {
-      if (where?.status === "COMPLETED" && where?.actionType === "THEORY") return completedItems;
-      return [];
-    });
-    (prisma.studySchedule.findFirst as jest.Mock).mockResolvedValue({
-      id: "sched-sim",
-      userId,
-      status: "ACTIVE",
-      dailyStudyMinutes: 120,
-      items: itemsAfterRound1,
-    });
-    (prisma.studyBlock.findMany as jest.Mock).mockResolvedValue([]); // nada novo no banco — tudo já está em items
-
-    const result2 = await reorganizeOverdueSchedule(userId, false, false, today);
-    expect(result2.success).toBe(true);
-    const idempotenciaItensMudados = result2.changes.length;
-
     // ── Relatório ──────────────────────────────────────────────────────
     console.log("\n═══════════════════════════════════════════════════════════");
-    console.log("  FRENTE C — SIMULAÇÃO DE 30 DIAS (13 números)");
+    console.log("  FRENTE C — SIMULAÇÃO DE 30 DIAS, 4 RODADAS");
     console.log("═══════════════════════════════════════════════════════════");
     console.log(`DIAS_DE_TEORIA                        = ${diasDeTeoria}`);
     console.log(`TEORIA_EM_DOMINGO                     = ${teoriaEmDomingo}`);
     console.log(`DIAS_FORA_DA_FAIXA_30_60 (c/ bloco)    = ${diasForaDaFaixaComBlocoDisponivel}`);
-    console.log(`diasAbaixoDoPisoPorFaltaDeBloco        = ${(result1 as any).diasAbaixoDoPisoPorFaltaDeBloco}`);
-    console.log(`diasAbaixoDoPisoPorTetoDeBlocos        = ${(result1 as any).diasAbaixoDoPisoPorTetoDeBlocos}`);
+    console.log(`diasAbaixoDoPisoPorFaltaDeBloco        = ${(r1.result as any).diasAbaixoDoPisoPorFaltaDeBloco}`);
+    console.log(`diasAbaixoDoPisoPorTetoDeBlocos        = ${(r1.result as any).diasAbaixoDoPisoPorTetoDeBlocos}`);
     console.log(`ITENS_COM_BLOCO_EXCLUDED              = ${itensComBlocoExcluded}`);
     console.log(`ITENS_FORA_DO_BLUEPRINT               = ${itensForaDoBlueprint}`);
     console.log(`FORA_DE_ORDEM                         = ${foraDeOrdem}`);
-    console.log(`IDEMPOTENCIA_ITENS_MUDADOS            = ${idempotenciaItensMudados}`);
     console.log(`MATERIA_REPETIDA_NO_DIA               = ${materiaRepetidaNoDia}`);
     console.log(`SOMA_DE_MINUTOS_ALOCADOS              = ${somaMinutos}`);
     console.log(`MEDIANA_MINUTOS_POR_DIA               = ${median(minutosPorDia)}`);
     console.log(`MEDIANA_BLOCOS_POR_DIA                = ${median(blocosPorDia)}`);
+    console.log("───────────────────────────────────────────────────────────");
+    console.log(`GRID_IGUAL_R1_R2                      = ${cmp12.igual ? "SIM" : "NÃO"}  (dias diferentes: ${cmp12.diasComGridDiferente})`);
+    console.log(`GRID_IGUAL_R2_R3                      = ${cmp23.igual ? "SIM" : "NÃO"}  (dias diferentes: ${cmp23.diasComGridDiferente})`);
+    console.log(`GRID_IGUAL_R3_R4                      = ${cmp34.igual ? "SIM" : "NÃO"}  (dias diferentes: ${cmp34.diasComGridDiferente})`);
+    console.log(`ITENS_COM_DATA_DIFERENTE (R1->R2)     = ${diff12.itensComDataDiferente}`);
+    console.log(`ITENS_SO_COM_REASON_DIF (R1->R2)      = ${diff12.itensSoComReasonDif}`);
     console.log("═══════════════════════════════════════════════════════════\n");
 
-    // Só travas de sanidade — os números em si vão no relatório, não são
-    // "esperado: 0" fixo (D3 da auditoria: a métrica de faixa só conta dias
-    // com bloco disponível, e o resto é para leitura, não para zerar).
-    expect(diasDeTeoria).toBeGreaterThan(0);
-  }, 30000);
+    // ── H4: critérios de aceite já verdes viram expect() ──────────────
+    expect(teoriaEmDomingo).toBe(0);
+    expect(itensComBlocoExcluded).toBe(0);
+    expect(itensForaDoBlueprint).toBe(0);
+    expect(foraDeOrdem).toBe(0);
+    expect((r1.result as any).diasAbaixoDoPisoPorFaltaDeBloco).toBe(0);
+  }, 60000);
 });

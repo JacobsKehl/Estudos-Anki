@@ -119,6 +119,33 @@ export function validateScheduleItemsIntegrity(
   return invalidItems;
 }
 
+/**
+ * Nenhum StudyBlock pode ter dois StudyScheduleItem PENDING do tipo THEORY
+ * apontando para ele no mesmo cronograma — sinal de duplicação (achado real
+ * durante a auditoria da Frente C: uma segunda chamada de
+ * reorganizeOverdueSchedule pode reagendar um bloco que já tem item PENDING,
+ * já que scheduledBlockIds só é semeado a partir de itens COMPLETED/IN_PROGRESS).
+ */
+export function findDuplicateTheoryStudyBlockIds(scheduleItems: any[]): string[] {
+  const seenBy = new Map<string, string>();
+  const duplicates: string[] = [];
+
+  for (const item of scheduleItems || []) {
+    if (item.actionType !== "THEORY" || item.status !== "PENDING" || !item.studyBlockId) continue;
+
+    const prevItemId = seenBy.get(item.studyBlockId);
+    if (prevItemId) {
+      duplicates.push(
+        `❌ studyBlockId=${item.studyBlockId} duplicado: itens ${prevItemId} e ${item.id} ambos PENDING/THEORY`
+      );
+    } else {
+      seenBy.set(item.studyBlockId, item.id);
+    }
+  }
+
+  return duplicates;
+}
+
 describe("CFC Blueprint Integrity Guard", () => {
   const blueprint = loadBlueprint();
 
@@ -263,6 +290,33 @@ describe("CFC Blueprint Integrity Guard", () => {
 
     // Reprovação de páginas fora do Blueprint [90-99]
     expect(violations.some((v) => v.includes("[90–99]") && v.includes("NÃO existe no Blueprint"))).toBe(true);
+  });
+
+  it("Modo Unitário: Guardião detecta dois StudyScheduleItem PENDING/THEORY apontando para o mesmo studyBlockId", () => {
+    const cleanItems = [
+      { id: "item-1", actionType: "THEORY", status: "PENDING", studyBlockId: "block-a" },
+      { id: "item-2", actionType: "THEORY", status: "PENDING", studyBlockId: "block-b" },
+    ];
+    expect(findDuplicateTheoryStudyBlockIds(cleanItems)).toEqual([]);
+
+    const duplicatedItems = [
+      ...cleanItems,
+      { id: "item-3", actionType: "THEORY", status: "PENDING", studyBlockId: "block-a" },
+    ];
+    const duplicates = findDuplicateTheoryStudyBlockIds(duplicatedItems);
+    expect(duplicates.length).toBe(1);
+    expect(duplicates[0]).toContain("block-a");
+    expect(duplicates[0]).toContain("item-1");
+    expect(duplicates[0]).toContain("item-3");
+
+    // COMPLETED/IN_PROGRESS e REVIEW_BLOCK compartilhando bloco não contam —
+    // a asserção é estritamente sobre THEORY PENDING.
+    const notDuplicates = [
+      { id: "item-4", actionType: "THEORY", status: "COMPLETED", studyBlockId: "block-c" },
+      { id: "item-5", actionType: "THEORY", status: "PENDING", studyBlockId: "block-c" },
+      { id: "item-6", actionType: "REVIEW_BLOCK", status: "PENDING", studyBlockId: "block-c" },
+    ];
+    expect(findDuplicateTheoryStudyBlockIds(notDuplicates)).toEqual([]);
   });
 
   const shouldRunDbTest = process.env.RUN_CFC_BLUEPRINT_DB_TEST === "true";
@@ -518,5 +572,44 @@ describe("CFC Blueprint Integrity Guard", () => {
     }
 
     expect(orphaned).toEqual([]);
+  }, 30000);
+
+  conditionalTest("Modo Integração DB: Nenhum StudyBlock tem dois StudyScheduleItem PENDING/THEORY apontando para ele (7ª asserção — achado da Frente C)", async () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://msmdekjetxajcwuxmxps.supabase.co";
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const userId = "cmp8od0wz0000iybklaotfqbs";
+
+    const { data: schedule, error: sErr } = await supabase
+      .from("StudySchedule")
+      .select("id")
+      .eq("userId", userId)
+      .eq("status", "ACTIVE")
+      .single();
+
+    if (sErr) throw sErr;
+    expect(schedule).toBeDefined();
+
+    const { data: theoryItems, error: itemsErr } = await supabase
+      .from("StudyScheduleItem")
+      .select("id, actionType, status, studyBlockId")
+      .eq("userId", userId)
+      .eq("scheduleId", schedule.id)
+      .eq("actionType", "THEORY")
+      .eq("status", "PENDING");
+
+    if (itemsErr) throw itemsErr;
+    expect(theoryItems).toBeDefined();
+
+    const duplicates = findDuplicateTheoryStudyBlockIds(theoryItems || []);
+
+    if (duplicates.length > 0) {
+      console.error("\n=== BLOCOS DUPLICADOS EM StudyScheduleItem PENDING/THEORY ===");
+      duplicates.forEach((msg) => console.error("  " + msg));
+      console.error(`Total THEORY PENDING avaliados: ${theoryItems?.length} | Duplicatas: ${duplicates.length}\n`);
+    }
+
+    expect(duplicates).toEqual([]);
   }, 30000);
 });
