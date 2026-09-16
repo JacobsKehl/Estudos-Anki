@@ -14,7 +14,12 @@ const nextConfig: NextConfig = {
   ],
   outputFileTracingExcludes: {
     '*': [
-      'node_modules/@swc/**',
+      // @swc/helpers é usado em RUNTIME (next/dist/client/lib/console.js importa
+      // _interop_require_default de lá) — excluir o escopo inteiro derrubou a
+      // produção. Só os binários do compilador (@swc/core, específicos de
+      // plataforma) são build-time; @swc/helpers fica de fora da exclusão.
+      'node_modules/@swc/core/**',
+      'node_modules/@swc/core-*/**',
       'node_modules/@esbuild/**',
       'node_modules/canvas/**',
       'node_modules/pdfjs-dist/standard_fonts/**',
