@@ -922,7 +922,9 @@ export async function reorganizeOverdueSchedule(
       mergedReviewBlocksCount: 0,
       changes: [],
       lastDateAfterReorganization: todayStr,
-      excludedItemsPurgedCount
+      excludedItemsPurgedCount,
+      diasAbaixoDoPisoPorFaltaDeBloco: 0,
+      diasAbaixoDoPisoPorTetoDeBlocos: 0,
     };
   }
 
@@ -987,7 +989,9 @@ export async function reorganizeOverdueSchedule(
       mergedReviewBlocksCount: 0,
       changes: [],
       lastDateAfterReorganization: maxDateStr,
-      excludedItemsPurgedCount
+      excludedItemsPurgedCount,
+      diasAbaixoDoPisoPorFaltaDeBloco: 0,
+      diasAbaixoDoPisoPorTetoDeBlocos: 0,
     };
   }
 
@@ -1182,6 +1186,10 @@ export async function reorganizeOverdueSchedule(
   // dailyStudyMinutes (padrão 120) é o TOTAL do dia (teoria + exercícios + flashcards),
   // NÃO a cota de teoria. A cota de teoria vive em SCHEDULER_LIMITS, independente do total.
   const targetTheoryMinutes = SCHEDULER_LIMITS.dailyTheoryMinutesTarget;
+  // D1 (auditoria do 0c26522d): observabilidade de por que um dia fecha abaixo
+  // do piso — sem mais bloco elegível vs. teto de blocos do dia atingido primeiro.
+  let diasAbaixoDoPisoPorFaltaDeBloco = 0;
+  let diasAbaixoDoPisoPorTetoDeBlocos = 0;
 
   let currentDate = new Date(firstStudyDate);
   let dayNumber = currentDayNumber;
@@ -1534,7 +1542,10 @@ export async function reorganizeOverdueSchedule(
         // elegível (o chamador deve parar o while). Retorna true tanto quando um
         // bloco foi de fato adicionado quanto quando um duplicado foi descartado
         // (o chamador tenta de novo no próximo giro, consumindo a fila).
-        const tryFillOneExtraBlock = (respectCeiling: boolean): boolean => {
+        //
+        // O teto vale nas duas fases (piso e alvo) — D2 da auditoria: antes, a
+        // fase de piso ignorava o teto e podia levar o dia muito além de 60.
+        const tryFillOneExtraBlock = (): boolean => {
           const fallbackSubject = getFallbackSubjectForSlot(
             eligibleSubjects,
             dbPendingBlocks,
@@ -1565,9 +1576,10 @@ export async function reorganizeOverdueSchedule(
 
           const blockMins = block.estimatedStudyMinutes ?? 45;
 
-          // Teto: nunca deixa o dia vazio por causa do teto (exceção do 1º bloco
-          // adicional), mas acima disso não estoura dailyTheoryMinutesCeil.
-          if (respectCeiling && theoryMinutesOnDay > 0 && theoryMinutesOnDay + blockMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) {
+          // Teto: nunca deixa o dia vazio por causa do teto (exceção só quando
+          // theoryMinutesOnDay === 0), mas acima disso não estoura o teto —
+          // em nenhuma das duas fases.
+          if (theoryMinutesOnDay > 0 && theoryMinutesOnDay + blockMins > SCHEDULER_LIMITS.dailyTheoryMinutesCeil) {
             if (!blocksBySubject[block.subjectId]) blocksBySubject[block.subjectId] = [];
             blocksBySubject[block.subjectId].unshift(block);
             return false;
@@ -1609,15 +1621,28 @@ export async function reorganizeOverdueSchedule(
           theoryMinutesOnDay < SCHEDULER_LIMITS.dailyTheoryMinutesFloor &&
           countTheoryItemsToday() < SCHEDULER_LIMITS.maxTheoryBlocksPerDay
         ) {
-          if (!tryFillOneExtraBlock(false)) break;
+          if (!tryFillOneExtraBlock()) break;
         }
 
-        // Acima do piso, continua até o alvo, agora respeitando o teto.
+        // Acima do piso, continua até o alvo, respeitando o teto.
         while (
           theoryMinutesOnDay < targetTheoryMinutesToday &&
           countTheoryItemsToday() < SCHEDULER_LIMITS.maxTheoryBlocksPerDay
         ) {
-          if (!tryFillOneExtraBlock(true)) break;
+          if (!tryFillOneExtraBlock()) break;
+        }
+
+        // D1 (auditoria): o teto de maxTheoryBlocksPerDay pode ganhar do piso —
+        // decisão de produto aceita, mas tem que ser OBSERVÁVEL, não um
+        // fallback silencioso. Duas razões distintas para o dia fechar abaixo
+        // do piso: sem mais bloco elegível em nenhuma matéria, ou o teto de
+        // blocos do dia foi atingido primeiro.
+        if (theoryMinutesOnDay < SCHEDULER_LIMITS.dailyTheoryMinutesFloor) {
+          if (countTheoryItemsToday() >= SCHEDULER_LIMITS.maxTheoryBlocksPerDay) {
+            diasAbaixoDoPisoPorTetoDeBlocos++;
+          } else {
+            diasAbaixoDoPisoPorFaltaDeBloco++;
+          }
         }
 
       } else {
@@ -1818,6 +1843,8 @@ export async function reorganizeOverdueSchedule(
     changes: finalChangesReport,
     lastDateAfterReorganization: finalLastDateStr,
     excludedItemsPurgedCount,
+    diasAbaixoDoPisoPorFaltaDeBloco,
+    diasAbaixoDoPisoPorTetoDeBlocos,
   };
 }
 

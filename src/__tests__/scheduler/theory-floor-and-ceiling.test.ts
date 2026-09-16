@@ -57,7 +57,8 @@ describe("C.1a/b/c — piso, alvo e teto da teoria diária", () => {
   const dt = { id: "sub-dt", name: "Direito do Trabalho", studyPriority: "PRIMARY" };
   const lp = { id: "sub-lp", name: "Língua Portuguesa", studyPriority: "PRIMARY" };
   const dpt = { id: "sub-dpt", name: "Direito Processual do Trabalho", studyPriority: "PRIMARY" };
-  const eligibleSubjects = [dt, lp, dpt];
+  const da = { id: "sub-da", name: "Direito Administrativo", studyPriority: "PRIMARY" };
+  const eligibleSubjects = [dt, lp, dpt, da];
 
   function setup(blocks: { id: string; subjectId: string; estimatedStudyMinutes: number }[]) {
     jest.clearAllMocks();
@@ -174,5 +175,35 @@ describe("C.1a/b/c — piso, alvo e teto da teoria diária", () => {
     const dtItem = createdDay1.find((it) => it.subjectId === "sub-dt");
     expect(dtItem).toBeDefined();
     expect(dtItem.estimatedMinutes).toBe(0);
+  });
+
+  test("T5 — o piso perde para o teto de 4 blocos: dia com 4 blocos pequenos (3+3+6+6=18) fecha abaixo do piso, e isso é observável", async () => {
+    setup([
+      { id: "block-dt-1", subjectId: "sub-dt", estimatedStudyMinutes: 3 },
+      { id: "block-lp-1", subjectId: "sub-lp", estimatedStudyMinutes: 3 },
+      { id: "block-dpt-1", subjectId: "sub-dpt", estimatedStudyMinutes: 6 },
+      { id: "block-da-1", subjectId: "sub-da", estimatedStudyMinutes: 6 },
+    ]);
+
+    const { result, totalMinutes } = await getDay1AllocatedMinutes();
+    expect(totalMinutes).toBe(18);
+    expect(totalMinutes).toBeLessThan(SCHEDULER_LIMITS.dailyTheoryMinutesFloor);
+    expect((result as any).diasAbaixoDoPisoPorTetoDeBlocos).toBe(1);
+    expect((result as any).diasAbaixoDoPisoPorFaltaDeBloco).toBe(0);
+  });
+
+  test("T6 — o teto vale também na fase de piso: de 29 min, um bloco de 45 não leva o dia a 74", async () => {
+    setup([
+      // As 2 obrigatórias (DT+LP) já somam 29 min sozinhas — nenhuma delas
+      // precisa de fallback, então o único bloco de 45 (DPT) só é alcançável
+      // pela fase de piso, não pelo laço obrigatório.
+      { id: "block-dt-1", subjectId: "sub-dt", estimatedStudyMinutes: 15 },
+      { id: "block-lp-1", subjectId: "sub-lp", estimatedStudyMinutes: 14 },
+      { id: "block-dpt-1", subjectId: "sub-dpt", estimatedStudyMinutes: 45 },
+    ]);
+
+    const { totalMinutes } = await getDay1AllocatedMinutes();
+    expect(totalMinutes).toBeLessThanOrEqual(SCHEDULER_LIMITS.dailyTheoryMinutesCeil);
+    expect(totalMinutes).toBe(29);
   });
 });
