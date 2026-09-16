@@ -46,7 +46,7 @@ compara contra ele.**
 ## 2. O guardião
 
 ```bash
-node scripts/run-guard-test.js     # → tem que dar 5/5
+node scripts/run-guard-test.js     # → tem que dar 8/8
 ```
 
 Roda `src/__tests__/cfc/block-blueprint-integrity.test.ts` com `RUN_CFC_BLUEPRINT_DB_TEST=true`.
@@ -108,7 +108,7 @@ legítimo. Afrouxar asserção não é.)*
 | **abrir a home** `src/app/page.tsx:192` | `shouldReorganizeSchedule` → `reorganizeOverdueSchedule` no **primeiro acesso do dia** | **é um `GET` que grava.** Dívida registrada: tirar a escrita da renderização |
 | `/api/materials/organize-all` `{reset:true}` | apaga flashcards, revisões, blocos, cronograma e planos — e reconstrói **por IA** | **é o botão que desfaz o blueprint.** Os 5 PDFs do CFC estão excluídos dessa rota; **mantenha assim** |
 | `completeStudyBlock` | marca `COMPLETED` e cria `REVIEW_BLOCK` D+1 | |
-| **`vercel --prod`** | roda `prisma migrate deploy` **no banco de produção**, antes do build | **`npx prisma migrate status` antes de todo deploy.** Pendência = pare |
+| **push na branch de produção** | deploy + `prisma migrate deploy` **no banco de produção** | **push É publicação.** Production Branch = `release`; push em `main` é só preview. Ver §12 |
 
 ## 10. O predicado, nas quatro consultas
 
@@ -149,11 +149,34 @@ mudanças. *(Já produziu 46. A causa era gravar sem comparar com o estado atual
 
 ## 12. Publicar
 
-```bash
-npx vercel --prod --scope jacobskehls-projects     # e confirmar readyState: READY
+🔴 **"`git push` não publica" é FALSO — sempre foi.** O painel mostra `JacobsKehl/Estudos-Anki`
+conectado desde 16 de maio. Rodou errado a sessão inteira até um incidente real (produção fora do
+ar por ~53 min, `@swc/helpers` excluído do bundle) expor isso.
+
+**Production Branch = `release`.** Push nela publica de verdade — build, deploy, e
+`prisma migrate deploy` no banco de produção, sem perguntar. Push em `main` (ou em qualquer outra
+branch) só gera preview.
+
+**O fluxo:**
+```
+1. branch nova a partir de release          git checkout release && git checkout -b fix/algo
+2. commit do conserto (um só, regra 6)
+3. push da branch                            → gera PREVIEW, não produção
+4. verificar o preview antes de prosseguir:
+     - GET / e GET /login → 200, título certo
+     - pelo menos uma rota que só o app poderia responder (ex: POST /api/auth/login
+       com credencial falsa → 400/401 do app, não 500 de módulo)
+     - `npx vercel logs <url-preview>` → confirma que as invocações aconteceram e
+       que não há erro de módulo/import
+   (proteção SSO do preview bloqueia curl direto — use `npx vercel curl <url> -- <args>`,
+   autenticado pela sessão da CLI, não por login no navegador)
+5. só depois do preview validado: merge em release e push        → ESSE push publica
+6. depois de publicado: merge de volta em main, para a próxima branch não nascer quebrada
 ```
 
-⚠️ **`git push` NÃO publica** — o projeto está com `Connected Repository: NONE`.
+**`npx vercel --prod`** continua existindo como comando manual, mas não é mais o caminho normal de
+publicar — ele ignora o preview e vai direto pra produção. Reserve para quando `release` não puder
+ser usada.
 
 **Variáveis na Vercel:**
 ```
