@@ -1482,7 +1482,22 @@ export async function reorganizeOverdueSchedule(
               : `Roteiro: Teoria de ${blockSubject.name} (Preenchimento de Lacuna)`;
 
             if (unusedPendingItemsPool.length > 0) {
-              const existingItem = unusedPendingItemsPool.shift()!;
+              // R1 (auditoria): identidade de linha estável. Um shift() cego
+              // reaproveita IDs em ordem de fila, não em relação ao que o ID já
+              // representava — rodar a função duas vezes sem nada mudar no
+              // mundo real embaralhava qual linha do banco representa qual
+              // par matéria+bloco (o cronograma final ficava igual, mas cada
+              // reorganização escrevia no banco sem necessidade).
+              // Prioridade: 1) item que já é este bloco (nada muda) — 2) item
+              // já agendado nesta data (não puxa de outro dia) — 3) shift().
+              let pickIdx = unusedPendingItemsPool.findIndex(i => i.studyBlockId === nextBlock.id);
+              if (pickIdx === -1) {
+                pickIdx = unusedPendingItemsPool.findIndex(
+                  i => i.scheduledDate && getTodayRangeSP(i.scheduledDate).dateString === dateStr
+                );
+              }
+              if (pickIdx === -1) pickIdx = 0;
+              const existingItem = unusedPendingItemsPool.splice(pickIdx, 1)[0];
               const origDateStr = existingItem.scheduledDate ? getTodayRangeSP(existingItem.scheduledDate).dateString : dateStr;
               updatesList.push({
                 id: existingItem.id,
