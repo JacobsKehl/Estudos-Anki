@@ -82,6 +82,13 @@ Já custou 136 linhas apagadas por um script de reorganização.
 - **backup e escrita nunca no mesmo script**
 - `--dry-run` antes de `--apply`, com os números impressos, e **parada** esperando aprovação
 
+🔴 **Backup escrito de dentro de uma função serverless não existe.** O filesystem da Vercel é
+efêmero: o arquivo passa em todas as validações, o log diz SUCESSO, e some quando o container
+morre. Os 15 backups reais desta pasta vieram de scripts locais, e é assim que tem que
+continuar. **Escrita destrutiva em produção acontece por script local, nunca por rota.** Uma
+rota que precise de backup ou grava em storage durável (Supabase Storage, S3) ou não faz a
+escrita.
+
 ## 6. Um commit por conserto
 
 Nada de dois consertos no mesmo commit. **Já se perdeu a capacidade de reverter** porque uma correção
