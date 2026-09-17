@@ -25,9 +25,15 @@ import path from "path";
 const SCAN_ROOTS = ["src/app", "src/components"];
 const FILE_EXTENSIONS = [".ts", ".tsx"];
 
-// Uso de FILTRO: sempre um objeto de operador Prisma ({ lte, gte, ... }).
+// Uso de FILTRO no Prisma: sempre um objeto de operador ({ lte, gte, ... }).
 // Uso de ESCRITA (`nextReviewAt: new Date()`, `x.nextReviewAt = now`) não bate aqui.
 const QUERY_FILTER_PATTERN = /nextReviewAt\s*:\s*\{/;
+
+// T14.1: uma página pode buscar tudo do Prisma e comparar nextReviewAt em
+// JavaScript depois — a mesma armadilha (null <= Date é true), só que fora
+// do `where`, invisível para o padrão acima. É exatamente o P5, que morava
+// dentro da própria função canônica (today-review-queue.ts:140).
+const JS_COMPARISON_PATTERN = /nextReviewAt\s*(<=|<|>=|>)/;
 
 function listFilesRecursive(dir: string): string[] {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -59,11 +65,18 @@ describe("Nenhuma página/componente monta a própria consulta de 'vencido'", ()
         const raw = fs.readFileSync(filePath, "utf-8");
         const source = stripComments(raw);
 
-        if (QUERY_FILTER_PATTERN.test(source)) {
+        const matchesQueryFilter = QUERY_FILTER_PATTERN.test(source);
+        const matchesJsComparison = JS_COMPARISON_PATTERN.test(source);
+
+        if (matchesQueryFilter || matchesJsComparison) {
           const relPath = path.relative(process.cwd(), filePath);
-          const lineIndex = source.split("\n").findIndex((line) => QUERY_FILTER_PATTERN.test(line));
+          const lines = source.split("\n");
+          const lineIndex = lines.findIndex(
+            (line) => QUERY_FILTER_PATTERN.test(line) || JS_COMPARISON_PATTERN.test(line)
+          );
           const lineNumber = lineIndex >= 0 ? lineIndex + 1 : "?";
-          violations.push(`${relPath}:${lineNumber}`);
+          const kind = matchesQueryFilter ? "filtro Prisma" : "comparação em JS";
+          violations.push(`${relPath}:${lineNumber} (${kind})`);
         }
       }
     }

@@ -140,3 +140,55 @@ describe("getTodayReviewQueue — fila de hoje, fonte única", () => {
     expect(mockPrisma.flashcard.updateMany).not.toHaveBeenCalled();
   });
 });
+
+describe("getTodayReviewQueue — stats.fromSpacedReview não conta NEW (T14.1a / P5)", () => {
+  const userId = "user-p5-fixture";
+
+  // Fixture pequeno, todos dentro do teto: um NEW de fora do bloco de hoje
+  // não pode contar como "revisão espaçada" só porque nextReviewAt é null e
+  // `null <= Date` vira `0 <= número` (true) em JavaScript.
+  const newCardOutsideToday = {
+    id: "new-outside",
+    studyBlockId: "block-novo",
+    reviewState: "NEW",
+    nextReviewAt: null,
+    lastReviewedAt: null,
+    repetitionCount: 0,
+    subject: { name: "Direito Administrativo" },
+    studyBlock: { id: "block-novo", title: "Bloco Novo" },
+  };
+  const genuinelyOverdueReview = {
+    id: "review-overdue",
+    studyBlockId: "block-revisao",
+    reviewState: "REVIEW",
+    nextReviewAt: new Date("2026-09-17T10:00:00Z"),
+    lastReviewedAt: new Date("2026-09-16T10:00:00Z"),
+    repetitionCount: 3,
+    subject: { name: "Direito Processual Civil" },
+    studyBlock: { id: "block-revisao", title: "Bloco de Revisão" },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(new Date("2026-09-17T14:00:00Z"));
+
+    (mockPrisma.studyScheduleItem.findMany as jest.Mock).mockResolvedValue([]);
+    (mockPrisma.studyBlock.findMany as jest.Mock).mockResolvedValue([]);
+    (mockPrisma.flashcard.findMany as jest.Mock).mockResolvedValue([
+      newCardOutsideToday,
+      genuinelyOverdueReview,
+    ]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("não conta o cartão NEW (nextReviewAt null) como revisão espaçada", async () => {
+    const result = await getTodayReviewQueue(userId);
+
+    // vermelho hoje: `c.nextReviewAt <= now` com nextReviewAt=null avalia
+    // `0 <= now.getTime()` → true, e o NEW entra na contagem junto do REVIEW.
+    expect(result.stats.fromSpacedReview).toBe(1);
+  });
+});

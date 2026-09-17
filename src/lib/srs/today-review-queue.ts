@@ -137,7 +137,7 @@ export async function getTodayReviewQueue(userId: string) {
     stats: {
       total: cappedCards.length,
       fromTodayBlocks: cappedCards.filter((c: any) => todayBlockIds.includes(c.studyBlockId)).length,
-      fromSpacedReview: cappedCards.filter((c: any) => !todayBlockIds.includes(c.studyBlockId) && c.nextReviewAt <= now).length,
+      fromSpacedReview: cappedCards.filter((c: any) => !todayBlockIds.includes(c.studyBlockId) && c.nextReviewAt && c.nextReviewAt <= now).length,
       breakdown: {
         new: cappedCards.filter((c: any) => c.reviewState === "NEW").length,
         learning: cappedCards.filter((c: any) => c.reviewState === "LEARNING").length,
