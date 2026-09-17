@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { SRS_LIMITS } from "@/lib/scheduler/config";
 
 /**
  * Normalizes text for semantic comparison.
@@ -125,20 +126,42 @@ export async function getUnifiedTodayCards(userId: string) {
     return true;
   });
 
+  // 5. Teto diário (SRS_LIMITS.maxReviewsPerDay) — corta a FILA DE SAÍDA, nunca
+  // reescreve nextReviewAt. O que não couber continua vencido e reaparece amanhã.
+  // Prioridade: (1) cartões dos blocos estudados HOJE, (2) LEARNING/RELEARNING
+  // (já em andamento), (3) REVIEW vencidos, mais antigo primeiro, (4) NEW.
+  const todaySet = new Set(todayBlockIds);
+  const priorityRank = (card: any): number => {
+    if (todaySet.has(card.studyBlockId)) return 0;
+    if (card.reviewState === "LEARNING" || card.reviewState === "RELEARNING") return 1;
+    if (card.reviewState === "REVIEW") return 2;
+    return 3; // NEW
+  };
+  const cappedCards = [...filteredCards]
+    .sort((a: any, b: any) => {
+      const rankDiff = priorityRank(a) - priorityRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      const aTime = a.nextReviewAt ? new Date(a.nextReviewAt).getTime() : Infinity;
+      const bTime = b.nextReviewAt ? new Date(b.nextReviewAt).getTime() : Infinity;
+      if (aTime !== bTime) return aTime - bTime;
+      return String(a.id).localeCompare(String(b.id)); // desempate estável
+    })
+    .slice(0, SRS_LIMITS.maxReviewsPerDay);
+
   return {
-    cards: filteredCards,
+    cards: cappedCards,
     todayBlockIds,
     stats: {
-      total: filteredCards.length,
-      fromTodayBlocks: filteredCards.filter((c: any) => todayBlockIds.includes(c.studyBlockId)).length,
-      fromSpacedReview: filteredCards.filter((c: any) => !todayBlockIds.includes(c.studyBlockId) && c.nextReviewAt <= now).length,
+      total: cappedCards.length,
+      fromTodayBlocks: cappedCards.filter((c: any) => todayBlockIds.includes(c.studyBlockId)).length,
+      fromSpacedReview: cappedCards.filter((c: any) => !todayBlockIds.includes(c.studyBlockId) && c.nextReviewAt <= now).length,
       breakdown: {
-        new: filteredCards.filter((c: any) => c.reviewState === "NEW").length,
-        learning: filteredCards.filter((c: any) => c.reviewState === "LEARNING").length,
-        review: filteredCards.filter((c: any) => c.reviewState === "REVIEW").length,
-        relearning: filteredCards.filter((c: any) => c.reviewState === "RELEARNING").length,
+        new: cappedCards.filter((c: any) => c.reviewState === "NEW").length,
+        learning: cappedCards.filter((c: any) => c.reviewState === "LEARNING").length,
+        review: cappedCards.filter((c: any) => c.reviewState === "REVIEW").length,
+        relearning: cappedCards.filter((c: any) => c.reviewState === "RELEARNING").length,
       },
-      subjects: Array.from(new Set(filteredCards.map((c: any) => c.subject.name))) as string[]
+      subjects: Array.from(new Set(cappedCards.map((c: any) => c.subject.name))) as string[]
     }
   };
 }
