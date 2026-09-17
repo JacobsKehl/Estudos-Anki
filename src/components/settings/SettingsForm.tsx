@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RepairSupportsButton } from "@/components/materials/RepairSupportsButton";
-import { OrganizeAllButton } from "@/components/materials/OrganizeAllButton";
 import { useStudyPreferences } from "@/hooks/useStudyPreferences";
 import { toast } from "sonner";
 import { WeeklyReviewSettingsCard } from "./WeeklyReviewSettingsCard";
@@ -1006,18 +1005,11 @@ export function SettingsForm({ unorganizedCount, isAdmin = false }: SettingsForm
                   </div>
                 </div>
 
-                {/* Advanced tool 2 */}
-                <div className="border border-border/40 bg-background rounded-2xl p-5 flex flex-col justify-between h-40">
-                  <div className="space-y-1">
-                    <span className="text-xs font-extrabold text-foreground">Reorganização Estrita</span>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Força a desestruturação total e regenera cronogramas a partir de seus PDFs originais.
-                    </p>
-                  </div>
-                  <div className="flex items-center">
-                    <OrganizeAllButton unorganizedCount={unorganizedCount} force={true} />
-                  </div>
-                </div>
+                {/* O caminho de clique até /api/materials/organize-all {reset:true} foi removido em 17/09/2026.
+                    Motivo: a proteção ao CFC nessa rota cobre StudyBlock e StudyMaterial, mas NÃO cobre
+                    Flashcard, FlashcardReview nem StudySchedule — um clique apaga os 988 cartões e todo o
+                    histórico de SRS, e eles não voltam (a reorganização por IA só reprocessa material não-CFC).
+                    A rota continua existindo para uso por script com --apply, quando a Frente 2 for decidida. */}
               </div>
             </div>
           </details>
