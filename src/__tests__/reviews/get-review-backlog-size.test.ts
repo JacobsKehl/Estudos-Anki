@@ -11,11 +11,11 @@
  * cinto e suspensório contra o default do schema.
  */
 import { prisma } from "@/lib/prisma";
-import { getReviewBacklogSize } from "@/lib/reviews/get-review-backlog-size";
+import { getReviewBacklogSize, getReviewBacklogCards } from "@/lib/reviews/get-review-backlog-size";
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
-    flashcard: { count: jest.fn() },
+    flashcard: { count: jest.fn(), findMany: jest.fn() },
   },
 }));
 
@@ -55,5 +55,31 @@ describe("getReviewBacklogSize — a dívida de revisão, sem NEW e sem teto", (
     expect(result).toBe(526);
     const callArgs = mockPrisma.flashcard.count.mock.calls[0][0];
     expect(callArgs.take).toBeUndefined();
+  });
+});
+
+describe("getReviewBacklogCards — a mesma dívida, com as linhas completas", () => {
+  const userId = "user-backlog-fixture";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("usa o MESMO where de getReviewBacklogSize (exclui NEW, exige lastReviewedAt)", async () => {
+    mockPrisma.flashcard.findMany.mockResolvedValue([{ id: "c1", subject: { name: "Direito do Trabalho" } }]);
+
+    const result = await getReviewBacklogCards(userId);
+
+    expect(result).toHaveLength(1);
+    expect(mockPrisma.flashcard.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId,
+          status: "APPROVED",
+          reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] },
+          lastReviewedAt: { not: null },
+        }),
+      })
+    );
   });
 });

@@ -4,6 +4,7 @@ import { RotateCw } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth-mock";
 import { ReviewDashboard } from "@/components/reviews/ReviewDashboard";
+import { getReviewBacklogCards } from "@/lib/reviews/get-review-backlog-size";
 
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -17,26 +18,7 @@ export default async function ReviewsPage() {
   let pendingApprovalCount = 0;
 
   try {
-    pendingCards = await (prisma as any).flashcard.findMany({
-      where: {
-        userId: mockUserId,
-        status: "APPROVED",
-        nextReviewAt: { lte: now },
-        reviewState: { in: ["LEARNING", "REVIEW", "RELEARNING"] }
-      },
-      select: {
-        id: true,
-        question: true,
-        answer: true,
-        type: true,
-        difficulty: true,
-        reviewState: true,
-        intervalDays: true,
-        learningStep: true,
-        subject: { select: { name: true } }
-      },
-      orderBy: { nextReviewAt: "asc" }
-    });
+    pendingCards = await getReviewBacklogCards(mockUserId, now);
 
     // 2. Count cards reviewed in the last 24h
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
