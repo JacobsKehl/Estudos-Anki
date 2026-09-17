@@ -4,6 +4,7 @@ import { ProfileClient } from "@/components/profile/ProfileClient";
 import { getSessionUser } from "@/lib/supabase-server";
 import { getReviewBacklogSize } from "@/lib/reviews/get-review-backlog-size";
 import { getNewCardsWaitingCount } from "@/lib/reviews/get-new-cards-waiting-count";
+import { CFC_FILE_NAMES } from "@/lib/scheduler/config";
 
 export const dynamic = "force-dynamic";
 
@@ -38,13 +39,22 @@ export default async function ProfilePage() {
     lastLoginAt: user?.lastLoginAt || new Date()
   };
 
-  // 2. Buscar estatísticas dos blocos
+  // 2. Buscar estatísticas dos blocos — conteúdo principal = os 5 PDFs do
+  // CFC (decisão do Henrique, 17/09/2026), nunca uma contagem sem escopo.
   const totalBlocks = await prisma.studyBlock.count({
-    where: { userId }
+    where: {
+      userId,
+      material: { originalFileName: { in: [...CFC_FILE_NAMES] } },
+      theoryStatus: { not: "EXCLUDED" }
+    }
   });
 
   const completedBlocks = await prisma.studyBlock.count({
-    where: { userId, theoryStatus: "COMPLETED" }
+    where: {
+      userId,
+      theoryStatus: "COMPLETED",
+      material: { originalFileName: { in: [...CFC_FILE_NAMES] } }
+    }
   });
 
   // 3. Buscar blocos pendentes para cálculo de viabilidade (ignorando material de suporte) das matérias do ciclo ativo

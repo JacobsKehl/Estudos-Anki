@@ -43,6 +43,29 @@ compara contra ele.**
 ⚠️ **O arquivo é gitignored e já se perdeu uma vez.** Se ainda não estiver versionado:
 `git add -f tmp/BLUEPRINT-blocos-cfc.csv` — ele não tem dado pessoal, só título de capítulo e página.
 
+## 1.1 Escopo do conteúdo principal
+
+O conteúdo principal são os **5 PDFs do CFC**: **89 blocos de teoria ativos, 1.083 minutos**
+(`tmp/BLUEPRINT-blocos-cfc.csv` tem 94 linhas, das quais 5 são placeholders
+`EXTRA – EXERCÍCIOS/QUESTÕES (TEC)` que não viram `StudyBlock`).
+
+**Português, Direito Civil e todo material não-CFC ficam fora do plano** — fora do ciclo, do
+cronograma, do cálculo de tempo e de todo percentual exibido. Decisão do dono do projeto,
+17/09/2026. Continuam no banco (regra 4: nada de DELETE); o que muda é o escopo do que as telas
+medem.
+
+A definição de escopo é **uma**: `CFC_FILE_NAMES` em `src/lib/scheduler/config.ts`. Agendador,
+guardião e métricas leem dela — nunca `studyPriority` nem `materialRole` isolados, que são eixos
+mais largos e já deixaram 436 blocos não-CFC contaminarem `globalProgress` e o painel de
+viabilidade do Cronograma. Tela ou rota que montar o próprio filtro de escopo de conteúdo
+principal reprova o teste de fonte (`no-inline-core-content-scope.test.ts`), mesma técnica do
+guardião de flashcards (§3, `no-inline-next-review-at-query.test.ts`).
+
+**Os 60 dias após o fim do conteúdo CFC** são de revisão, atividades e encerramento dos
+flashcards. Não há segunda rodada de teoria — o próprio agendador já busca blocos exclusivamente
+via `CFC_FILE_NAMES`, então quando o pool CFC esgota, os dias seguintes simplesmente ficam sem
+`THEORY` (SRS continua por outro mecanismo).
+
 ## 2. O guardião
 
 ```bash

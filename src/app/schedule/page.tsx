@@ -13,6 +13,7 @@ import { ReorganizeScheduleButton } from "@/components/schedule/ReorganizeSchedu
 import { reorganizeActiveSchedule } from "@/lib/scheduler";
 import { ActivateSecondaryModal } from "@/components/schedule/ActivateSecondaryModal";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { CFC_FILE_NAMES, SCHEDULER_LIMITS } from "@/lib/scheduler/config";
 
 export default async function SchedulePage() {
   const mockUserId = await getCurrentUserId();
@@ -40,7 +41,9 @@ export default async function SchedulePage() {
       where: { userId: mockUserId }
     });
     dailyGoalMinutes = userPrefs?.dailyGoalMinutes || 120;
-    dailyTheoryMinutes = dailyGoalMinutes - 30; // 30 mins SRS
+    // Cota real de teoria do agendador (regra R2, AGENTS.md §11) — não
+    // dailyGoalMinutes-30, que morreu como definição desde a C.1.
+    dailyTheoryMinutes = SCHEDULER_LIMITS.dailyTheoryMinutesTarget;
 
     const subjects = await prisma.studySubject.findMany({
       where: { userId: mockUserId },
@@ -75,15 +78,15 @@ export default async function SchedulePage() {
     const totalAvailableTheoryMinutes = remainingDays * dailyTheoryMinutes;
     totalAvailableTheoryHours = Math.ceil(totalAvailableTheoryMinutes / 60);
 
-    // Blocos pendentes teóricos (ignora materiais de apoio) das matérias PRIMARY e ACTIVE
-    const activeSubjectIds = [...primarySubjects, ...activeSecondarySubjects].map(s => s.id);
+    // Blocos pendentes de teoria — conteúdo principal = os 5 PDFs do CFC
+    // (decisão do Henrique, 17/09/2026). Mesma lista branca do agendador e
+    // do guardião; nunca um filtro próprio por studyPriority/materialRole.
     const pendingBlocks = await prisma.studyBlock.findMany({
       where: {
         userId: mockUserId,
-        subjectId: { in: activeSubjectIds },
         theoryStatus: "NOT_STARTED",
         material: {
-          materialRole: { not: "SUPPORT_MATERIAL" }
+          originalFileName: { in: [...CFC_FILE_NAMES] }
         }
       },
       include: {

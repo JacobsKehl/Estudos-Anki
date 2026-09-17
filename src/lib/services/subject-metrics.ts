@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { CFC_FILE_NAMES } from "@/lib/scheduler/config";
 
 export type SubjectHealth = 'EXCELLENT' | 'GOOD' | 'ATTENTION' | 'CRITICAL';
 
@@ -188,15 +189,20 @@ export async function getGlobalMetrics(userId: string) {
       where: { userId, status: "COMPLETED", completedAt: { not: null } },
       select: { completedAt: true }
     }),
+    // Conteúdo principal = os 5 PDFs do CFC (decisão do Henrique, 17/09/2026).
+    // Mesma lista branca que o agendador e o guardião usam — nunca um filtro
+    // próprio por studyPriority/materialRole, que é mais largo e deixava
+    // 436 blocos não-CFC (Português, Direito Civil, "Estratégia") entrarem
+    // na conta. theoryStatus != EXCLUDED é obrigatório: há 100 StudyBlock
+    // EXCLUDED (duplicatas, P2) vinculados aos mesmos 5 materiais — sem essa
+    // exclusão o denominador vira 189 em vez de 89.
     prisma.studyBlock.findMany({
       where: {
         userId,
-        subject: {
-          studyPriority: { in: ["PRIMARY", "ACTIVE"] }
-        },
         material: {
-          materialRole: { not: "SUPPORT_MATERIAL" }
-        }
+          originalFileName: { in: [...CFC_FILE_NAMES] }
+        },
+        theoryStatus: { not: "EXCLUDED" }
       },
       select: {
         theoryStatus: true
@@ -250,8 +256,10 @@ export async function getGlobalMetrics(userId: string) {
   // Total summary
   const summary = {
     totalSubjects: subjectsMetrics.length,
-    totalBlocks: subjectsMetrics.reduce((acc, s) => acc + s.metrics.totalBlocks, 0),
-    completedBlocks: subjectsMetrics.reduce((acc, s) => acc + s.metrics.completedBlocks, 0),
+    // Conteúdo principal = os 5 PDFs do CFC — mesmo escopo de globalProgress
+    // (eligibleBlocks acima), não a soma bruta de todas as matérias.
+    totalBlocks: totalTheory,
+    completedBlocks: completedTheory,
     totalFlashcards: subjectsMetrics.reduce((acc, s) => acc + s.metrics.totalFlashcards, 0),
     approvedFlashcards: subjectsMetrics.reduce((acc, s) => acc + s.metrics.approvedFlashcards, 0),
     dueReviews: subjectsMetrics.reduce((acc, s) => acc + s.metrics.dueReviews, 0),
