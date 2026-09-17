@@ -106,9 +106,14 @@ legítimo. Afrouxar asserção não é.)*
 |---|---|---|
 | **cron `*/15`** → `/api/cron/reminder` | só age na janela **08:00–08:20** (`emailReminderTime`); chama `reorganizeActiveSchedule` → `reorganizeOverdueSchedule` | **dispara e-mail para a aluna** — não chame essa rota em teste |
 | **abrir a home** `src/app/page.tsx:192` | `shouldReorganizeSchedule` → `reorganizeOverdueSchedule` no **primeiro acesso do dia** | **é um `GET` que grava.** Dívida registrada: tirar a escrita da renderização |
-| `/api/materials/organize-all` `{reset:true}` | apaga flashcards, revisões, blocos, cronograma e planos — e reconstrói **por IA** | **é o botão que desfaz o blueprint.** Os 5 PDFs do CFC estão excluídos dessa rota; **mantenha assim** |
+| `/api/materials/organize-all` `{reset:true}` | apaga flashcards, revisões, blocos, cronograma e planos — e reconstrói **por IA** | **a proteção ao CFC cobre `StudyBlock` e `StudyMaterial` apenas.** `Flashcard`, `FlashcardReview` e `StudySchedule` são apagados do usuário inteiro, CFC incluído: o filtro `notIn: cfcFileList` em `studyScheduleItem` (`route.ts:603`) é anulado pelo cascade de `studySchedule.deleteMany` na instrução seguinte (`schema.prisma:397`, `onDelete: Cascade`). Cartões e histórico de revisão **não voltam** — a reorganização por IA só reprocessa material não-CFC. O caminho de clique foi removido da interface em 17/09/2026 (era `SettingsForm.tsx`, "Reorganizar tudo do zero"). A rota só deve ser acionada por script, com `--apply` e confirmação textual |
 | `completeStudyBlock` | marca `COMPLETED` e cria `REVIEW_BLOCK` D+1 | |
 | **push na branch de produção** | deploy + `prisma migrate deploy` **no banco de produção** | **push É publicação.** Production Branch = `release`; push em `main` é só preview. Ver §12 |
+
+🔴 **Filtro de proteção precisa ser provado, não lido.** Um `where` que exclui dados sensíveis não
+protege nada se uma instrução seguinte apaga o pai por cascade. Antes de confiar numa
+salvaguarda, verifique o `onDelete` das relações envolvidas — já houve um filtro de CFC anulado
+por cascade uma linha depois.
 
 ## 10. O predicado, nas quatro consultas
 
