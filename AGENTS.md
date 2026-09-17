@@ -69,18 +69,21 @@ via `CFC_FILE_NAMES`, então quando o pool CFC esgota, os dias seguintes simples
 ## 2. O guardião
 
 ```bash
-node scripts/run-guard-test.js     # → tem que dar 11/12
+node scripts/run-guard-test.js     # → tem que dar 12/12
 ```
 
 Roda `src/__tests__/cfc/block-blueprint-integrity.test.ts` com `RUN_CFC_BLUEPRINT_DB_TEST=true`.
 **Rode antes e depois de qualquer mudança no agendador ou no acervo.**
 
-🔴 **A 12ª asserção (EXCLUDED↔ATIVO, P2) está vermelha de propósito — não conserte o teste.**
-Ela encontrou **34 pares reais** de `StudyBlock` EXCLUDED que compartilham `(materialId,
-pageStart, pageEnd)` com um bloco ATIVO (mesmo conteúdo, duas linhas). É dívida de dados
-verdadeira, registrada e não resolvida ainda — resolver exige script local com backup e
-`--dry-run` (regras 4/5), não é tarefa de teste. **11/12 é o estado esperado até essa limpeza
-acontecer.** Se o número cair para 10 ou menos, algo novo quebrou.
+🔴 **A 12ª asserção (EXCLUDED↔ATIVO, P2) carrega dívida de dados fixada em 34 pares — não é
+`toEqual([])`.** `StudyBlock` EXCLUDED que compartilham `(materialId, pageStart, pageEnd)` com um
+bloco ATIVO (mesmo conteúdo, duas linhas): **34 pares**, medidos em 17/09/2026 (T22), presos no
+número via `expect(overlaps.length).toBe(34)` — a listagem individual continua no output do
+teste, é o que torna a dívida auditável. **12/12 é o portão real.** Se esse número **subir**,
+é regressão nova — investigue antes de mexer. Se **descer**, foi limpeza real — atualize o
+número (e vá para `toEqual([])` quando zerar). Não limpe os 34 pares sem pedido: são `EXCLUDED`,
+já fora do pool (R9) e das métricas (T18) — o único dano real (denominador errado) já foi
+corrigido; limpar agora seria escrita em produção sem ganho.
 
 ## 3. Regra Zero — teste que nunca foi visto reprovando não conta
 
