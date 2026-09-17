@@ -146,6 +146,66 @@ export function findDuplicateTheoryStudyBlockIds(scheduleItems: any[]): string[]
   return duplicates;
 }
 
+/**
+ * 9ª asserção (achado do T21/Replano, P2): dois StudyBlock ATIVOS (qualquer
+ * theoryStatus != EXCLUDED) dos 5 PDFs do CFC nunca podem compartilhar o
+ * mesmo (materialId, pageStart, pageEnd) — isso é o mesmo capítulo duplicado
+ * duas vezes no acervo ativo.
+ */
+export function findDuplicateActiveBlocks(
+  blocks: { id: string; materialId: string; pageStart: number; pageEnd: number; theoryStatus: string }[]
+): string[] {
+  const seenBy = new Map<string, string>();
+  const duplicates: string[] = [];
+
+  for (const b of blocks || []) {
+    if (b.theoryStatus === "EXCLUDED") continue;
+    const key = `${b.materialId}:${b.pageStart}:${b.pageEnd}`;
+    const prevId = seenBy.get(key);
+    if (prevId) {
+      duplicates.push(
+        `❌ (materialId=${b.materialId}, pageStart=${b.pageStart}, pageEnd=${b.pageEnd}) duplicado entre blocos ATIVOS: ${prevId} e ${b.id}`
+      );
+    } else {
+      seenBy.set(key, b.id);
+    }
+  }
+
+  return duplicates;
+}
+
+/**
+ * 10ª asserção (achado do T21/Replano, P2): nenhum StudyBlock EXCLUDED pode
+ * compartilhar (materialId, pageStart, pageEnd) com um StudyBlock ATIVO — é
+ * o padrão real encontrado ("Cumprimento da Sentença" em CAIXA-ALTA ativo e
+ * em Title Case EXCLUDED, mesmas páginas): um filtro `!= EXCLUDED` esconde a
+ * duplicata da tela, mas ela continua existindo no banco como um segundo
+ * StudyBlock para o mesmo conteúdo.
+ */
+export function findExcludedActiveOverlap(
+  blocks: { id: string; title: string; materialId: string; pageStart: number; pageEnd: number; theoryStatus: string }[]
+): string[] {
+  const activeByKey = new Map<string, string>();
+  for (const b of blocks || []) {
+    if (b.theoryStatus === "EXCLUDED") continue;
+    activeByKey.set(`${b.materialId}:${b.pageStart}:${b.pageEnd}`, b.id);
+  }
+
+  const overlaps: string[] = [];
+  for (const b of blocks || []) {
+    if (b.theoryStatus !== "EXCLUDED") continue;
+    const key = `${b.materialId}:${b.pageStart}:${b.pageEnd}`;
+    const activeId = activeByKey.get(key);
+    if (activeId) {
+      overlaps.push(
+        `❌ (materialId=${b.materialId}, pageStart=${b.pageStart}, pageEnd=${b.pageEnd}) "${b.title}": EXCLUDED ${b.id} tem o mesmo conteúdo do ATIVO ${activeId}`
+      );
+    }
+  }
+
+  return overlaps;
+}
+
 describe("CFC Blueprint Integrity Guard", () => {
   const blueprint = loadBlueprint();
 
@@ -317,6 +377,56 @@ describe("CFC Blueprint Integrity Guard", () => {
       { id: "item-6", actionType: "REVIEW_BLOCK", status: "PENDING", studyBlockId: "block-c" },
     ];
     expect(findDuplicateTheoryStudyBlockIds(notDuplicates)).toEqual([]);
+  });
+
+  it("Modo Unitário: Guardião detecta dois blocos ATIVOS com o mesmo (materialId, pageStart, pageEnd)", () => {
+    const cleanBlocks = [
+      { id: "block-a", materialId: "mat-1", pageStart: 10, pageEnd: 15, theoryStatus: "NOT_STARTED" },
+      { id: "block-b", materialId: "mat-1", pageStart: 16, pageEnd: 20, theoryStatus: "COMPLETED" },
+    ];
+    expect(findDuplicateActiveBlocks(cleanBlocks)).toEqual([]);
+
+    const duplicatedBlocks = [
+      ...cleanBlocks,
+      { id: "block-c", materialId: "mat-1", pageStart: 10, pageEnd: 15, theoryStatus: "NOT_STARTED" },
+    ];
+    const duplicates = findDuplicateActiveBlocks(duplicatedBlocks);
+    expect(duplicates.length).toBe(1);
+    expect(duplicates[0]).toContain("block-a");
+    expect(duplicates[0]).toContain("block-c");
+
+    // Um EXCLUDED com as mesmas páginas de um ATIVO não conta aqui — é a
+    // 10ª asserção, não esta.
+    const withExcluded = [
+      ...cleanBlocks,
+      { id: "block-d", materialId: "mat-1", pageStart: 10, pageEnd: 15, theoryStatus: "EXCLUDED" },
+    ];
+    expect(findDuplicateActiveBlocks(withExcluded)).toEqual([]);
+  });
+
+  it("Modo Unitário: Guardião detecta bloco EXCLUDED com o mesmo conteúdo de um bloco ATIVO", () => {
+    const cleanBlocks = [
+      { id: "block-a", title: "Capítulo A", materialId: "mat-1", pageStart: 10, pageEnd: 15, theoryStatus: "NOT_STARTED" },
+      { id: "block-b", title: "Capítulo B", materialId: "mat-1", pageStart: 16, pageEnd: 20, theoryStatus: "EXCLUDED" },
+    ];
+    expect(findExcludedActiveOverlap(cleanBlocks)).toEqual([]);
+
+    const overlapping = [
+      ...cleanBlocks,
+      { id: "block-c", title: "Capítulo A (Title Case)", materialId: "mat-1", pageStart: 10, pageEnd: 15, theoryStatus: "EXCLUDED" },
+    ];
+    const overlaps = findExcludedActiveOverlap(overlapping);
+    expect(overlaps.length).toBe(1);
+    expect(overlaps[0]).toContain("block-a");
+    expect(overlaps[0]).toContain("block-c");
+
+    // Dois EXCLUDED com as mesmas páginas entre si, sem nenhum ATIVO
+    // correspondente, não contam aqui.
+    const onlyExcludedDuplicated = [
+      { id: "block-x", title: "X", materialId: "mat-2", pageStart: 1, pageEnd: 5, theoryStatus: "EXCLUDED" },
+      { id: "block-y", title: "Y", materialId: "mat-2", pageStart: 1, pageEnd: 5, theoryStatus: "EXCLUDED" },
+    ];
+    expect(findExcludedActiveOverlap(onlyExcludedDuplicated)).toEqual([]);
   });
 
   const shouldRunDbTest = process.env.RUN_CFC_BLUEPRINT_DB_TEST === "true";
@@ -611,5 +721,85 @@ describe("CFC Blueprint Integrity Guard", () => {
     }
 
     expect(duplicates).toEqual([]);
+  }, 30000);
+
+  conditionalTest("Modo Integração DB: Nenhum bloco ATIVO dos 5 PDFs do CFC compartilha (materialId, pageStart, pageEnd) com outro ATIVO (9ª asserção — P2)", async () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://msmdekjetxajcwuxmxps.supabase.co";
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const userId = "cmp8od0wz0000iybklaotfqbs";
+    const cfcFiles = [
+      "1 - Direito Administrativo_compressed.pdf",
+      "2 - Direito do Trabalho.pdf",
+      "3 - Direito Constitucional.pdf",
+      "4 - Direito Processual do Trabalho.pdf",
+      "Direito Processual Civil_compressed.pdf",
+    ];
+
+    const { data: materials, error: matErr } = await supabase
+      .from("StudyMaterial")
+      .select("id")
+      .eq("userId", userId)
+      .in("originalFileName", cfcFiles);
+    if (matErr) throw matErr;
+    const matIds = (materials || []).map((m) => m.id);
+
+    const { data: allCfcBlocks, error: bErr } = await supabase
+      .from("StudyBlock")
+      .select("id, title, materialId, pageStart, pageEnd, theoryStatus")
+      .eq("userId", userId)
+      .in("materialId", matIds);
+    if (bErr) throw bErr;
+
+    const duplicates = findDuplicateActiveBlocks(allCfcBlocks || []);
+
+    if (duplicates.length > 0) {
+      console.error("\n=== BLOCOS ATIVOS DUPLICADOS (mesmo materialId+pageStart+pageEnd) ===");
+      duplicates.forEach((msg) => console.error("  " + msg));
+      console.error(`Total de blocos CFC avaliados: ${allCfcBlocks?.length} | Duplicatas entre ativos: ${duplicates.length}\n`);
+    }
+
+    expect(duplicates).toEqual([]);
+  }, 30000);
+
+  conditionalTest("Modo Integração DB: Nenhum bloco EXCLUDED dos 5 PDFs do CFC compartilha conteúdo com um bloco ATIVO (10ª asserção — P2)", async () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://msmdekjetxajcwuxmxps.supabase.co";
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const userId = "cmp8od0wz0000iybklaotfqbs";
+    const cfcFiles = [
+      "1 - Direito Administrativo_compressed.pdf",
+      "2 - Direito do Trabalho.pdf",
+      "3 - Direito Constitucional.pdf",
+      "4 - Direito Processual do Trabalho.pdf",
+      "Direito Processual Civil_compressed.pdf",
+    ];
+
+    const { data: materials, error: matErr } = await supabase
+      .from("StudyMaterial")
+      .select("id")
+      .eq("userId", userId)
+      .in("originalFileName", cfcFiles);
+    if (matErr) throw matErr;
+    const matIds = (materials || []).map((m) => m.id);
+
+    const { data: allCfcBlocks, error: bErr } = await supabase
+      .from("StudyBlock")
+      .select("id, title, materialId, pageStart, pageEnd, theoryStatus")
+      .eq("userId", userId)
+      .in("materialId", matIds);
+    if (bErr) throw bErr;
+
+    const overlaps = findExcludedActiveOverlap(allCfcBlocks || []);
+
+    if (overlaps.length > 0) {
+      console.error("\n=== BLOCOS EXCLUDED COM O MESMO CONTEÚDO DE UM BLOCO ATIVO ===");
+      overlaps.forEach((msg) => console.error("  " + msg));
+      console.error(`Total de blocos CFC avaliados: ${allCfcBlocks?.length} | Overlaps EXCLUDED↔ATIVO: ${overlaps.length}\n`);
+    }
+
+    expect(overlaps).toEqual([]);
   }, 30000);
 });
