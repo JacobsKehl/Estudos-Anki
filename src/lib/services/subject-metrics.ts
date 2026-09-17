@@ -193,13 +193,16 @@ export async function getGlobalMetrics(userId: string) {
     // Mesma lista branca que o agendador e o guardião usam — nunca um filtro
     // próprio por studyPriority/materialRole, que é mais largo e deixava
     // 436 blocos não-CFC (Português, Direito Civil, "Estratégia") entrarem
-    // na conta.
+    // na conta. theoryStatus != EXCLUDED é obrigatório: há 100 StudyBlock
+    // EXCLUDED (duplicatas, P2) vinculados aos mesmos 5 materiais — sem essa
+    // exclusão o denominador vira 189 em vez de 89.
     prisma.studyBlock.findMany({
       where: {
         userId,
         material: {
           originalFileName: { in: [...CFC_FILE_NAMES] }
-        }
+        },
+        theoryStatus: { not: "EXCLUDED" }
       },
       select: {
         theoryStatus: true
