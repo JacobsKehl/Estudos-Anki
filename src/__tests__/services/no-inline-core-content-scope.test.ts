@@ -62,40 +62,52 @@ function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 }
 
-describe("Nenhuma tela monta o próprio filtro de escopo de conteúdo principal", () => {
-  it("studyPriority(PRIMARY/ACTIVE) + materialRole(!=SUPPORT_MATERIAL) não aparecem próximos fora da fonte única", () => {
-    const violations: string[] = [];
+/**
+ * Varre SCAN_ROOTS e devolve, por arquivo relativo, se ele combina os dois
+ * lados do filtro largo (studyPriority PRIMARY/ACTIVE + materialRole !=
+ * SUPPORT_MATERIAL). Sem allowlist — quem quiser excluir um arquivo aplica
+ * o allowlist no chamador, nunca aqui, para os dois casos abaixo
+ * (a asserção de tamanho e a de "allowlist ainda viola") sempre verem o
+ * estado real do arquivo.
+ */
+function scanForCoreScopeViolations(): Map<string, { priorityLine: number; materialRoleLine: number }> {
+  const hits = new Map<string, { priorityLine: number; materialRoleLine: number }>();
 
-    for (const root of SCAN_ROOTS) {
-      const absRoot = path.join(process.cwd(), root);
-      if (!fs.existsSync(absRoot)) continue;
+  for (const root of SCAN_ROOTS) {
+    const absRoot = path.join(process.cwd(), root);
+    if (!fs.existsSync(absRoot)) continue;
 
-      for (const filePath of listFilesRecursive(absRoot)) {
-        const raw = fs.readFileSync(filePath, "utf-8");
-        const source = stripComments(raw);
-        const lines = source.split("\n");
+    for (const filePath of listFilesRecursive(absRoot)) {
+      const raw = fs.readFileSync(filePath, "utf-8");
+      const source = stripComments(raw);
+      const lines = source.split("\n");
 
-        const priorityLines: number[] = [];
-        const materialRoleLines: number[] = [];
-        lines.forEach((line, idx) => {
-          if (STUDY_PRIORITY_SCOPE_PATTERN.test(line)) priorityLines.push(idx);
-          if (MATERIAL_ROLE_SUPPORT_PATTERN.test(line)) materialRoleLines.push(idx);
-        });
+      const priorityLines: number[] = [];
+      const materialRoleLines: number[] = [];
+      lines.forEach((line, idx) => {
+        if (STUDY_PRIORITY_SCOPE_PATTERN.test(line)) priorityLines.push(idx);
+        if (MATERIAL_ROLE_SUPPORT_PATTERN.test(line)) materialRoleLines.push(idx);
+      });
 
-        // Não exige proximidade de linha: a assinatura é o ARQUIVO montar as
-        // duas pontas do filtro largo (studyPriority PRIMARY/ACTIVE e
-        // materialRole != SUPPORT_MATERIAL), mesmo que uma alimente uma
-        // variável usada várias linhas depois (schedule/page.tsx é assim).
+      // Não exige proximidade de linha: a assinatura é o ARQUIVO montar as
+      // duas pontas do filtro largo, mesmo que uma alimente uma variável
+      // usada várias linhas depois (schedule/page.tsx era assim).
+      if (priorityLines.length > 0 && materialRoleLines.length > 0) {
         const relPath = path.relative(process.cwd(), filePath);
-        if (
-          priorityLines.length > 0 &&
-          materialRoleLines.length > 0 &&
-          !KNOWN_UNFIXED_FILES.includes(relPath)
-        ) {
-          violations.push(`${relPath}:${priorityLines[0] + 1} (studyPriority) + :${materialRoleLines[0] + 1} (materialRole)`);
-        }
+        hits.set(relPath, { priorityLine: priorityLines[0] + 1, materialRoleLine: materialRoleLines[0] + 1 });
       }
     }
+  }
+
+  return hits;
+}
+
+describe("Nenhuma tela monta o próprio filtro de escopo de conteúdo principal", () => {
+  it("studyPriority(PRIMARY/ACTIVE) + materialRole(!=SUPPORT_MATERIAL) não aparecem fora da fonte única ou do allowlist", () => {
+    const hits = scanForCoreScopeViolations();
+    const violations = [...hits.entries()]
+      .filter(([relPath]) => !KNOWN_UNFIXED_FILES.includes(relPath))
+      .map(([relPath, loc]) => `${relPath}:${loc.priorityLine} (studyPriority) + :${loc.materialRoleLine} (materialRole)`);
 
     if (violations.length > 0) {
       console.error("\n=== FILTRO DE ESCOPO DE CONTEÚDO PRINCIPAL MONTADO FORA DA FONTE ÚNICA ===");
@@ -106,5 +118,17 @@ describe("Nenhuma tela monta o próprio filtro de escopo de conteúdo principal"
     }
 
     expect(violations).toEqual([]);
+  });
+
+  it("T19.2a: o allowlist tem exatamente 2 entradas — um terceiro exige mudar esta asserção, visível no diff", () => {
+    expect(KNOWN_UNFIXED_FILES.length).toBe(2);
+  });
+
+  it("T19.2b: cada arquivo do allowlist AINDA viola o padrão — allowlist se limpa sozinho quando alguém consertar", () => {
+    const hits = scanForCoreScopeViolations();
+
+    for (const knownFile of KNOWN_UNFIXED_FILES) {
+      expect(hits.has(knownFile)).toBe(true);
+    }
   });
 });
