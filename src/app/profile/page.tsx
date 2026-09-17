@@ -41,7 +41,11 @@ export default async function ProfilePage() {
   // 2. Buscar estatísticas dos blocos — conteúdo principal = os 5 PDFs do
   // CFC (decisão do Henrique, 17/09/2026), nunca uma contagem sem escopo.
   const totalBlocks = await prisma.studyBlock.count({
-    where: { userId, material: { originalFileName: { in: [...CFC_FILE_NAMES] } } }
+    where: {
+      userId,
+      material: { originalFileName: { in: [...CFC_FILE_NAMES] } },
+      theoryStatus: { not: "EXCLUDED" }
+    }
   });
 
   const completedBlocks = await prisma.studyBlock.count({
