@@ -9,9 +9,36 @@ import { BrandLockup } from "@/components/brand/BrandLockup";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 
-export function PracticeDashboard({ cards }: { cards: any[] }) {
+interface PracticeStats {
+  total: number;
+  fromTodayBlocks: number;
+  fromSpacedReview: number;
+  breakdown: { new: number; learning: number; review: number; relearning: number };
+}
+
+export function PracticeDashboard({ cards, stats }: { cards: any[]; stats?: PracticeStats }) {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const router = useRouter();
+
+  const compositionParts: string[] = [];
+  if (stats) {
+    if (stats.fromTodayBlocks > 0) {
+      compositionParts.push(`${stats.fromTodayBlocks} dos conteúdos de hoje`);
+    }
+    if (stats.breakdown.learning > 0) {
+      compositionParts.push(`${stats.breakdown.learning} aprendendo`);
+    }
+    const reviewCount = stats.breakdown.review + stats.breakdown.relearning;
+    if (reviewCount > 0) {
+      compositionParts.push(`${reviewCount} de revisão espaçada`);
+    }
+    if (stats.breakdown.new > 0) {
+      compositionParts.push(`${stats.breakdown.new} novos`);
+    }
+  }
+  const compositionText = compositionParts.length > 0
+    ? compositionParts.join(", ")
+    : `${cards.length} cards`;
 
   if (isSessionActive) {
     return (
@@ -41,7 +68,7 @@ export function PracticeDashboard({ cards }: { cards: any[] }) {
             <>
               <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Pronto para testar seus conhecimentos?</h2>
               <p className="text-muted-foreground text-base md:text-lg max-w-md">
-                Temos {cards.length} cards relacionados aos conteúdos de hoje. 
+                Temos {cards.length} cards para hoje: {compositionText}.
                 Sua resposta calibrará o algoritmo para as revisões futuras.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 md:gap-4 pt-2 justify-center md:justify-start">

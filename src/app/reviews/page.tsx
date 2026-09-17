@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth-mock";
 import { ReviewDashboard } from "@/components/reviews/ReviewDashboard";
 import { getReviewBacklogCards } from "@/lib/reviews/get-review-backlog-size";
+import { getTodayReviewQueue } from "@/lib/srs/today-review-queue";
 
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -16,9 +17,14 @@ export default async function ReviewsPage() {
   let pendingCards: any[] = [];
   let reviewedTodayCount = 0;
   let pendingApprovalCount = 0;
+  let queueToday = 0;
 
   try {
     pendingCards = await getReviewBacklogCards(mockUserId, now);
+
+    // A fila que a sessão de fato entrega (com teto) — mesma fonte da home/practice.
+    const todayQueue = await getTodayReviewQueue(mockUserId);
+    queueToday = todayQueue.stats.total;
 
     // 2. Count cards reviewed in the last 24h
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -41,8 +47,10 @@ export default async function ReviewsPage() {
   }
 
   const stats = {
+    // Fila que a sessão entrega hoje (com teto) — número principal do cartão "Para Hoje".
+    queueToday,
+    // A dívida real, sem teto — número secundário.
     totalPending: pendingCards.length,
-    dueToday: pendingCards.length,
     reviewedToday: reviewedTodayCount,
     pendingApproval: pendingApprovalCount
   };

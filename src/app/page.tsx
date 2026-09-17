@@ -21,6 +21,8 @@ import { TodayTaskCard } from "@/components/today/TodayTaskCard";
 import { getAdaptiveStudyQueue } from "@/lib/recommendations/adaptive-scheduler";
 import { PageHeader } from "@/components/ui/page-header";
 import { getTodayReviewQueue } from "@/lib/srs/today-review-queue";
+import { getReviewBacklogSize } from "@/lib/reviews/get-review-backlog-size";
+import { getNewCardsWaitingCount } from "@/lib/reviews/get-new-cards-waiting-count";
 import { reorganizeOverdueSchedule } from "@/lib/scheduler";
 import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
 import { NextDayStudySession } from "@/components/today/NextDayStudySession";
@@ -40,6 +42,8 @@ export default async function Dashboard() {
   const todayEnd = todayRange.end;
 
   let unifiedData;
+  let reviewBacklogSize = 0;
+  let newCardsWaitingCount = 0;
   let subjectsCount = 0;
   let materialsCount = 0;
   let blocksCount = 0;
@@ -52,6 +56,8 @@ export default async function Dashboard() {
   try {
     const [
       unifiedDataRes,
+      reviewBacklogSizeRes,
+      newCardsWaitingCountRes,
       subjectsCountRes,
       materialsCountRes,
       blocksCountRes,
@@ -61,6 +67,8 @@ export default async function Dashboard() {
       activeScheduleRes
     ] = await Promise.all([
       getTodayReviewQueue(userId),
+      getReviewBacklogSize(userId),
+      getNewCardsWaitingCount(userId),
       prisma.studySubject.count({ where: { userId } }),
       prisma.studyMaterial.count({ where: { userId } }),
       prisma.studyBlock.count({ where: { userId } }),
@@ -114,6 +122,8 @@ export default async function Dashboard() {
     ]);
 
     unifiedData = unifiedDataRes;
+    reviewBacklogSize = reviewBacklogSizeRes;
+    newCardsWaitingCount = newCardsWaitingCountRes;
     subjectsCount = subjectsCountRes;
     materialsCount = materialsCountRes;
     blocksCount = blocksCountRes;
@@ -500,8 +510,13 @@ export default async function Dashboard() {
                 <div className="space-y-1">
                   <p className="text-4xl font-black text-accent tracking-tighter">{todayStats.total}</p>
                   <p className="text-xs font-bold text-accent/60 uppercase tracking-widest">
-                    cards para praticar hoje
+                    para praticar hoje
                   </p>
+                  {(reviewBacklogSize > 0 || newCardsWaitingCount > 0) && (
+                    <p className="text-[11px] font-semibold text-muted-foreground/70">
+                      {reviewBacklogSize} represados · {newCardsWaitingCount} novos aguardando
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-bold text-muted-foreground/70">

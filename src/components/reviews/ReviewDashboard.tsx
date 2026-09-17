@@ -19,8 +19,8 @@ import Link from "next/link";
 interface ReviewDashboardProps {
   pendingCards: any[];
   stats: {
+    queueToday: number;
     totalPending: number;
-    dueToday: number;
     reviewedToday: number;
     pendingApproval: number;
   }
@@ -55,8 +55,13 @@ export function ReviewDashboard({ pendingCards, stats }: ReviewDashboardProps) {
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Para Hoje</span>
           </div>
           <div className="space-y-1">
-            <p className="text-4xl font-bold">{stats.dueToday}</p>
-            <p className="text-sm text-muted-foreground">Flashcards aguardando revisão</p>
+            <p className="text-4xl font-bold">{stats.queueToday}</p>
+            <p className="text-sm text-muted-foreground">para praticar hoje</p>
+            {stats.totalPending > stats.queueToday && (
+              <p className="text-xs font-semibold text-muted-foreground/70">
+                {stats.totalPending} represados no total
+              </p>
+            )}
           </div>
         </div>
 
@@ -89,11 +94,11 @@ export function ReviewDashboard({ pendingCards, stats }: ReviewDashboardProps) {
 
       <div className="bg-accent/5 border border-accent/10 rounded-3xl md:rounded-[2.5rem] p-6 md:p-10 flex flex-col md:flex-row items-center gap-6 md:gap-10">
         <div className="flex-1 space-y-4 text-center md:text-left">
-          {stats.dueToday > 0 ? (
+          {stats.queueToday > 0 ? (
             <>
               <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Sua mente está pronta?</h2>
               <p className="text-muted-foreground text-base md:text-lg max-w-md">
-                O algoritmo selecionou os {stats.dueToday} flashcards que você está prestes a esquecer. 
+                A sessão de hoje tem {stats.queueToday} flashcards prontos para você revisar.
                 Revise agora para fortalecer a conexão neural.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 md:gap-4 pt-2 justify-center md:justify-start">

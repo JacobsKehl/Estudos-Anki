@@ -19,6 +19,7 @@ interface ProfileProgressCardsProps {
   totalBlocks: number;
   reviewedFlashcards: number;
   pendingFlashcardsToday: number;
+  newCardsWaitingCount: number;
   scheduleProgress: number; // Percentual 0-100
 }
 
@@ -29,6 +30,7 @@ export function ProfileProgressCards({
   totalBlocks,
   reviewedFlashcards,
   pendingFlashcardsToday,
+  newCardsWaitingCount,
   scheduleProgress
 }: ProfileProgressCardsProps) {
   
@@ -174,6 +176,11 @@ export function ProfileProgressCards({
                 </span>
                 <span className="text-[10px] text-muted-foreground font-bold">pendentes</span>
               </div>
+              {newCardsWaitingCount > 0 && (
+                <p className="text-[10px] text-muted-foreground font-semibold">
+                  {newCardsWaitingCount} novos aguardando
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

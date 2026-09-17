@@ -11,11 +11,13 @@ export default async function PracticePage({ searchParams }: { searchParams: { b
   const { blockId, blockIds, source } = await searchParams;
 
   let practiceCards: any[] = [];
+  let practiceStats: Awaited<ReturnType<typeof getTodayReviewQueue>>["stats"] | undefined;
 
   try {
     if (source === "today") {
-      const { cards } = await getTodayReviewQueue(mockUserId);
+      const { cards, stats } = await getTodayReviewQueue(mockUserId);
       practiceCards = cards;
+      practiceStats = stats;
     } else {
       let ids: string[] = [];
       if (blockId) ids.push(blockId);
@@ -45,7 +47,7 @@ export default async function PracticePage({ searchParams }: { searchParams: { b
 
   return (
     <div className="space-y-8 max-w-6xl animate-in fade-in duration-700 slide-in-from-bottom-4 pb-20">
-      <PracticeDashboard cards={practiceCards} />
+      <PracticeDashboard cards={practiceCards} stats={practiceStats} />
     </div>
   );
 }

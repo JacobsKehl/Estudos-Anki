@@ -23,6 +23,7 @@ interface ProfileClientProps {
     totalBlocks: number;
     reviewedFlashcards: number;
     pendingFlashcardsToday: number;
+    newCardsWaitingCount: number;
     scheduleProgress: number;
     remainingBlockMinutes: number;
   };
@@ -101,6 +102,7 @@ export function ProfileClient({ userEmail, stats, authData }: ProfileClientProps
           totalBlocks={stats.totalBlocks}
           reviewedFlashcards={stats.reviewedFlashcards}
           pendingFlashcardsToday={stats.pendingFlashcardsToday}
+          newCardsWaitingCount={stats.newCardsWaitingCount}
           scheduleProgress={stats.scheduleProgress}
         />
 
