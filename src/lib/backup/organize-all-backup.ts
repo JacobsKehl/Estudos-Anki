@@ -21,6 +21,19 @@ export interface BackupResult {
  * Executa asserção estrita de contagem antes de permitir qualquer exclusão.
  */
 export async function createPreOrganizeAllBackup(userId: string): Promise<BackupResult> {
+  // O filesystem da Vercel é efêmero fora de /tmp, e /tmp morre com o container.
+  // Um backup gravado ali passa todas as validações e o log diz SUCESSO, mas o
+  // arquivo já não existe segundos depois da resposta HTTP voltar — é um backup
+  // que mente. Escrita destrutiva em produção só por script local, onde o
+  // backup vai para disco real. Ver AGENTS.md §5.
+  if (process.env.VERCEL === "1") {
+    throw new Error(
+      "[BACKUP ERROR] Backup não pode ser gravado em ambiente serverless: o filesystem é " +
+      "efêmero e o arquivo morre com o container. Escrita destrutiva em produção só por " +
+      "script local, onde o backup vai para disco real. Ver AGENTS.md §5."
+    );
+  }
+
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const label = `pre-organize-all-reset-${timestamp}`;
 
@@ -105,18 +118,11 @@ export async function createPreOrganizeAllBackup(userId: string): Promise<Backup
     throw new Error("[BACKUP ERROR] Snapshot gerado está vazio ou truncado.");
   }
 
-  // 4. Gravação com fallback seguro de diretório
-  let backupDir = path.join(process.cwd(), "backups", "json");
-  try {
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-  } catch {
-    // Fallback para /tmp se process.cwd() for read-only (serverless)
-    backupDir = path.join("/tmp", "backups", "json");
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
+  // 4. Gravação em disco real. Sem fallback para /tmp: se process.cwd() não for
+  // gravável fora da Vercel, é um problema real que deve estourar, não ser contornado.
+  const backupDir = path.join(process.cwd(), "backups", "json");
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
   }
 
   const backupPath = path.join(backupDir, `${label}.json`);
