@@ -253,8 +253,10 @@ export async function getGlobalMetrics(userId: string) {
   // Total summary
   const summary = {
     totalSubjects: subjectsMetrics.length,
-    totalBlocks: subjectsMetrics.reduce((acc, s) => acc + s.metrics.totalBlocks, 0),
-    completedBlocks: subjectsMetrics.reduce((acc, s) => acc + s.metrics.completedBlocks, 0),
+    // Conteúdo principal = os 5 PDFs do CFC — mesmo escopo de globalProgress
+    // (eligibleBlocks acima), não a soma bruta de todas as matérias.
+    totalBlocks: totalTheory,
+    completedBlocks: completedTheory,
     totalFlashcards: subjectsMetrics.reduce((acc, s) => acc + s.metrics.totalFlashcards, 0),
     approvedFlashcards: subjectsMetrics.reduce((acc, s) => acc + s.metrics.approvedFlashcards, 0),
     dueReviews: subjectsMetrics.reduce((acc, s) => acc + s.metrics.dueReviews, 0),

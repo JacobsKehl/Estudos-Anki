@@ -26,7 +26,7 @@ jest.mock("@/lib/prisma", () => ({
     studySessionLog: { findMany: jest.fn() },
     studyScheduleItem: { findMany: jest.fn() },
     questionReviewTask: { findMany: jest.fn() },
-    studyBlock: { findMany: jest.fn() },
+    studyBlock: { findMany: jest.fn(), findFirst: jest.fn() },
   },
 }));
 
@@ -80,5 +80,30 @@ describe("getGlobalMetrics — globalProgress escopado por CFC_FILE_NAMES", () =
     const result = await getGlobalMetrics(userId);
 
     expect(result.summary.globalProgress).toBe(54); // Math.round(48/89*100)
+  });
+
+  it("summary.totalBlocks/completedBlocks são 89/48 (escopo CFC) — não a soma bruta de todas as matérias", async () => {
+    // Uma matéria não-CFC com 500 blocos "some.subject.metrics.totalBlocks" —
+    // se summary ainda somasse subjectsMetrics.reduce(...), veríamos 500 aqui.
+    mockPrisma.studySubject.findMany.mockResolvedValue([{ id: "subj-nao-cfc", name: "Língua Portuguesa" }]);
+    mockPrisma.studySubject.findFirst.mockResolvedValue({
+      id: "subj-nao-cfc",
+      materials: [],
+      studyBlocks: Array.from({ length: 500 }, () => ({ theoryStatus: "NOT_STARTED" })),
+      flashcards: [],
+    });
+    mockPrisma.flashcardReview.findMany.mockResolvedValue([]);
+    mockPrisma.studyBlock.findFirst.mockResolvedValue(null);
+
+    const cfcBlocks = [
+      ...Array.from({ length: 48 }, () => ({ theoryStatus: "COMPLETED" })),
+      ...Array.from({ length: 41 }, () => ({ theoryStatus: "NOT_STARTED" })),
+    ];
+    mockPrisma.studyBlock.findMany.mockResolvedValue(cfcBlocks);
+
+    const result = await getGlobalMetrics(userId);
+
+    expect(result.summary.totalBlocks).toBe(89);
+    expect(result.summary.completedBlocks).toBe(48);
   });
 });
