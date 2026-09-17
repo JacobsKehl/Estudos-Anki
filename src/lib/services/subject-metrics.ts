@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getTodayRangeSP } from "@/lib/date-utils";
+import { CFC_FILE_NAMES } from "@/lib/scheduler/config";
 
 export type SubjectHealth = 'EXCELLENT' | 'GOOD' | 'ATTENTION' | 'CRITICAL';
 
@@ -188,14 +189,16 @@ export async function getGlobalMetrics(userId: string) {
       where: { userId, status: "COMPLETED", completedAt: { not: null } },
       select: { completedAt: true }
     }),
+    // Conteúdo principal = os 5 PDFs do CFC (decisão do Henrique, 17/09/2026).
+    // Mesma lista branca que o agendador e o guardião usam — nunca um filtro
+    // próprio por studyPriority/materialRole, que é mais largo e deixava
+    // 436 blocos não-CFC (Português, Direito Civil, "Estratégia") entrarem
+    // na conta.
     prisma.studyBlock.findMany({
       where: {
         userId,
-        subject: {
-          studyPriority: { in: ["PRIMARY", "ACTIVE"] }
-        },
         material: {
-          materialRole: { not: "SUPPORT_MATERIAL" }
+          originalFileName: { in: [...CFC_FILE_NAMES] }
         }
       },
       select: {
