@@ -69,11 +69,18 @@ via `CFC_FILE_NAMES`, então quando o pool CFC esgota, os dias seguintes simples
 ## 2. O guardião
 
 ```bash
-node scripts/run-guard-test.js     # → tem que dar 8/8
+node scripts/run-guard-test.js     # → tem que dar 11/12
 ```
 
 Roda `src/__tests__/cfc/block-blueprint-integrity.test.ts` com `RUN_CFC_BLUEPRINT_DB_TEST=true`.
 **Rode antes e depois de qualquer mudança no agendador ou no acervo.**
+
+🔴 **A 12ª asserção (EXCLUDED↔ATIVO, P2) está vermelha de propósito — não conserte o teste.**
+Ela encontrou **34 pares reais** de `StudyBlock` EXCLUDED que compartilham `(materialId,
+pageStart, pageEnd)` com um bloco ATIVO (mesmo conteúdo, duas linhas). É dívida de dados
+verdadeira, registrada e não resolvida ainda — resolver exige script local com backup e
+`--dry-run` (regras 4/5), não é tarefa de teste. **11/12 é o estado esperado até essa limpeza
+acontecer.** Se o número cair para 10 ou menos, algo novo quebrou.
 
 ## 3. Regra Zero — teste que nunca foi visto reprovando não conta
 
