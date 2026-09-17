@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth-mock";
 import { PracticeDashboard } from "@/components/flashcards/PracticeDashboard";
 
-import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
+import { getTodayReviewQueue } from "@/lib/srs/today-review-queue";
 
 export default async function PracticePage({ searchParams }: { searchParams: { blockId?: string, blockIds?: string, source?: string } }) {
   const mockUserId = await getCurrentUserId();
@@ -14,7 +14,7 @@ export default async function PracticePage({ searchParams }: { searchParams: { b
 
   try {
     if (source === "today") {
-      const { cards } = await getUnifiedTodayCards(mockUserId);
+      const { cards } = await getTodayReviewQueue(mockUserId);
       practiceCards = cards;
     } else {
       let ids: string[] = [];

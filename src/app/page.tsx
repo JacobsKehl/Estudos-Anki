@@ -20,7 +20,7 @@ import Link from "next/link";
 import { TodayTaskCard } from "@/components/today/TodayTaskCard";
 import { getAdaptiveStudyQueue } from "@/lib/recommendations/adaptive-scheduler";
 import { PageHeader } from "@/components/ui/page-header";
-import { getUnifiedTodayCards } from "@/lib/srs/srs-utils";
+import { getTodayReviewQueue } from "@/lib/srs/today-review-queue";
 import { reorganizeOverdueSchedule } from "@/lib/scheduler";
 import { DailyGoalAlert } from "@/components/today/DailyGoalAlert";
 import { NextDayStudySession } from "@/components/today/NextDayStudySession";
@@ -60,7 +60,7 @@ export default async function Dashboard() {
       initialTodayItemsRes,
       activeScheduleRes
     ] = await Promise.all([
-      getUnifiedTodayCards(userId),
+      getTodayReviewQueue(userId),
       prisma.studySubject.count({ where: { userId } }),
       prisma.studyMaterial.count({ where: { userId } }),
       prisma.studyBlock.count({ where: { userId } }),
@@ -124,7 +124,7 @@ export default async function Dashboard() {
   } catch (error) {
     console.error("Error loading dashboard pre-fetch:", error);
     // Fallback if anything fails
-    unifiedData = await getUnifiedTodayCards(userId);
+    unifiedData = await getTodayReviewQueue(userId);
   }
 
   const { stats: todayStats } = unifiedData;
