@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth-mock";
 import { ProfileClient } from "@/components/profile/ProfileClient";
 import { getSessionUser } from "@/lib/supabase-server";
+import { getReviewBacklogSize } from "@/lib/reviews/get-review-backlog-size";
 
 export const dynamic = "force-dynamic";
 
@@ -78,13 +79,7 @@ export default async function ProfilePage() {
 
   // 4. Buscar flashcards
   const now = new Date();
-  const pendingFlashcardsToday = await prisma.flashcard.count({
-    where: {
-      userId,
-      status: "APPROVED",
-      nextReviewAt: { lte: now }
-    }
-  });
+  const pendingFlashcardsToday = await getReviewBacklogSize(userId, now);
 
   // 5. Buscar revisões do usuário para calcular dias estudados e sequência (streak)
   const reviews = await prisma.flashcardReview.findMany({
