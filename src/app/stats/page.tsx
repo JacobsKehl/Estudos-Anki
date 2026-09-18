@@ -1,4 +1,5 @@
 import { getGlobalMetrics } from "@/lib/services/subject-metrics";
+import { getEditalVerticalizadoPorMateria } from "@/lib/services/edital-verticalizado";
 import { getCurrentUserId } from "@/lib/auth-mock";
 import { Trophy } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,7 +10,10 @@ export const dynamic = "force-dynamic";
 
 export default async function StatsPage() {
   const userId = await getCurrentUserId();
-  const metrics = await getGlobalMetrics(userId);
+  const [metrics, editalSections] = await Promise.all([
+    getGlobalMetrics(userId),
+    getEditalVerticalizadoPorMateria(userId),
+  ]);
 
   let goal = "Estudos";
   try {
@@ -32,7 +36,7 @@ export default async function StatsPage() {
         description={`Acompanhe sua consistência e evolução rumo a: ${goal}.`}
       />
 
-      <StudyStats data={metrics} />
+      <StudyStats data={metrics} editalSections={editalSections} />
     </div>
   );
 }
