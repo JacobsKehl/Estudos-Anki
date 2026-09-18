@@ -16,13 +16,15 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { EditalSubjectSection } from "@/lib/services/edital-verticalizado";
 
 interface StudyStatsProps {
   data: any;
+  editalSections: EditalSubjectSection[];
 }
 
-export function StudyStats({ data }: StudyStatsProps) {
-  const { summary, heatmap, mastery, subjects } = data;
+export function StudyStats({ data, editalSections }: StudyStatsProps) {
+  const { summary, heatmap, mastery } = data;
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -171,7 +173,7 @@ export function StudyStats({ data }: StudyStatsProps) {
         </Card>
       </div>
 
-      {/* ── Subjects Progress List ────────────────────────────────────────── */}
+      {/* ── Subjects Progress List (edital verticalizado, etapa A) ─────────── */}
       <Card className="rounded-[2.5rem] border-border/40 shadow-sm overflow-hidden">
         <CardHeader className="p-8 pb-4">
           <CardTitle className="text-xl font-bold flex items-center gap-3">
@@ -180,26 +182,70 @@ export function StudyStats({ data }: StudyStatsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-8 pt-0">
-          <div className="space-y-6">
-            {subjects.map((subject: any) => (
-              <div key={subject.id} className="space-y-2">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <h4 className="font-bold text-sm">{subject.name}</h4>
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                      {subject.metrics.completedBlocks} de {subject.metrics.totalBlocks} blocos concluídos
-                    </p>
+          <div className="space-y-4">
+            {editalSections.map((section) => {
+              const progress = section.chaptersCount > 0
+                ? Math.round((section.chaptersStudiedCount / section.chaptersCount) * 100)
+                : 0;
+              return (
+                <details key={section.canonicalKey} className="group">
+                  <summary className="list-none cursor-pointer space-y-2 [&::-webkit-details-marker]:hidden">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <h4 className="font-bold text-sm">
+                          {section.displayName}
+                          <span className="ml-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                            · peso {section.weight}
+                          </span>
+                        </h4>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                          {section.topicsCount} tópicos no edital · {section.chaptersCount} capítulos no material · {section.chaptersStudiedCount} estudados
+                        </p>
+                      </div>
+                      <span className="text-xs font-black text-accent">{progress}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent transition-all duration-1000 ease-out"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </summary>
+
+                  <div className="mt-4 pt-4 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Edital</p>
+                      <ol className="space-y-1.5 text-xs">
+                        {section.topics.map((topic) => (
+                          <li key={`${topic.topicCode}-${topic.orderIndex}`} className="text-foreground/80">
+                            <span className="font-bold">{topic.topicCode}</span> {topic.title}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Seu Material</p>
+                      <ol className="space-y-1.5 text-xs">
+                        {section.chapters.map((chapter) => (
+                          <li key={chapter.id} className="flex items-center justify-between gap-2 text-foreground/80">
+                            <span>
+                              {chapter.title} <span className="text-muted-foreground">pp. {chapter.pageStart}
+                              {chapter.pageEnd !== chapter.pageStart ? `–${chapter.pageEnd}` : ""}</span>
+                            </span>
+                            <Badge variant={chapter.theoryStatus === "COMPLETED" ? "default" : "outline"} className="text-[9px] shrink-0">
+                              {chapter.theoryStatus === "COMPLETED" ? "estudado" : "a estudar"}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
                   </div>
-                  <span className="text-xs font-black text-accent">{subject.metrics.progress}%</span>
-                </div>
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-accent transition-all duration-1000 ease-out" 
-                    style={{ width: `${subject.metrics.progress}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+                  <p className="text-[10px] text-muted-foreground italic mt-3">
+                    A correspondência entre capítulo e tópico ainda não foi conferida — as duas colunas são paralelas.
+                  </p>
+                </details>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
